@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: slidesage-backend:latest
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: slidesage-frontend:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    restart: unless-stopped
