@@ -94,11 +94,8 @@ def generate_presentation():
         # Generate presentation structure
         presentation_data = ai.generate_presentation_structure(prompt, slide_count)
         
-        # Extract title from presentation data (use first slide title or default)
-        title = 'Untitled Presentation'
-        if presentation_data and 'slides' in presentation_data and len(presentation_data['slides']) > 0:
-            first_slide = presentation_data['slides'][0]
-            title = first_slide.get('title', 'Untitled Presentation')
+        # Extract title from presentation data (title is extracted from first slide in ai.py)
+        title = presentation_data.get('title', 'Untitled Presentation') if presentation_data else 'Untitled Presentation'
         
         # Save to database
         presentation = Presentation(

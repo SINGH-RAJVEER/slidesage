@@ -66,7 +66,6 @@ class AIService:
         
         Required JSON structure (MUST match exactly):
         {
-          "title": "string",
           "theme": "string", 
           "slides": [
             {
@@ -301,11 +300,28 @@ class AIService:
 
             parsed_content = json.loads(content)
 
-            # Validate and ensure title is a string
-            if 'title' not in parsed_content or not isinstance(parsed_content.get('title'), str):
-                parsed_content['title'] = "Untitled Presentation"
-            elif not parsed_content['title'].strip():
-                parsed_content['title'] = "Untitled Presentation"
+            # Extract title from first slide and add it to the presentation
+            extracted_title = "Untitled Presentation"
+            if 'slides' in parsed_content and len(parsed_content['slides']) > 0:
+                first_slide = parsed_content['slides'][0]
+                if 'title' in first_slide and first_slide['title']:
+                    extracted_title = first_slide['title']
+                elif 'html' in first_slide:
+                    # Extract from HTML
+                    import re
+                    html = first_slide['html']
+                    # Try to find h1 or h2 with id="slide-title"
+                    title_match = re.search(r'<h[12][^>]*id=["\']slide-title["\'][^>]*>([^<]+)</h[12]>', html)
+                    if title_match:
+                        extracted_title = title_match.group(1).strip()
+                    else:
+                        # Fallback: find any h1 or h2
+                        header_match = re.search(r'<h[12][^>]*>([^<]+)</h[12]>', html)
+                        if header_match:
+                            extracted_title = header_match.group(1).strip()
+            
+            # Add the extracted title to the parsed content
+            parsed_content['title'] = extracted_title
 
             if 'slides' in parsed_content:
                 parsed_content['totalSlides'] = len(parsed_content['slides'])
