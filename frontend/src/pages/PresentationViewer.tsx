@@ -51,6 +51,7 @@ const PresentationViewer: React.FC = () => {
   const [customInterval, setCustomInterval] = useState("5");
   const customInputRef = useRef<HTMLInputElement>(null);
   const slideContainerRef = useRef<HTMLDivElement | null>(null);
+  const [visibleSlide, setVisibleSlide] = useState(0);
 
   const { currentTemplate, changeTemplate } = useTemplate();
 
@@ -84,19 +85,46 @@ const PresentationViewer: React.FC = () => {
     }
   }, [currentSlide]);
 
+  // IntersectionObserver to track which slide is centered/visible
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.9) {
+            const slideId = entry.target.id;
+            const slideIndex = parseInt(slideId.split("-")[1]);
+            setVisibleSlide(slideIndex);
+          }
+        });
+      },
+      {
+        root: slideContainerRef.current,
+        threshold: [0.9], // Trigger when 90% of slide is visible
+        rootMargin: "0px",
+      }
+    );
+
+    const slideElements = document.querySelectorAll(".slide-carousel__item");
+    slideElements.forEach((slide) => observer.observe(slide));
+
+    return () => {
+      slideElements.forEach((slide) => observer.unobserve(slide));
+    };
+  }, [presentationState]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Primary navigation: Left/Right for prev/next; Up/Down to jump to first/last
       if (e.key === "ArrowLeft") {
-        prevSlide();
+        prevSlide("auto");
       } else if (e.key === "ArrowRight") {
-        nextSlide();
+        nextSlide("auto");
       } else if (e.key === "ArrowUp") {
         // Jump to first slide
-        skipToFirstSlide();
+        skipToFirstSlide("auto");
       } else if (e.key === "ArrowDown") {
         // Jump to last slide
-        skipToLastSlide();
+        skipToLastSlide("auto");
       } else if (e.key === "Escape") {
         if (isFullscreen) {
           document.exitFullscreen();
@@ -109,9 +137,9 @@ const PresentationViewer: React.FC = () => {
         }
         // Home/End to jump to first/last slide (also supported)
       } else if (e.key === "Home") {
-        skipToFirstSlide();
+        skipToFirstSlide("auto");
       } else if (e.key === "End") {
-        skipToLastSlide();
+        skipToLastSlide("auto");
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -131,14 +159,14 @@ const PresentationViewer: React.FC = () => {
     return null;
   }
 
-  const nextSlide = () => {
+  const nextSlide = (scrollBehavior: ScrollBehavior = "smooth") => {
     if (currentSlide < presentationState.slides.length - 1) {
       setCurrentSlide(currentSlide + 1);
       setIsPlaying(false);
       const slideElement = document.getElementById(`slide-${currentSlide + 1}`);
       if (slideElement) {
         slideElement.scrollIntoView({
-          behavior: "smooth",
+          behavior: scrollBehavior,
           inline: "center",
           block: "nearest",
         });
@@ -146,14 +174,14 @@ const PresentationViewer: React.FC = () => {
     }
   };
 
-  const prevSlide = () => {
+  const prevSlide = (scrollBehavior: ScrollBehavior = "smooth") => {
     if (currentSlide > 0) {
       setCurrentSlide(currentSlide - 1);
       setIsPlaying(false);
       const slideElement = document.getElementById(`slide-${currentSlide - 1}`);
       if (slideElement) {
         slideElement.scrollIntoView({
-          behavior: "smooth",
+          behavior: scrollBehavior,
           inline: "center",
           block: "nearest",
         });
@@ -184,20 +212,20 @@ const PresentationViewer: React.FC = () => {
     }
   };
 
-  const skipToFirstSlide = () => {
+  const skipToFirstSlide = (scrollBehavior: ScrollBehavior = "smooth") => {
     setCurrentSlide(0);
     setIsPlaying(false);
     const slideElement = document.getElementById("slide-0");
     if (slideElement) {
       slideElement.scrollIntoView({
-        behavior: "smooth",
+        behavior: scrollBehavior,
         inline: "center",
         block: "nearest",
       });
     }
   };
 
-  const skipToLastSlide = () => {
+  const skipToLastSlide = (scrollBehavior: ScrollBehavior = "smooth") => {
     setCurrentSlide(presentationState.slides.length - 1);
     setIsPlaying(false);
     const slideElement = document.getElementById(
@@ -205,7 +233,7 @@ const PresentationViewer: React.FC = () => {
     );
     if (slideElement) {
       slideElement.scrollIntoView({
-        behavior: "smooth",
+        behavior: scrollBehavior,
         inline: "center",
         block: "nearest",
       });
@@ -480,41 +508,60 @@ const PresentationViewer: React.FC = () => {
               role="listbox"
               aria-label="Slides carousel"
             >
-              {presentationState.slides.map((slide, idx) => (
-                <div
-                  key={idx}
-                  id={`slide-${idx}`}
-                  role="option"
-                  aria-selected={currentSlide === idx}
-                  className="slide-carousel__item"
-                  style={{ width: "75vw", minWidth: "75vw", maxWidth: "75vw" }}
-                  onClick={() => {
-                    if (idx !== currentSlide) {
-                      setCurrentSlide(idx);
-                      const slideElement = document.getElementById(
-                        `slide-${idx}`
-                      );
-                      if (slideElement) {
-                        slideElement.scrollIntoView({
-                          behavior: "smooth",
-                          inline: "center",
-                          block: "nearest",
-                        });
+              {presentationState.slides.map((slide, idx) => {
+                const isFirstSlide = idx === 0;
+                const isLastSlide = idx === presentationState.slides.length - 1;
+                const marginLeft = isFirstSlide
+                  ? "calc((100vw - 75vw) / 2 - 2rem)"
+                  : "0";
+                const marginRight = isLastSlide
+                  ? "calc((100vw - 75vw) / 2 - 2rem)"
+                  : "0";
+                const isActive = visibleSlide === idx;
+
+                return (
+                  <div
+                    key={idx}
+                    id={`slide-${idx}`}
+                    role="option"
+                    aria-selected={isActive}
+                    className="slide-carousel__item"
+                    data-active={isActive}
+                    style={{
+                      width: "75vw",
+                      minWidth: "75vw",
+                      maxWidth: "75vw",
+                      marginLeft,
+                      marginRight,
+                    }}
+                    onClick={() => {
+                      if (idx !== currentSlide) {
+                        setCurrentSlide(idx);
+                        const slideElement = document.getElementById(
+                          `slide-${idx}`
+                        );
+                        if (slideElement) {
+                          slideElement.scrollIntoView({
+                            behavior: "smooth",
+                            inline: "center",
+                            block: "nearest",
+                          });
+                        }
                       }
-                    }
-                  }}
-                >
-                  <div className="w-full aspect-video flex-shrink-0 cursor-pointer">
-                    <Card
-                      className={`w-full h-full rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 flex items-stretch ${
-                        currentSlide === idx ? "ring-2 ring-blue-500" : ""
-                      }`}
-                    >
-                      {renderSlideContent(slide, currentSlide === idx)}
-                    </Card>
+                    }}
+                  >
+                    <div className="w-full aspect-video flex-shrink-0 cursor-pointer">
+                      <Card
+                        className={`w-full h-full rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 flex items-stretch ${
+                          currentSlide === idx ? "ring-2 ring-blue-500" : ""
+                        }`}
+                      >
+                        {renderSlideContent(slide, currentSlide === idx)}
+                      </Card>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -528,7 +575,7 @@ const PresentationViewer: React.FC = () => {
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-2">
               <Button
                 variant="outline"
-                onClick={skipToFirstSlide}
+                onClick={() => skipToFirstSlide()}
                 disabled={currentSlide === 0}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
@@ -536,7 +583,7 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={prevSlide}
+                onClick={() => prevSlide()}
                 disabled={currentSlide === 0}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
@@ -545,7 +592,7 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={nextSlide}
+                onClick={() => nextSlide()}
                 disabled={currentSlide === presentationState.slides.length - 1}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
@@ -554,7 +601,7 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={skipToLastSlide}
+                onClick={() => skipToLastSlide()}
                 disabled={currentSlide === presentationState.slides.length - 1}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
@@ -583,46 +630,58 @@ const PresentationViewer: React.FC = () => {
             style={{ minHeight: 40 }}
           >
             <div className="slide-thumbnails-container flex gap-3 overflow-x-auto py-6 px-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-              {presentationState.slides.map((slide, index) => (
-                <button
-                  key={index}
-                  data-slide-index={index}
-                  onClick={() => {
-                    setCurrentSlide(index);
-                    setIsPlaying(false);
-                    const slideElement = document.getElementById(
-                      `slide-${index}`
-                    );
-                    if (slideElement) {
-                      slideElement.scrollIntoView({
-                        behavior: "smooth",
-                        block: "center",
-                      });
-                    }
-                  }}
-                  className={`w-20 h-14 border-2 rounded-xl flex-shrink-0 transition-all duration-300
-                    ${
-                      currentSlide === index
-                        ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/25 scale-110"
-                        : "border-white/20 bg-white/10 hover:border-white/40 hover:bg-white/20"
-                    }
-                    backdrop-blur-sm relative`}
-                >
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-sm text-white font-medium">
-                      {index + 1}
-                    </span>
-                    {slide.type === "chart" && (
-                      <div className="absolute top-0 right-0 w-2 h-2 bg-green-500 rounded-full"></div>
-                    )}
-                    {(slide as HtmlSlide).html?.includes(
-                      'id="slide-table"'
-                    ) && (
-                      <div className="absolute top-0 left-0 w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    )}
-                  </div>
-                </button>
-              ))}
+              {presentationState.slides.map((slide, index) => {
+                const isFirstThumbnail = index === 0;
+                const isLastThumbnail =
+                  index === presentationState.slides.length - 1;
+                const marginLeft = isFirstThumbnail ? "calc(50vw - 40px)" : "0";
+                const marginRight = isLastThumbnail ? "calc(50vw - 40px)" : "0";
+
+                return (
+                  <button
+                    key={index}
+                    data-slide-index={index}
+                    onClick={() => {
+                      setCurrentSlide(index);
+                      setIsPlaying(false);
+                      const slideElement = document.getElementById(
+                        `slide-${index}`
+                      );
+                      if (slideElement) {
+                        slideElement.scrollIntoView({
+                          behavior: "smooth",
+                          block: "center",
+                        });
+                      }
+                    }}
+                    style={{
+                      marginLeft,
+                      marginRight,
+                    }}
+                    className={`w-20 h-14 border-2 rounded-xl flex-shrink-0 transition-all duration-300
+                      ${
+                        currentSlide === index
+                          ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/25 scale-110"
+                          : "border-white/20 bg-white/10 hover:border-white/40 hover:bg-white/20"
+                      }
+                      backdrop-blur-sm relative`}
+                  >
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-sm text-white font-medium">
+                        {index + 1}
+                      </span>
+                      {slide.type === "chart" && (
+                        <div className="absolute top-0 right-0 w-2 h-2 bg-green-500 rounded-full"></div>
+                      )}
+                      {(slide as HtmlSlide).html?.includes(
+                        'id="slide-table"'
+                      ) && (
+                        <div className="absolute top-0 left-0 w-2 h-2 bg-yellow-500 rounded-full"></div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -756,7 +815,7 @@ const PresentationViewer: React.FC = () => {
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
-                onClick={skipToFirstSlide}
+                onClick={() => skipToFirstSlide()}
                 disabled={currentSlide === 0}
                 className="text-white hover:bg-white/20"
               >
@@ -764,7 +823,7 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="ghost"
-                onClick={prevSlide}
+                onClick={() => prevSlide()}
                 disabled={currentSlide === 0}
                 className="text-white hover:bg-white/20"
               >
@@ -772,7 +831,7 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="ghost"
-                onClick={nextSlide}
+                onClick={() => nextSlide()}
                 disabled={currentSlide === presentationState.slides.length - 1}
                 className="text-white hover:bg-white/20"
               >
@@ -780,7 +839,7 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="ghost"
-                onClick={skipToLastSlide}
+                onClick={() => skipToLastSlide()}
                 disabled={currentSlide === presentationState.slides.length - 1}
                 className="text-white hover:bg-white/20"
               >
