@@ -71,42 +71,16 @@ const PresentationViewer: React.FC = () => {
   }, [currentSlide, presentationState, isPlaying]);
 
   useEffect(() => {
-    const thumbnailContainer = document.querySelector(
-      ".slide-thumbnails-container"
-    );
     const currentThumbnail = document.querySelector(
       `[data-slide-index="${currentSlide}"]`
     );
 
-    if (thumbnailContainer && currentThumbnail) {
-      const containerRect = thumbnailContainer.getBoundingClientRect();
-      const thumbnailRect = currentThumbnail.getBoundingClientRect();
-
-      const thumbnailLeft = thumbnailRect.left - containerRect.left;
-      const thumbnailRight = thumbnailLeft + thumbnailRect.width;
-
-      const isOutsideLeft = thumbnailLeft < 0;
-      const isOutsideRight = thumbnailRight > containerRect.width;
-
-      if (isOutsideLeft || isOutsideRight) {
-        const targetScrollLeft =
-          thumbnailContainer.scrollLeft +
-          thumbnailLeft -
-          containerRect.width / 2 +
-          thumbnailRect.width / 2;
-
-        const maxScrollLeft =
-          thumbnailContainer.scrollWidth - containerRect.width;
-        const clampedScrollLeft = Math.max(
-          0,
-          Math.min(targetScrollLeft, maxScrollLeft)
-        );
-
-        thumbnailContainer.scrollTo({
-          left: clampedScrollLeft,
-          behavior: "smooth",
-        });
-      }
+    if (currentThumbnail) {
+      currentThumbnail.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
     }
   }, [currentSlide]);
 
@@ -291,7 +265,7 @@ const PresentationViewer: React.FC = () => {
     setCurrentSlide(newCurrent);
   };
 
-  const renderSlideContent = (slide: Slide) => {
+  const renderSlideContent = (slide: Slide, isActive: boolean = true) => {
     const template = AVAILABLE_TEMPLATES.find((t) => t.id === currentTemplate);
     const textColor = template?.styles.slideContent.color || "white";
 
@@ -307,6 +281,7 @@ const PresentationViewer: React.FC = () => {
               chartConfig={chartSlide.chartConfig}
               className="w-full h-full"
               textColor={textColor}
+              isActive={isActive}
             />
           </div>
         </TemplateApplier>
@@ -341,15 +316,15 @@ const PresentationViewer: React.FC = () => {
         className={`${
           isFullscreen
             ? "h-screen w-screen flex flex-col"
-            : "max-w-7xl mx-auto h-full flex flex-col pt-3"
+            : "max-w-[95vw] mx-auto h-full flex flex-col pt-3"
         }`}
         style={{ height: "100vh", minHeight: "100vh", maxHeight: "100vh" }}
       >
         {/* Header Controls */}
         {showControls && !isFullscreen && (
           <div
-            className="relative flex items-center justify-between bg-white/10 backdrop-blur-md rounded-2xl px-3 py-2 border border-white/20 flex-shrink-0"
-            style={{ minHeight: 40, fontSize: "0.95rem" }}
+            className="relative flex items-center justify-between bg-white/10 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/20 flex-shrink-0"
+            style={{ minHeight: 48, fontSize: "1rem" }}
           >
             <div className="flex items-center gap-4">
               <Button
@@ -512,14 +487,30 @@ const PresentationViewer: React.FC = () => {
                   role="option"
                   aria-selected={currentSlide === idx}
                   className="slide-carousel__item"
+                  style={{ width: "75vw", minWidth: "75vw", maxWidth: "75vw" }}
+                  onClick={() => {
+                    if (idx !== currentSlide) {
+                      setCurrentSlide(idx);
+                      const slideElement = document.getElementById(
+                        `slide-${idx}`
+                      );
+                      if (slideElement) {
+                        slideElement.scrollIntoView({
+                          behavior: "smooth",
+                          inline: "center",
+                          block: "nearest",
+                        });
+                      }
+                    }
+                  }}
                 >
-                  <div className="w-full max-w-[90vw] mx-auto aspect-video flex-shrink-0">
+                  <div className="w-full aspect-video flex-shrink-0 cursor-pointer">
                     <Card
                       className={`w-full h-full rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 flex items-stretch ${
                         currentSlide === idx ? "ring-2 ring-blue-500" : ""
                       }`}
                     >
-                      {renderSlideContent(slide)}
+                      {renderSlideContent(slide, currentSlide === idx)}
                     </Card>
                   </div>
                 </div>
@@ -588,52 +579,50 @@ const PresentationViewer: React.FC = () => {
         {/* Slide Thumbnails (horizontal, below slides) */}
         {showControls && !isFullscreen && (
           <div
-            className="w-full overflow-hidden flex-shrink-0"
+            className="w-full overflow-hidden flex-shrink-0 relative"
             style={{ minHeight: 40 }}
           >
             <div className="slide-thumbnails-container flex gap-3 overflow-x-auto py-6 px-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-              <div className="flex gap-3 min-w-max mx-auto">
-                {presentationState.slides.map((slide, index) => (
-                  <button
-                    key={index}
-                    data-slide-index={index}
-                    onClick={() => {
-                      setCurrentSlide(index);
-                      setIsPlaying(false);
-                      const slideElement = document.getElementById(
-                        `slide-${index}`
-                      );
-                      if (slideElement) {
-                        slideElement.scrollIntoView({
-                          behavior: "smooth",
-                          block: "center",
-                        });
-                      }
-                    }}
-                    className={`w-20 h-14 border-2 rounded-xl flex-shrink-0 transition-all duration-300
-                      ${
-                        currentSlide === index
-                          ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/25 scale-110"
-                          : "border-white/20 bg-white/10 hover:border-white/40 hover:bg-white/20"
-                      }
-                      backdrop-blur-sm relative`}
-                  >
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-xs text-white font-medium">
-                        {index + 1}
-                      </span>
-                      {slide.type === "chart" && (
-                        <div className="absolute top-0 right-0 w-2 h-2 bg-green-500 rounded-full"></div>
-                      )}
-                      {(slide as HtmlSlide).html?.includes(
-                        'id="slide-table"'
-                      ) && (
-                        <div className="absolute top-0 left-0 w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
+              {presentationState.slides.map((slide, index) => (
+                <button
+                  key={index}
+                  data-slide-index={index}
+                  onClick={() => {
+                    setCurrentSlide(index);
+                    setIsPlaying(false);
+                    const slideElement = document.getElementById(
+                      `slide-${index}`
+                    );
+                    if (slideElement) {
+                      slideElement.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                      });
+                    }
+                  }}
+                  className={`w-20 h-14 border-2 rounded-xl flex-shrink-0 transition-all duration-300
+                    ${
+                      currentSlide === index
+                        ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/25 scale-110"
+                        : "border-white/20 bg-white/10 hover:border-white/40 hover:bg-white/20"
+                    }
+                    backdrop-blur-sm relative`}
+                >
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-sm text-white font-medium">
+                      {index + 1}
+                    </span>
+                    {slide.type === "chart" && (
+                      <div className="absolute top-0 right-0 w-2 h-2 bg-green-500 rounded-full"></div>
+                    )}
+                    {(slide as HtmlSlide).html?.includes(
+                      'id="slide-table"'
+                    ) && (
+                      <div className="absolute top-0 left-0 w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -11,15 +11,8 @@ import {
   Tooltip,
   Legend,
   RadialLinearScale,
-} from 'chart.js';
-import {
-  Bar,
-  Line,
-  Pie,
-  Doughnut,
-  Radar,
-  PolarArea,
-} from 'react-chartjs-2';
+} from "chart.js";
+import { Bar, Line, Pie, Doughnut, Radar, PolarArea } from "react-chartjs-2";
 
 // Register Chart.js components
 ChartJS.register(
@@ -36,7 +29,7 @@ ChartJS.register(
 );
 
 interface ChartData {
-  type: 'bar' | 'line' | 'pie' | 'doughnut' | 'radar' | 'polarArea';
+  type: "bar" | "line" | "pie" | "doughnut" | "radar" | "polarArea";
   data: {
     labels: string[];
     datasets: Array<{
@@ -57,19 +50,27 @@ interface ChartRendererProps {
   chartConfig: ChartData;
   className?: string;
   textColor?: string;
+  isActive?: boolean;
 }
 
-const ChartRenderer: React.FC<ChartRendererProps> = ({ 
-  chartConfig, 
+const ChartRenderer: React.FC<ChartRendererProps> = ({
+  chartConfig,
   className = "",
-  textColor = "white"
+  textColor = "white",
+  isActive = true,
 }) => {
   const defaultOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: isActive
+      ? {
+          duration: 1000,
+          easing: "easeInOutQuart" as const,
+        }
+      : false,
     plugins: {
       legend: {
-        position: 'top' as const,
+        position: "top" as const,
         labels: {
           color: textColor,
           font: {
@@ -83,35 +84,40 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         color: textColor,
         font: {
           size: 18,
-          weight: 'bold',
+          weight: "bold",
         },
       },
       tooltip: {
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
         titleColor: textColor,
         bodyColor: textColor,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
+        borderColor: "rgba(255, 255, 255, 0.2)",
         borderWidth: 1,
       },
     },
-    scales: chartConfig.type !== 'pie' && chartConfig.type !== 'doughnut' && chartConfig.type !== 'polarArea' ? {
-      x: {
-        ticks: {
-          color: textColor,
-        },
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
-        },
-      },
-      y: {
-        ticks: {
-          color: textColor,
-        },
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
-        },
-      },
-    } : {},
+    scales:
+      chartConfig.type !== "pie" &&
+      chartConfig.type !== "doughnut" &&
+      chartConfig.type !== "polarArea"
+        ? {
+            x: {
+              ticks: {
+                color: textColor,
+              },
+              grid: {
+                color: "rgba(255, 255, 255, 0.1)",
+              },
+            },
+            y: {
+              ticks: {
+                color: textColor,
+              },
+              grid: {
+                color: "rgba(255, 255, 255, 0.1)",
+              },
+            },
+          }
+        : {},
   };
 
   const mergedOptions = {
@@ -126,17 +132,17 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     };
 
     switch (chartConfig.type) {
-      case 'bar':
+      case "bar":
         return <Bar {...commonProps} />;
-      case 'line':
+      case "line":
         return <Line {...commonProps} />;
-      case 'pie':
+      case "pie":
         return <Pie {...commonProps} />;
-      case 'doughnut':
+      case "doughnut":
         return <Doughnut {...commonProps} />;
-      case 'radar':
+      case "radar":
         return <Radar {...commonProps} />;
-      case 'polarArea':
+      case "polarArea":
         return <PolarArea {...commonProps} />;
       default:
         return <Bar {...commonProps} />;
@@ -144,13 +150,16 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   return (
-    <div className={`w-full h-full flex flex-col ${className}`}>
-      <div className="flex-1 min-h-0 p-6">
-        {renderChart()}
-      </div>
+    <div
+      className={`w-full h-full flex flex-col ${className}`}
+      key={isActive ? "active" : "inactive"}
+    >
+      <div className="flex-1 min-h-0 p-6">{renderChart()}</div>
       {chartConfig.description && (
         <div className="p-4 text-center">
-          <p style={{ color: textColor }} className="text-sm opacity-80">{chartConfig.description}</p>
+          <p style={{ color: textColor }} className="text-sm opacity-80">
+            {chartConfig.description}
+          </p>
         </div>
       )}
     </div>

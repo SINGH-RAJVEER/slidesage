@@ -98,18 +98,19 @@ export default function GeneratePPTPage() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <Header />
       <div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-64px)]">
-        <Card className="w-full max-w-2xl shadow-2xl border border-white/20 bg-white/10 backdrop-blur-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
-              <Sparkles className="h-5 w-5" />
+        <Card className="w-full max-w-4xl shadow-2xl border border-white/20 bg-white/10 backdrop-blur-md">
+          <CardHeader className="space-y-3 pb-8">
+            <CardTitle className="flex items-center gap-2 text-white text-4xl">
+              <Sparkles className="h-6 w-6" />
               Generate a Presentation
             </CardTitle>
+            <div className="h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
+          <CardContent className="px-8 pb-8 space-y-6">
+            <div className="space-y-3">
               <label
                 htmlFor="prompt"
-                className="block text-sm font-medium text-white/80"
+                className="block text-lg font-medium text-white/80"
               >
                 Presentation Topic
               </label>
@@ -118,7 +119,7 @@ export default function GeneratePPTPage() {
                 placeholder="List your topics"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                className="min-h-[120px] text-base bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40"
+                className="min-h-[200px] text-xl bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40"
                 disabled={loading}
               />
             </div>
@@ -135,10 +136,7 @@ export default function GeneratePPTPage() {
                     Generating
                   </>
                 ) : (
-                  <>
-                    <Sparkles className="mr-2 h-5 w-5" />
-                    Generate Presentation
-                  </>
+                  "Generate Presentation"
                 )}
               </Button>
             </div>

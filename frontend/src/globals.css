@@ -84,13 +84,13 @@
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: transparent;
   border-radius: 3px;
-  transition: background 0.2s ease;
+  pointer-events: none;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: transparent;
 }
 
 /* Firefox scrollbar styles */
@@ -116,19 +116,63 @@ input.hide-number-spin[type="number"] {
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  padding: 1rem 1.5rem;
+  padding: 1rem 2rem;
   align-items: center;
+  position: relative;
+}
+
+/* Add padding to center first and last slides */
+.slide-carousel::before,
+.slide-carousel::after {
+  content: "";
+  flex: 0 0 auto;
+  width: calc((100vw - 75vw) / 2 - 2rem);
+  min-width: calc((100vw - 75vw) / 2 - 2rem);
 }
 
 .slide-carousel__item {
-  /* allow child width to determine slide size so original sizing (max-w-[90vw], aspect-video) is preserved */
+  /* allow child width to determine slide size so original sizing (max-w-[75vw], aspect-video) is preserved */
   flex: 0 0 auto;
   scroll-snap-align: center;
   box-sizing: border-box;
   display: flex;
   justify-content: center;
   align-items: center;
-  width: 100%;
+  width: auto;
+  position: relative;
+}
+
+/* Soft wrap effect for non-active slides */
+.slide-carousel__item:not([aria-selected="true"])::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 20%,
+    black 80%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 20%,
+    black 80%,
+    transparent 100%
+  );
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.5) 0%,
+    transparent 20%,
+    transparent 80%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
 }
 
 @media (max-width: 768px) {
@@ -151,4 +195,32 @@ input.hide-number-spin[type="number"] {
 }
 .slide-carousel:focus {
   outline: none;
+}
+
+/* Thumbnails container with soft wrap effect */
+.slide-thumbnails-container {
+  position: relative;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 5%,
+    black 95%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 5%,
+    black 95%,
+    transparent 100%
+  );
+}
+
+/* Add padding to center first and last thumbnails */
+.slide-thumbnails-container::before,
+.slide-thumbnails-container::after {
+  content: "";
+  flex: 0 0 auto;
+  width: calc(50vw - 40px);
+  min-width: calc(50vw - 40px);
 }
