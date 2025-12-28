@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Sparkles, ArrowLeft, ChevronDown } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, ChevronDown, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   DropdownMenu,
@@ -18,6 +18,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 export default function GeneratePPTPage() {
   const [prompt, setPrompt] = useState("");
+  const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hasPresentations, setHasPresentations] = useState(false);
@@ -66,8 +67,22 @@ export default function GeneratePPTPage() {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && prompt.trim()) {
+      e.preventDefault();
+      if (!topics.includes(prompt.trim())) {
+        setTopics([...topics, prompt.trim()]);
+      }
+      setPrompt("");
+    }
+  };
+
+  const handleRemoveTopic = (topicToRemove: string) => {
+    setTopics(topics.filter((topic) => topic !== topicToRemove));
+  };
+
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
+    if (topics.length === 0) return;
 
     setLoading(true);
     setError("");
@@ -79,7 +94,7 @@ export default function GeneratePPTPage() {
         {
           method: "POST",
           headers,
-          body: JSON.stringify({ prompt: prompt.trim() }),
+          body: JSON.stringify({ prompt: topics.join(", ") }),
         }
       );
 
@@ -94,7 +109,7 @@ export default function GeneratePPTPage() {
             {
               method: "POST",
               headers: newHeaders,
-              body: JSON.stringify({ prompt: prompt.trim() }),
+              body: JSON.stringify({ prompt: topics.join(", ") }),
             }
           );
 
@@ -156,7 +171,7 @@ export default function GeneratePPTPage() {
                 variant="outline"
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ArrowLeft className="w-4 h-4" />
               </Button>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -327,14 +342,34 @@ export default function GeneratePPTPage() {
                   htmlFor="prompt"
                   className="block text-lg font-medium text-white/80"
                 >
-                  Presentation Topic
+                  Presentation Topics
                 </label>
-                <Textarea
+                {topics.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-white/5 rounded-lg border border-white/10">
+                    {topics.map((topic, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-white/20 border border-white/30 rounded-full text-white text-sm backdrop-blur-sm hover:bg-white/25 transition-all duration-200"
+                      >
+                        <span className="font-medium">{topic}</span>
+                        <button
+                          onClick={() => handleRemoveTopic(topic)}
+                          className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                          disabled={loading}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Input
                   id="prompt"
-                  placeholder="List your topics"
+                  placeholder="Type a topic and press Enter"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  className="min-h-[200px] text-xl bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40"
+                  onKeyDown={handleKeyDown}
+                  className="text-xl bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40 h-14"
                   disabled={loading}
                 />
               </div>
@@ -342,7 +377,7 @@ export default function GeneratePPTPage() {
               <div className="flex justify-center my-8">
                 <Button
                   onClick={handleGenerate}
-                  disabled={loading || !prompt.trim()}
+                  disabled={loading || topics.length === 0}
                   className="w-1/3 bg-white/10 hover:bg-white/20 backdrop-blur-lg border border-white/30 text-white shadow-[0_8px_32px_0_rgba(255,255,255,0.1)] transition-all duration-300 hover:shadow-[0_8px_32px_0_rgba(255,255,255,0.2)] h-14 text-lg font-semibold"
                 >
                   {loading ? (
