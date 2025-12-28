@@ -33,19 +33,33 @@ AI-assisted presentation generator
 
 Copy the example env files and fill with your credentials and model IDs:
 
--- `backend/.env` (create from `backend/.env.example`):
+**`backend/.env`** (create from `backend/.env.example`):
 
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `BEDROCK_MODEL_ID`
-- Optional: `FLASK_DEBUG`, `CORS_ORIGINS`
-- `frontend/.env` (create from `frontend/.env.example`):
-  - `API_URL` (e.g. `http://localhost:8000`)
+- `LITELLM_MODEL`, `LITELLM_PROXY_URL` - AI service configuration
+- `FLASK_DEBUG`, `CORS_ORIGINS` - Flask configuration
+- `JWT_SECRET_KEY` - **REQUIRED**: Secret key for JWT tokens (use a strong random string in production!)
+- `JWT_ACCESS_TOKEN_EXPIRES` - Access token expiration (default: 3600 seconds)
+- `JWT_REFRESH_TOKEN_EXPIRES` - Refresh token expiration (default: 86400 seconds)
+- `DATABASE_URL` - PostgreSQL connection string (defaults to Docker Compose: `postgresql://slidesage:slidesage@postgres:5432/slidesage`)
+  - For local development: `postgresql://user:password@localhost:5432/slidesage`
+
+**`frontend/.env`** (create from `frontend/.env.example`):
+- `VITE_API_URL` - Backend API URL (e.g. `http://localhost:8000`)
 
 ---
 
 ## Important endpoints
 
-- `POST /api/generate-presentation` — body: `{ prompt: string }` → response: `{ success: boolean, data: presentation }`
-  Generated images are no longer created by the backend. The primary endpoint is below.
+### Authentication (No auth required)
+- `POST /api/auth/register` — Register new user: `{ email: string, password: string }`
+- `POST /api/auth/login` — Login: `{ email: string, password: string }` → returns `{ access_token, refresh_token }`
+- `POST /api/auth/refresh` — Refresh access token (requires refresh token)
+- `GET /api/auth/me` — Get current user (requires access token)
+- `POST /api/auth/logout` — Logout (requires access token)
+
+### Application (Auth required)
+- `POST /api/generate-presentation` — Generate presentation: `{ prompt: string }` → `{ success: boolean, data: presentation }`
+- `GET /api/health` — Health check (no auth required)
 
 ---
 
@@ -57,7 +71,12 @@ From the project root:
 docker compose up --build
 ```
 
-After that the backend listens on `http://localhost:8000` and the frontend on `http://localhost:8080` (unless ports are changed in `docker-compose.yml`).
+This will start:
+- **PostgreSQL** database on port `5432`
+- **Backend** API on `http://localhost:8000`
+- **Frontend** app on `http://localhost:8080`
+
+The database will be automatically initialized with the required tables on first run.
 
 ---
 
