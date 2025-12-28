@@ -38,7 +38,7 @@ services:
       dockerfile: Dockerfile
     image: slidesage-frontend:latest
     ports:
-      - "8080:8080"
+      - "5173:5173"
     depends_on:
       - backend
     restart: unless-stopped

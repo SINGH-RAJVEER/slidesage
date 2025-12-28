@@ -1,52 +1,35 @@
 {
-  description = "Nix flake for SlideSage backend";
+  description = "SlideSage backend";
 
   inputs = {
-    nixpkgs.url = "git+https://github.com/NixOS/nixpkgs.git?ref=nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs }: 
-  let
-    system = "x86_64-linux";
-    pkgs = import nixpkgs { inherit system; };
-    python = pkgs.python310Full;
-  in {
-    devShells.${system}.default = pkgs.mkShell {
-      name = "slidesage-backend-shell";
-      buildInputs = [ 
-        python
-        pkgs.git
-      ];
-    };
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          buildInputs = [ 
+            pkgs.uv 
+            pkgs.postgresql 
+            pkgs.stdenv.cc.cc.lib 
+          ];
 
-    packages.${system}.uv = pkgs.writeShellScriptBin "uv" ''
-      export FLASK_APP=main
-
-      if [ -z "$FLASK_ENV" ]; then
-        FLASK_ENV=development
-      fi
-      export FLASK_ENV
-
-      if [ ! -d .venv ]; then
-        echo "Initializing virtualenv with uv..."
-
-        if command -v uv >/dev/null 2>&1; then
-          uv init
-
-          if [ -f requirements.txt ]; then
-            echo "Installing dependencies with uv..."
-            uv add -r requirements.txt
-          fi
-        fi
-      fi
-
-      echo "Starting Flask server on http://127.0.0.1:8000"
-
-      if [ -d .venv ]; then
-        . .venv/bin/activate
-      fi
-
-      flask run --host=0.0.0.0 --port=8000
-    '';
-  };
+          shellHook = ''
+            export FLASK_APP=main
+            export FLASK_ENV=development
+            export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH
+            
+            [ ! -d .venv ] && uv venv
+            source .venv/bin/activate
+            
+            [ -f pyproject.toml ] && uv sync || [ -f requirements.txt ] && uv pip install -r requirements.txt
+          '';
+        };
+      }
+    );
 }

@@ -1,22 +1,34 @@
-FROM nixos/nix:latest AS builder
-
-# Enable nix flakes and nix-command
-ENV NIX_CONFIG="experimental-features = nix-command flakes"
+FROM oven/bun:latest AS builder
 
 WORKDIR /app
 
-# Copy frontend sources and build with nix
-COPY . /app
-RUN nix build .#packages.x86_64-linux.default -o /result --option sandbox false
+# Set API URL for build
+ENV VITE_API_URL=http://localhost:8000
 
-FROM python:3.10-slim
+# Copy package files
+COPY package.json bun.lockb* ./
+
+# Install dependencies
+RUN bun install --frozen-lockfile
+
+# Copy source files
+COPY . .
+
+# Build the application
+RUN bun run build
+
+FROM oven/bun:latest
 
 WORKDIR /app
+
+# Copy package.json and install only vite for preview
+COPY --from=builder /app/package.json /app/bun.lockb* ./
+RUN bun install --frozen-lockfile
 
 # Copy built static site from builder stage
-COPY --from=builder /result /app
+COPY --from=builder /app/dist /app/dist
 
-EXPOSE 8080
+EXPOSE 5173
 
-# Serve the built static site using Python's http.server
-CMD ["python3", "-m", "http.server", "8080", "--directory", "/app"]
+# Serve the built static site using Vite preview
+CMD ["bunx", "vite", "preview", "--host", "0.0.0.0", "--port", "5173"]

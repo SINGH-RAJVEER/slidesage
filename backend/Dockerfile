@@ -1,15 +1,25 @@
-FROM nixos/nix:latest
-
-# Enable nix flakes and nix-command
-ENV NIX_CONFIG="experimental-features = nix-command flakes"
+FROM python:3.11-slim
 
 WORKDIR /app
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy dependency files
+COPY requirements.txt .
+
+# Install dependencies using uv
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy backend sources
 COPY . /app
 
-# Expose Flask default port used in the flake
+# Expose Flask port
 EXPOSE 8000
 
-# Run the `uv` package defined in the backend flake which sets up a venv and starts Flask
-CMD ["/bin/sh", "-c", "nix run .#uv"]
+# Set environment variables
+ENV FLASK_APP=main
+ENV FLASK_ENV=production
+
+# Run Flask
+CMD ["flask", "run", "--host=0.0.0.0", "--port=8000"]
