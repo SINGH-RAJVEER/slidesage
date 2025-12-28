@@ -1,5 +1,7 @@
 import json
 import logging
+import re
+from typing import Generator
 from config import ConfigAI
 
 logging.basicConfig(level=logging.INFO)
@@ -19,8 +21,85 @@ class AIService:
         else:
             logger.info("AI Service initialized")
 
-    def generate_presentation_structure(self, user_prompt: str, slide_count: int = 8) -> dict:
+    def _process_slide(self, slide: dict, index: int) -> dict:
+        """Process a single slide to ensure it has required fields and formatting"""
+        if not isinstance(slide, dict):
+            logger.warning(f"Invalid slide {index}, skipping")
+            return None
+
+        slide['id'] = slide.get('id', f'slide-{index+1}')
+        slide['type'] = slide.get('type', 'content')
+
+        if slide['type'] == 'chart' and 'chartConfig' not in slide:
+            logger.warning(f"Chart slide {index} missing chartConfig, converting to content")
+            slide['type'] = 'content'
+            slide['html'] = '<div id="slide-content"><h2 id="slide-title">Data Visualization</h2><p id="slide-description">Chart data unavailable</p></div>'
+
+        elif 'html' in slide and slide['html']:
+            html_content = slide['html'].strip()
+            if not html_content.startswith('<div id="slide-content">'):
+                slide['html'] = f'<div id="slide-content">{html_content}</div>'
+                logger.info(f"Added slide-content wrapper to slide {index}")
+
+        return slide
+
+    def generate_presentation_stream(self, user_prompt: str, slide_count: int = 8, detail_level: str = 'balanced', tonality: str = 'professional') -> Generator[dict, None, None]:
+        """Stream presentation generation, yielding each slide as it becomes available"""
         try:
+            # Detail level definitions with examples
+            detail_level_guide = {
+                'brief': {
+                    'description': 'Brief - Minimal content with key highlights only',
+                    'example': 'Lists with 2-3 bullet points, short sentences (5-8 words), minimal descriptions'
+                },
+                'concise': {
+                    'description': 'Concise - Essential information in compact form',
+                    'example': 'Lists with 3-4 bullet points, concise sentences (8-12 words), brief explanations'
+                },
+                'balanced': {
+                    'description': 'Balanced - Standard level of detail with clear explanations',
+                    'example': 'Lists with 4-5 bullet points, complete sentences (12-15 words), adequate context and explanations'
+                },
+                'detailed': {
+                    'description': 'Detailed - Comprehensive information with elaboration',
+                    'example': 'Lists with 5-6 bullet points, detailed sentences (15-20 words), thorough explanations with supporting details'
+                },
+                'comprehensive': {
+                    'description': 'Comprehensive - In-depth coverage with extensive details',
+                    'example': 'Lists with 6-8 bullet points, extensive sentences (20+ words), deep explanations with examples, context, and implications'
+                }
+            }
+            
+            # Tonality definitions with examples
+            tonality_guide = {
+                'professional': {
+                    'description': 'Professional - Business-appropriate, objective, and polished',
+                    'example': 'Use formal language, industry terminology, data-driven statements. Example: "Our analysis demonstrates a significant improvement in operational efficiency."'
+                },
+                'casual': {
+                    'description': 'Casual - Relaxed, conversational, and approachable',
+                    'example': 'Use everyday language, contractions, and friendly tone. Example: "We\'ve seen some great results that we\'re excited to share with you."'
+                },
+                'enthusiastic': {
+                    'description': 'Enthusiastic - Energetic, passionate, and motivational',
+                    'example': 'Use dynamic verbs, exclamations, and inspiring language. Example: "This breakthrough innovation is transforming the way we work!"'
+                },
+                'persuasive': {
+                    'description': 'Persuasive - Compelling, benefit-focused, and action-oriented',
+                    'example': 'Use strong calls-to-action, benefits-driven language, and compelling arguments. Example: "Imagine the impact: 40% faster results with half the effort. That\'s the power of our solution."'
+                }
+            }
+            
+            # Get selected detail level and tonality guides
+            selected_detail = detail_level_guide.get(detail_level, detail_level_guide['balanced'])
+            selected_tonality = tonality_guide.get(tonality, tonality_guide['professional'])
+            
+            # Extract values to avoid nested f-string issues
+            detail_description = selected_detail['description']
+            detail_example = selected_detail['example']
+            tonality_description = selected_tonality['description']
+            tonality_example = selected_tonality['example']
+            
             system_prompt = """
         You are an expert presentation designer. Create comprehensive presentations with structured HTML, standardized IDs, data tables, and appropriate content.
         
@@ -99,151 +178,20 @@ class AIService:
           "totalSlides": number
         }
         
-        SLIDE TYPE EXAMPLES WITH PROPER IDs:
+        DETAIL LEVEL REQUIREMENT:
+        """ + detail_description + """
+        Example: """ + detail_example + """
         
-        TITLE SLIDE:
-        <div id="slide-content">
-          <header id="slide-header">
-            <h1 id="slide-title">Main Presentation Title</h1>
-            <h2 id="slide-subtitle">Compelling Subtitle</h2>
-          </header>
-          <div id="slide-description">
-            <p>Brief presentation overview or tagline</p>
-          </div>
-        </div>
-        
-        CONTENT SLIDE WITH LIST:
-        <div id="slide-content">
-          <h2 id="slide-title">Section Title</h2>
-          <h3 id="slide-subtitle">Key Points</h3>
-          <ul id="slide-list">
-            <li>First important point with detailed explanation</li>
-            <li>Second crucial insight with supporting details</li>
-            <li>Third key element with relevant context</li>
-          </ul>
-          <div id="slide-highlight">
-            <p>Important note or takeaway message</p>
-          </div>
-        </div>
-        
-        DATA SLIDE WITH TABLE:
-        <div id="slide-content">
-          <h2 id="slide-title">Performance Metrics</h2>
-          <h3 id="slide-subtitle">Quarterly Results Comparison</h3>
-          <table id="slide-table" class="data-table">
-            <thead>
-              <tr>
-                <th>Quarter</th>
-                <th>Revenue ($M)</th>
-                <th>Growth (%)</th>
-                <th>Market Share (%)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Q1 2024</td>
-                <td>125.5</td>
-                <td>12.3</td>
-                <td>18.7</td>
-              </tr>
-              <tr>
-                <td>Q2 2024</td>
-                <td>142.8</td>
-                <td>13.8</td>
-                <td>21.2</td>
-              </tr>
-              <tr>
-                <td>Q3 2024</td>
-                <td>158.9</td>
-                <td>11.3</td>
-                <td>23.1</td>
-              </tr>
-              <tr>
-                <td>Q4 2024</td>
-                <td>176.2</td>
-                <td>10.9</td>
-                <td>24.8</td>
-              </tr>
-            </tbody>
-          </table>
-          <div id="slide-description">
-            <p>Consistent growth trajectory with expanding market presence</p>
-          </div>
-        </div>
-        
-        STATISTICS SLIDE:
-        <div id="slide-content">
-          <h2 id="slide-title">Key Statistics</h2>
-          <div id="slide-stats">
-            <div id="slide-highlight">
-              <h3>85%</h3>
-              <p id="slide-description">Customer Satisfaction Rate</p>
-            </div>
-            <div id="slide-keypoint">
-              <h3>2.3M</h3>
-              <p id="slide-description">Active Users Worldwide</p>
-            </div>
-          </div>
-        </div>
-        
-        QUOTE/EMPHASIS SLIDE:
-        <div id="slide-content">
-          <h2 id="slide-title">Industry Insight</h2>
-          <blockquote id="slide-quote">
-            "Innovation distinguishes between a leader and a follower."
-          </blockquote>
-          <div id="slide-description">
-            <p>- Steve Jobs, Apple Co-founder</p>
-          </div>
-        </div>
-        
-        IMAGE SLIDE:
-        <div id="slide-content">
-          <h2 id="slide-title">Visual Overview</h2>
-          <img id="slide-image" src="https://example.com/chart.jpg" alt="Market analysis chart" />
-          <div id="slide-description">
-            <p>Comprehensive market analysis showing growth trends</p>
-          </div>
-        </div>
-        
-        WHEN TO INCLUDE TABLES:
-        - Comparative data (features, prices, performance)
-        - Financial information (budgets, revenue, costs)
-        - Statistics and metrics
-        - Schedules and timelines
-        - Technical specifications
-        - Survey results with numbers
-        - Before/after comparisons
-        - Product/service comparisons
-        
-        TABLE STYLING REQUIREMENTS:
-        - Always use id="slide-table" 
-        - Add class="data-table" for template styling
-        - Use proper <thead> and <tbody> structure
-        - Include meaningful column headers
-        - Ensure data is realistic and relevant
-        - Keep tables readable (max 6-8 columns)
-        - Add descriptions below tables when needed
-        
-        CHART TYPES AND WHEN TO USE:
-        - "bar": Comparing quantities across categories
-        - "line": Showing trends over time
-        - "pie": Showing parts of a whole (percentages)
-        - "doughnut": Similar to pie but with center space
-        - "radar": Comparing multiple variables
-        - "polarArea": Similar to pie but with variable radius
-        
-        CONTENT SCALING RULES:
-        - Always include tables when showing comparative data
-        - Always include charts when showing trends/statistics
-        - Simple topics: 5-8 slides (1-2 tables, 1-2 charts)
-        - Medium complexity: 8-12 slides (2-3 tables, 2-3 charts)
-        - Complex topics: 12-20+ slides (3-5 tables, 3-5 charts)
+        TONALITY REQUIREMENT:
+        """ + tonality_description + """
+        Example: """ + tonality_example + """
         
         Generate slides that are:
         - Well-structured with proper HTML and standardized IDs
         - Include relevant data tables using proper HTML structure
         - Include relevant data visualizations using charts
+        - Follow the specified detail level: """ + detail_level + """
+        - Match the specified tonality: """ + tonality + """
         - Professional and clear with consistent ID usage
         - Data-driven where appropriate
         - Template-ready with standardized element IDs
@@ -262,100 +210,194 @@ class AIService:
             provider = None
             model_name = model_setting
             if isinstance(model_setting, str) and '/' in model_setting:
-              provider, model_name = model_setting.split('/', 1)
+                provider, model_name = model_setting.split('/', 1)
 
-            logger.info("LiteLLM model_setting=%s", model_setting)
+            logger.info("LiteLLM streaming model_setting=%s", model_setting)
             logger.info("Parsed provider=%s, model_name=%s", provider, model_name)
 
             try:
-              if provider:
-                resp = completion(model=f"{provider}/{model_name}", messages=messages)
-              else:
-                resp = completion(model=model_name, messages=messages)
+                if provider:
+                    resp = completion(model=f"{provider}/{model_name}", messages=messages, stream=True)
+                else:
+                    resp = completion(model=model_name, messages=messages, stream=True)
             except Exception as e:
-              err_name = type(e).__name__
-              logger.error("LiteLLM completion failed (%s). provider=%s model=%s error=%s", err_name, provider, model_name, str(e))
-              raise RuntimeError(f"LiteLLM completion failed (provider={provider}, model={model_name}): {e}") from e
+                err_name = type(e).__name__
+                logger.error("LiteLLM streaming completion failed (%s). provider=%s model=%s error=%s", err_name, provider, model_name, str(e))
+                raise RuntimeError(f"LiteLLM streaming completion failed (provider={provider}, model={model_name}): {e}") from e
 
-            content = None
-            if isinstance(resp, dict):
-                choices = resp.get("choices") or []
-                if choices:
-                    message = choices[0].get("message") or {}
-                    content = message.get("content")
-            else:
-                try:
-                    content = resp.choices[0].message.content
-                except Exception:
-                    content = str(resp)
-
-            if content is None:
-                raise RuntimeError("No content returned from LiteLLM completion")
-
-            content = content.strip()
-            if content.startswith('```json'):
-                content = content.replace('```json', '').replace('```', '').strip()
-            elif content.startswith('```'):
-                content = content.replace('```', '').strip()
-
-            parsed_content = json.loads(content)
-
-            # Extract title from first slide and add it to the presentation
-            extracted_title = "Untitled Presentation"
-            if 'slides' in parsed_content and len(parsed_content['slides']) > 0:
-                first_slide = parsed_content['slides'][0]
-                if 'title' in first_slide and first_slide['title']:
-                    extracted_title = first_slide['title']
-                elif 'html' in first_slide:
-                    # Extract from HTML
-                    import re
-                    html = first_slide['html']
-                    # Try to find h1 or h2 with id="slide-title"
-                    title_match = re.search(r'<h[12][^>]*id=["\']slide-title["\'][^>]*>([^<]+)</h[12]>', html)
-                    if title_match:
-                        extracted_title = title_match.group(1).strip()
-                    else:
-                        # Fallback: find any h1 or h2
-                        header_match = re.search(r'<h[12][^>]*>([^<]+)</h[12]>', html)
-                        if header_match:
-                            extracted_title = header_match.group(1).strip()
+            # Accumulate the streamed content
+            accumulated_content = ""
+            slides_yielded = 0
+            theme_yielded = False
+            title_extracted = None
             
-            # Add the extracted title to the parsed content
-            parsed_content['title'] = extracted_title
+            # Yield initial event
+            yield {"event": "start", "data": {"status": "generating"}}
 
-            if 'slides' in parsed_content:
-                parsed_content['totalSlides'] = len(parsed_content['slides'])
+            for chunk in resp:
+                # Extract content from chunk
+                chunk_content = ""
+                if isinstance(chunk, dict):
+                    choices = chunk.get("choices") or []
+                    if choices:
+                        delta = choices[0].get("delta") or {}
+                        chunk_content = delta.get("content", "")
+                else:
+                    try:
+                        if chunk.choices and chunk.choices[0].delta.content:
+                            chunk_content = chunk.choices[0].delta.content
+                    except Exception:
+                        pass
 
-            if 'slides' not in parsed_content or len(parsed_content.get('slides', [])) == 0:
-                raise ValueError("Invalid or empty slides generated")
+                if chunk_content:
+                    accumulated_content += chunk_content
+                    
+                    # Clean markdown code blocks if present
+                    clean_content = accumulated_content.strip()
+                    if clean_content.startswith('```json'):
+                        clean_content = clean_content.replace('```json', '').replace('```', '').strip()
+                    elif clean_content.startswith('```'):
+                        clean_content = clean_content.replace('```', '').strip()
+                    
+                    # Try to extract theme if not yet yielded
+                    if not theme_yielded:
+                        theme_match = re.search(r'"theme"\s*:\s*"([^"]*)"', clean_content)
+                        if theme_match:
+                            theme_yielded = True
+                            yield {"event": "theme", "data": {"theme": theme_match.group(1)}}
+                    
+                    # Try to extract complete slides using regex
+                    # Look for complete slide objects in the slides array
+                    slides_pattern = r'"slides"\s*:\s*\['
+                    slides_match = re.search(slides_pattern, clean_content)
+                    
+                    if slides_match:
+                        # Find all complete slide objects
+                        slides_start = slides_match.end()
+                        remaining = clean_content[slides_start:]
+                        
+                        # Parse complete slide objects
+                        current_pos = 0
+                        bracket_count = 0
+                        slide_start = -1
+                        in_string = False
+                        escape_next = False
+                        
+                        extracted_slides = []
+                        
+                        for i, char in enumerate(remaining):
+                            if escape_next:
+                                escape_next = False
+                                continue
+                            if char == '\\':
+                                escape_next = True
+                                continue
+                            if char == '"' and not escape_next:
+                                in_string = not in_string
+                                continue
+                            if in_string:
+                                continue
+                            
+                            if char == '{':
+                                if bracket_count == 0:
+                                    slide_start = i
+                                bracket_count += 1
+                            elif char == '}':
+                                bracket_count -= 1
+                                if bracket_count == 0 and slide_start >= 0:
+                                    # Found a complete slide object
+                                    slide_json = remaining[slide_start:i+1]
+                                    try:
+                                        slide_obj = json.loads(slide_json)
+                                        extracted_slides.append(slide_obj)
+                                    except json.JSONDecodeError:
+                                        pass
+                                    slide_start = -1
+                            elif char == ']' and bracket_count == 0:
+                                # End of slides array
+                                break
+                        
+                        # Yield any new slides
+                        for idx in range(slides_yielded, len(extracted_slides)):
+                            slide = extracted_slides[idx]
+                            processed_slide = self._process_slide(slide, idx)
+                            if processed_slide:
+                                # Extract title from first slide
+                                if idx == 0 and title_extracted is None:
+                                    if 'title' in slide and slide['title']:
+                                        title_extracted = slide['title']
+                                    elif 'html' in slide:
+                                        html = slide['html']
+                                        title_match = re.search(r'<h[12][^>]*id=["\']slide-title["\'][^>]*>([^<]+)</h[12]>', html)
+                                        if title_match:
+                                            title_extracted = title_match.group(1).strip()
+                                        else:
+                                            header_match = re.search(r'<h[12][^>]*>([^<]+)</h[12]>', html)
+                                            if header_match:
+                                                title_extracted = header_match.group(1).strip()
+                                
+                                slides_yielded += 1
+                                yield {
+                                    "event": "slide",
+                                    "data": {
+                                        "slide": processed_slide,
+                                        "index": idx,
+                                        "title": title_extracted
+                                    }
+                                }
 
-            for i, slide in enumerate(parsed_content['slides']):
-                if not isinstance(slide, dict):
-                    logger.warning(f"Invalid slide {i}, skipping")
-                    continue
+            # Final processing of complete response
+            clean_content = accumulated_content.strip()
+            if clean_content.startswith('```json'):
+                clean_content = clean_content.replace('```json', '').replace('```', '').strip()
+            elif clean_content.startswith('```'):
+                clean_content = clean_content.replace('```', '').strip()
 
-                slide['id'] = slide.get('id', f'slide-{i+1}')
-                slide['type'] = slide.get('type', 'content')
-
-                if slide['type'] == 'chart' and 'chartConfig' not in slide:
-                    logger.warning(f"Chart slide {i} missing chartConfig, converting to content")
-                    slide['type'] = 'content'
-                    slide['html'] = '<div id="slide-content"><h2 id="slide-title">Data Visualization</h2><p id="slide-description">Chart data unavailable</p></div>'
-
-                elif 'html' in slide and slide['html']:
-                    html_content = slide['html'].strip()
-                    if not html_content.startswith('<div id="slide-content">'):
-                        slide['html'] = f'<div id="slide-content">{html_content}</div>'
-                        logger.info(f"Added slide-content wrapper to slide {i}")
-
-            logger.info(f"Generated {len(parsed_content['slides'])} slides successfully")
-            return parsed_content
-
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON parsing error: {e}")
-            logger.error(f"Content: {content}")
-            raise Exception("Failed to parse AI response")
+            try:
+                parsed_content = json.loads(clean_content)
+                
+                # Process any remaining slides that weren't yielded during streaming
+                if 'slides' in parsed_content:
+                    for idx in range(slides_yielded, len(parsed_content['slides'])):
+                        slide = parsed_content['slides'][idx]
+                        processed_slide = self._process_slide(slide, idx)
+                        if processed_slide:
+                            slides_yielded += 1
+                            yield {
+                                "event": "slide",
+                                "data": {
+                                    "slide": processed_slide,
+                                    "index": idx,
+                                    "title": title_extracted
+                                }
+                            }
+                
+                # Add title to parsed content
+                if title_extracted:
+                    parsed_content['title'] = title_extracted
+                else:
+                    parsed_content['title'] = 'Untitled Presentation'
+                
+                if 'slides' in parsed_content:
+                    parsed_content['totalSlides'] = len(parsed_content['slides'])
+                
+                # Yield completion event with full presentation data
+                yield {
+                    "event": "complete",
+                    "data": parsed_content
+                }
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing error in stream: {e}")
+                logger.error(f"Content: {clean_content}")
+                yield {
+                    "event": "error",
+                    "data": {"error": "Failed to parse AI response"}
+                }
 
         except Exception as e:
-            logger.error(f"Error generating presentation: {e}")
-            raise
+            logger.error(f"Error in streaming presentation: {e}")
+            yield {
+                "event": "error",
+                "data": {"error": str(e)}
+            }

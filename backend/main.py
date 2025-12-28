@@ -1,6 +1,6 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, verify_jwt_in_request
 from config import ConfigAI
 from models import db, User, Presentation
 from auth import auth_bp
@@ -69,10 +69,10 @@ except Exception:
 
 ai = AIService()
 
-@app.route('/api/generate-presentation', methods=['POST'])
+@app.route('/api/generate-presentation-stream', methods=['POST'])
 @jwt_required()
-def generate_presentation():
-    """Generate presentation - requires authentication"""
+def generate_presentation_stream():
+    """Generate presentation with streaming - requires authentication"""
     try:
         # Get current user
         current_user_id = get_jwt_identity()
@@ -86,40 +86,59 @@ def generate_presentation():
             return jsonify({'error': 'Invalid JSON data'}), 400
             
         prompt = data.get('prompt')
-        slide_count = data.get('slideCount', 8)  # Default to 8 slides if not specified
+        slide_count = data.get('slideCount', 8)
+        detail_level = data.get('detailLevel', 'balanced')
+        tonality = data.get('tonality', 'professional')
 
         if not prompt:
             return jsonify({'error': 'Prompt is required'}), 400
-       
-        # Generate presentation structure
-        presentation_data = ai.generate_presentation_structure(prompt, slide_count)
-        
-        # Extract title from presentation data (title is extracted from first slide in ai.py)
-        title = presentation_data.get('title', 'Untitled Presentation') if presentation_data else 'Untitled Presentation'
-        
-        # Save to database
-        presentation = Presentation(
-            user_id=current_user_id,
-            title=title,
-            prompt=prompt
-        )
-        presentation.set_slides_data(presentation_data)
-        
-        db.session.add(presentation)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'data': presentation_data,
-            'presentation_id': presentation.id
-        })
-        
-    except json.JSONDecodeError as e:
-        return jsonify({
-            'success': False,
-            'error': f'Invalid JSON format: {str(e)}'
-        }), 400
 
+        def generate():
+            presentation_data = None
+            
+            for event in ai.generate_presentation_stream(prompt, slide_count, detail_level, tonality):
+                event_type = event.get('event', 'data')
+                event_data = event.get('data', {})
+                
+                # Store complete presentation data for saving
+                if event_type == 'complete':
+                    presentation_data = event_data
+                
+                # Format as SSE
+                yield f"event: {event_type}\n"
+                yield f"data: {json.dumps(event_data)}\n\n"
+            
+            # Save to database after streaming completes
+            if presentation_data and 'slides' in presentation_data:
+                try:
+                    with app.app_context():
+                        title = presentation_data.get('title', 'Untitled Presentation')
+                        presentation = Presentation(
+                            user_id=current_user_id,
+                            title=title,
+                            prompt=prompt
+                        )
+                        presentation.set_slides_data(presentation_data)
+                        db.session.add(presentation)
+                        db.session.commit()
+                        
+                        # Send the presentation ID
+                        yield f"event: saved\n"
+                        yield f"data: {json.dumps({'presentation_id': presentation.id})}\n\n"
+                except Exception as e:
+                    yield f"event: save_error\n"
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        return Response(
+            generate(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no'
+            }
+        )
+        
     except Exception as e:
         return jsonify({
             'success': False,

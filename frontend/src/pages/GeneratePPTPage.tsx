@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { authService } from "@/services/authService";
 import Header from "@/components/Header";
+import { useStreaming } from "@/contexts/StreamingContext";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -27,13 +28,36 @@ export default function GeneratePPTPage() {
   const [tonality, setTonality] = useState("professional");
   const navigate = useNavigate();
   const location = useLocation();
+  const { streamingState, startStreaming, resetStreaming } = useStreaming();
 
   // Check if we came from the grid page (via /generate route) and user has presentations
   const showBackButton = location.pathname === "/generate" && hasPresentations;
 
   useEffect(() => {
     checkPresentations();
+    // Reset streaming state when entering generate page
+    resetStreaming();
   }, []);
+
+  // Navigate to viewer when first slide arrives
+  useEffect(() => {
+    if (streamingState.slides.length >= 1 && loading) {
+      setLoading(false);
+      navigate("/presentation", {
+        state: {
+          isStreaming: true,
+        },
+      });
+    }
+  }, [streamingState.slides.length, loading, navigate]);
+
+  // Handle streaming errors
+  useEffect(() => {
+    if (streamingState.error) {
+      setError(streamingState.error);
+      setLoading(false);
+    }
+  }, [streamingState.error]);
 
   const checkPresentations = async () => {
     try {
@@ -94,80 +118,14 @@ export default function GeneratePPTPage() {
       return parseInt(parts[parts.length - 1]) || 10;
     };
 
-    try {
-      const headers = authService.getAuthHeaders();
-      const presentationResponse = await fetch(
-        `${API_URL}/api/generate-presentation`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            prompt: topics.join(", "),
-            slideCount: getUpperLimit(slideCount),
-          }),
-        }
-      );
+    const success = await startStreaming(
+      topics.join(", "),
+      getUpperLimit(slideCount),
+      detailLevel,
+      tonality
+    );
 
-      // Handle 401 Unauthorized - token might be expired
-      if (presentationResponse.status === 401) {
-        const refreshed = await authService.refreshToken();
-        if (refreshed) {
-          // Retry with new token
-          const newHeaders = authService.getAuthHeaders();
-          const retryResponse = await fetch(
-            `${API_URL}/api/generate-presentation`,
-            {
-              method: "POST",
-              headers: newHeaders,
-              body: JSON.stringify({
-                prompt: topics.join(", "),
-                slideCount: getUpperLimit(slideCount),
-              }),
-            }
-          );
-
-          if (!retryResponse.ok) {
-            setError("Authentication failed. Please log in again.");
-            return;
-          }
-
-          const retryResult = await retryResponse.json();
-          if (!retryResult.success) {
-            setError(retryResult.error || "Failed to generate presentation");
-            return;
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          navigate("/presentation", {
-            state: { presentation: retryResult.data },
-          });
-          return;
-        } else {
-          setError("Session expired. Please log in again.");
-          return;
-        }
-      }
-
-      // Handle 422 - invalid token format (e.g., old tokens with integer identity)
-      if (presentationResponse.status === 422) {
-        setError("Your session is invalid. Please log out and log in again.");
-        return;
-      }
-
-      const presentationResult = await presentationResponse.json();
-
-      if (!presentationResult.success) {
-        setError(presentationResult.error || "Failed to generate presentation");
-        return;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      navigate("/presentation", {
-        state: { presentation: presentationResult.data },
-      });
-    } catch (err) {
-      setError(`Error: ${err.message || err}`);
-    } finally {
+    if (!success) {
       setLoading(false);
     }
   };
@@ -193,14 +151,14 @@ export default function GeneratePPTPage() {
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-36 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
+                        className="min-w-36 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
                       >
                         {detailLevel.charAt(0).toUpperCase() +
                           detailLevel.slice(1)}
                         <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-36 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
+                    <DropdownMenuContent className="min-w-36 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
                       <DropdownMenuItem
                         onClick={() => setDetailLevel("brief")}
                         className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
@@ -258,24 +216,6 @@ export default function GeneratePPTPage() {
                         className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
                       >
                         Casual
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setTonality("formal")}
-                        className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
-                      >
-                        Formal
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setTonality("balanced")}
-                        className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
-                      >
-                        Balanced
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setTonality("friendly")}
-                        className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
-                      >
-                        Friendly
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setTonality("enthusiastic")}

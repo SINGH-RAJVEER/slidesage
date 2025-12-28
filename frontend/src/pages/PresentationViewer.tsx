@@ -13,6 +13,7 @@ import {
   SkipForward,
   Trash,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import DownloadPPTXButton from "@/components/Viewer/DownloadPPTXButton";
 import ChartRenderer from "@/components/Charts/ChartRenderer";
@@ -32,16 +33,27 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useStreaming } from "@/contexts/StreamingContext";
 
 const PresentationViewer: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const presentation: PresentationData | undefined =
-    location.state?.presentation;
+  const { streamingState, getPresentation } = useStreaming();
+
+  // Check if we're in streaming mode
+  const isStreamingMode = location.state?.isStreaming === true;
+
+  // Get presentation from either location state or streaming context
+  const getInitialPresentation = (): PresentationData | undefined => {
+    if (isStreamingMode) {
+      return getPresentation() || undefined;
+    }
+    return location.state?.presentation;
+  };
 
   const [presentationState, setPresentation] = useState<
     PresentationData | undefined
-  >(presentation);
+  >(getInitialPresentation());
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -54,6 +66,27 @@ const PresentationViewer: React.FC = () => {
   const [visibleSlide, setVisibleSlide] = useState(0);
 
   const { currentTemplate, changeTemplate } = useTemplate();
+
+  // Update presentation state when streaming slides arrive
+  // Use slides.length as the primary trigger since array reference changes may not be detected
+  const streamingSlidesCount = streamingState.slides.length;
+  useEffect(() => {
+    if (isStreamingMode && streamingSlidesCount > 0) {
+      // Create a new presentation object with the latest slides
+      setPresentation({
+        title: streamingState.title,
+        theme: streamingState.theme,
+        slides: streamingState.slides.map((s) => ({ ...s })), // Deep copy to ensure new references
+        totalSlides: streamingSlidesCount,
+      });
+    }
+  }, [
+    isStreamingMode,
+    streamingSlidesCount,
+    streamingState.title,
+    streamingState.theme,
+    streamingState.slides,
+  ]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -173,7 +206,23 @@ const PresentationViewer: React.FC = () => {
     }
   }, [intervalMode]);
 
-  if (!presentationState) {
+  // If in streaming mode and still loading first slide, show loading state
+  if (
+    isStreamingMode &&
+    streamingState.isStreaming &&
+    (!presentationState || presentationState.slides.length === 0)
+  ) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-white">
+          <Loader2 className="w-12 h-12 animate-spin" />
+          <p className="text-lg">Generating your presentation...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!presentationState || presentationState.slides.length === 0) {
     navigate("/");
     return null;
   }
@@ -382,8 +431,14 @@ const PresentationViewer: React.FC = () => {
                 onTemplateChange={changeTemplate}
               />
             </div>
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/80 text-sm font-medium select-none pointer-events-none bg-white/10 border border-white/20 px-4 py-1 rounded-full shadow-sm">
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/80 text-sm font-medium select-none pointer-events-none bg-white/10 border border-white/20 px-4 py-1 rounded-full shadow-sm flex items-center gap-2">
+              {isStreamingMode && streamingState.isStreaming && (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              )}
               Slide {currentSlide + 1} of {presentationState.slides.length}
+              {isStreamingMode && streamingState.isStreaming && (
+                <span className="text-blue-400">...</span>
+              )}
             </span>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
@@ -686,7 +741,8 @@ const PresentationViewer: React.FC = () => {
               {presentationState.slides.map((slide, index) => {
                 const isFirstThumbnail = index === 0;
                 const isLastThumbnail =
-                  index === presentationState.slides.length - 1;
+                  index === presentationState.slides.length - 1 &&
+                  !(isStreamingMode && streamingState.isStreaming);
                 const marginLeft = isFirstThumbnail ? "calc(50vw - 40px)" : "0";
                 const marginRight = isLastThumbnail ? "calc(50vw - 40px)" : "0";
 
@@ -727,6 +783,17 @@ const PresentationViewer: React.FC = () => {
                   </button>
                 );
               })}
+              {/* Streaming loading indicator */}
+              {isStreamingMode && streamingState.isStreaming && (
+                <div
+                  style={{
+                    marginRight: "calc(50vw - 40px)",
+                  }}
+                  className="w-20 h-14 border-2 border-dashed border-blue-400/50 rounded-xl flex-shrink-0 overflow-hidden backdrop-blur-sm bg-blue-500/10 flex items-center justify-center"
+                >
+                  <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+                </div>
+              )}
             </div>
           </div>
         )}
