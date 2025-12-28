@@ -1,0 +1,47 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import LoginForm from '@/components/auth/LoginForm';
+import RegisterForm from '@/components/auth/RegisterForm';
+import Header from '@/components/Header';
+import { Loader2 } from 'lucide-react';
+
+export default function LoginPage() {
+  const [isLogin, setIsLogin] = useState(true);
+  const { isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-white" />
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return null; // Will redirect
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+      <Header />
+      <div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-64px)]">
+        <div className="w-full max-w-md">
+          {isLogin ? (
+            <LoginForm onSwitchToRegister={() => setIsLogin(false)} />
+          ) : (
+            <RegisterForm onSwitchToLogin={() => setIsLogin(true)} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+

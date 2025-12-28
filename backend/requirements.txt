@@ -1,0 +1,14 @@
+Flask
+Flask-CORS
+Flask-JWT-Extended>=4.6.0
+Flask-SQLAlchemy>=3.1.0
+python-dotenv
+litellm
+python-pptx
+pydantic
+watchdog
+google-auth>=2.0.0
+google-cloud-aiplatform>=1.30.0
+bcrypt>=4.1.0
+SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.0
