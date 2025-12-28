@@ -19,12 +19,18 @@ export default function Header() {
   };
 
   const handleProfileClick = () => {
-    // Profile page - does nothing for now
-    console.log("Profile clicked");
+    navigate("/profile");
   };
 
   // Get user initials for avatar placeholder
-  const getUserInitials = (email: string) => {
+  const getUserInitials = (email: string, name?: string) => {
+    if (name) {
+      const nameParts = name.trim().split(" ");
+      if (nameParts.length >= 2) {
+        return (nameParts[0].charAt(0) + nameParts[1].charAt(0)).toUpperCase();
+      }
+      return name.charAt(0).toUpperCase();
+    }
     return email.charAt(0).toUpperCase();
   };
 
@@ -44,10 +50,18 @@ export default function Header() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-semibold text-sm hover:bg-white/20 hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent"
+                  className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-semibold text-sm hover:bg-white/20 hover:scale-105 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent overflow-hidden"
                   title={user.email}
                 >
-                  {getUserInitials(user.email)}
+                  {user.profile_picture ? (
+                    <img
+                      src={user.profile_picture}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    getUserInitials(user.email, user.name)
+                  )}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -55,7 +69,7 @@ export default function Header() {
                 className="w-48 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white"
               >
                 <div className="px-2 py-1.5 text-sm text-white/60">
-                  {user.email}
+                  {user.name || user.email}
                 </div>
                 <DropdownMenuSeparator className="bg-white/20" />
                 <DropdownMenuItem

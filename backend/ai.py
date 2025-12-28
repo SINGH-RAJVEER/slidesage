@@ -19,7 +19,7 @@ class AIService:
         else:
             logger.info("AI Service initialized")
 
-    def generate_presentation_structure(self, user_prompt: str) -> dict:
+    def generate_presentation_structure(self, user_prompt: str, slide_count: int = 8) -> dict:
         try:
             system_prompt = """
         You are an expert presentation designer. Create comprehensive presentations with structured HTML, standardized IDs, data tables, and appropriate content.
@@ -252,7 +252,7 @@ class AIService:
 
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Create a comprehensive presentation with data visualizations about: {user_prompt}"}
+                {"role": "user", "content": f"Create a comprehensive presentation with data visualizations about: {user_prompt} in {slide_count} slides."}
             ]
 
             if completion is None:

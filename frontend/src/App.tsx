@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import HomePage from "./pages/HomePage";
 import GeneratePPTPage from "./pages/GeneratePPTPage";
 import PresentationViewer from "./pages/PresentationViewer";
+import ProfilePage from "./pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -31,6 +32,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <PresentationViewer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />

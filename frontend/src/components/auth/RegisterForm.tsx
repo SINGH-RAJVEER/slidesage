@@ -18,6 +18,7 @@ interface RegisterFormProps {
 }
 
 export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -43,7 +44,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     setLoading(true);
 
     try {
-      const result = await register({ email, password });
+      const result = await register({ name, email, password });
 
       if (!result.success) {
         setError(result.error || "Registration failed");
@@ -77,6 +78,21 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+
+          <div className="space-y-3">
+            <Label htmlFor="name" className="text-white/80 text-lg">
+              Name
+            </Label>
+            <Input
+              id="name"
+              type="text"
+              placeholder="John Doe"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={loading}
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40 h-12 text-lg"
+            />
+          </div>
 
           <div className="space-y-3">
             <Label htmlFor="email" className="text-white/80 text-lg">

@@ -86,12 +86,13 @@ def generate_presentation():
             return jsonify({'error': 'Invalid JSON data'}), 400
             
         prompt = data.get('prompt')
+        slide_count = data.get('slideCount', 8)  # Default to 8 slides if not specified
 
         if not prompt:
             return jsonify({'error': 'Prompt is required'}), 400
        
         # Generate presentation structure
-        presentation_data = ai.generate_presentation_structure(prompt)
+        presentation_data = ai.generate_presentation_structure(prompt, slide_count)
         
         # Extract title from presentation data (use first slide title or default)
         title = 'Untitled Presentation'

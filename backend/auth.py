@@ -25,6 +25,7 @@ def register():
         data = request.get_json()
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
+        name = data.get('name', '').strip()
         
         # Validation
         if not email:
@@ -44,7 +45,7 @@ def register():
             return jsonify({'error': 'Email already registered'}), 409
         
         # Create new user
-        user = User(email=email)
+        user = User(email=email, name=name)
         user.set_password(password)
         
         db.session.add(user)
@@ -174,4 +175,75 @@ def logout():
         'success': True,
         'message': 'Logged out successfully'
     }), 200
+
+
+@auth_bp.route('/profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    """Update user profile"""
+    try:
+        current_user_id = get_jwt_identity()
+        # Convert to int since identity is stored as string but user.id is int
+        try:
+            user_id = int(current_user_id) if isinstance(current_user_id, str) else current_user_id
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid token format'}), 422
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type must be JSON'}), 400
+        
+        data = request.get_json()
+        
+        # Update name if provided
+        if 'name' in data:
+            name = data.get('name', '').strip()
+            user.name = name if name else None
+        
+        # Update email if provided and different
+        if 'email' in data:
+            email = data.get('email', '').strip().lower()
+            if email and email != user.email:
+                # Validate email format
+                if not validate_email(email):
+                    return jsonify({'error': 'Invalid email format'}), 400
+                
+                # Check if email is already taken
+                existing_user = User.query.filter_by(email=email).first()
+                if existing_user:
+                    return jsonify({'error': 'Email already in use'}), 409
+                
+                user.email = email
+        
+        # Update password if provided
+        if 'password' in data:
+            password = data.get('password', '')
+            if password:
+                if not validate_password(password):
+                    return jsonify({'error': 'Password must be at least 8 characters long'}), 400
+                user.set_password(password)
+        
+        # Update profile picture if provided
+        if 'profile_picture' in data:
+            profile_picture = data.get('profile_picture', '').strip()
+            user.profile_picture = profile_picture if profile_picture else None
+        
+        user.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Profile updated successfully',
+            'user': user.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 

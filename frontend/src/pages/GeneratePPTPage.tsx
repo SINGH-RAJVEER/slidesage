@@ -87,6 +87,13 @@ export default function GeneratePPTPage() {
     setLoading(true);
     setError("");
 
+    // Extract upper limit from range (e.g., "5-10" -> 10, "20+" -> 25)
+    const getUpperLimit = (range: string): number => {
+      if (range.includes("+")) return 25;
+      const parts = range.split("-");
+      return parseInt(parts[parts.length - 1]) || 10;
+    };
+
     try {
       const headers = authService.getAuthHeaders();
       const presentationResponse = await fetch(
@@ -94,7 +101,10 @@ export default function GeneratePPTPage() {
         {
           method: "POST",
           headers,
-          body: JSON.stringify({ prompt: topics.join(", ") }),
+          body: JSON.stringify({
+            prompt: topics.join(", "),
+            slideCount: getUpperLimit(slideCount),
+          }),
         }
       );
 
@@ -109,7 +119,10 @@ export default function GeneratePPTPage() {
             {
               method: "POST",
               headers: newHeaders,
-              body: JSON.stringify({ prompt: topics.join(", ") }),
+              body: JSON.stringify({
+                prompt: topics.join(", "),
+                slideCount: getUpperLimit(slideCount),
+              }),
             }
           );
 
@@ -160,12 +173,12 @@ export default function GeneratePPTPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
       <Header />
-      <div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-64px)]">
+      <div className="flex-1 p-4 md:p-8 flex items-center justify-center overflow-y-auto">
         <div className="w-full max-w-4xl relative">
           {showBackButton && (
-            <div className="mb-4 flex items-center justify-between bg-white/10 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/20">
+            <div className="absolute bottom-[calc(100%+1rem)] left-0 right-0 flex items-center justify-between bg-white/10 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/20">
               <Button
                 onClick={() => navigate("/")}
                 variant="outline"
