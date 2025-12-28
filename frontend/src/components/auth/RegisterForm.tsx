@@ -1,36 +1,42 @@
-import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
 
 interface RegisterFormProps {
   onSwitchToLogin?: () => void;
 }
 
 export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     // Validation
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setError("Password must be at least 8 characters long");
       return;
     }
 
@@ -38,34 +44,44 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
 
     try {
       const result = await register({ email, password });
-      
+
       if (!result.success) {
-        setError(result.error || 'Registration failed');
+        setError(result.error || "Registration failed");
       }
       // On success, the AuthContext will update and redirect will happen via routing
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card className="w-full max-w-md shadow-2xl border border-white/20 bg-white/10 backdrop-blur-md">
-      <CardHeader>
-        <CardTitle className="text-white">Create Account</CardTitle>
-        <CardDescription className="text-white/80">Sign up to start creating presentations with AI</CardDescription>
+    <Card className="w-full max-w-4xl shadow-2xl border border-white/20 bg-white/10 backdrop-blur-md">
+      <CardHeader className="space-y-3 pb-8">
+        <CardTitle className="text-white text-4xl">Create Account</CardTitle>
+        <div className="h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
+        <CardDescription className="text-white/80 text-lg">
+          Sign up to start creating presentations with AI
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <CardContent className="px-8 pb-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <Alert variant="destructive" className="bg-red-500/20 border-red-500/50 text-white">
+            <Alert
+              variant="destructive"
+              className="bg-red-500/20 border-red-500/50 text-white"
+            >
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-white/80">Email</Label>
+
+          <div className="space-y-3">
+            <Label htmlFor="email" className="text-white/80 text-lg">
+              Email
+            </Label>
             <Input
               id="email"
               type="email"
@@ -74,12 +90,14 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40"
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40 h-12 text-lg"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-white/80">Password</Label>
+          <div className="space-y-3">
+            <Label htmlFor="password" className="text-white/80 text-lg">
+              Password
+            </Label>
             <Input
               id="password"
               type="password"
@@ -89,15 +107,19 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               required
               disabled={loading}
               minLength={8}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40"
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40 h-12 text-lg"
             />
-            <p className="text-xs text-white/60">
-              Must be at least 8 characters
-            </p>
+            {password.length > 0 && password.length < 8 && (
+              <p className="text-sm text-red-400">
+                Must be at least 8 characters
+              </p>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword" className="text-white/80">Confirm Password</Label>
+          <div className="space-y-3">
+            <Label htmlFor="confirmPassword" className="text-white/80 text-lg">
+              Confirm Password
+            </Label>
             <Input
               id="confirmPassword"
               type="password"
@@ -107,29 +129,30 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               required
               disabled={loading}
               minLength={8}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40"
+              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40 h-12 text-lg"
             />
           </div>
 
-          <Button 
-            type="submit" 
-            className="w-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 text-white border-0" 
-            disabled={loading}
-            size="lg"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Creating account...
-              </>
-            ) : (
-              'Sign Up'
-            )}
-          </Button>
+          <div className="flex justify-center my-8">
+            <Button
+              type="submit"
+              className="w-1/3 bg-white/10 hover:bg-white/20 backdrop-blur-lg border border-white/30 text-white shadow-[0_8px_32px_0_rgba(255,255,255,0.1)] transition-all duration-300 hover:shadow-[0_8px_32px_0_rgba(255,255,255,0.2)] h-14 text-lg font-semibold"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                "Sign Up"
+              )}
+            </Button>
+          </div>
 
           {onSwitchToLogin && (
             <div className="text-center text-sm text-white/60">
-              Already have an account?{' '}
+              Already have an account?{" "}
               <button
                 type="button"
                 onClick={onSwitchToLogin}
@@ -145,4 +168,3 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     </Card>
   );
 }
-

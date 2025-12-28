@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import LoginForm from '@/components/auth/LoginForm';
-import RegisterForm from '@/components/auth/RegisterForm';
-import Header from '@/components/Header';
-import { Loader2 } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import LoginForm from "@/components/auth/LoginForm";
+import RegisterForm from "@/components/auth/RegisterForm";
+import Header from "@/components/Header";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,7 +13,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      navigate('/');
+      navigate("/");
     }
   }, [isAuthenticated, loading, navigate]);
 
@@ -30,18 +30,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
       <Header />
-      <div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-64px)]">
-        <div className="w-full max-w-md">
-          {isLogin ? (
-            <LoginForm onSwitchToRegister={() => setIsLogin(false)} />
-          ) : (
-            <RegisterForm onSwitchToLogin={() => setIsLogin(true)} />
-          )}
-        </div>
+      <div className="flex-1 flex items-center justify-center px-4 md:px-8">
+        {isLogin ? (
+          <LoginForm onSwitchToRegister={() => setIsLogin(false)} />
+        ) : (
+          <RegisterForm onSwitchToLogin={() => setIsLogin(true)} />
+        )}
       </div>
     </div>
   );
 }
-
