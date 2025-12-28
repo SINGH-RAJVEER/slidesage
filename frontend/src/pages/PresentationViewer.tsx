@@ -78,6 +78,7 @@ const PresentationViewer: React.FC = () => {
   const customInputRef = useRef<HTMLInputElement | null>(null);
   const slideContainerRef = useRef<HTMLDivElement | null>(null);
   const [visibleSlide, setVisibleSlide] = useState(0);
+  const thumbnailScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Iterative editing states
   const [showIterateModal, setShowIterateModal] = useState(false);
@@ -174,17 +175,33 @@ const PresentationViewer: React.FC = () => {
   }, [currentSlide, presentationState, isPlaying]);
 
   useEffect(() => {
-    const currentThumbnail = document.querySelector(
-      `[data-slide-index="${currentSlide}"]`
-    );
-
-    if (currentThumbnail) {
-      currentThumbnail.scrollIntoView({
-        behavior: "smooth",
-        inline: "center",
-        block: "nearest",
-      });
+    // Clear any pending thumbnail scroll
+    if (thumbnailScrollTimeoutRef.current) {
+      clearTimeout(thumbnailScrollTimeoutRef.current);
     }
+
+    // Debounce thumbnail scrolling to prevent wobble
+    thumbnailScrollTimeoutRef.current = setTimeout(() => {
+      requestAnimationFrame(() => {
+        const currentThumbnail = document.querySelector(
+          `[data-slide-index="${currentSlide}"]`
+        );
+
+        if (currentThumbnail) {
+          currentThumbnail.scrollIntoView({
+            behavior: "smooth",
+            inline: "center",
+            block: "nearest",
+          });
+        }
+      });
+    }, 50);
+
+    return () => {
+      if (thumbnailScrollTimeoutRef.current) {
+        clearTimeout(thumbnailScrollTimeoutRef.current);
+      }
+    };
   }, [currentSlide]);
 
   // IntersectionObserver to track which slide is centered/visible
@@ -883,7 +900,7 @@ const PresentationViewer: React.FC = () => {
                     className={`w-20 h-14 border-2 rounded-xl flex-shrink-0 transition-all duration-300 overflow-hidden
                       ${
                         currentSlide === index
-                          ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/25 scale-110"
+                          ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/50"
                           : "border-white/20 bg-white/10 hover:border-white/40 hover:bg-white/20"
                       }
                       backdrop-blur-sm relative`}

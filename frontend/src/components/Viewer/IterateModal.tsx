@@ -7,12 +7,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2, Sparkles } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Loader2, Sparkles, ChevronDown } from "lucide-react";
 
 interface IterateModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onIterate: (prompt: string) => void;
+  onIterate: (
+    prompt: string,
+    slideCount: number,
+    detailLevel: string,
+    tonality: string
+  ) => void;
   isStreaming: boolean;
 }
 
@@ -23,10 +34,24 @@ export default function IterateModal({
   isStreaming,
 }: IterateModalProps) {
   const [iteratePrompt, setIteratePrompt] = useState("");
+  const [slideCount, setSlideCount] = useState("5-10");
+  const [detailLevel, setDetailLevel] = useState("balanced");
+  const [tonality, setTonality] = useState("professional");
+
+  const getUpperLimit = (range: string): number => {
+    if (range.includes("+")) return 25;
+    const parts = range.split("-");
+    return parseInt(parts[parts.length - 1]) || 10;
+  };
 
   const handleSubmit = () => {
     if (iteratePrompt.trim()) {
-      onIterate(iteratePrompt);
+      onIterate(
+        iteratePrompt,
+        getUpperLimit(slideCount),
+        detailLevel,
+        tonality
+      );
       setIteratePrompt("");
     }
   };
@@ -59,6 +84,148 @@ export default function IterateModal({
               className="text-xl bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40 min-h-[200px] resize-none"
               disabled={isStreaming}
             />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 pt-2">
+            <div className="flex items-center gap-2">
+              <span className="text-white/70 text-sm font-medium">Detail:</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-40 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
+                    disabled={isStreaming}
+                  >
+                    {detailLevel.charAt(0).toUpperCase() + detailLevel.slice(1)}
+                    <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-40 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
+                  <DropdownMenuItem
+                    onClick={() => setDetailLevel("brief")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    Brief
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setDetailLevel("concise")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    Concise
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setDetailLevel("balanced")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    Balanced
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setDetailLevel("detailed")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    Detailed
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setDetailLevel("comprehensive")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    Comprehensive
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-white/70 text-sm font-medium">
+                Tonality:
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-36 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
+                    disabled={isStreaming}
+                  >
+                    {tonality.charAt(0).toUpperCase() + tonality.slice(1)}
+                    <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-36 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
+                  <DropdownMenuItem
+                    onClick={() => setTonality("professional")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    Professional
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setTonality("casual")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    Casual
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setTonality("enthusiastic")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    Enthusiastic
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setTonality("persuasive")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    Persuasive
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-white/70 text-sm font-medium">Slides:</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-28 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
+                    disabled={isStreaming}
+                  >
+                    {slideCount}
+                    <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-28 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
+                  <DropdownMenuItem
+                    onClick={() => setSlideCount("3-5")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    3-5
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setSlideCount("5-10")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    5-10
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setSlideCount("10-15")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    10-15
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setSlideCount("15-20")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    15-20
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setSlideCount("20+")}
+                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                  >
+                    20+
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           <div className="flex justify-center pt-4">
