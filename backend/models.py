@@ -49,8 +49,12 @@ class Presentation(db.Model):
     title = db.Column(db.String(255), nullable=False)
     prompt = db.Column(db.Text, nullable=False)
     slides_data = db.Column(db.Text, nullable=False)  # JSON string of the presentation structure
+    parent_presentation_id = db.Column(db.Integer, db.ForeignKey('presentations.id'), nullable=True, index=True)  # For iterative editing
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship to parent presentation (self-referential)
+    parent_presentation = db.relationship('Presentation', remote_side=[id], backref='iterations')
     
     def set_slides_data(self, data):
         """Store presentation data as JSON string"""

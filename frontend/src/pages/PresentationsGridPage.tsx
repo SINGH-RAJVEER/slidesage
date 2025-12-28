@@ -122,7 +122,10 @@ export default function PresentationsGridPage() {
         const retryResult = await retryResponse.json();
         if (retryResult.success && retryResult.presentation) {
           navigate("/presentation", {
-            state: { presentation: retryResult.presentation.slides_data },
+            state: {
+              presentation: retryResult.presentation.slides_data,
+              presentationId: retryResult.presentation.id,
+            },
           });
         }
         return;
@@ -132,7 +135,10 @@ export default function PresentationsGridPage() {
 
       if (result.success && result.presentation) {
         navigate("/presentation", {
-          state: { presentation: result.presentation.slides_data },
+          state: {
+            presentation: result.presentation.slides_data,
+            presentationId: result.presentation.id,
+          },
         });
       } else {
         setError(result.error || "Failed to load presentation");

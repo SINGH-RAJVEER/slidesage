@@ -2,6 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,11 +22,14 @@ import {
   Trash,
   ChevronDown,
   Loader2,
+  Sparkles,
+  X,
 } from "lucide-react";
 import DownloadPPTXButton from "@/components/Viewer/DownloadPPTXButton";
 import ChartRenderer from "@/components/Charts/ChartRenderer";
 import TemplateApplier from "@/components/Viewer/TemplateApplier";
 import TemplateSelector from "@/components/Viewer/TemplateSelector";
+import IterateModal from "@/components/Viewer/IterateModal";
 import { useTemplate } from "@/hooks/useTemplate";
 import { AVAILABLE_TEMPLATES } from "@/types/template";
 import type {
@@ -38,7 +49,7 @@ import { useStreaming } from "@/contexts/StreamingContext";
 const PresentationViewer: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { streamingState, getPresentation } = useStreaming();
+  const { streamingState, getPresentation, startIterating } = useStreaming();
 
   // Check if we're in streaming mode
   const isStreamingMode = location.state?.isStreaming === true;
@@ -54,6 +65,9 @@ const PresentationViewer: React.FC = () => {
   const [presentationState, setPresentation] = useState<
     PresentationData | undefined
   >(getInitialPresentation());
+  const [presentationId, setPresentationId] = useState<number | undefined>(
+    location.state?.presentationId || streamingState.presentationId
+  );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -61,17 +75,30 @@ const PresentationViewer: React.FC = () => {
   const [slideInterval, setSlideInterval] = useState(5);
   const [intervalMode, setIntervalMode] = useState("preset");
   const [customInterval, setCustomInterval] = useState("5");
-  const customInputRef = useRef<HTMLInputElement>(null);
+  const customInputRef = useRef<HTMLInputElement | null>(null);
   const slideContainerRef = useRef<HTMLDivElement | null>(null);
   const [visibleSlide, setVisibleSlide] = useState(0);
+
+  // Iterative editing states
+  const [showIterateModal, setShowIterateModal] = useState(false);
 
   const { currentTemplate, changeTemplate } = useTemplate();
 
   // Update presentation state when streaming slides arrive
   // Use slides.length as the primary trigger since array reference changes may not be detected
   const streamingSlidesCount = streamingState.slides.length;
+
+  // Clear presentation when streaming starts (for iterations)
   useEffect(() => {
-    if (isStreamingMode && streamingSlidesCount > 0) {
+    if (streamingState.isStreaming && streamingSlidesCount === 0) {
+      // Streaming just started, clear current presentation to show loading
+      setPresentation(undefined);
+    }
+  }, [streamingState.isStreaming, streamingSlidesCount]);
+
+  // Update presentation as slides arrive
+  useEffect(() => {
+    if (streamingSlidesCount > 0 && streamingState.isStreaming) {
       // Create a new presentation object with the latest slides
       setPresentation({
         title: streamingState.title,
@@ -81,12 +108,41 @@ const PresentationViewer: React.FC = () => {
       });
     }
   }, [
-    isStreamingMode,
     streamingSlidesCount,
+    streamingState.isStreaming,
     streamingState.title,
     streamingState.theme,
     streamingState.slides,
   ]);
+
+  // Auto-navigate to the latest slide when streaming
+  useEffect(() => {
+    if (streamingState.isStreaming && streamingSlidesCount > 0) {
+      const latestSlideIndex = streamingSlidesCount - 1;
+      setCurrentSlide(latestSlideIndex);
+
+      // Scroll to the latest slide
+      setTimeout(() => {
+        const slideElement = document.getElementById(
+          `slide-${latestSlideIndex}`
+        );
+        if (slideElement) {
+          slideElement.scrollIntoView({
+            behavior: "smooth",
+            inline: "center",
+            block: "nearest",
+          });
+        }
+      }, 100);
+    }
+  }, [streamingState.isStreaming, streamingSlidesCount]);
+
+  // Update presentationId when it becomes available from streaming
+  useEffect(() => {
+    if (streamingState.presentationId && !presentationId) {
+      setPresentationId(streamingState.presentationId);
+    }
+  }, [streamingState.presentationId, presentationId]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -175,11 +231,6 @@ const PresentationViewer: React.FC = () => {
         // Jump to last slide
         setIsPlaying(false);
         skipToLastSlide("auto");
-      } else if (e.key === "Escape") {
-        if (isFullscreen) {
-          document.exitFullscreen();
-          setIsFullscreen(false);
-        }
       } else if (e.key === "f" || e.key === "F") {
         if (!isFullscreen) {
           document.documentElement.requestFullscreen();
@@ -201,14 +252,83 @@ const PresentationViewer: React.FC = () => {
   }, [currentSlide, presentationState, isFullscreen]);
 
   useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  useEffect(() => {
     if (intervalMode === "custom" && customInputRef.current) {
       customInputRef.current.focus();
     }
   }, [intervalMode]);
 
-  // If in streaming mode and still loading first slide, show loading state
+  // Sync currentSlide with carousel scroll position
+  useEffect(() => {
+    const container = slideContainerRef.current;
+    if (!container || !presentationState) return;
+
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const children = Array.from(container.children) as HTMLElement[];
+        if (!children.length) {
+          ticking = false;
+          return;
+        }
+        const containerRect = container.getBoundingClientRect();
+        let nearestIndex = 0;
+        let nearestDistance = Infinity;
+        children.forEach((child, i) => {
+          const rect = child.getBoundingClientRect();
+          const childCenter = (rect.left + rect.right) / 2;
+          const containerCenter =
+            (containerRect.left + containerRect.right) / 2;
+          const distance = Math.abs(childCenter - containerCenter);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestIndex = i;
+          }
+        });
+        setCurrentSlide(nearestIndex);
+        ticking = false;
+      });
+    };
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    // run once to ensure state sync
+    onScroll();
+    return () => container.removeEventListener("scroll", onScroll);
+  }, [presentationState?.slides.length]);
+
+  // Navigate away only if we loaded without any presentation data and not streaming
+  const hasLocationPresentation = !!location.state?.presentation;
+  const isLocationStreaming = !!location.state?.isStreaming;
+  useEffect(() => {
+    if (
+      !hasLocationPresentation &&
+      !isLocationStreaming &&
+      !streamingState.isStreaming &&
+      !presentationState
+    ) {
+      navigate("/");
+    }
+  }, [
+    hasLocationPresentation,
+    isLocationStreaming,
+    streamingState.isStreaming,
+    presentationState,
+    navigate,
+  ]);
+
+  // If streaming and still loading first slide, show loading state
   if (
-    isStreamingMode &&
     streamingState.isStreaming &&
     (!presentationState || presentationState.slides.length === 0)
   ) {
@@ -222,8 +342,8 @@ const PresentationViewer: React.FC = () => {
     );
   }
 
-  if (!presentationState || presentationState.slides.length === 0) {
-    navigate("/");
+  // Guard: Don't render if no presentation and not streaming
+  if (!presentationState) {
     return null;
   }
 
@@ -304,46 +424,6 @@ const PresentationViewer: React.FC = () => {
     }
   };
 
-  // Sync currentSlide with carousel scroll position
-  useEffect(() => {
-    const container = slideContainerRef.current;
-    if (!container) return;
-
-    let ticking = false;
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        const children = Array.from(container.children) as HTMLElement[];
-        if (!children.length) {
-          ticking = false;
-          return;
-        }
-        const containerRect = container.getBoundingClientRect();
-        let nearestIndex = 0;
-        let nearestDistance = Infinity;
-        children.forEach((child, i) => {
-          const rect = child.getBoundingClientRect();
-          const childCenter = (rect.left + rect.right) / 2;
-          const containerCenter =
-            (containerRect.left + containerRect.right) / 2;
-          const distance = Math.abs(childCenter - containerCenter);
-          if (distance < nearestDistance) {
-            nearestDistance = distance;
-            nearestIndex = i;
-          }
-        });
-        setCurrentSlide(nearestIndex);
-        ticking = false;
-      });
-    };
-
-    container.addEventListener("scroll", onScroll, { passive: true });
-    // run once to ensure state sync
-    onScroll();
-    return () => container.removeEventListener("scroll", onScroll);
-  }, [presentationState.slides.length]);
-
   const deleteCurrentSlide = () => {
     if (!presentationState || presentationState.slides.length === 1) return;
     const newSlides = presentationState.slides.filter(
@@ -355,6 +435,22 @@ const PresentationViewer: React.FC = () => {
     }
     setPresentation({ ...presentationState, slides: newSlides });
     setCurrentSlide(newCurrent);
+  };
+
+  const handleIteratePresentation = async (prompt: string) => {
+    if (!prompt.trim() || !presentationId) return;
+
+    const success = await startIterating(
+      prompt,
+      presentationId,
+      10, // default slide count
+      "balanced", // default detail level
+      "professional" // default tonality
+    );
+
+    if (success) {
+      setShowIterateModal(false);
+    }
   };
 
   const renderSlideContent = (slide: Slide, isActive: boolean = true) => {
@@ -430,6 +526,16 @@ const PresentationViewer: React.FC = () => {
                 selectedTemplate={currentTemplate}
                 onTemplateChange={changeTemplate}
               />
+              {presentationId && (
+                <Button
+                  onClick={() => setShowIterateModal(true)}
+                  variant="outline"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Iterate
+                </Button>
+              )}
             </div>
             <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/80 text-sm font-medium select-none pointer-events-none bg-white/10 border border-white/20 px-4 py-1 rounded-full shadow-sm flex items-center gap-2">
               {isStreamingMode && streamingState.isStreaming && (
@@ -590,6 +696,13 @@ const PresentationViewer: React.FC = () => {
             </div>
           </div>
         )}
+        {/* Iterate Modal */}
+        <IterateModal
+          open={showIterateModal}
+          onOpenChange={setShowIterateModal}
+          onIterate={handleIteratePresentation}
+          isStreaming={streamingState.isStreaming}
+        />
         {/* Slide Counter */}
         {showControls && !isFullscreen && <></>}
         {/* Slides Area (horizontal carousel, fills available space) */}
