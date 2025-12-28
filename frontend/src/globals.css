@@ -161,6 +161,7 @@ input.hide-number-spin[type="number"] {
   );
   opacity: 0.8;
   transition: opacity 0.6s ease-in-out;
+  border-radius: 1rem;
 }
 
 @media (max-width: 768px) {

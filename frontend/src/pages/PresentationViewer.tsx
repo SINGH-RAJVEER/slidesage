@@ -12,6 +12,7 @@ import {
   SkipBack,
   SkipForward,
   Trash,
+  ChevronDown,
 } from "lucide-react";
 import DownloadPPTXButton from "@/components/Viewer/DownloadPPTXButton";
 import ChartRenderer from "@/components/Charts/ChartRenderer";
@@ -26,12 +27,11 @@ import type {
   ChartSlide,
 } from "@/types/presentation";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const PresentationViewer: React.FC = () => {
   const location = useLocation();
@@ -57,10 +57,23 @@ const PresentationViewer: React.FC = () => {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isPlaying && currentSlide < presentationState!.slides.length - 1) {
-      interval = setInterval(() => {
-        nextSlide();
-      }, slideInterval * 1000);
+    if (isPlaying && presentationState) {
+      if (currentSlide < presentationState.slides.length - 1) {
+        interval = setInterval(() => {
+          setCurrentSlide((prev) => {
+            const nextIndex = prev + 1;
+            const slideElement = document.getElementById(`slide-${nextIndex}`);
+            if (slideElement) {
+              slideElement.scrollIntoView({
+                behavior: "smooth",
+                inline: "center",
+                block: "nearest",
+              });
+            }
+            return nextIndex;
+          });
+        }, slideInterval * 1000);
+      }
     }
     return () => clearInterval(interval);
   }, [isPlaying, currentSlide, presentationState, slideInterval]);
@@ -116,14 +129,18 @@ const PresentationViewer: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Primary navigation: Left/Right for prev/next; Up/Down to jump to first/last
       if (e.key === "ArrowLeft") {
+        setIsPlaying(false);
         prevSlide("auto");
       } else if (e.key === "ArrowRight") {
+        setIsPlaying(false);
         nextSlide("auto");
       } else if (e.key === "ArrowUp") {
         // Jump to first slide
+        setIsPlaying(false);
         skipToFirstSlide("auto");
       } else if (e.key === "ArrowDown") {
         // Jump to last slide
+        setIsPlaying(false);
         skipToLastSlide("auto");
       } else if (e.key === "Escape") {
         if (isFullscreen) {
@@ -137,8 +154,10 @@ const PresentationViewer: React.FC = () => {
         }
         // Home/End to jump to first/last slide (also supported)
       } else if (e.key === "Home") {
+        setIsPlaying(false);
         skipToFirstSlide("auto");
       } else if (e.key === "End") {
+        setIsPlaying(false);
         skipToLastSlide("auto");
       }
     };
@@ -162,7 +181,6 @@ const PresentationViewer: React.FC = () => {
   const nextSlide = (scrollBehavior: ScrollBehavior = "smooth") => {
     if (currentSlide < presentationState.slides.length - 1) {
       setCurrentSlide(currentSlide + 1);
-      setIsPlaying(false);
       const slideElement = document.getElementById(`slide-${currentSlide + 1}`);
       if (slideElement) {
         slideElement.scrollIntoView({
@@ -177,7 +195,6 @@ const PresentationViewer: React.FC = () => {
   const prevSlide = (scrollBehavior: ScrollBehavior = "smooth") => {
     if (currentSlide > 0) {
       setCurrentSlide(currentSlide - 1);
-      setIsPlaying(false);
       const slideElement = document.getElementById(`slide-${currentSlide - 1}`);
       if (slideElement) {
         slideElement.scrollIntoView({
@@ -214,7 +231,6 @@ const PresentationViewer: React.FC = () => {
 
   const skipToFirstSlide = (scrollBehavior: ScrollBehavior = "smooth") => {
     setCurrentSlide(0);
-    setIsPlaying(false);
     const slideElement = document.getElementById("slide-0");
     if (slideElement) {
       slideElement.scrollIntoView({
@@ -227,7 +243,6 @@ const PresentationViewer: React.FC = () => {
 
   const skipToLastSlide = (scrollBehavior: ScrollBehavior = "smooth") => {
     setCurrentSlide(presentationState.slides.length - 1);
-    setIsPlaying(false);
     const slideElement = document.getElementById(
       `slide-${presentationState.slides.length - 1}`
     );
@@ -360,9 +375,8 @@ const PresentationViewer: React.FC = () => {
                 variant="outline"
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
-                ← Back to Generator
+                ←
               </Button>
-              <DownloadPPTXButton title={presentationState.title} />
               <TemplateSelector
                 selectedTemplate={currentTemplate}
                 onTemplateChange={changeTemplate}
@@ -374,42 +388,75 @@ const PresentationViewer: React.FC = () => {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 {intervalMode === "preset" ? (
-                  <Select
-                    value={slideInterval.toString()}
-                    onValueChange={(v) => {
-                      if (v === "custom") {
-                        setIntervalMode("custom");
-                      } else {
-                        setSlideInterval(Number(v));
-                        setCustomInterval(v);
-                        setIntervalMode("preset");
-                      }
-                    }}
-                  >
-                    <SelectTrigger
-                      className={`w-24 text-white ${
-                        isFullscreen
-                          ? "bg-transparent border-0 shadow-none hover:bg-white/20"
-                          : "bg-white/10 border-white/20 hover:bg-white/20"
-                      }`}
-                    >
-                      {!["2", "3", "5", "10", "15"].includes(
-                        slideInterval.toString()
-                      ) && slideInterval !== 0 ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-24 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 justify-between"
+                      >
                         <span>{slideInterval}s</span>
-                      ) : (
-                        <SelectValue />
-                      )}
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-800/95 backdrop-blur-md border-gray-600 text-white">
-                      <SelectItem value="2">2s</SelectItem>
-                      <SelectItem value="3">3s</SelectItem>
-                      <SelectItem value="5">5s</SelectItem>
-                      <SelectItem value="10">10s</SelectItem>
-                      <SelectItem value="15">15s</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
-                    </SelectContent>
-                  </Select>
+                        <ChevronDown className="w-4 h-4 opacity-50" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-32 bg-gray-800/95 backdrop-blur-md border-gray-600">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSlideInterval(2);
+                          setCustomInterval("2");
+                          setIntervalMode("preset");
+                        }}
+                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
+                      >
+                        2s
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSlideInterval(3);
+                          setCustomInterval("3");
+                          setIntervalMode("preset");
+                        }}
+                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
+                      >
+                        3s
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSlideInterval(5);
+                          setCustomInterval("5");
+                          setIntervalMode("preset");
+                        }}
+                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
+                      >
+                        5s
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSlideInterval(10);
+                          setCustomInterval("10");
+                          setIntervalMode("preset");
+                        }}
+                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
+                      >
+                        10s
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSlideInterval(15);
+                          setCustomInterval("15");
+                          setIntervalMode("preset");
+                        }}
+                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
+                      >
+                        15s
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setIntervalMode("custom")}
+                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
+                      >
+                        Custom
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : (
                   <input
                     ref={customInputRef}
@@ -446,8 +493,8 @@ const PresentationViewer: React.FC = () => {
                     className={`w-24 px-3 py-2 rounded-md border ${
                       isFullscreen
                         ? "bg-transparent border-0 shadow-none text-white hover:bg-white/20"
-                        : "border-white/20 bg-white/10 text-white"
-                    } focus:outline-none focus:ring-2 focus:ring-blue-400 hide-number-spin`}
+                        : "border-white/20 bg-white/10 text-white hover:bg-white/20"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-400 hide-number-spin transition-all duration-200`}
                     placeholder="Custom (s)"
                     inputMode="numeric"
                     style={{ MozAppearance: "textfield" }}
@@ -459,7 +506,7 @@ const PresentationViewer: React.FC = () => {
                   className={
                     isFullscreen
                       ? "text-white hover:bg-white/20"
-                      : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      : "bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
                   }
                   disabled={presentationState.slides.length === 1}
                 >
@@ -478,18 +525,12 @@ const PresentationViewer: React.FC = () => {
                 <Button
                   onClick={toggleFullscreen}
                   variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
                 >
                   <Maximize className="w-4 h-4 mr-2" />
                   Fullscreen
                 </Button>
-                <Button
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
+                <DownloadPPTXButton title={presentationState.title} />
               </div>
             </div>
           </div>
@@ -575,7 +616,10 @@ const PresentationViewer: React.FC = () => {
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => skipToFirstSlide()}
+                onClick={() => {
+                  setIsPlaying(false);
+                  skipToFirstSlide();
+                }}
                 disabled={currentSlide === 0}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
@@ -583,7 +627,10 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => prevSlide()}
+                onClick={() => {
+                  setIsPlaying(false);
+                  prevSlide();
+                }}
                 disabled={currentSlide === 0}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
@@ -592,7 +639,10 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => nextSlide()}
+                onClick={() => {
+                  setIsPlaying(false);
+                  nextSlide();
+                }}
                 disabled={currentSlide === presentationState.slides.length - 1}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
@@ -601,7 +651,10 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => skipToLastSlide()}
+                onClick={() => {
+                  setIsPlaying(false);
+                  skipToLastSlide();
+                }}
                 disabled={currentSlide === presentationState.slides.length - 1}
                 className="bg-white/10 border-white/20 text-white hover:bg-white/20"
               >
@@ -658,7 +711,7 @@ const PresentationViewer: React.FC = () => {
                       marginLeft,
                       marginRight,
                     }}
-                    className={`w-20 h-14 border-2 rounded-xl flex-shrink-0 transition-all duration-300
+                    className={`w-20 h-14 border-2 rounded-xl flex-shrink-0 transition-all duration-300 overflow-hidden
                       ${
                         currentSlide === index
                           ? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/25 scale-110"
@@ -670,14 +723,6 @@ const PresentationViewer: React.FC = () => {
                       <span className="text-sm text-white font-medium">
                         {index + 1}
                       </span>
-                      {slide.type === "chart" && (
-                        <div className="absolute top-0 right-0 w-2 h-2 bg-green-500 rounded-full"></div>
-                      )}
-                      {(slide as HtmlSlide).html?.includes(
-                        'id="slide-table"'
-                      ) && (
-                        <div className="absolute top-0 left-0 w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      )}
                     </div>
                   </button>
                 );
@@ -815,7 +860,10 @@ const PresentationViewer: React.FC = () => {
             <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
-                onClick={() => skipToFirstSlide()}
+                onClick={() => {
+                  setIsPlaying(false);
+                  skipToFirstSlide();
+                }}
                 disabled={currentSlide === 0}
                 className="text-white hover:bg-white/20"
               >
@@ -823,7 +871,10 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => prevSlide()}
+                onClick={() => {
+                  setIsPlaying(false);
+                  prevSlide();
+                }}
                 disabled={currentSlide === 0}
                 className="text-white hover:bg-white/20"
               >
@@ -831,7 +882,10 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => nextSlide()}
+                onClick={() => {
+                  setIsPlaying(false);
+                  nextSlide();
+                }}
                 disabled={currentSlide === presentationState.slides.length - 1}
                 className="text-white hover:bg-white/20"
               >
@@ -839,7 +893,10 @@ const PresentationViewer: React.FC = () => {
               </Button>
               <Button
                 variant="ghost"
-                onClick={() => skipToLastSlide()}
+                onClick={() => {
+                  setIsPlaying(false);
+                  skipToLastSlide();
+                }}
                 disabled={currentSlide === presentationState.slides.length - 1}
                 className="text-white hover:bg-white/20"
               >

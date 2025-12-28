@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 from config import ConfigAI
-from models import db, User
+from models import db, User, Presentation
 from auth import auth_bp
 from ai import AIService
 import json
@@ -74,7 +74,7 @@ ai = AIService()
 def generate_presentation():
     """Generate presentation - requires authentication"""
     try:
-        # Get current user (optional, for logging/analytics)
+        # Get current user
         current_user_id = get_jwt_identity()
         
         if not request.is_json:
@@ -90,11 +90,30 @@ def generate_presentation():
         if not prompt:
             return jsonify({'error': 'Prompt is required'}), 400
        
+        # Generate presentation structure
         presentation_data = ai.generate_presentation_structure(prompt)
+        
+        # Extract title from presentation data (use first slide title or default)
+        title = 'Untitled Presentation'
+        if presentation_data and 'slides' in presentation_data and len(presentation_data['slides']) > 0:
+            first_slide = presentation_data['slides'][0]
+            title = first_slide.get('title', 'Untitled Presentation')
+        
+        # Save to database
+        presentation = Presentation(
+            user_id=current_user_id,
+            title=title,
+            prompt=prompt
+        )
+        presentation.set_slides_data(presentation_data)
+        
+        db.session.add(presentation)
+        db.session.commit()
         
         return jsonify({
             'success': True,
-            'data': presentation_data
+            'data': presentation_data,
+            'presentation_id': presentation.id
         })
         
     except json.JSONDecodeError as e:
@@ -104,6 +123,93 @@ def generate_presentation():
         }), 400
 
     except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/presentations', methods=['GET'])
+@jwt_required()
+def get_presentations():
+    """Get all presentations for the current user"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Query all presentations for the user, ordered by most recent first
+        presentations = Presentation.query.filter_by(user_id=current_user_id)\
+            .order_by(Presentation.created_at.desc())\
+            .all()
+        
+        return jsonify({
+            'success': True,
+            'presentations': [p.to_dict(include_slides=False) for p in presentations]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/presentations/<int:presentation_id>', methods=['GET'])
+@jwt_required()
+def get_presentation(presentation_id):
+    """Get a specific presentation with full slide data"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Query the presentation and ensure it belongs to the current user
+        presentation = Presentation.query.filter_by(
+            id=presentation_id,
+            user_id=current_user_id
+        ).first()
+        
+        if not presentation:
+            return jsonify({
+                'success': False,
+                'error': 'Presentation not found'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'presentation': presentation.to_dict(include_slides=True)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/presentations/<int:presentation_id>', methods=['DELETE'])
+@jwt_required()
+def delete_presentation(presentation_id):
+    """Delete a specific presentation"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        # Query the presentation and ensure it belongs to the current user
+        presentation = Presentation.query.filter_by(
+            id=presentation_id,
+            user_id=current_user_id
+        ).first()
+        
+        if not presentation:
+            return jsonify({
+                'success': False,
+                'error': 'Presentation not found'
+            }), 404
+        
+        db.session.delete(presentation)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Presentation deleted successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
         return jsonify({
             'success': False,
             'error': str(e)

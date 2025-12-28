@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import HomePage from "./pages/HomePage";
 import GeneratePPTPage from "./pages/GeneratePPTPage";
 import PresentationViewer from "./pages/PresentationViewer";
 import LoginPage from "./pages/LoginPage";
@@ -11,6 +12,14 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route
           path="/"
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/generate"
           element={
             <ProtectedRoute>
               <GeneratePPTPage />
