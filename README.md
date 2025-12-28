@@ -1,56 +1,114 @@
 # SlideSage
 
-AI-assisted presentation generator
+AI-assisted presentation generator that creates professional slides with rich content, charts, and beautiful templates.
+
 ---
 
 ## Overview
 
-- **Backend:** Flask app that provides AI services (text generation via `backend/ai.py`) and serves generated content under `backend/public`.
-- **Frontend:** Vite + Bun app that submits prompts to the backend, previews generated slides, and lets users download PPTX files.
-- **Build system:** Nix flakes are used for reproducible dev shells and Docker image builds.
+SlideSage is a modern web application that leverages AI to generate complete presentations from simple text prompts. It features real-time streaming of generated content, support for data visualization charts, and multiple professional design templates.
+
+- **Backend:** Flask app providing AI services (via LiteLLM), authentication, and data persistence.
+- **Frontend:** React (Vite + Bun) app with a modern UI built using Tailwind CSS and Shadcn UI.
+- **Database:** PostgreSQL for storing user data and presentation history.
+- **Build system:** Nix flakes for reproducible environments and Docker for containerization.
+
+---
+
+## Key Features
+
+- 🚀 **AI Generation:** Generates comprehensive slide decks including titles, bullet points, and summaries.
+- 📊 **Smart Charts:** Automatically creates data visualizations (Bar, Line, Pie, etc.) based on the context.
+- ⚡ **Streaming:** Watch your presentation being built in real-time with streaming responses.
+- 🎨 **Templates:** Choose from multiple professional themes (Modern Dark, Corporate Blue, Minimalist, etc.).
+- 🔐 **Authentication:** Secure user accounts to save and manage your presentation history.
+- 📥 **Export:** Download your presentations as editable PPTX files.
 
 ---
 
 ## Architecture & Flow
 
-- **User → Frontend:** Enter prompt and request a presentation.
-- **Frontend → Backend:** `POST /api/generate-presentation` with `{ "prompt": "..." }`.
-- **Backend → AI services:** Backend calls Bedrock models to generate slide content and optional images.
-- **Backend → Storage:** Generated images saved to `backend/public` and served at `/public/<filename>`.
-- **Frontend → User:** Receives presentation JSON and renders preview; users can edit or download PPTX.
+1. **User → Frontend:** User logs in, selects a template, and enters a prompt.
+2. **Frontend → Backend:** `POST /api/generate-presentation-stream` initiates the generation process.
+3. **Backend → AI:** Backend uses LiteLLM to interface with LLMs to generate content and chart data.
+4. **Streaming:** Slides are streamed back to the frontend one by one as they are generated.
+5. **Storage:** Completed presentations are saved to the PostgreSQL database.
+6. **Frontend → User:** User previews the slides, applies different templates, and downloads the final PPTX.
+
+---
+
+## Tech Stack
+
+### Backend
+
+- **Framework:** Flask
+- **Database:** PostgreSQL (SQLAlchemy)
+- **AI/LLM:** LiteLLM (LLM integration)
+- **Auth:** Flask-JWT-Extended
+
+### Frontend
+
+- **Framework:** React + Vite
+- **Runtime:** Bun
+- **Styling:** Tailwind CSS
+- **Components:** Shadcn UI
+- **Icons:** Lucide React
 
 ---
 
 ## Files to know
 
-- **`backend/`** — Flask services and AI helpers (`ai.py`, `main.py`, `config.py`).
-- **`frontend/`** — Vite + Bun app; source in `frontend/src/` (pages, components, hooks, types).
-- **`docker-compose.yml`** — Starts `backend` (port `8000`) and `frontend` (port `8080`) for local development.
+- **`backend/`**
+  - `main.py`: Application entry point and API routes.
+  - `ai.py`: AI service logic for generating content and charts.
+  - `models.py`: Database models (User, Presentation).
+  - `auth.py`: Authentication routes and logic.
+- **`frontend/`**
+  - `src/components/Viewer/`: Presentation viewer and template logic.
+  - `src/components/Charts/`: Chart rendering components.
+  - `src/contexts/StreamingContext.tsx`: Handling of streaming AI responses.
+- **`docker-compose.yml`**: Orchestrates Backend, Frontend, and PostgreSQL services.
 
 ---
 
 ## Environment variables
 
-Copy the example env files and fill with your credentials and model IDs:
+Copy the example env files and fill with your credentials:
 
 **`backend/.env`** (create from `backend/.env.example`):
 
 - `LITELLM_MODEL`, `LITELLM_PROXY_URL` - AI service configuration
 - `FLASK_DEBUG`, `CORS_ORIGINS` - Flask configuration
-- `JWT_SECRET_KEY` - **REQUIRED**: Secret key for JWT tokens (use a strong random string in production!)
-- `JWT_ACCESS_TOKEN_EXPIRES` - Access token expiration (default: 3600 seconds)
-- `JWT_REFRESH_TOKEN_EXPIRES` - Refresh token expiration (default: 86400 seconds)
-- `DATABASE_URL` - PostgreSQL connection string (defaults to Docker Compose: `postgresql://slidesage:slidesage@postgres:5432/slidesage`)
-  - For local development: `postgresql://user:password@localhost:5432/slidesage`
+- `JWT_SECRET_KEY` - **REQUIRED**: Secret key for JWT tokens
+- `DATABASE_URL` - PostgreSQL connection string
+  - Default: `postgresql://slidesage:slidesage@postgres:5432/slidesage`
 
 **`frontend/.env`** (create from `frontend/.env.example`):
+
 - `VITE_API_URL` - Backend API URL (e.g. `http://localhost:8000`)
 
 ---
 
+## Getting Started
+
+1. **Start Services:**
+
+   ```bash
+   docker-compose up --build
+   ```
+
+2. **Access Application:**
+
+   - Frontend: `http://localhost:5173`
+   - Backend API: `http://localhost:8000`
+
+3. **Development:**
+   - The project includes `flake.nix` for setting up a reproducible development environment with Nix.
+
 ## Important endpoints
 
 ### Authentication (No auth required)
+
 - `POST /api/auth/register` — Register new user: `{ email: string, password: string }`
 - `POST /api/auth/login` — Login: `{ email: string, password: string }` → returns `{ access_token, refresh_token }`
 - `POST /api/auth/refresh` — Refresh access token (requires refresh token)
@@ -58,6 +116,7 @@ Copy the example env files and fill with your credentials and model IDs:
 - `POST /api/auth/logout` — Logout (requires access token)
 
 ### Application (Auth required)
+
 - `POST /api/generate-presentation` — Generate presentation: `{ prompt: string }` → `{ success: boolean, data: presentation }`
 - `GET /api/health` — Health check (no auth required)
 
@@ -72,6 +131,7 @@ docker compose up --build
 ```
 
 This will start:
+
 - **PostgreSQL** database on port `5432`
 - **Backend** API on `http://localhost:8000`
 - **Frontend** app on `http://localhost:8080`

@@ -12,7 +12,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     name = db.Column(db.String(100), nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    profile_picture = db.Column(db.String(500), nullable=True)  # URL or base64 string
+    profile_picture = db.Column(db.Text, nullable=True)  # URL or base64 string
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
