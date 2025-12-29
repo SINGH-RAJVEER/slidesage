@@ -65,7 +65,11 @@ const SlideRenderer = React.memo(
     if (slide.type === "chart") {
       const chartSlide = slide as ChartSlide;
       return (
-        <TemplateApplier templateId={currentTemplate} className="w-full h-full">
+        <TemplateApplier
+          templateId={currentTemplate}
+          className="w-full h-full"
+          slideType="chart"
+        >
           <div
             id="slide-content"
             className="w-full h-full flex items-center justify-center"
@@ -82,7 +86,11 @@ const SlideRenderer = React.memo(
     } else {
       const htmlSlide = slide as HtmlSlide;
       return (
-        <TemplateApplier templateId={currentTemplate} className="w-full h-full">
+        <TemplateApplier
+          templateId={currentTemplate}
+          className="w-full h-full"
+          slideType={htmlSlide.type}
+        >
           <div
             className="w-full h-full flex flex-col justify-center"
             dangerouslySetInnerHTML={{
