@@ -11,8 +11,13 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     name = db.Column(db.String(100), nullable=True)
-    password_hash = db.Column(db.String(255), nullable=False)
-    profile_picture = db.Column(db.Text, nullable=True)  # URL or base64 string
+    password_hash = db.Column(db.String(255), nullable=True)  # Nullable for OAuth users
+    profile_picture = db.Column(db.Text, nullable=True)
+    
+    # OAuth fields
+    oauth_provider = db.Column(db.String(50), nullable=True)
+    oauth_id = db.Column(db.String(255), nullable=True)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

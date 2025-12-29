@@ -17,12 +17,12 @@ SlideSage is a modern web application that leverages AI to generate complete pre
 
 ## Key Features
 
-- 🚀 **AI Generation:** Generates comprehensive slide decks including titles, bullet points, and summaries.
-- 📊 **Smart Charts:** Automatically creates data visualizations (Bar, Line, Pie, etc.) based on the context.
-- ⚡ **Streaming:** Watch your presentation being built in real-time with streaming responses.
-- 🎨 **Templates:** Choose from multiple professional themes (Modern Dark, Corporate Blue, Minimalist, etc.).
-- 🔐 **Authentication:** Secure user accounts to save and manage your presentation history.
-- 📥 **Export:** Download your presentations as editable PPTX files.
+- **AI Generation:** Generates comprehensive slide decks including titles, bullet points, and summaries.
+- **Smart Charts:** Automatically creates data visualizations (Bar, Line, Pie, etc.) based on the context.
+- **Streaming:** Watch your presentation being built in real-time with streaming responses.
+- **Templates:** Choose from multiple professional themes (Modern Dark, Corporate Blue, Minimalist, etc.).
+- **Authentication:** Secure user accounts with email/password or **Google OAuth** to save and manage your presentation history.
+- **Export:** Download your presentations as editable PPTX files.
 
 ---
 
@@ -44,7 +44,7 @@ SlideSage is a modern web application that leverages AI to generate complete pre
 - **Framework:** Flask
 - **Database:** PostgreSQL (SQLAlchemy)
 - **AI/LLM:** LiteLLM (LLM integration)
-- **Auth:** Flask-JWT-Extended
+- **Auth:** Flask-JWT-Extended + Google OAuth 2.0
 
 ### Frontend
 
@@ -80,12 +80,14 @@ Copy the example env files and fill with your credentials:
 - `LITELLM_MODEL`, `LITELLM_PROXY_URL` - AI service configuration
 - `FLASK_DEBUG`, `CORS_ORIGINS` - Flask configuration
 - `JWT_SECRET_KEY` - **REQUIRED**: Secret key for JWT tokens
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` - **OPTIONAL**: For Google OAuth
 - `DATABASE_URL` - PostgreSQL connection string
   - Default: `postgresql://slidesage:slidesage@postgres:5432/slidesage`
 
 **`frontend/.env`** (create from `frontend/.env.example`):
 
 - `VITE_API_URL` - Backend API URL (e.g. `http://localhost:8000`)
+- `VITE_GOOGLE_CLIENT_ID` - **OPTIONAL**: Google OAuth Client ID
 
 ---
 
@@ -111,6 +113,7 @@ Copy the example env files and fill with your credentials:
 
 - `POST /api/auth/register` — Register new user: `{ email: string, password: string }`
 - `POST /api/auth/login` — Login: `{ email: string, password: string }` → returns `{ access_token, refresh_token }`
+- `POST /api/auth/google` — Google OAuth login: `{ token: string }` → returns `{ access_token, refresh_token }`
 - `POST /api/auth/refresh` — Refresh access token (requires refresh token)
 - `GET /api/auth/me` — Get current user (requires access token)
 - `POST /api/auth/logout` — Logout (requires access token)
@@ -169,6 +172,6 @@ docker compose up --build
 uv run main.py
 ```
 
-- Frontend: run the dev server with `bunx vite` or `pnpm run dev` and set `API_URL` to your backend.
+- Frontend: run the dev server with `bun dev` and set `API_URL` to your backend.
 
 ---

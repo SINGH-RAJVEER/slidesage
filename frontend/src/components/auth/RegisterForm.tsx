@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import GoogleLoginButton from "./GoogleLoginButton";
 
 interface RegisterFormProps {
   onSwitchToLogin?: () => void;
@@ -78,6 +79,17 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+
+          <GoogleLoginButton
+            onError={(err) => setError(err)}
+            onSuccess={() => {
+              // Redirect handled by AuthContext
+            }}
+          />
+
+          <div className="flex justify-center text-sm">
+            <span className="text-white/60">Or continue with email</span>
+          </div>
 
           <div className="space-y-3">
             <Label htmlFor="name" className="text-white/80 text-lg">

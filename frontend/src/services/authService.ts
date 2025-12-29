@@ -104,6 +104,31 @@ class AuthService {
     }
   }
 
+  async googleLogin(token: string): Promise<AuthResponse> {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/google`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      const data: AuthResponse = await response.json();
+
+      if (data.success && data.access_token && data.refresh_token) {
+        this.setTokens(data.access_token, data.refresh_token);
+      }
+
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Network error",
+      };
+    }
+  }
+
   async logout(): Promise<void> {
     const token = this.getToken();
 
@@ -180,13 +205,14 @@ class AuthService {
         },
       });
 
-      const data: AuthResponse = await response.json();
-
-      // Handle 422 - invalid token format (e.g., old tokens with integer identity)
-      if (response.status === 422) {
+      // Handle errors - clear tokens for 422, 500, or other failures
+      if (response.status === 422 || response.status === 500 || !response.ok) {
+        console.warn("Invalid or expired refresh token, clearing tokens");
         this.clearTokens();
         return false;
       }
+
+      const data: AuthResponse = await response.json();
 
       if (data.success && data.access_token) {
         const currentRefreshToken = this.getRefreshToken();

@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory, Response
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, verify_jwt_in_request
-from config import ConfigAI
+from config import Config
 from models import db, User, Presentation
 from auth import auth_bp
 from ai import AIService
@@ -14,7 +14,7 @@ app = Flask(
 )
 
 # Load configuration
-app.config.from_object(ConfigAI)
+app.config.from_object(Config)
 
 # Initialize extensions
 CORS(app)

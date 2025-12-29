@@ -3,6 +3,9 @@ from flask_jwt_extended import create_access_token, create_refresh_token, jwt_re
 from models import db, User
 from datetime import datetime
 import re
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from config import Config
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -119,7 +122,8 @@ def refresh():
             user_id = int(current_user_id) if isinstance(current_user_id, str) else current_user_id
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid token format'}), 422
-        user = User.query.get(user_id)
+        
+        user = db.session.get(User, user_id)
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
@@ -133,6 +137,9 @@ def refresh():
         }), 200
         
     except Exception as e:
+        print(f"Refresh token error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -149,7 +156,8 @@ def get_current_user():
             user_id = int(current_user_id) if isinstance(current_user_id, str) else current_user_id
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid token format'}), 422
-        user = User.query.get(user_id)
+        
+        user = db.session.get(User, user_id)
         
         if not user:
             return jsonify({'error': 'User not found'}), 404
@@ -160,6 +168,9 @@ def get_current_user():
         }), 200
         
     except Exception as e:
+        print(f"Get current user error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -238,6 +249,92 @@ def update_profile():
             'success': True,
             'message': 'Profile updated successfully',
             'user': user.to_dict()
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@auth_bp.route('/google', methods=['POST'])
+def google_login():
+    """Authenticate user with Google OAuth token"""
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type must be JSON'}), 400
+        
+        data = request.get_json()
+        token = data.get('token')
+        
+        if not token:
+            return jsonify({'error': 'Google token is required'}), 400
+        
+        # Verify the Google token
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                token, 
+                google_requests.Request(), 
+                Config.GOOGLE_CLIENT_ID
+            )
+            
+            # Verify the token is for our app
+            if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
+                return jsonify({'error': 'Invalid token issuer'}), 401
+            
+            # Extract user information
+            google_id = idinfo['sub']
+            email = idinfo.get('email', '').lower()
+            name = idinfo.get('name', '')
+            picture = idinfo.get('picture', '')
+            email_verified = idinfo.get('email_verified', False)
+            
+            if not email_verified:
+                return jsonify({'error': 'Email not verified with Google'}), 401
+            
+        except ValueError as e:
+            # Invalid token
+            return jsonify({'error': f'Invalid Google token: {str(e)}'}), 401
+        
+        # Check if user exists with this Google ID
+        user = User.query.filter_by(oauth_provider='google', oauth_id=google_id).first()
+        
+        if not user:
+            # Check if user exists with this email (from traditional signup)
+            user = User.query.filter_by(email=email).first()
+            
+            if user:
+                # Link Google account to existing user
+                user.oauth_provider = 'google'
+                user.oauth_id = google_id
+                if not user.profile_picture and picture:
+                    user.profile_picture = picture
+                user.updated_at = datetime.utcnow()
+            else:
+                # Create new user
+                user = User(
+                    email=email,
+                    name=name,
+                    profile_picture=picture,
+                    oauth_provider='google',
+                    oauth_id=google_id
+                )
+                db.session.add(user)
+            
+            db.session.commit()
+        
+        # Generate JWT tokens
+        access_token = create_access_token(identity=str(user.id))
+        refresh_token = create_refresh_token(identity=str(user.id))
+        
+        return jsonify({
+            'success': True,
+            'message': 'Google login successful',
+            'user': user.to_dict(),
+            'access_token': access_token,
+            'refresh_token': refresh_token
         }), 200
         
     except Exception as e:

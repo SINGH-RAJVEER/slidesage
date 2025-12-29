@@ -2,7 +2,7 @@ import json
 import logging
 import re
 from typing import Generator
-from config import ConfigAI
+from config import Config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -205,7 +205,7 @@ class AIService:
             if completion is None:
                 raise RuntimeError("litellm SDK is not installed or failed to import")
 
-            model_setting = ConfigAI.LITELLM_MODEL
+            model_setting = Config.LITELLM_MODEL
 
             provider = None
             model_name = model_setting
@@ -587,7 +587,7 @@ Please create an updated presentation with approximately {slide_count} slides th
             if completion is None:
                 raise RuntimeError("litellm SDK is not installed or failed to import")
 
-            model_setting = ConfigAI.LITELLM_MODEL
+            model_setting = Config.LITELLM_MODEL
 
             provider = None
             model_name = model_setting
