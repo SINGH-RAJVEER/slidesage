@@ -1,11 +1,11 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
-from models import db, User
+from app.models import db, User
 from datetime import datetime
 import re
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
-from config import Config
+from app.config import Config
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -343,4 +343,3 @@ def google_login():
             'success': False,
             'error': str(e)
         }), 500
-

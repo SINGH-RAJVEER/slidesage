@@ -8,9 +8,9 @@ import {
   FileText,
   Calendar,
   Trash2,
-  Grid3x3,
-  Grid2x2,
-  LayoutGrid,
+  Columns2,
+  Columns3,
+  Columns4,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService";
@@ -256,7 +256,7 @@ export default function PresentationsGridPage() {
                 }`}
                 title="2 columns"
               >
-                <Grid2x2 className="h-5 w-5" />
+                <Columns2 className="h-5 w-5" />
               </Button>
               <Button
                 variant="ghost"
@@ -269,7 +269,7 @@ export default function PresentationsGridPage() {
                 }`}
                 title="3 columns"
               >
-                <Grid3x3 className="h-5 w-5" />
+                <Columns3 className="h-5 w-5" />
               </Button>
               <Button
                 variant="ghost"
@@ -282,7 +282,7 @@ export default function PresentationsGridPage() {
                 }`}
                 title="4 columns"
               >
-                <LayoutGrid className="h-5 w-5" />
+                <Columns4 className="h-5 w-5" />
               </Button>
             </div>
           </div>

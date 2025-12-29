@@ -2,7 +2,7 @@ import json
 import logging
 import re
 from typing import Generator
-from config import Config
+from app.config import Config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
