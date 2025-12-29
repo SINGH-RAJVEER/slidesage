@@ -34,24 +34,19 @@ export default function IterateModal({
   isStreaming,
 }: IterateModalProps) {
   const [iteratePrompt, setIteratePrompt] = useState("");
-  const [slideCount, setSlideCount] = useState("5-10");
+  const [slideCount, setSlideCount] = useState("5");
+  const [slideCountMode, setSlideCountMode] = useState("preset");
+  const [customSlideCount, setCustomSlideCount] = useState("5");
   const [detailLevel, setDetailLevel] = useState("balanced");
   const [tonality, setTonality] = useState("professional");
 
-  const getUpperLimit = (range: string): number => {
-    if (range.includes("+")) return 25;
-    const parts = range.split("-");
-    return parseInt(parts[parts.length - 1]) || 10;
-  };
-
   const handleSubmit = () => {
     if (iteratePrompt.trim()) {
-      onIterate(
-        iteratePrompt,
-        getUpperLimit(slideCount),
-        detailLevel,
-        tonality
-      );
+      const count =
+        slideCountMode === "preset"
+          ? parseInt(slideCount)
+          : parseInt(customSlideCount);
+      onIterate(iteratePrompt, count, detailLevel, tonality);
       setIteratePrompt("");
     }
   };
@@ -181,50 +176,126 @@ export default function IterateModal({
 
             <div className="flex items-center gap-2">
               <span className="text-white/70 text-sm font-medium">Slides:</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-28 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
-                    disabled={isStreaming}
-                  >
-                    {slideCount}
-                    <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-28 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
-                  <DropdownMenuItem
-                    onClick={() => setSlideCount("3-5")}
-                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
-                  >
-                    3-5
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setSlideCount("5-10")}
-                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
-                  >
-                    5-10
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setSlideCount("10-15")}
-                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
-                  >
-                    10-15
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setSlideCount("15-20")}
-                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
-                  >
-                    15-20
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setSlideCount("20+")}
-                    className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
-                  >
-                    20+
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {slideCountMode === "preset" ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-24 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
+                      disabled={isStreaming}
+                    >
+                      {slideCount}
+                      <ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-24 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSlideCount("5");
+                        setCustomSlideCount("5");
+                        setSlideCountMode("preset");
+                      }}
+                      className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                    >
+                      5
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSlideCount("10");
+                        setCustomSlideCount("10");
+                        setSlideCountMode("preset");
+                      }}
+                      className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                    >
+                      10
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSlideCount("15");
+                        setCustomSlideCount("15");
+                        setSlideCountMode("preset");
+                      }}
+                      className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                    >
+                      15
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSlideCount("20");
+                        setCustomSlideCount("20");
+                        setSlideCountMode("preset");
+                      }}
+                      className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                    >
+                      20
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSlideCount("25");
+                        setCustomSlideCount("25");
+                        setSlideCountMode("preset");
+                      }}
+                      className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                    >
+                      25
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSlideCount("30");
+                        setCustomSlideCount("30");
+                        setSlideCountMode("preset");
+                      }}
+                      className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                    >
+                      30
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setSlideCountMode("custom")}
+                      className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+                    >
+                      Custom
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <input
+                  type="number"
+                  min={1}
+                  max={35}
+                  value={customSlideCount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (/^\d{0,2}$/.test(val) && Number(val) <= 35) {
+                      setCustomSlideCount(val);
+                    }
+                  }}
+                  onBlur={() => {
+                    let val = Number(customSlideCount);
+                    if (isNaN(val) || val < 1) val = 1;
+                    if (val > 35) val = 35;
+                    setCustomSlideCount(val.toString());
+                    setSlideCount(val.toString());
+                    setSlideCountMode("preset");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      let val = Number(customSlideCount);
+                      if (isNaN(val) || val < 1) val = 1;
+                      if (val > 35) val = 35;
+                      setCustomSlideCount(val.toString());
+                      setSlideCount(val.toString());
+                      setSlideCountMode("preset");
+                    } else if (e.key === "Escape") {
+                      setSlideCountMode("preset");
+                    }
+                  }}
+                  disabled={isStreaming}
+                  className="w-24 px-3 py-2 rounded-md border border-white/20 bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-400 hide-number-spin disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="1-35"
+                  inputMode="numeric"
+                  style={{ MozAppearance: "textfield" }}
+                />
+              )}
             </div>
           </div>
 

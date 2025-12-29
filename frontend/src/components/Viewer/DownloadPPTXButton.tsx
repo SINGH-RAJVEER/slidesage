@@ -78,7 +78,7 @@ const DownloadPPTXButton: React.FC<Props> = ({ title }) => {
       variant="outline"
       className="bg-blue-500/20 border-blue-400/30 text-blue-300 hover:bg-blue-500/30 hover:border-blue-400/50 transition-all duration-200"
     >
-      Download PPTX
+      Download
     </Button>
   );
 };

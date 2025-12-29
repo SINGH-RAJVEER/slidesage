@@ -10,7 +10,7 @@ class Presentation(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False)
     prompt = db.Column(db.Text, nullable=False)
-    slides_data = db.Column(db.Text, nullable=False)  # JSON string of the presentation structure
+    slides_data = db.Column(db.Text, nullable=False)
     parent_presentation_id = db.Column(db.Integer, db.ForeignKey('presentations.id'), nullable=True, index=True)  # For iterative editing
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

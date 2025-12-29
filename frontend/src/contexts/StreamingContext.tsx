@@ -205,6 +205,14 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                         // Generation started
                         break;
 
+                      case "created":
+                        // Presentation record created - store the ID immediately
+                        setStreamingState((prev) => ({
+                          ...prev,
+                          presentationId: data.presentation_id,
+                        }));
+                        break;
+
                       case "theme":
                         setStreamingState((prev) => ({
                           ...prev,
@@ -236,15 +244,31 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                           isComplete: true,
                           theme: data.theme || prev.theme,
                           title: data.title || prev.title,
-                          totalSlides: data.totalSlides || prev.slides.length,
+                          slides: data.slides || prev.slides,
+                          totalSlides:
+                            data.totalSlides ||
+                            (data.slides
+                              ? data.slides.length
+                              : prev.slides.length),
                         }));
                         break;
 
                       case "saved":
+                        // Final save confirmation - update presentation ID if provided
                         setStreamingState((prev) => ({
                           ...prev,
-                          presentationId: data.presentation_id,
+                          presentationId:
+                            data.presentation_id || prev.presentationId,
                         }));
+                        console.log(
+                          "Presentation saved:",
+                          data.presentation_id
+                        );
+                        break;
+
+                      case "save_error":
+                        console.error("Save error:", data.error);
+                        // Don't set streaming to false, just log the error
                         break;
 
                       case "error":
@@ -452,15 +476,34 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                           isComplete: true,
                           theme: data.theme || prev.theme,
                           title: data.title || prev.title,
-                          totalSlides: data.totalSlides || prev.slides.length,
+                          // Use complete slides data if available to ensure consistency
+                          slides: data.slides || prev.slides,
+                          totalSlides:
+                            data.totalSlides ||
+                            (data.slides
+                              ? data.slides.length
+                              : prev.slides.length),
                         }));
                         break;
 
                       case "saved":
+                        // Iteration saved - presentation updated in place
                         setStreamingState((prev) => ({
                           ...prev,
-                          presentationId: data.presentation_id,
+                          presentationId:
+                            data.presentation_id || prev.presentationId,
                         }));
+                        console.log(
+                          "Iteration saved to presentation:",
+                          data.presentation_id
+                        );
+                        break;
+
+                      case "save_error":
+                        console.error(
+                          "Save error during iteration:",
+                          data.error
+                        );
                         break;
 
                       case "error":

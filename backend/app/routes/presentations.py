@@ -1,8 +1,12 @@
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, request, jsonify, Response, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.models import db, Presentation
 from app.services.ai_service import AIService
+from datetime import datetime
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 presentations_bp = Blueprint('presentations', __name__, url_prefix='/api')
 
@@ -10,19 +14,48 @@ presentations_bp = Blueprint('presentations', __name__, url_prefix='/api')
 ai_service = AIService()
 
 
+def save_presentation_sync(app, presentation_id, data, prompt=None):
+    """
+    Synchronously save presentation data to database.
+    This function creates its own app context to ensure DB operations work.
+    """
+    try:
+        with app.app_context():
+            pres = db.session.get(Presentation, presentation_id)
+            if pres:
+                if data.get('title'):
+                    pres.title = data.get('title', pres.title)
+                if prompt:
+                    pres.prompt = prompt
+                pres.set_slides_data(data)
+                pres.updated_at = datetime.utcnow()
+                db.session.commit()
+                logger.info(f"Saved presentation {presentation_id} with {len(data.get('slides', []))} slides")
+                return True
+            else:
+                logger.error(f"Presentation {presentation_id} not found")
+                return False
+    except Exception as e:
+        logger.error(f"Error saving presentation {presentation_id}: {e}")
+        try:
+            with app.app_context():
+                db.session.rollback()
+        except:
+            pass
+        return False
+
+
 @presentations_bp.route('/generate-presentation-stream', methods=['POST'])
 @jwt_required()
 def generate_presentation_stream():
-    """Generate presentation with streaming - requires authentication"""
+    """Generate a new presentation with streaming"""
     try:
-        # Get current user
         current_user_id = get_jwt_identity()
         
         if not request.is_json:
             return jsonify({'error': 'Content-Type must be JSON'}), 400
             
         data = request.get_json()
-
         if not data:
             return jsonify({'error': 'Invalid JSON data'}), 400
             
@@ -34,42 +67,78 @@ def generate_presentation_stream():
         if not prompt:
             return jsonify({'error': 'Prompt is required'}), 400
 
+        # Create presentation record FIRST with placeholder data
+        presentation = Presentation(
+            user_id=current_user_id,
+            title='Generating...',
+            prompt=prompt
+        )
+        presentation.set_slides_data({'slides': [], 'theme': 'default', 'title': 'Generating...', 'totalSlides': 0})
+        db.session.add(presentation)
+        db.session.commit()
+        
+        presentation_id = presentation.id
+        app = current_app._get_current_object()
+        
+        logger.info(f"Created presentation {presentation_id} for user {current_user_id}")
+
         def generate():
-            presentation_data = None
+            all_slides = []
+            theme = 'default'
+            title = 'Untitled Presentation'
             
-            for event in ai_service.generate_presentation_stream(prompt, slide_count, detail_level, tonality):
-                event_type = event.get('event', 'data')
-                event_data = event.get('data', {})
-                
-                # Store complete presentation data for saving
-                if event_type == 'complete':
-                    presentation_data = event_data
-                
-                # Format as SSE
-                yield f"event: {event_type}\n"
-                yield f"data: {json.dumps(event_data)}\n\n"
+            # Send the presentation ID immediately so frontend knows it
+            yield f"event: created\n"
+            yield f"data: {json.dumps({'presentation_id': presentation_id})}\n\n"
             
-            # Save to database after streaming completes
-            if presentation_data and 'slides' in presentation_data:
-                try:
-                    from flask import current_app
-                    with current_app.app_context():
-                        title = presentation_data.get('title', 'Untitled Presentation')
-                        presentation = Presentation(
-                            user_id=current_user_id,
-                            title=title,
-                            prompt=prompt
-                        )
-                        presentation.set_slides_data(presentation_data)
-                        db.session.add(presentation)
-                        db.session.commit()
-                        
-                        # Send the presentation ID
-                        yield f"event: saved\n"
-                        yield f"data: {json.dumps({'presentation_id': presentation.id})}\n\n"
-                except Exception as e:
+            try:
+                for event in ai_service.generate_presentation_stream(prompt, slide_count, detail_level, tonality):
+                    event_type = event.get('event', 'data')
+                    event_data = event.get('data', {})
+                    
+                    # Accumulate data
+                    if event_type == 'theme':
+                        theme = event_data.get('theme', theme)
+                    
+                    if event_type == 'slide':
+                        slide = event_data.get('slide')
+                        if slide:
+                            all_slides.append(slide)
+                        if event_data.get('title'):
+                            title = event_data.get('title')
+                    
+                    if event_type == 'complete':
+                        # Use complete data if available
+                        if event_data.get('slides'):
+                            all_slides = event_data.get('slides')
+                        if event_data.get('theme'):
+                            theme = event_data.get('theme')
+                        if event_data.get('title'):
+                            title = event_data.get('title')
+                    
+                    # Stream the event to frontend
+                    yield f"event: {event_type}\n"
+                    yield f"data: {json.dumps(event_data)}\n\n"
+                
+                # After streaming completes, save final data
+                final_data = {
+                    'slides': all_slides,
+                    'theme': theme,
+                    'title': title,
+                    'totalSlides': len(all_slides)
+                }
+                
+                if save_presentation_sync(app, presentation_id, final_data, prompt):
+                    yield f"event: saved\n"
+                    yield f"data: {json.dumps({'presentation_id': presentation_id, 'success': True})}\n\n"
+                else:
                     yield f"event: save_error\n"
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    yield f"data: {json.dumps({'error': 'Failed to save presentation'})}\n\n"
+                    
+            except Exception as e:
+                logger.error(f"Error during generation: {e}")
+                yield f"event: error\n"
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         return Response(
             generate(),
@@ -82,6 +151,7 @@ def generate_presentation_stream():
         )
         
     except Exception as e:
+        logger.error(f"Error in generate_presentation_stream: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -91,7 +161,7 @@ def generate_presentation_stream():
 @presentations_bp.route('/iterate-presentation-stream', methods=['POST'])
 @jwt_required()
 def iterate_presentation_stream():
-    """Iterate on an existing presentation with streaming - requires authentication"""
+    """Iterate on an existing presentation - updates in place"""
     try:
         current_user_id = get_jwt_identity()
         
@@ -99,12 +169,11 @@ def iterate_presentation_stream():
             return jsonify({'error': 'Content-Type must be JSON'}), 400
             
         data = request.get_json()
-
         if not data:
             return jsonify({'error': 'Invalid JSON data'}), 400
             
         prompt = data.get('prompt')
-        parent_presentation_id = data.get('parentPresentationId')
+        presentation_id = data.get('parentPresentationId')
         slide_count = data.get('slideCount', 8)
         detail_level = data.get('detailLevel', 'balanced')
         tonality = data.get('tonality', 'professional')
@@ -112,57 +181,83 @@ def iterate_presentation_stream():
         if not prompt:
             return jsonify({'error': 'Prompt is required'}), 400
         
-        if not parent_presentation_id:
-            return jsonify({'error': 'Parent presentation ID is required'}), 400
+        if not presentation_id:
+            return jsonify({'error': 'Presentation ID is required'}), 400
 
-        # Get the parent presentation
-        parent_presentation = Presentation.query.filter_by(
-            id=parent_presentation_id,
+        # Get the existing presentation
+        presentation = Presentation.query.filter_by(
+            id=presentation_id,
             user_id=current_user_id
         ).first()
         
-        if not parent_presentation:
-            return jsonify({'error': 'Parent presentation not found'}), 404
+        if not presentation:
+            return jsonify({'error': 'Presentation not found'}), 404
         
-        parent_data = parent_presentation.get_slides_data()
+        # Get current data for AI context
+        parent_data = presentation.get_slides_data()
+        app = current_app._get_current_object()
+        
+        logger.info(f"Starting iteration on presentation {presentation_id}")
 
         def generate():
-            presentation_data = None
+            all_slides = []
+            theme = parent_data.get('theme', 'default')
+            title = parent_data.get('title', 'Untitled Presentation')
             
-            for event in ai_service.iterate_presentation_stream(prompt, parent_data, slide_count, detail_level, tonality):
-                event_type = event.get('event', 'data')
-                event_data = event.get('data', {})
+            try:
+                for event in ai_service.iterate_presentation_stream(prompt, parent_data, slide_count, detail_level, tonality):
+                    event_type = event.get('event', 'data')
+                    event_data = event.get('data', {})
+                    
+                    # Accumulate data
+                    if event_type == 'theme':
+                        theme = event_data.get('theme', theme)
+                    
+                    if event_type == 'slide':
+                        slide = event_data.get('slide')
+                        if slide:
+                            all_slides.append(slide)
+                        if event_data.get('title'):
+                            title = event_data.get('title')
+                    
+                    if event_type == 'complete':
+                        # Use complete data if available
+                        if event_data.get('slides'):
+                            all_slides = event_data.get('slides')
+                        if event_data.get('theme'):
+                            theme = event_data.get('theme')
+                        if event_data.get('title'):
+                            title = event_data.get('title')
+                    
+                    # Stream the event to frontend
+                    yield f"event: {event_type}\n"
+                    yield f"data: {json.dumps(event_data)}\n\n"
                 
-                # Store complete presentation data for saving
-                if event_type == 'complete':
-                    presentation_data = event_data
+                # After streaming completes, save final data (replaces existing)
+                final_data = {
+                    'slides': all_slides,
+                    'theme': theme,
+                    'title': title,
+                    'totalSlides': len(all_slides)
+                }
                 
-                # Format as SSE
-                yield f"event: {event_type}\n"
-                yield f"data: {json.dumps(event_data)}\n\n"
-            
-            # Save to database after streaming completes
-            if presentation_data and 'slides' in presentation_data:
-                try:
-                    from flask import current_app
-                    with current_app.app_context():
-                        title = presentation_data.get('title', 'Untitled Presentation')
-                        presentation = Presentation(
-                            user_id=current_user_id,
-                            title=title,
-                            prompt=prompt,
-                            parent_presentation_id=parent_presentation_id
-                        )
-                        presentation.set_slides_data(presentation_data)
-                        db.session.add(presentation)
-                        db.session.commit()
-                        
-                        # Send the presentation ID
+                if len(all_slides) > 0:
+                    if save_presentation_sync(app, presentation_id, final_data, prompt):
+                        logger.info(f"Successfully updated presentation {presentation_id} with {len(all_slides)} slides")
                         yield f"event: saved\n"
-                        yield f"data: {json.dumps({'presentation_id': presentation.id})}\n\n"
-                except Exception as e:
+                        yield f"data: {json.dumps({'presentation_id': presentation_id, 'success': True})}\n\n"
+                    else:
+                        yield f"event: save_error\n"
+                        yield f"data: {json.dumps({'error': 'Failed to save presentation'})}\n\n"
+                else:
+                    logger.warning(f"No slides generated for presentation {presentation_id}")
                     yield f"event: save_error\n"
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    yield f"data: {json.dumps({'error': 'No slides were generated'})}\n\n"
+                    
+            except Exception as e:
+                logger.error(f"Error during iteration: {e}")
+                yield f"event: error\n"
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         return Response(
             generate(),
@@ -175,6 +270,119 @@ def iterate_presentation_stream():
         )
         
     except Exception as e:
+        logger.error(f"Error in iterate_presentation_stream: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@presentations_bp.route('/presentations/<int:presentation_id>/slides', methods=['PUT'])
+@jwt_required()
+def update_presentation_slides(presentation_id):
+    """Update slides for a presentation - for manual edits, deletions, reordering"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        presentation = Presentation.query.filter_by(
+            id=presentation_id,
+            user_id=current_user_id
+        ).first()
+        
+        if not presentation:
+            return jsonify({
+                'success': False,
+                'error': 'Presentation not found'
+            }), 404
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid JSON data'}), 400
+        
+        # Get current presentation data
+        current_data = presentation.get_slides_data()
+        
+        # Update with new slides data
+        if 'slides' in data:
+            current_data['slides'] = data['slides']
+            current_data['totalSlides'] = len(data['slides'])
+        
+        if 'title' in data:
+            current_data['title'] = data['title']
+            presentation.title = data['title']
+        
+        if 'theme' in data:
+            current_data['theme'] = data['theme']
+        
+        presentation.set_slides_data(current_data)
+        presentation.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        logger.info(f"Updated presentation {presentation_id} slides")
+        
+        return jsonify({
+            'success': True,
+            'presentation': presentation.to_dict(include_slides=True)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating presentation slides: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@presentations_bp.route('/presentations/<int:presentation_id>/slides/<string:slide_id>', methods=['DELETE'])
+@jwt_required()
+def delete_slide(presentation_id, slide_id):
+    """Delete a specific slide from a presentation"""
+    try:
+        current_user_id = get_jwt_identity()
+        
+        presentation = Presentation.query.filter_by(
+            id=presentation_id,
+            user_id=current_user_id
+        ).first()
+        
+        if not presentation:
+            return jsonify({
+                'success': False,
+                'error': 'Presentation not found'
+            }), 404
+        
+        current_data = presentation.get_slides_data()
+        slides = current_data.get('slides', [])
+        
+        # Find and remove the slide
+        original_count = len(slides)
+        slides = [s for s in slides if s.get('id') != slide_id]
+        
+        if len(slides) == original_count:
+            return jsonify({
+                'success': False,
+                'error': 'Slide not found'
+            }), 404
+        
+        current_data['slides'] = slides
+        current_data['totalSlides'] = len(slides)
+        
+        presentation.set_slides_data(current_data)
+        presentation.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        logger.info(f"Deleted slide {slide_id} from presentation {presentation_id}")
+        
+        return jsonify({
+            'success': True,
+            'slides': slides,
+            'totalSlides': len(slides)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting slide: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -188,9 +396,8 @@ def get_presentations():
     try:
         current_user_id = get_jwt_identity()
         
-        # Query all presentations for the user, ordered by most recent first
         presentations = Presentation.query.filter_by(user_id=current_user_id)\
-            .order_by(Presentation.created_at.desc())\
+            .order_by(Presentation.updated_at.desc())\
             .all()
         
         return jsonify({
@@ -212,7 +419,6 @@ def get_presentation(presentation_id):
     try:
         current_user_id = get_jwt_identity()
         
-        # Query the presentation and ensure it belongs to the current user
         presentation = Presentation.query.filter_by(
             id=presentation_id,
             user_id=current_user_id
@@ -243,7 +449,6 @@ def delete_presentation(presentation_id):
     try:
         current_user_id = get_jwt_identity()
         
-        # Query the presentation and ensure it belongs to the current user
         presentation = Presentation.query.filter_by(
             id=presentation_id,
             user_id=current_user_id
@@ -257,6 +462,8 @@ def delete_presentation(presentation_id):
         
         db.session.delete(presentation)
         db.session.commit()
+        
+        logger.info(f"Deleted presentation {presentation_id}")
         
         return jsonify({
             'success': True,

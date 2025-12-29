@@ -240,8 +240,7 @@ export default function PresentationsGridPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-              <FileText className="h-8 w-8" />
-              My Presentations
+              Generated Presentations
             </h1>
             <div className="flex items-center gap-2">
               <span className="text-white/70 text-sm mr-2">Grid Size:</span>

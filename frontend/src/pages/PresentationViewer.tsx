@@ -45,6 +45,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useStreaming } from "@/contexts/StreamingContext";
+import { authService } from "@/services/authService";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const PresentationViewer: React.FC = () => {
   const location = useLocation();
@@ -55,11 +58,18 @@ const PresentationViewer: React.FC = () => {
   const isStreamingMode = location.state?.isStreaming === true;
 
   // Get presentation from either location state or streaming context
+  // Note: This is just initial state - we'll fetch fresh data from API if we have an ID
   const getInitialPresentation = (): PresentationData | undefined => {
     if (isStreamingMode) {
       return getPresentation() || undefined;
     }
-    return location.state?.presentation;
+    // For non-streaming mode, don't use location.state.presentation
+    // We'll fetch fresh data from the API instead
+    // Only use location.state if we're coming from a generation page
+    if (location.state?.isNewGeneration) {
+      return location.state?.presentation;
+    }
+    return undefined;
   };
 
   const [presentationState, setPresentation] = useState<
@@ -67,6 +77,9 @@ const PresentationViewer: React.FC = () => {
   >(getInitialPresentation());
   const [presentationId, setPresentationId] = useState<number | undefined>(
     location.state?.presentationId || streamingState.presentationId
+  );
+  const [isLoadingPresentation, setIsLoadingPresentation] = useState(
+    !isStreamingMode && !location.state?.isNewGeneration && !!location.state?.presentationId
   );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -144,6 +157,66 @@ const PresentationViewer: React.FC = () => {
       setPresentationId(streamingState.presentationId);
     }
   }, [streamingState.presentationId, presentationId]);
+
+  // Fetch fresh presentation data from API when we have an ID and are NOT streaming
+  // This ensures we have the latest data after a refresh or when coming from the grid
+  const hasFetchedRef = useRef(false);
+  useEffect(() => {
+    const fetchPresentation = async () => {
+      const idToFetch = presentationId || location.state?.presentationId;
+      
+      // Don't fetch if we're actively streaming - we'll use streamed data
+      if (streamingState.isStreaming) {
+        setIsLoadingPresentation(false);
+        return;
+      }
+      
+      // Don't fetch if we don't have an ID
+      if (!idToFetch) {
+        setIsLoadingPresentation(false);
+        return;
+      }
+      
+      // Don't fetch if we already have (prevents re-fetching on state changes)
+      if (hasFetchedRef.current) {
+        return;
+      }
+      
+      hasFetchedRef.current = true;
+      setIsLoadingPresentation(true);
+      
+      try {
+        const response = await fetch(
+          `${API_URL}/api/presentations/${idToFetch}`,
+          {
+            headers: authService.getAuthHeaders(),
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.presentation) {
+            const pres = data.presentation;
+            // Update presentation with fresh data from DB
+            setPresentation({
+              title: pres.title,
+              theme: pres.slides_data?.theme || 'default',
+              slides: pres.slides_data?.slides || [],
+              totalSlides: pres.slides_data?.totalSlides || pres.slides_data?.slides?.length || 0,
+            });
+            setPresentationId(pres.id);
+            console.log('Loaded fresh presentation data from API');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching presentation:', error);
+      } finally {
+        setIsLoadingPresentation(false);
+      }
+    };
+    
+    fetchPresentation();
+  }, [presentationId, location.state?.presentationId, streamingState.isStreaming]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -327,20 +400,29 @@ const PresentationViewer: React.FC = () => {
   // Navigate away only if we loaded without any presentation data and not streaming
   const hasLocationPresentation = !!location.state?.presentation;
   const isLocationStreaming = !!location.state?.isStreaming;
+  const hasLocationPresentationId = !!location.state?.presentationId;
   useEffect(() => {
+    // Don't navigate away if we're still loading
+    if (isLoadingPresentation) return;
+    
     if (
       !hasLocationPresentation &&
       !isLocationStreaming &&
+      !hasLocationPresentationId &&
       !streamingState.isStreaming &&
-      !presentationState
+      !presentationState &&
+      !presentationId
     ) {
       navigate("/");
     }
   }, [
     hasLocationPresentation,
+    hasLocationPresentationId,
     isLocationStreaming,
     streamingState.isStreaming,
     presentationState,
+    presentationId,
+    isLoadingPresentation,
     navigate,
   ]);
 
@@ -354,6 +436,18 @@ const PresentationViewer: React.FC = () => {
         <div className="flex flex-col items-center gap-4 text-white">
           <Loader2 className="w-12 h-12 animate-spin" />
           <p className="text-lg">Generating your presentation...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If loading presentation from API, show loading state
+  if (isLoadingPresentation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 text-white">
+          <Loader2 className="w-12 h-12 animate-spin" />
+          <p className="text-lg">Loading presentation...</p>
         </div>
       </div>
     );
@@ -441,8 +535,15 @@ const PresentationViewer: React.FC = () => {
     }
   };
 
-  const deleteCurrentSlide = () => {
+  const deleteCurrentSlide = async () => {
     if (!presentationState || presentationState.slides.length === 1) return;
+    
+    const slideToDelete = presentationState.slides[currentSlide];
+    const slideId = slideToDelete?.id;
+    
+    console.log('Deleting slide:', { presentationId, slideId, currentSlide });
+    
+    // Optimistically update UI
     const newSlides = presentationState.slides.filter(
       (_, idx) => idx !== currentSlide
     );
@@ -450,8 +551,37 @@ const PresentationViewer: React.FC = () => {
     if (currentSlide >= newSlides.length) {
       newCurrent = newSlides.length - 1;
     }
-    setPresentation({ ...presentationState, slides: newSlides });
+    setPresentation({ ...presentationState, slides: newSlides, totalSlides: newSlides.length });
     setCurrentSlide(newCurrent);
+    
+    // Persist to database if we have a presentation ID
+    if (presentationId && slideId) {
+      try {
+        // URL encode the slide ID in case it contains special characters
+        const encodedSlideId = encodeURIComponent(slideId);
+        const url = `${API_URL}/api/presentations/${presentationId}/slides/${encodedSlideId}`;
+        console.log('DELETE request to:', url);
+        
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: authService.getAuthHeaders(),
+        });
+        
+        const data = await response.json();
+        console.log('Delete response:', response.status, data);
+        
+        if (!response.ok) {
+          console.error('Failed to delete slide from database:', data);
+          // Optionally revert the UI change on error
+        } else {
+          console.log('Slide deleted from database successfully');
+        }
+      } catch (error) {
+        console.error('Error deleting slide:', error);
+      }
+    } else {
+      console.warn('Cannot delete: missing presentationId or slideId', { presentationId, slideId });
+    }
   };
 
   const handleIteratePresentation = async (
