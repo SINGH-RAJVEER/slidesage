@@ -49,44 +49,44 @@ class AIService:
             # Detail level definitions with examples
             detail_level_guide = {
                 'brief': {
-                    'description': 'Brief - Minimal content with key highlights only',
-                    'example': 'Lists with 2-3 bullet points, short sentences (5-8 words), minimal descriptions'
+                    'description': 'Brief - Minimal content with key highlights only. Focus on visual impact and headlines.',
+                    'example': 'Use 2-3 short bullet points (3-5 words). Avoid full sentences. Focus on keywords and metrics.'
                 },
                 'concise': {
-                    'description': 'Concise - Essential information in compact form',
-                    'example': 'Lists with 3-4 bullet points, concise sentences (8-12 words), brief explanations'
+                    'description': 'Concise - Essential information in compact form. Ideal for standard presentations.',
+                    'example': 'Use 3-4 bullet points (5-10 words). Short, punchy phrases. Clear and direct.'
                 },
                 'balanced': {
-                    'description': 'Balanced - Standard level of detail with clear explanations',
-                    'example': 'Lists with 4-5 bullet points, complete sentences (12-15 words), adequate context and explanations'
+                    'description': 'Balanced - Standard level of detail with clear explanations. Good for informative decks.',
+                    'example': 'Use 4-5 bullet points (10-15 words). Complete thoughts but not paragraphs. Mix of text and data.'
                 },
                 'detailed': {
-                    'description': 'Detailed - Comprehensive information with elaboration',
-                    'example': 'Lists with 5-6 bullet points, detailed sentences (15-20 words), thorough explanations with supporting details'
+                    'description': 'Detailed - Comprehensive information with elaboration. Suitable for technical or academic topics.',
+                    'example': 'Use 5-6 bullet points (15-25 words). Full sentences with supporting details. Thorough explanations.'
                 },
                 'comprehensive': {
-                    'description': 'Comprehensive - In-depth coverage with extensive details',
-                    'example': 'Lists with 6-8 bullet points, extensive sentences (20+ words), deep explanations with examples, context, and implications'
+                    'description': 'Comprehensive - In-depth coverage with extensive details. For reading decks or documentation.',
+                    'example': 'Use 6+ bullet points or paragraphs. Extensive text (25+ words). Deep analysis, context, and footnotes.'
                 }
             }
             
             # Tonality definitions with examples
             tonality_guide = {
                 'professional': {
-                    'description': 'Professional - Business-appropriate, objective, and polished',
-                    'example': 'Use formal language, industry terminology, data-driven statements. Example: "Our analysis demonstrates a significant improvement in operational efficiency."'
+                    'description': 'Professional - Business-appropriate, objective, and polished. Trustworthy and authoritative.',
+                    'example': 'Use formal language, industry terminology, and data-driven statements. Avoid slang or casual idioms.'
                 },
                 'casual': {
-                    'description': 'Casual - Relaxed, conversational, and approachable',
-                    'example': 'Use everyday language, contractions, and friendly tone. Example: "We\'ve seen some great results that we\'re excited to share with you."'
+                    'description': 'Casual - Relaxed, conversational, and approachable. Friendly and relatable.',
+                    'example': 'Use everyday language, contractions ("we\'re", "it\'s"), and a warm tone. Speak directly to the audience.'
                 },
                 'enthusiastic': {
-                    'description': 'Enthusiastic - Energetic, passionate, and motivational',
-                    'example': 'Use dynamic verbs, exclamations, and inspiring language. Example: "This breakthrough innovation is transforming the way we work!"'
+                    'description': 'Enthusiastic - Energetic, passionate, and motivational. High energy and inspiring.',
+                    'example': 'Use dynamic verbs, positive adjectives ("amazing", "incredible"), and exclamation points. Focus on potential and excitement.'
                 },
                 'persuasive': {
-                    'description': 'Persuasive - Compelling, benefit-focused, and action-oriented',
-                    'example': 'Use strong calls-to-action, benefits-driven language, and compelling arguments. Example: "Imagine the impact: 40% faster results with half the effort. That\'s the power of our solution."'
+                    'description': 'Persuasive - Compelling, benefit-focused, and action-oriented. Designed to convert.',
+                    'example': 'Use strong calls-to-action, rhetorical questions, and benefit-driven language. Focus on the "why" and the value proposition.'
                 }
             }
             
@@ -134,6 +134,63 @@ class AIService:
         - id="slide-highlight" - Highlighted content (div/span)
         - id="slide-stats" - Statistical data (div)
         - id="slide-keypoint" - Key points (div)
+        - class="two-column" - Use on a div to create a two-column layout
+        - class="column" - Use inside .two-column for each column
+        
+        SLIDE LAYOUT EXAMPLES:
+        
+        1. Title Slide:
+        <div id="slide-content" class="layout-title">
+            <h1 id="slide-title">Presentation Title</h1>
+            <h2 id="slide-subtitle">Subtitle or Presenter Name</h2>
+        </div>
+
+        2. Standard Content Slide:
+        <div id="slide-content" class="layout-content">
+            <h2 id="slide-title">Slide Title</h2>
+            <ul id="slide-list">
+                <li>Point 1</li>
+                <li>Point 2</li>
+            </ul>
+        </div>
+
+        3. Two-Column Slide (Comparison/Pros & Cons):
+        <div id="slide-content" class="layout-two-col">
+            <h2 id="slide-title">Comparison Title</h2>
+            <div class="two-column">
+                <div class="column">
+                    <h3 id="slide-subtitle">Left Side</h3>
+                    <ul id="slide-list"><li>Item A</li></ul>
+                </div>
+                <div class="column">
+                    <h3 id="slide-subtitle">Right Side</h3>
+                    <ul id="slide-list"><li>Item B</li></ul>
+                </div>
+            </div>
+        </div>
+
+        4. Highlight/Quote Slide:
+        <div id="slide-content" class="layout-highlight">
+            <blockquote id="slide-quote">"Big impactful quote here"</blockquote>
+            <p id="slide-description">- Author Name</p>
+        </div>
+
+        5. Image & Content Slide:
+        <div id="slide-content" class="layout-image-right">
+            <h2 id="slide-title">Visual Concept</h2>
+            <div class="two-column">
+                <div class="column">
+                    <ul id="slide-list">
+                        <li>Key visual point 1</li>
+                        <li>Key visual point 2</li>
+                    </ul>
+                </div>
+                <div class="column">
+                    <img id="slide-image" src="https://placehold.co/600x400/e2e8f0/1e293b?text=Visual+Placeholder" alt="Descriptive alt text">
+                    <p id="slide-description">Image caption or credit</p>
+                </div>
+            </div>
+        </div>
         
         HTML TABLE GUIDELINES:
         - Use proper HTML table structure: <table><thead><tbody><tr><th><td>
@@ -142,6 +199,12 @@ class AIService:
         - Use <tbody> for data rows
         - Add class="data-table" for styling hooks
         - Include tables for: comparisons, statistics, schedules, specifications, etc.
+        
+        IMAGE GUIDELINES:
+        - Use <img id="slide-image"> for all images
+        - Use "https://placehold.co/600x400/e2e8f0/1e293b?text=Topic+Placeholder" as the src, replacing "Topic+Placeholder" with relevant keywords
+        - Always include descriptive alt text
+        - Place images in a column for side-by-side layouts or centered for full-width
         
         Required JSON structure (MUST match exactly):
         {
@@ -188,8 +251,10 @@ class AIService:
         
         Generate slides that are:
         - Well-structured with proper HTML and standardized IDs
+        - VARY THE LAYOUTS: Use a mix of standard, two-column, highlight, and image-based slides to keep the presentation engaging.
         - Include relevant data tables using proper HTML structure
         - Include relevant data visualizations using charts
+        - Include placeholder images where appropriate to break up text
         - Follow the specified detail level: """ + detail_level + """
         - Match the specified tonality: """ + tonality + """
         - Professional and clear with consistent ID usage
@@ -408,44 +473,44 @@ class AIService:
             # Detail level definitions with examples
             detail_level_guide = {
                 'brief': {
-                    'description': 'Brief - Minimal content with key highlights only',
-                    'example': 'Lists with 2-3 bullet points, short sentences (5-8 words), minimal descriptions'
+                    'description': 'Brief - Minimal content with key highlights only. Focus on visual impact and headlines.',
+                    'example': 'Use 2-3 short bullet points (3-5 words). Avoid full sentences. Focus on keywords and metrics.'
                 },
                 'concise': {
-                    'description': 'Concise - Essential information in compact form',
-                    'example': 'Lists with 3-4 bullet points, concise sentences (8-12 words), brief explanations'
+                    'description': 'Concise - Essential information in compact form. Ideal for standard presentations.',
+                    'example': 'Use 3-4 bullet points (5-10 words). Short, punchy phrases. Clear and direct.'
                 },
                 'balanced': {
-                    'description': 'Balanced - Standard level of detail with clear explanations',
-                    'example': 'Lists with 4-5 bullet points, complete sentences (12-15 words), adequate context and explanations'
+                    'description': 'Balanced - Standard level of detail with clear explanations. Good for informative decks.',
+                    'example': 'Use 4-5 bullet points (10-15 words). Complete thoughts but not paragraphs. Mix of text and data.'
                 },
                 'detailed': {
-                    'description': 'Detailed - Comprehensive information with elaboration',
-                    'example': 'Lists with 5-6 bullet points, detailed sentences (15-20 words), thorough explanations with supporting details'
+                    'description': 'Detailed - Comprehensive information with elaboration. Suitable for technical or academic topics.',
+                    'example': 'Use 5-6 bullet points (15-25 words). Full sentences with supporting details. Thorough explanations.'
                 },
                 'comprehensive': {
-                    'description': 'Comprehensive - In-depth coverage with extensive details',
-                    'example': 'Lists with 6-8 bullet points, extensive sentences (20+ words), deep explanations with examples, context, and implications'
+                    'description': 'Comprehensive - In-depth coverage with extensive details. For reading decks or documentation.',
+                    'example': 'Use 6+ bullet points or paragraphs. Extensive text (25+ words). Deep analysis, context, and footnotes.'
                 }
             }
             
             # Tonality definitions with examples
             tonality_guide = {
                 'professional': {
-                    'description': 'Professional - Business-appropriate, objective, and polished',
-                    'example': 'Use formal language, industry terminology, data-driven statements. Example: "Our analysis demonstrates a significant improvement in operational efficiency."'
+                    'description': 'Professional - Business-appropriate, objective, and polished. Trustworthy and authoritative.',
+                    'example': 'Use formal language, industry terminology, and data-driven statements. Avoid slang or casual idioms.'
                 },
                 'casual': {
-                    'description': 'Casual - Relaxed, conversational, and approachable',
-                    'example': 'Use everyday language, contractions, and friendly tone. Example: "We\'ve seen some great results that we\'re excited to share with you."'
+                    'description': 'Casual - Relaxed, conversational, and approachable. Friendly and relatable.',
+                    'example': 'Use everyday language, contractions ("we\'re", "it\'s"), and a warm tone. Speak directly to the audience.'
                 },
                 'enthusiastic': {
-                    'description': 'Enthusiastic - Energetic, passionate, and motivational',
-                    'example': 'Use dynamic verbs, exclamations, and inspiring language. Example: "This breakthrough innovation is transforming the way we work!"'
+                    'description': 'Enthusiastic - Energetic, passionate, and motivational. High energy and inspiring.',
+                    'example': 'Use dynamic verbs, positive adjectives ("amazing", "incredible"), and exclamation points. Focus on potential and excitement.'
                 },
                 'persuasive': {
-                    'description': 'Persuasive - Compelling, benefit-focused, and action-oriented',
-                    'example': 'Use strong calls-to-action, benefits-driven language, and compelling arguments. Example: "Imagine the impact: 40% faster results with half the effort. That\'s the power of our solution."'
+                    'description': 'Persuasive - Compelling, benefit-focused, and action-oriented. Designed to convert.',
+                    'example': 'Use strong calls-to-action, rhetorical questions, and benefit-driven language. Focus on the "why" and the value proposition.'
                 }
             }
             

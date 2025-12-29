@@ -49,6 +49,60 @@ import { authService } from "@/services/authService";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+const SlideRenderer = React.memo(
+  ({
+    slide,
+    currentTemplate,
+    isActive,
+  }: {
+    slide: Slide;
+    currentTemplate: string;
+    isActive: boolean;
+  }) => {
+    const template = AVAILABLE_TEMPLATES.find((t) => t.id === currentTemplate);
+    const textColor = template?.styles.slideContent.color || "white";
+
+    if (slide.type === "chart") {
+      const chartSlide = slide as ChartSlide;
+      return (
+        <TemplateApplier templateId={currentTemplate} className="w-full h-full">
+          <div
+            id="slide-content"
+            className="w-full h-full flex items-center justify-center"
+          >
+            <ChartRenderer
+              chartConfig={chartSlide.chartConfig}
+              className="w-full h-full"
+              textColor={textColor}
+              isActive={isActive}
+            />
+          </div>
+        </TemplateApplier>
+      );
+    } else {
+      const htmlSlide = slide as HtmlSlide;
+      return (
+        <TemplateApplier templateId={currentTemplate} className="w-full h-full">
+          <div
+            className="w-full h-full flex flex-col justify-center"
+            dangerouslySetInnerHTML={{
+              __html: htmlSlide.html,
+            }}
+          />
+        </TemplateApplier>
+      );
+    }
+  },
+  (prevProps, nextProps) => {
+    if (prevProps.currentTemplate !== nextProps.currentTemplate) return false;
+    if (prevProps.slide !== nextProps.slide) return false;
+    if (prevProps.slide.type === "chart") {
+      return prevProps.isActive === nextProps.isActive;
+    }
+    return true; // Ignore isActive changes for HTML slides
+  }
+);
+
 const PresentationViewer: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -569,44 +623,6 @@ const PresentationViewer: React.FC = () => {
     }
   };
 
-  const renderSlideContent = (slide: Slide, isActive: boolean = true) => {
-    const template = AVAILABLE_TEMPLATES.find((t) => t.id === currentTemplate);
-    const textColor = template?.styles.slideContent.color || "white";
-
-    if (slide.type === "chart") {
-      const chartSlide = slide as ChartSlide;
-      return (
-        <TemplateApplier templateId={currentTemplate} className="w-full h-full">
-          <div
-            id="slide-content"
-            className="w-full h-full flex items-center justify-center"
-          >
-            <ChartRenderer
-              chartConfig={chartSlide.chartConfig}
-              className="w-full h-full"
-              textColor={textColor}
-              isActive={isActive}
-            />
-          </div>
-        </TemplateApplier>
-      );
-    } else {
-      const htmlSlide = slide as HtmlSlide;
-      return (
-        <TemplateApplier templateId={currentTemplate} className="w-full h-full">
-          <div
-            className="w-full h-full flex flex-col justify-center"
-            dangerouslySetInnerHTML={{
-              __html:
-                htmlSlide.html ||
-                '<div id="slide-content"><p id="slide-description">No content available</p></div>',
-            }}
-          />
-        </TemplateApplier>
-      );
-    }
-  };
-
   return (
     <div
       className={`min-h-screen transition-all duration-300 ${
@@ -881,7 +897,11 @@ const PresentationViewer: React.FC = () => {
                           currentSlide === idx ? "ring-2 ring-blue-500" : ""
                         }`}
                       >
-                        {renderSlideContent(slide, currentSlide === idx)}
+                        <SlideRenderer
+                          slide={slide}
+                          currentTemplate={currentTemplate}
+                          isActive={currentSlide === idx}
+                        />
                       </Card>
                     </div>
                   </div>
@@ -1031,7 +1051,11 @@ const PresentationViewer: React.FC = () => {
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="w-full max-w-[98vw] h-full flex items-center justify-center">
               <Card className="w-full h-full rounded-none bg-black flex items-center justify-center aspect-video">
-                {renderSlideContent(presentationState.slides[currentSlide])}
+                <SlideRenderer
+                  slide={presentationState.slides[currentSlide]}
+                  currentTemplate={currentTemplate}
+                  isActive={true}
+                />
               </Card>
             </div>
           </div>

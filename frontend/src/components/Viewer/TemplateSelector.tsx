@@ -1,5 +1,5 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
+import React from "react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,10 +7,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import { ChevronDown, Check, Sparkles } from 'lucide-react';
-import { AVAILABLE_TEMPLATES } from '@/types/template';
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { ChevronDown, Check, Sparkles } from "lucide-react";
+import { AVAILABLE_TEMPLATES } from "@/types/template";
 
 interface TemplateSelectorProps {
   selectedTemplate: string;
@@ -19,15 +19,43 @@ interface TemplateSelectorProps {
 }
 
 const getTemplatePreviewColors = (templateId: string) => {
-  const colorMap: Record<string, { primary: string; secondary: string; accent: string }> = {
-    'modern-dark': { primary: 'bg-slate-800', secondary: 'bg-blue-500', accent: 'bg-slate-600' },
-    'corporate-blue': { primary: 'bg-blue-600', secondary: 'bg-white', accent: 'bg-slate-200' },
-    'minimalist': { primary: 'bg-white', secondary: 'bg-gray-100', accent: 'bg-gray-300' },
-    'gradient-purple': { primary: 'bg-purple-600', secondary: 'bg-pink-500', accent: 'bg-indigo-500' },
-    'nature-green': { primary: 'bg-green-600', secondary: 'bg-emerald-400', accent: 'bg-lime-500' },
+  const colorMap: Record<
+    string,
+    { primary: string; secondary: string; accent: string }
+  > = {
+    "modern-dark": {
+      primary: "bg-slate-900",
+      secondary: "bg-cyan-400",
+      accent: "bg-indigo-500",
+    },
+    "corporate-blue": {
+      primary: "bg-white",
+      secondary: "bg-blue-900",
+      accent: "bg-blue-600",
+    },
+    minimalist: {
+      primary: "bg-stone-50",
+      secondary: "bg-stone-900",
+      accent: "bg-stone-400",
+    },
+    "creative-studio": {
+      primary: "bg-orange-500",
+      secondary: "bg-pink-500",
+      accent: "bg-purple-600",
+    },
+    "nature-green": {
+      primary: "bg-green-50",
+      secondary: "bg-green-700",
+      accent: "bg-emerald-500",
+    },
+    "elegant-serif": {
+      primary: "bg-stone-100",
+      secondary: "bg-stone-800",
+      accent: "bg-stone-500",
+    },
   };
-  
-  return colorMap[templateId] || colorMap['corporate-blue'];
+
+  return colorMap[templateId] || colorMap["corporate-blue"];
 };
 
 const TemplateSelector: React.FC<TemplateSelectorProps> = ({
@@ -36,14 +64,14 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   className = "",
 }) => {
   const currentTemplate = AVAILABLE_TEMPLATES.find(
-    t => t.id === selectedTemplate
+    (t) => t.id === selectedTemplate
   );
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button 
+          <Button
             variant="outline"
             className="w-52 bg-white/10 border-white/20 text-white hover:bg-white/20 justify-between"
           >
@@ -51,20 +79,22 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
               {/* Current template preview */}
               {currentTemplate && (
                 <div className="flex gap-1">
-                  {Object.values(getTemplatePreviewColors(currentTemplate.id)).map((color, i) => (
+                  {Object.values(
+                    getTemplatePreviewColors(currentTemplate.id)
+                  ).map((color, i) => (
                     <div key={i} className={`w-2 h-2 rounded-full ${color}`} />
                   ))}
                 </div>
               )}
               <span className="truncate">
-                {currentTemplate?.name || 'Select Template'}
+                {currentTemplate?.name || "Select Template"}
               </span>
             </div>
             <ChevronDown className="w-4 h-4 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
-        
-        <DropdownMenuContent 
+
+        <DropdownMenuContent
           className="w-72 bg-gray-800/95 backdrop-blur-md border-gray-600"
           align="start"
         >
@@ -73,18 +103,18 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
             Choose Template
           </DropdownMenuLabel>
           <DropdownMenuSeparator className="bg-gray-600" />
-          
+
           {AVAILABLE_TEMPLATES.map((template) => {
             const colors = getTemplatePreviewColors(template.id);
             const isSelected = selectedTemplate === template.id;
-            
+
             return (
               <DropdownMenuItem
                 key={template.id}
                 onClick={() => onTemplateChange(template.id)}
                 className={`
                   text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer p-4
-                  ${isSelected ? 'bg-gray-700/30' : ''}
+                  ${isSelected ? "bg-gray-700/30" : ""}
                 `}
               >
                 <div className="flex items-center gap-3 w-full">
@@ -96,7 +126,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                       <div className={`w-1/3 ${colors.accent}`} />
                     </div>
                   </div>
-                  
+
                   {/* Template info */}
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -104,8 +134,8 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                         {template.name}
                       </span>
                       {isSelected && (
-                        <Badge 
-                          variant="secondary" 
+                        <Badge
+                          variant="secondary"
                           className="bg-blue-500/20 text-blue-300 text-xs"
                         >
                           Active
@@ -116,7 +146,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                       {template.description}
                     </div>
                   </div>
-                  
+
                   {/* Check mark */}
                   {isSelected && (
                     <Check className="w-4 h-4 text-blue-400 flex-shrink-0" />
