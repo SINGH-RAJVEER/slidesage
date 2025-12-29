@@ -454,15 +454,20 @@ const PresentationViewer: React.FC = () => {
     setCurrentSlide(newCurrent);
   };
 
-  const handleIteratePresentation = async (prompt: string) => {
+  const handleIteratePresentation = async (
+    prompt: string,
+    slideCount: number,
+    detailLevel: string,
+    tonality: string
+  ) => {
     if (!prompt.trim() || !presentationId) return;
 
     const success = await startIterating(
       prompt,
       presentationId,
-      10, // default slide count
-      "balanced", // default detail level
-      "professional" // default tonality
+      slideCount,
+      detailLevel,
+      tonality
     );
 
     if (success) {
