@@ -54,18 +54,12 @@ const PresentationViewer: React.FC = () => {
   const navigate = useNavigate();
   const { streamingState, getPresentation, startIterating } = useStreaming();
 
-  // Check if we're in streaming mode
   const isStreamingMode = location.state?.isStreaming === true;
 
-  // Get presentation from either location state or streaming context
-  // Note: This is just initial state - we'll fetch fresh data from API if we have an ID
   const getInitialPresentation = (): PresentationData | undefined => {
     if (isStreamingMode) {
       return getPresentation() || undefined;
     }
-    // For non-streaming mode, don't use location.state.presentation
-    // We'll fetch fresh data from the API instead
-    // Only use location.state if we're coming from a generation page
     if (location.state?.isNewGeneration) {
       return location.state?.presentation;
     }
@@ -79,7 +73,9 @@ const PresentationViewer: React.FC = () => {
     location.state?.presentationId || streamingState.presentationId
   );
   const [isLoadingPresentation, setIsLoadingPresentation] = useState(
-    !isStreamingMode && !location.state?.isNewGeneration && !!location.state?.presentationId
+    !isStreamingMode &&
+      !location.state?.isNewGeneration &&
+      !!location.state?.presentationId
   );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -93,31 +89,24 @@ const PresentationViewer: React.FC = () => {
   const [visibleSlide, setVisibleSlide] = useState(0);
   const thumbnailScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Iterative editing states
   const [showIterateModal, setShowIterateModal] = useState(false);
 
   const { currentTemplate, changeTemplate } = useTemplate();
 
-  // Update presentation state when streaming slides arrive
-  // Use slides.length as the primary trigger since array reference changes may not be detected
   const streamingSlidesCount = streamingState.slides.length;
 
-  // Clear presentation when streaming starts (for iterations)
   useEffect(() => {
     if (streamingState.isStreaming && streamingSlidesCount === 0) {
-      // Streaming just started, clear current presentation to show loading
       setPresentation(undefined);
     }
   }, [streamingState.isStreaming, streamingSlidesCount]);
 
-  // Update presentation as slides arrive
   useEffect(() => {
     if (streamingSlidesCount > 0 && streamingState.isStreaming) {
-      // Create a new presentation object with the latest slides
       setPresentation({
         title: streamingState.title,
         theme: streamingState.theme,
-        slides: streamingState.slides.map((s) => ({ ...s })), // Deep copy to ensure new references
+        slides: streamingState.slides.map((s) => ({ ...s })),
         totalSlides: streamingSlidesCount,
       });
     }
@@ -129,13 +118,11 @@ const PresentationViewer: React.FC = () => {
     streamingState.slides,
   ]);
 
-  // Auto-navigate to the latest slide when streaming
   useEffect(() => {
     if (streamingState.isStreaming && streamingSlidesCount > 0) {
       const latestSlideIndex = streamingSlidesCount - 1;
       setCurrentSlide(latestSlideIndex);
 
-      // Scroll to the latest slide
       setTimeout(() => {
         const slideElement = document.getElementById(
           `slide-${latestSlideIndex}`
@@ -151,40 +138,34 @@ const PresentationViewer: React.FC = () => {
     }
   }, [streamingState.isStreaming, streamingSlidesCount]);
 
-  // Update presentationId when it becomes available from streaming
   useEffect(() => {
     if (streamingState.presentationId && !presentationId) {
       setPresentationId(streamingState.presentationId);
     }
   }, [streamingState.presentationId, presentationId]);
 
-  // Fetch fresh presentation data from API when we have an ID and are NOT streaming
-  // This ensures we have the latest data after a refresh or when coming from the grid
   const hasFetchedRef = useRef(false);
   useEffect(() => {
     const fetchPresentation = async () => {
       const idToFetch = presentationId || location.state?.presentationId;
-      
-      // Don't fetch if we're actively streaming - we'll use streamed data
+
       if (streamingState.isStreaming) {
         setIsLoadingPresentation(false);
         return;
       }
-      
-      // Don't fetch if we don't have an ID
+
       if (!idToFetch) {
         setIsLoadingPresentation(false);
         return;
       }
-      
-      // Don't fetch if we already have (prevents re-fetching on state changes)
+
       if (hasFetchedRef.current) {
         return;
       }
-      
+
       hasFetchedRef.current = true;
       setIsLoadingPresentation(true);
-      
+
       try {
         const response = await fetch(
           `${API_URL}/api/presentations/${idToFetch}`,
@@ -192,31 +173,37 @@ const PresentationViewer: React.FC = () => {
             headers: authService.getAuthHeaders(),
           }
         );
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.presentation) {
             const pres = data.presentation;
-            // Update presentation with fresh data from DB
             setPresentation({
               title: pres.title,
-              theme: pres.slides_data?.theme || 'default',
+              theme: pres.slides_data?.theme || "default",
               slides: pres.slides_data?.slides || [],
-              totalSlides: pres.slides_data?.totalSlides || pres.slides_data?.slides?.length || 0,
+              totalSlides:
+                pres.slides_data?.totalSlides ||
+                pres.slides_data?.slides?.length ||
+                0,
             });
             setPresentationId(pres.id);
-            console.log('Loaded fresh presentation data from API');
+            console.log("Loaded fresh presentation data from API");
           }
         }
       } catch (error) {
-        console.error('Error fetching presentation:', error);
+        console.error("Error fetching presentation:", error);
       } finally {
         setIsLoadingPresentation(false);
       }
     };
-    
+
     fetchPresentation();
-  }, [presentationId, location.state?.presentationId, streamingState.isStreaming]);
+  }, [
+    presentationId,
+    location.state?.presentationId,
+    streamingState.isStreaming,
+  ]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -248,12 +235,10 @@ const PresentationViewer: React.FC = () => {
   }, [currentSlide, presentationState, isPlaying]);
 
   useEffect(() => {
-    // Clear any pending thumbnail scroll
     if (thumbnailScrollTimeoutRef.current) {
       clearTimeout(thumbnailScrollTimeoutRef.current);
     }
 
-    // Debounce thumbnail scrolling to prevent wobble
     thumbnailScrollTimeoutRef.current = setTimeout(() => {
       requestAnimationFrame(() => {
         const currentThumbnail = document.querySelector(
@@ -277,7 +262,6 @@ const PresentationViewer: React.FC = () => {
     };
   }, [currentSlide]);
 
-  // IntersectionObserver to track which slide is centered/visible
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -291,7 +275,7 @@ const PresentationViewer: React.FC = () => {
       },
       {
         root: slideContainerRef.current,
-        threshold: [0.9], // Trigger when 90% of slide is visible
+        threshold: [0.9],
         rootMargin: "0px",
       }
     );
@@ -306,7 +290,6 @@ const PresentationViewer: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Primary navigation: Left/Right for prev/next; Up/Down to jump to first/last
       if (e.key === "ArrowLeft") {
         setIsPlaying(false);
         prevSlide("auto");
@@ -314,23 +297,9 @@ const PresentationViewer: React.FC = () => {
         setIsPlaying(false);
         nextSlide("auto");
       } else if (e.key === "ArrowUp") {
-        // Jump to first slide
         setIsPlaying(false);
         skipToFirstSlide("auto");
       } else if (e.key === "ArrowDown") {
-        // Jump to last slide
-        setIsPlaying(false);
-        skipToLastSlide("auto");
-      } else if (e.key === "f" || e.key === "F") {
-        if (!isFullscreen) {
-          document.documentElement.requestFullscreen();
-          setIsFullscreen(true);
-        }
-        // Home/End to jump to first/last slide (also supported)
-      } else if (e.key === "Home") {
-        setIsPlaying(false);
-        skipToFirstSlide("auto");
-      } else if (e.key === "End") {
         setIsPlaying(false);
         skipToLastSlide("auto");
       }
@@ -357,7 +326,6 @@ const PresentationViewer: React.FC = () => {
     }
   }, [intervalMode]);
 
-  // Sync currentSlide with carousel scroll position
   useEffect(() => {
     const container = slideContainerRef.current;
     if (!container || !presentationState) return;
@@ -392,19 +360,16 @@ const PresentationViewer: React.FC = () => {
     };
 
     container.addEventListener("scroll", onScroll, { passive: true });
-    // run once to ensure state sync
     onScroll();
     return () => container.removeEventListener("scroll", onScroll);
   }, [presentationState?.slides.length]);
 
-  // Navigate away only if we loaded without any presentation data and not streaming
   const hasLocationPresentation = !!location.state?.presentation;
   const isLocationStreaming = !!location.state?.isStreaming;
   const hasLocationPresentationId = !!location.state?.presentationId;
   useEffect(() => {
-    // Don't navigate away if we're still loading
     if (isLoadingPresentation) return;
-    
+
     if (
       !hasLocationPresentation &&
       !isLocationStreaming &&
@@ -426,7 +391,6 @@ const PresentationViewer: React.FC = () => {
     navigate,
   ]);
 
-  // If streaming and still loading first slide, show loading state
   if (
     streamingState.isStreaming &&
     (!presentationState || presentationState.slides.length === 0)
@@ -441,7 +405,6 @@ const PresentationViewer: React.FC = () => {
     );
   }
 
-  // If loading presentation from API, show loading state
   if (isLoadingPresentation) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
@@ -453,7 +416,6 @@ const PresentationViewer: React.FC = () => {
     );
   }
 
-  // Guard: Don't render if no presentation and not streaming
   if (!presentationState) {
     return null;
   }
@@ -497,7 +459,6 @@ const PresentationViewer: React.FC = () => {
 
   const togglePlayback = () => {
     if (!isPlaying) {
-      // If at the last slide, reset to first before playing
       if (currentSlide === presentationState.slides.length - 1) {
         setCurrentSlide(0);
         setIsPlaying(true);
@@ -537,13 +498,12 @@ const PresentationViewer: React.FC = () => {
 
   const deleteCurrentSlide = async () => {
     if (!presentationState || presentationState.slides.length === 1) return;
-    
+
     const slideToDelete = presentationState.slides[currentSlide];
     const slideId = slideToDelete?.id;
-    
-    console.log('Deleting slide:', { presentationId, slideId, currentSlide });
-    
-    // Optimistically update UI
+
+    console.log("Deleting slide:", { presentationId, slideId, currentSlide });
+
     const newSlides = presentationState.slides.filter(
       (_, idx) => idx !== currentSlide
     );
@@ -551,36 +511,40 @@ const PresentationViewer: React.FC = () => {
     if (currentSlide >= newSlides.length) {
       newCurrent = newSlides.length - 1;
     }
-    setPresentation({ ...presentationState, slides: newSlides, totalSlides: newSlides.length });
+    setPresentation({
+      ...presentationState,
+      slides: newSlides,
+      totalSlides: newSlides.length,
+    });
     setCurrentSlide(newCurrent);
-    
-    // Persist to database if we have a presentation ID
+
     if (presentationId && slideId) {
       try {
-        // URL encode the slide ID in case it contains special characters
         const encodedSlideId = encodeURIComponent(slideId);
         const url = `${API_URL}/api/presentations/${presentationId}/slides/${encodedSlideId}`;
-        console.log('DELETE request to:', url);
-        
+        console.log("DELETE request to:", url);
+
         const response = await fetch(url, {
-          method: 'DELETE',
+          method: "DELETE",
           headers: authService.getAuthHeaders(),
         });
-        
+
         const data = await response.json();
-        console.log('Delete response:', response.status, data);
-        
+        console.log("Delete response:", response.status, data);
+
         if (!response.ok) {
-          console.error('Failed to delete slide from database:', data);
-          // Optionally revert the UI change on error
+          console.error("Failed to delete slide from database:", data);
         } else {
-          console.log('Slide deleted from database successfully');
+          console.log("Slide deleted from database successfully");
         }
       } catch (error) {
-        console.error('Error deleting slide:', error);
+        console.error("Error deleting slide:", error);
       }
     } else {
-      console.warn('Cannot delete: missing presentationId or slideId', { presentationId, slideId });
+      console.warn("Cannot delete: missing presentationId or slideId", {
+        presentationId,
+        slideId,
+      });
     }
   };
 

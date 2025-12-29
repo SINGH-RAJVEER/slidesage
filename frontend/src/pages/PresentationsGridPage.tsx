@@ -1,20 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Plus,
-  Loader2,
-  FileText,
-  Calendar,
-  Trash2,
-  Columns2,
-  Columns3,
-  Columns4,
-} from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { authService } from "@/services/authService";
 import Header from "@/components/Header";
+import {
+  PresentationCard,
+  GridSizeControl,
+  CreatePresentationButton,
+} from "@/components/PresentationsGridPage";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -242,48 +236,10 @@ export default function PresentationsGridPage() {
             <h1 className="text-4xl font-bold text-white flex items-center gap-3">
               Generated Presentations
             </h1>
-            <div className="flex items-center gap-2">
-              <span className="text-white/70 text-sm mr-2">Grid Size:</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setGridSize(2)}
-                className={`h-10 w-10 ${
-                  gridSize === 2
-                    ? "bg-white/20 text-white"
-                    : "text-white/60 hover:text-white hover:bg-white/10"
-                }`}
-                title="2 columns"
-              >
-                <Columns2 className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setGridSize(3)}
-                className={`h-10 w-10 ${
-                  gridSize === 3
-                    ? "bg-white/20 text-white"
-                    : "text-white/60 hover:text-white hover:bg-white/10"
-                }`}
-                title="3 columns"
-              >
-                <Columns3 className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setGridSize(4)}
-                className={`h-10 w-10 ${
-                  gridSize === 4
-                    ? "bg-white/20 text-white"
-                    : "text-white/60 hover:text-white hover:bg-white/10"
-                }`}
-                title="4 columns"
-              >
-                <Columns4 className="h-5 w-5" />
-              </Button>
-            </div>
+            <GridSizeControl
+              gridSize={gridSize}
+              onGridSizeChange={setGridSize}
+            />
           </div>
 
           {error && (
@@ -306,60 +262,21 @@ export default function PresentationsGridPage() {
             } gap-6`}
           >
             {presentations.map((presentation) => (
-              <Card
+              <PresentationCard
                 key={presentation.id}
-                className="group cursor-pointer shadow-lg border border-white/20 bg-white/10 backdrop-blur-md hover:bg-white/15 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02]"
-                onClick={() => handlePresentationClick(presentation.id)}
-              >
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-white text-xl line-clamp-2 flex items-start justify-between">
-                    <span className="flex-1">{presentation.title}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-white/60 hover:text-red-400 hover:bg-red-500/20 flex-shrink-0 ml-2"
-                      onClick={(e) =>
-                        handleDeletePresentation(e, presentation.id)
-                      }
-                      disabled={deletingId === presentation.id}
-                    >
-                      {deletingId === presentation.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-white/70 text-sm line-clamp-3">
-                    {presentation.prompt}
-                  </p>
-                  <div className="flex items-center gap-2 text-white/50 text-xs pt-2 border-t border-white/10">
-                    <Calendar className="h-3 w-3" />
-                    <span>{formatDate(presentation.created_at)}</span>
-                  </div>
-                </CardContent>
-              </Card>
+                presentation={presentation}
+                isDeleting={deletingId === presentation.id}
+                onCardClick={handlePresentationClick}
+                onDelete={handleDeletePresentation}
+                formatDate={formatDate}
+              />
             ))}
           </div>
         </div>
       </div>
 
       {/* Floating Add Button */}
-      <div className="group fixed bottom-8 right-8 z-50">
-        <Button
-          onClick={() => navigate("/generate")}
-          className="h-16 w-16 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-lg border border-white/30 text-white shadow-[0_8px_32px_0_rgba(255,255,255,0.1)] hover:shadow-[0_8px_32px_0_rgba(255,255,255,0.2)] transition-all duration-300 p-0"
-        >
-          <Plus className="h-8 w-8" />
-        </Button>
-        <div className="absolute bottom-full right-0 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-          <div className="bg-white/10 backdrop-blur-lg border border-white/30 text-white px-4 py-2 rounded-lg shadow-lg whitespace-nowrap">
-            Create New Presentation
-          </div>
-        </div>
-      </div>
+      <CreatePresentationButton onCreateClick={() => navigate("/generate")} />
     </div>
   );
 }
