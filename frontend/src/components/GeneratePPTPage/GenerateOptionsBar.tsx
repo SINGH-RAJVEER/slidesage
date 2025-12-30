@@ -34,18 +34,18 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
   onSlideCountChange,
   onCustomSlideCountChange,
 }) => {
-  if (!showBackButton) return null;
-
   return (
     <div className="absolute bottom-[calc(100%+1rem)] left-0 right-0 flex items-center justify-between bg-white/10 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/20">
-      <Button
-        onClick={onBackClick}
-        variant="outline"
-        className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
-      >
-        <ArrowLeft className="w-4 h-4" />
-      </Button>
-      <div className="flex items-center gap-4">
+      {showBackButton && (
+        <Button
+          onClick={onBackClick}
+          variant="outline"
+          className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+      )}
+      <div className="flex items-center gap-4 ml-auto">
         <DetailLevelSelector
           detailLevel={detailLevel}
           onDetailLevelChange={onDetailLevelChange}

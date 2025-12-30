@@ -6,7 +6,6 @@ load_dotenv()
 
 class Config:
     LITELLM_MODEL = os.getenv('LITELLM_MODEL')
-    LITELLM_PROXY_URL = os.getenv('LITELLM_PROXY_URL')
     
     DEBUG = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
     CORS_ORIGINS = os.getenv('CORS_ORIGINS')
@@ -22,8 +21,7 @@ class Config:
     GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
     
     # Database Configuration
-    default_db_url = 'postgresql://slidesage:slidesage@localhost:5432/slidesage'
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', default_db_url)
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost:5432/slidesage')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
