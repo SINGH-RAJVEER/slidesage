@@ -163,6 +163,7 @@ const PresentationViewer: React.FC = () => {
     }
   }, [streamingState.isStreaming, streamingSlidesCount]);
 
+  // Update presentation while streaming
   useEffect(() => {
     if (streamingSlidesCount > 0 && streamingState.isStreaming) {
       setPresentation({
@@ -178,6 +179,34 @@ const PresentationViewer: React.FC = () => {
     streamingState.title,
     streamingState.theme,
     streamingState.slides,
+  ]);
+
+  // CRITICAL: Capture final presentation state when streaming completes
+  // This ensures we have the complete data even if the DB hasn't fully saved yet
+  useEffect(() => {
+    if (
+      streamingState.isComplete &&
+      !streamingState.isStreaming &&
+      streamingState.slides.length > 0
+    ) {
+      console.log(
+        "Streaming completed - capturing final presentation state with",
+        streamingState.slides.length,
+        "slides"
+      );
+      setPresentation({
+        title: streamingState.title,
+        theme: streamingState.theme,
+        slides: streamingState.slides.map((s) => ({ ...s })),
+        totalSlides: streamingState.slides.length,
+      });
+    }
+  }, [
+    streamingState.isComplete,
+    streamingState.isStreaming,
+    streamingState.slides,
+    streamingState.title,
+    streamingState.theme,
   ]);
 
   useEffect(() => {
@@ -206,17 +235,67 @@ const PresentationViewer: React.FC = () => {
     }
   }, [streamingState.presentationId, presentationId]);
 
+  // Track if streaming just completed - use this to skip immediate fetch after streaming
+  const streamingJustCompletedRef = useRef(false);
+  const wasStreamingRef = useRef(streamingState.isStreaming);
+
+  useEffect(() => {
+    // Detect when streaming transitions from true to false
+    if (
+      wasStreamingRef.current &&
+      !streamingState.isStreaming &&
+      streamingState.isComplete
+    ) {
+      streamingJustCompletedRef.current = true;
+      console.log(
+        "Streaming just completed, will skip fetch and use streamed data"
+      );
+    }
+    wasStreamingRef.current = streamingState.isStreaming;
+  }, [streamingState.isStreaming, streamingState.isComplete]);
+
   const hasFetchedRef = useRef(false);
   useEffect(() => {
     const fetchPresentation = async () => {
       const idToFetch = presentationId || location.state?.presentationId;
 
+      // Don't fetch if actively streaming
       if (streamingState.isStreaming) {
         setIsLoadingPresentation(false);
         return;
       }
 
+      // If streaming just completed and we have presentation data, don't fetch
+      // This prevents race conditions with distributed deployments where DB might not have committed yet
+      if (
+        streamingJustCompletedRef.current &&
+        presentationState &&
+        presentationState.slides.length > 0
+      ) {
+        console.log("Skipping fetch - using data from completed stream");
+        setIsLoadingPresentation(false);
+        streamingJustCompletedRef.current = false; // Reset for next time
+        return;
+      }
+
+      // If streaming is complete and we have valid slides in streaming state, use those
+      if (streamingState.isComplete && streamingState.slides.length > 0) {
+        console.log("Skipping fetch - streaming complete with valid data");
+        setIsLoadingPresentation(false);
+        return;
+      }
+
       if (!idToFetch) {
+        setIsLoadingPresentation(false);
+        return;
+      }
+
+      // If we're in streaming mode and have valid data, don't refetch
+      if (
+        isStreamingMode &&
+        presentationState &&
+        presentationState.slides.length > 0
+      ) {
         setIsLoadingPresentation(false);
         return;
       }
@@ -240,17 +319,25 @@ const PresentationViewer: React.FC = () => {
           const data = await response.json();
           if (data.success && data.presentation) {
             const pres = data.presentation;
-            setPresentation({
-              title: pres.title,
-              theme: pres.slides_data?.theme || "default",
-              slides: pres.slides_data?.slides || [],
-              totalSlides:
-                pres.slides_data?.totalSlides ||
-                pres.slides_data?.slides?.length ||
-                0,
-            });
-            setPresentationId(pres.id);
-            console.log("Loaded fresh presentation data from API");
+            const fetchedSlides = pres.slides_data?.slides || [];
+
+            // Only update if fetched data has valid slides
+            // This prevents overwriting good data with placeholder/empty data
+            if (fetchedSlides.length > 0 && pres.title !== "Generating...") {
+              setPresentation({
+                title: pres.title,
+                theme: pres.slides_data?.theme || "default",
+                slides: fetchedSlides,
+                totalSlides:
+                  pres.slides_data?.totalSlides || fetchedSlides.length || 0,
+              });
+              setPresentationId(pres.id);
+              console.log("Loaded fresh presentation data from API");
+            } else {
+              console.log(
+                "Fetched data appears incomplete, keeping current state"
+              );
+            }
           }
         }
       } catch (error) {
@@ -265,6 +352,10 @@ const PresentationViewer: React.FC = () => {
     presentationId,
     location.state?.presentationId,
     streamingState.isStreaming,
+    streamingState.isComplete,
+    streamingState.slides.length,
+    presentationState,
+    isStreamingMode,
   ]);
 
   useEffect(() => {
@@ -432,13 +523,16 @@ const PresentationViewer: React.FC = () => {
   useEffect(() => {
     if (isLoadingPresentation) return;
 
+    // Don't redirect if streaming is in progress OR just completed with data
+    if (streamingState.isStreaming) return;
+    if (streamingState.isComplete && streamingState.slides.length > 0) return;
+    if (presentationState && presentationState.slides.length > 0) return;
+    if (presentationId) return;
+
     if (
       !hasLocationPresentation &&
       !isLocationStreaming &&
-      !hasLocationPresentationId &&
-      !streamingState.isStreaming &&
-      !presentationState &&
-      !presentationId
+      !hasLocationPresentationId
     ) {
       navigate("/");
     }
@@ -447,6 +541,8 @@ const PresentationViewer: React.FC = () => {
     hasLocationPresentationId,
     isLocationStreaming,
     streamingState.isStreaming,
+    streamingState.isComplete,
+    streamingState.slides.length,
     presentationState,
     presentationId,
     isLoadingPresentation,

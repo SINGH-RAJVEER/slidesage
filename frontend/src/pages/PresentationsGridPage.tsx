@@ -2,6 +2,15 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { authService } from "@/services/authService";
 import Header from "@/components/Header";
 import {
@@ -25,6 +34,9 @@ export default function PresentationsGridPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [presentationToDelete, setPresentationToDelete] = useState<
+    number | null
+  >(null);
   const [gridSize, setGridSize] = useState<2 | 3 | 4>(() => {
     const saved = localStorage.getItem("gridSize");
     return saved ? (parseInt(saved) as 2 | 3 | 4) : 3;
@@ -142,15 +154,17 @@ export default function PresentationsGridPage() {
     }
   };
 
-  const handleDeletePresentation = async (
+  const handleDeletePresentation = (
     e: React.MouseEvent,
     presentationId: number
   ) => {
     e.stopPropagation();
+    setPresentationToDelete(presentationId);
+  };
 
-    if (!confirm("Are you sure you want to delete this presentation?")) {
-      return;
-    }
+  const executeDelete = async () => {
+    if (!presentationToDelete) return;
+    const presentationId = presentationToDelete;
 
     try {
       setDeletingId(presentationId);
@@ -204,6 +218,7 @@ export default function PresentationsGridPage() {
       setError(`Error: ${err instanceof Error ? err.message : err}`);
     } finally {
       setDeletingId(null);
+      setPresentationToDelete(null);
     }
   };
 
@@ -277,6 +292,45 @@ export default function PresentationsGridPage() {
 
       {/* Floating Add Button */}
       <CreatePresentationButton onCreateClick={() => navigate("/generate")} />
+
+      <Dialog
+        open={!!presentationToDelete}
+        onOpenChange={(open) => !open && setPresentationToDelete(null)}
+      >
+        <DialogContent className="bg-white/10 backdrop-blur-md border-white/20 text-white shadow-2xl">
+          <DialogHeader>
+            <DialogTitle>Delete Presentation</DialogTitle>
+            <DialogDescription className="text-white/70">
+              Are you sure you want to delete this presentation? This action
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setPresentationToDelete(null)}
+              className="text-white hover:bg-white/10 hover:text-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={executeDelete}
+              disabled={deletingId !== null}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              {deletingId !== null ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
