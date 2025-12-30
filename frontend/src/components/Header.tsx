@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { LogOut, User, Coins } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,13 +48,16 @@ export default function Header() {
         {user && (
           <div className="flex items-center gap-4">
             {/* Slide Tokens Display */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20">
-              <Coins className="h-4 w-4 text-yellow-400" />
+            <button
+              onClick={() => navigate("/purchase")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:scale-105 transition-all duration-200 cursor-pointer"
+              title="Click to purchase more tokens"
+            >
               <span className="text-sm font-medium text-white">
                 {user.slide_tokens?.toFixed(1) ?? "0.0"}
               </span>
-              <span className="text-xs text-white/60">tokens</span>
-            </div>
+              <span className="text-xs text-white/60">slide tokens</span>
+            </button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
