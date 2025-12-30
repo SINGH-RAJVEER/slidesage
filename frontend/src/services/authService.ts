@@ -5,6 +5,7 @@ export type User = {
   email: string;
   name: string;
   profile_picture?: string;
+  slide_tokens: number;
   created_at?: string;
 };
 

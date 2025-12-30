@@ -259,6 +259,33 @@ def update_profile():
         }), 500
 
 
+@auth_bp.route('/slide-tokens', methods=['GET'])
+@jwt_required()
+def get_slide_tokens():
+    """Get current user's slide token balance"""
+    try:
+        current_user_id = get_jwt_identity()
+        try:
+            user_id = int(current_user_id) if isinstance(current_user_id, str) else current_user_id
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid token format'}), 422
+        
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'slide_tokens': user.slide_tokens
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @auth_bp.route('/google', methods=['POST'])
 def google_login():
     """Authenticate user with Google OAuth token"""

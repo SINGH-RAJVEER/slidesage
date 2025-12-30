@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, Response, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.models import db, Presentation
+from app.models import db, Presentation, User
 from app.services.ai_service import AIService
 from datetime import datetime
 import json
@@ -12,6 +12,40 @@ presentations_bp = Blueprint('presentations', __name__, url_prefix='/api')
 
 # Initialize AI service
 ai_service = AIService()
+
+# Minimum slide tokens required to start a generation (estimate: 5 slide tokens = 5000 AI tokens)
+MIN_SLIDE_TOKENS_REQUIRED = 1.0
+
+
+def deduct_user_tokens_sync(app, user_id, tokens_used):
+    """
+    Synchronously deduct slide tokens from user based on AI token usage.
+    1 slide token = 1000 AI tokens
+    Returns the number of slide tokens deducted and remaining balance.
+    """
+    try:
+        with app.app_context():
+            user = db.session.get(User, user_id)
+            if user:
+                slide_tokens_deducted = user.deduct_slide_tokens(tokens_used)
+                db.session.commit()
+                logger.info(f"Deducted {slide_tokens_deducted:.2f} slide tokens from user {user_id}. Remaining: {user.slide_tokens:.2f}")
+                return {
+                    'success': True,
+                    'slide_tokens_deducted': slide_tokens_deducted,
+                    'slide_tokens_remaining': user.slide_tokens
+                }
+            else:
+                logger.error(f"User {user_id} not found for token deduction")
+                return {'success': False, 'error': 'User not found'}
+    except Exception as e:
+        logger.error(f"Error deducting tokens for user {user_id}: {e}")
+        try:
+            with app.app_context():
+                db.session.rollback()
+        except:
+            pass
+        return {'success': False, 'error': str(e)}
 
 
 def save_presentation_sync(app, presentation_id, data, prompt=None):
@@ -51,6 +85,23 @@ def generate_presentation_stream():
     """Generate a new presentation with streaming"""
     try:
         current_user_id = get_jwt_identity()
+        # Convert to int since identity is stored as string
+        try:
+            user_id = int(current_user_id) if isinstance(current_user_id, str) else current_user_id
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid user ID'}), 422
+        
+        # Check if user has sufficient slide tokens
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        if user.slide_tokens < MIN_SLIDE_TOKENS_REQUIRED:
+            return jsonify({
+                'error': 'Insufficient slide tokens',
+                'slide_tokens_remaining': user.slide_tokens,
+                'slide_tokens_required': MIN_SLIDE_TOKENS_REQUIRED
+            }), 402  # Payment Required
         
         if not request.is_json:
             return jsonify({'error': 'Content-Type must be JSON'}), 400
@@ -69,7 +120,7 @@ def generate_presentation_stream():
 
         # Create presentation record FIRST with placeholder data
         presentation = Presentation(
-            user_id=current_user_id,
+            user_id=user_id,
             title='Generating...',
             prompt=prompt
         )
@@ -80,12 +131,13 @@ def generate_presentation_stream():
         presentation_id = presentation.id
         app = current_app._get_current_object()
         
-        logger.info(f"Created presentation {presentation_id} for user {current_user_id}")
+        logger.info(f"Created presentation {presentation_id} for user {user_id}")
 
         def generate():
             all_slides = []
             theme = 'default'
             title = 'Untitled Presentation'
+            tokens_used = 0
             
             # Send the presentation ID immediately so frontend knows it
             yield f"event: created\n"
@@ -115,6 +167,8 @@ def generate_presentation_stream():
                             theme = event_data.get('theme')
                         if event_data.get('title'):
                             title = event_data.get('title')
+                        # Get tokens used from complete event
+                        tokens_used = event_data.get('tokens_used', 0)
                     
                     # Stream the event to frontend
                     yield f"event: {event_type}\n"
@@ -129,8 +183,11 @@ def generate_presentation_stream():
                 }
                 
                 if save_presentation_sync(app, presentation_id, final_data, prompt):
+                    # Deduct slide tokens based on tokens used
+                    token_result = deduct_user_tokens_sync(app, user_id, tokens_used)
+                    
                     yield f"event: saved\n"
-                    yield f"data: {json.dumps({'presentation_id': presentation_id, 'success': True})}\n\n"
+                    yield f"data: {json.dumps({'presentation_id': presentation_id, 'success': True, 'tokens_used': tokens_used, **token_result})}\n\n"
                 else:
                     yield f"event: save_error\n"
                     yield f"data: {json.dumps({'error': 'Failed to save presentation'})}\n\n"
@@ -164,6 +221,23 @@ def iterate_presentation_stream():
     """Iterate on an existing presentation - updates in place"""
     try:
         current_user_id = get_jwt_identity()
+        # Convert to int since identity is stored as string
+        try:
+            user_id = int(current_user_id) if isinstance(current_user_id, str) else current_user_id
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid user ID'}), 422
+        
+        # Check if user has sufficient slide tokens
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        
+        if user.slide_tokens < MIN_SLIDE_TOKENS_REQUIRED:
+            return jsonify({
+                'error': 'Insufficient slide tokens',
+                'slide_tokens_remaining': user.slide_tokens,
+                'slide_tokens_required': MIN_SLIDE_TOKENS_REQUIRED
+            }), 402  # Payment Required
         
         if not request.is_json:
             return jsonify({'error': 'Content-Type must be JSON'}), 400
@@ -187,7 +261,7 @@ def iterate_presentation_stream():
         # Get the existing presentation
         presentation = Presentation.query.filter_by(
             id=presentation_id,
-            user_id=current_user_id
+            user_id=user_id
         ).first()
         
         if not presentation:
@@ -203,6 +277,7 @@ def iterate_presentation_stream():
             all_slides = []
             theme = parent_data.get('theme', 'default')
             title = parent_data.get('title', 'Untitled Presentation')
+            tokens_used = 0
             
             try:
                 for event in ai_service.iterate_presentation_stream(prompt, parent_data, slide_count, detail_level, tonality):
@@ -228,6 +303,8 @@ def iterate_presentation_stream():
                             theme = event_data.get('theme')
                         if event_data.get('title'):
                             title = event_data.get('title')
+                        # Get tokens used from complete event
+                        tokens_used = event_data.get('tokens_used', 0)
                     
                     # Stream the event to frontend
                     yield f"event: {event_type}\n"
@@ -243,9 +320,12 @@ def iterate_presentation_stream():
                 
                 if len(all_slides) > 0:
                     if save_presentation_sync(app, presentation_id, final_data, prompt):
+                        # Deduct slide tokens based on tokens used
+                        token_result = deduct_user_tokens_sync(app, user_id, tokens_used)
+                        
                         logger.info(f"Successfully updated presentation {presentation_id} with {len(all_slides)} slides")
                         yield f"event: saved\n"
-                        yield f"data: {json.dumps({'presentation_id': presentation_id, 'success': True})}\n\n"
+                        yield f"data: {json.dumps({'presentation_id': presentation_id, 'success': True, 'tokens_used': tokens_used, **token_result})}\n\n"
                     else:
                         yield f"event: save_error\n"
                         yield f"data: {json.dumps({'error': 'Failed to save presentation'})}\n\n"

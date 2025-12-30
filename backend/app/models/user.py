@@ -16,6 +16,11 @@ class User(db.Model):
     oauth_provider = db.Column(db.String(50), nullable=True)
     oauth_id = db.Column(db.String(255), nullable=True)
     
+    # Slide tokens - in-app currency (1 slide token = 1000 AI tokens)
+    # New users start with 100 slide tokens
+    # For existing databases, run: ALTER TABLE users ADD COLUMN slide_tokens FLOAT DEFAULT 100.0 NOT NULL;
+    slide_tokens = db.Column(db.Float, default=100.0, nullable=False)
+    
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -37,8 +42,20 @@ class User(db.Model):
             'email': self.email,
             'name': self.name,
             'profile_picture': self.profile_picture,
+            'slide_tokens': self.slide_tokens,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
+    
+    def deduct_slide_tokens(self, tokens_used: int) -> float:
+        """Deduct slide tokens based on AI token usage (1 slide token = 1000 AI tokens)"""
+        slide_tokens_to_deduct = tokens_used / 1000.0
+        self.slide_tokens = max(0, self.slide_tokens - slide_tokens_to_deduct)
+        return slide_tokens_to_deduct
+    
+    def has_sufficient_tokens(self, estimated_tokens: int = 5000) -> bool:
+        """Check if user has enough slide tokens for generation (default estimate: 5 slide tokens)"""
+        estimated_slide_tokens = estimated_tokens / 1000.0
+        return self.slide_tokens >= estimated_slide_tokens
     
     def __repr__(self):
         return f'<User {self.email}>'

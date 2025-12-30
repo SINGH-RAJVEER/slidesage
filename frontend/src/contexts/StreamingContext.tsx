@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import type { Slide, PresentationData } from "@/types/presentation";
 import { authService } from "@/services/authService";
+import { useAuth } from "@/contexts/AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -60,6 +61,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(
     null
   );
+  const { refreshUser } = useAuth();
 
   const resetStreaming = useCallback(() => {
     setStreamingState(initialState);
@@ -153,6 +155,20 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             isStreaming: false,
             error: "Your session is invalid. Please log out and log in again.",
+          }));
+          return false;
+        }
+
+        if (response.status === 402) {
+          const errorData = await response.json();
+          setStreamingState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            error: `Insufficient slide tokens. You have ${
+              errorData.slide_tokens_remaining?.toFixed(1) || 0
+            } tokens, but need at least ${
+              errorData.slide_tokens_required || 1
+            } to generate.`,
           }));
           return false;
         }
@@ -264,6 +280,16 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                           "Presentation saved:",
                           data.presentation_id
                         );
+                        // Refresh user to get updated slide token balance
+                        if (data.slide_tokens_deducted !== undefined) {
+                          console.log(
+                            "Slide tokens deducted:",
+                            data.slide_tokens_deducted,
+                            "Remaining:",
+                            data.slide_tokens_remaining
+                          );
+                          refreshUser();
+                        }
                         break;
 
                       case "save_error":
@@ -321,7 +347,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    []
+    [refreshUser]
   );
 
   const startIterating = useCallback(
@@ -393,6 +419,20 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             isStreaming: false,
             error: "Your session is invalid. Please log out and log in again.",
+          }));
+          return false;
+        }
+
+        if (response.status === 402) {
+          const errorData = await response.json();
+          setStreamingState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            error: `Insufficient slide tokens. You have ${
+              errorData.slide_tokens_remaining?.toFixed(1) || 0
+            } tokens, but need at least ${
+              errorData.slide_tokens_required || 1
+            } to iterate.`,
           }));
           return false;
         }
@@ -497,6 +537,16 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                           "Iteration saved to presentation:",
                           data.presentation_id
                         );
+                        // Refresh user to get updated slide token balance
+                        if (data.slide_tokens_deducted !== undefined) {
+                          console.log(
+                            "Slide tokens deducted:",
+                            data.slide_tokens_deducted,
+                            "Remaining:",
+                            data.slide_tokens_remaining
+                          );
+                          refreshUser();
+                        }
                         break;
 
                       case "save_error":
@@ -556,7 +606,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    []
+    [refreshUser]
   );
 
   // Cleanup on unmount

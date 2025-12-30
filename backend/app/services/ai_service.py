@@ -282,9 +282,9 @@ class AIService:
 
             try:
                 if provider:
-                    resp = completion(model=f"{provider}/{model_name}", messages=messages, stream=True)
+                    resp = completion(model=f"{provider}/{model_name}", messages=messages, stream=True, stream_options={"include_usage": True})
                 else:
-                    resp = completion(model=model_name, messages=messages, stream=True)
+                    resp = completion(model=model_name, messages=messages, stream=True, stream_options={"include_usage": True})
             except Exception as e:
                 err_name = type(e).__name__
                 logger.error("LiteLLM streaming completion failed (%s). provider=%s model=%s error=%s", err_name, provider, model_name, str(e))
@@ -295,6 +295,7 @@ class AIService:
             slides_yielded = 0
             theme_yielded = False
             title_extracted = None
+            total_tokens_used = 0
             
             # Yield initial event
             yield {"event": "start", "data": {"status": "generating"}}
@@ -302,13 +303,20 @@ class AIService:
             for chunk in resp:
                 # Extract content from chunk
                 chunk_content = ""
+                
+                # Try to extract usage from final chunk
                 if isinstance(chunk, dict):
+                    if chunk.get("usage"):
+                        total_tokens_used = chunk["usage"].get("total_tokens", 0)
                     choices = chunk.get("choices") or []
                     if choices:
                         delta = choices[0].get("delta") or {}
                         chunk_content = delta.get("content", "")
                 else:
                     try:
+                        # Check for usage in the chunk object
+                        if hasattr(chunk, 'usage') and chunk.usage:
+                            total_tokens_used = getattr(chunk.usage, 'total_tokens', 0)
                         if chunk.choices and chunk.choices[0].delta.content:
                             chunk_content = chunk.choices[0].delta.content
                     except Exception:
@@ -445,6 +453,10 @@ class AIService:
                 
                 if 'slides' in parsed_content:
                     parsed_content['totalSlides'] = len(parsed_content['slides'])
+                
+                # Add token usage to the response
+                parsed_content['tokens_used'] = total_tokens_used
+                logger.info(f"Generation completed. Total tokens used: {total_tokens_used}")
                 
                 # Yield completion event with full presentation data
                 yield {
@@ -664,9 +676,9 @@ Please create an updated presentation with approximately {slide_count} slides th
 
             try:
                 if provider:
-                    resp = completion(model=f"{provider}/{model_name}", messages=messages, stream=True)
+                    resp = completion(model=f"{provider}/{model_name}", messages=messages, stream=True, stream_options={"include_usage": True})
                 else:
-                    resp = completion(model=model_name, messages=messages, stream=True)
+                    resp = completion(model=model_name, messages=messages, stream=True, stream_options={"include_usage": True})
             except Exception as e:
                 err_name = type(e).__name__
                 logger.error("LiteLLM iteration streaming completion failed (%s). provider=%s model=%s error=%s", err_name, provider, model_name, str(e))
@@ -677,6 +689,7 @@ Please create an updated presentation with approximately {slide_count} slides th
             slides_yielded = 0
             theme_yielded = False
             title_extracted = None
+            total_tokens_used = 0
             
             # Yield initial event
             yield {"event": "start", "data": {"status": "generating"}}
@@ -684,13 +697,19 @@ Please create an updated presentation with approximately {slide_count} slides th
             for chunk in resp:
                 # Extract content from chunk
                 chunk_content = ""
+                # Try to extract usage from final chunk
                 if isinstance(chunk, dict):
+                    if chunk.get("usage"):
+                        total_tokens_used = chunk["usage"].get("total_tokens", 0)
                     choices = chunk.get("choices") or []
                     if choices:
                         delta = choices[0].get("delta") or {}
                         chunk_content = delta.get("content", "")
                 else:
                     try:
+                        # Check for usage in the chunk object
+                        if hasattr(chunk, 'usage') and chunk.usage:
+                            total_tokens_used = getattr(chunk.usage, 'total_tokens', 0)
                         if chunk.choices and chunk.choices[0].delta.content:
                             chunk_content = chunk.choices[0].delta.content
                     except Exception:
@@ -827,6 +846,10 @@ Please create an updated presentation with approximately {slide_count} slides th
                 
                 if 'slides' in parsed_content:
                     parsed_content['totalSlides'] = len(parsed_content['slides'])
+                
+                # Add token usage to the response
+                parsed_content['tokens_used'] = total_tokens_used
+                logger.info(f"Iteration completed. Total tokens used: {total_tokens_used}")
                 
                 # Yield completion event with full presentation data
                 yield {
