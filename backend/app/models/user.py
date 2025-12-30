@@ -16,8 +16,8 @@ class User(db.Model):
     oauth_provider = db.Column(db.String(50), nullable=True)
     oauth_id = db.Column(db.String(255), nullable=True)
     
-    # New users start with 10 slide tokens
-    slide_tokens = db.Column(db.Float, default=10.0, nullable=False)
+    # New users start with 50 slide tokens (enough for ~20 slides with balanced detail)
+    slide_tokens = db.Column(db.Float, default=50.0, nullable=False)
     
     # Last login date for daily bonus tracking
     last_login_date = db.Column(db.Date, nullable=True)

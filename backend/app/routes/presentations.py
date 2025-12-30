@@ -13,8 +13,33 @@ presentations_bp = Blueprint('presentations', __name__, url_prefix='/api')
 # Initialize AI service
 ai_service = AIService()
 
-# Minimum slide tokens required to start a generation (estimate: 5 slide tokens = 5000 AI tokens)
-MIN_SLIDE_TOKENS_REQUIRED = 1.0
+
+def calculate_estimated_tokens(slide_count: int, detail_level: str, tonality: str) -> float:
+    """
+    Calculate estimated slide tokens required for a presentation.
+    1 slide token = 1000 AI tokens
+    """
+    # Base token cost per slide (in slide tokens)
+    base_token_per_slide = 2.5  # ~2500 AI tokens per slide
+    
+    # Adjust based on detail level
+    if detail_level == 'concise':
+        base_token_per_slide = 1.5  # ~1500 AI tokens per slide
+    elif detail_level == 'detailed':
+        base_token_per_slide = 4.0  # ~4000 AI tokens per slide
+    # balanced stays at 2.5
+    
+    # Minor adjustment for tonality complexity
+    tonality_multiplier = 1.0
+    if tonality == 'casual':
+        tonality_multiplier = 0.9
+    elif tonality == 'technical':
+        tonality_multiplier = 1.1
+    # professional stays at 1.0
+    
+    # Calculate total estimated tokens
+    estimated_tokens = slide_count * base_token_per_slide * tonality_multiplier
+    return round(estimated_tokens, 1)
 
 
 def deduct_user_tokens_sync(app, user_id, tokens_used):
@@ -91,17 +116,10 @@ def generate_presentation_stream():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid user ID'}), 422
         
-        # Check if user has sufficient slide tokens
+        # Check if user exists
         user = db.session.get(User, user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
-        
-        if user.slide_tokens < MIN_SLIDE_TOKENS_REQUIRED:
-            return jsonify({
-                'error': 'Insufficient slide tokens',
-                'slide_tokens_remaining': user.slide_tokens,
-                'slide_tokens_required': MIN_SLIDE_TOKENS_REQUIRED
-            }), 402  # Payment Required
         
         if not request.is_json:
             return jsonify({'error': 'Content-Type must be JSON'}), 400
@@ -114,6 +132,17 @@ def generate_presentation_stream():
         slide_count = data.get('slideCount', 8)
         detail_level = data.get('detailLevel', 'balanced')
         tonality = data.get('tonality', 'professional')
+        
+        # Calculate estimated tokens based on parameters
+        estimated_tokens = calculate_estimated_tokens(slide_count, detail_level, tonality)
+        
+        # Check if user has sufficient slide tokens
+        if user.slide_tokens < estimated_tokens:
+            return jsonify({
+                'error': 'Insufficient slide tokens',
+                'slide_tokens_remaining': user.slide_tokens,
+                'slide_tokens_required': estimated_tokens
+            }), 402  # Payment Required
 
         if not prompt:
             return jsonify({'error': 'Prompt is required'}), 400
@@ -227,17 +256,10 @@ def iterate_presentation_stream():
         except (ValueError, TypeError):
             return jsonify({'error': 'Invalid user ID'}), 422
         
-        # Check if user has sufficient slide tokens
+        # Check if user exists
         user = db.session.get(User, user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 404
-        
-        if user.slide_tokens < MIN_SLIDE_TOKENS_REQUIRED:
-            return jsonify({
-                'error': 'Insufficient slide tokens',
-                'slide_tokens_remaining': user.slide_tokens,
-                'slide_tokens_required': MIN_SLIDE_TOKENS_REQUIRED
-            }), 402  # Payment Required
         
         if not request.is_json:
             return jsonify({'error': 'Content-Type must be JSON'}), 400
@@ -251,6 +273,17 @@ def iterate_presentation_stream():
         slide_count = data.get('slideCount', 8)
         detail_level = data.get('detailLevel', 'balanced')
         tonality = data.get('tonality', 'professional')
+        
+        # Calculate estimated tokens based on parameters
+        estimated_tokens = calculate_estimated_tokens(slide_count, detail_level, tonality)
+        
+        # Check if user has sufficient slide tokens
+        if user.slide_tokens < estimated_tokens:
+            return jsonify({
+                'error': 'Insufficient slide tokens',
+                'slide_tokens_remaining': user.slide_tokens,
+                'slide_tokens_required': estimated_tokens
+            }), 402  # Payment Required
 
         if not prompt:
             return jsonify({'error': 'Prompt is required'}), 400

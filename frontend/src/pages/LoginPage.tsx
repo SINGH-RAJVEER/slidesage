@@ -7,7 +7,7 @@ import Header from "@/components/Header";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(false);
   const { isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
 

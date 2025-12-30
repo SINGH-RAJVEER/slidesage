@@ -12,7 +12,6 @@ export default function GeneratePPTPage() {
   const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [hasPresentations, setHasPresentations] = useState(false);
   const [slideCount, setSlideCount] = useState("5");
   const [slideCountMode, setSlideCountMode] = useState("preset");
   const [customSlideCount, setCustomSlideCount] = useState("5");
@@ -22,11 +21,7 @@ export default function GeneratePPTPage() {
   const location = useLocation();
   const { streamingState, startStreaming, resetStreaming } = useStreaming();
 
-  // Check if we came from the grid page (via /generate route) and user has presentations
-  const showBackButton = location.pathname === "/generate" && hasPresentations;
-
   useEffect(() => {
-    checkPresentations();
     // Reset streaming state when entering generate page
     resetStreaming();
   }, []);
@@ -50,38 +45,6 @@ export default function GeneratePPTPage() {
       setLoading(false);
     }
   }, [streamingState.error]);
-
-  const checkPresentations = async () => {
-    try {
-      const headers = authService.getAuthHeaders();
-      const response = await fetch(`${API_URL}/api/presentations`, {
-        headers,
-      });
-
-      if (response.status === 401) {
-        const refreshed = await authService.refreshToken();
-        if (refreshed) {
-          const newHeaders = authService.getAuthHeaders();
-          const retryResponse = await fetch(`${API_URL}/api/presentations`, {
-            headers: newHeaders,
-          });
-
-          if (retryResponse.ok) {
-            const retryResult = await retryResponse.json();
-            setHasPresentations(
-              retryResult.success && retryResult.presentations.length > 0
-            );
-          }
-        }
-        return;
-      }
-
-      const result = await response.json();
-      setHasPresentations(result.success && result.presentations.length > 0);
-    } catch (err) {
-      console.error("Error checking presentations:", err);
-    }
-  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && prompt.trim()) {
@@ -128,19 +91,29 @@ export default function GeneratePPTPage() {
         ? parseInt(slideCount)
         : parseInt(customSlideCount);
 
-    // Base token cost per slide
-    let baseTokenPerSlide = 1.0;
+    // Base token cost per slide (in AI tokens, converted to slide tokens)
+    // 1 slide token = 1000 AI tokens
+    let baseTokenPerSlide = 2.5; // Realistic estimate: ~2500 AI tokens per slide = 2.5 points
 
     // Adjust based on detail level
     if (detailLevel === "concise") {
-      baseTokenPerSlide *= 0.7;
+      baseTokenPerSlide = 1.5; // ~1500 AI tokens per slide
     } else if (detailLevel === "detailed") {
-      baseTokenPerSlide *= 1.5;
+      baseTokenPerSlide = 4.0; // ~4000 AI tokens per slide
     }
-    // balanced stays at 1.0
+    // balanced stays at 2.5
+
+    // Minor adjustment for tonality complexity
+    let tonalityMultiplier = 1.0;
+    if (tonality === "casual") {
+      tonalityMultiplier = 0.9;
+    } else if (tonality === "technical") {
+      tonalityMultiplier = 1.1;
+    }
+    // professional stays at 1.0
 
     // Calculate total
-    const estimatedTokens = count * baseTokenPerSlide;
+    const estimatedTokens = count * baseTokenPerSlide * tonalityMultiplier;
     return estimatedTokens;
   };
 
@@ -150,7 +123,6 @@ export default function GeneratePPTPage() {
       <div className="flex-1 p-4 md:p-8 flex items-center justify-center overflow-y-auto">
         <div className="w-full max-w-4xl relative">
           <GenerateOptionsBar
-            showBackButton={showBackButton}
             detailLevel={detailLevel}
             tonality={tonality}
             slideCountMode={slideCountMode}
