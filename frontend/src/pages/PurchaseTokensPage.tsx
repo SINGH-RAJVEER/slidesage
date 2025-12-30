@@ -29,7 +29,7 @@ export default function PurchaseTokensPage() {
     // For now, just simulate a delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    console.log(`Processing purchase of ${amount} slide tokens`);
+    console.log(`Processing purchase of ${amount} points`);
 
     // After successful purchase, redirect back
     setIsProcessing(false);
@@ -77,18 +77,22 @@ export default function PurchaseTokensPage() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-              Purchase Slide Tokens
+              Purchase Points
             </h1>
           </div>
 
-          <div className="text-center mb-12">
-            <p className="text-white/60 text-lg">
-              Current Balance:{" "}
-              <span className="text-white font-semibold">
+          <div className="flex justify-center mb-20">
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm text-center min-w-[300px] shadow-xl">
+              <h2 className="text-white/60 text-lg mb-2 uppercase tracking-wider font-medium">
+                Current Balance
+              </h2>
+              <div className="text-6xl font-bold text-white flex items-center justify-center gap-3">
                 {user?.slide_tokens?.toFixed(1) ?? "0.0"}
-              </span>{" "}
-              slide tokens
-            </p>
+                <span className="text-2xl text-blue-400 font-normal mt-4">
+                  points
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Purchase Options */}
@@ -107,7 +111,7 @@ export default function PurchaseTokensPage() {
                 <div className="flex-1 space-y-4">
                   <div className="text-center py-4">
                     <div className="text-5xl font-bold text-white mb-2">10</div>
-                    <div className="text-white/60">slide tokens</div>
+                    <div className="text-white/60">points</div>
                   </div>
                   <div className="text-center text-3xl font-bold text-blue-400">
                     ₹50
@@ -154,7 +158,7 @@ export default function PurchaseTokensPage() {
                     <div className="text-5xl font-bold text-white mb-2">
                       100
                     </div>
-                    <div className="text-white/60">slide tokens</div>
+                    <div className="text-white/60">points</div>
                   </div>
                   <div className="text-center">
                     <div className="text-3xl font-bold text-blue-400">₹450</div>
@@ -167,21 +171,12 @@ export default function PurchaseTokensPage() {
                         <span className="font-semibold">
                           Ad-Free Experience
                         </span>{" "}
-                        (50+ tokens)
-                      </span>
-                    </div>
-                    <div className="text-sm text-white/80 flex items-start gap-2">
-                      <span className="text-green-400 mt-0.5">✓</span>
-                      <span>
-                        <span className="font-semibold">
-                          Priority Throughput
-                        </span>{" "}
-                        (100+ tokens)
+                        (30+ points)
                       </span>
                     </div>
                     <div className="text-sm text-white/70">
                       <span className="text-white/50">
-                        • Faster generation speeds
+                        • Standard generation speed
                       </span>
                     </div>
                   </div>
@@ -223,7 +218,7 @@ export default function PurchaseTokensPage() {
                       <div className="text-5xl font-bold text-white mb-2">
                         250
                       </div>
-                      <div className="text-white/60">slide tokens</div>
+                      <div className="text-white/60">points</div>
                     </div>
                     <div className="text-center">
                       <div className="text-3xl font-bold text-blue-400">
@@ -240,7 +235,7 @@ export default function PurchaseTokensPage() {
                           <span className="font-semibold">
                             Ad-Free Experience
                           </span>{" "}
-                          (50+ tokens)
+                          (30+ points)
                         </span>
                       </div>
                       <div className="text-sm text-white/80 flex items-start gap-2">
@@ -249,7 +244,7 @@ export default function PurchaseTokensPage() {
                           <span className="font-semibold">
                             Priority Throughput
                           </span>{" "}
-                          (100+ tokens)
+                          (100+ points)
                         </span>
                       </div>
                       <div className="text-sm text-white/70">
@@ -296,7 +291,7 @@ export default function PurchaseTokensPage() {
                         type="number"
                         min="10"
                         max="1000"
-                        placeholder="Enter number of tokens"
+                        placeholder="Enter number of points"
                         value={customAmount}
                         onChange={(e) => setCustomAmount(e.target.value)}
                         onInput={(e) => {
@@ -338,9 +333,9 @@ export default function PurchaseTokensPage() {
                   )}
                   {customAmount &&
                     isCustomAmountValid() &&
-                    parseInt(customAmount) >= 50 && (
+                    parseInt(customAmount) >= 30 && (
                       <div className="pt-4 space-y-3 border-t border-white/10">
-                        {parseInt(customAmount) >= 50 && (
+                        {parseInt(customAmount) >= 30 && (
                           <div className="text-sm text-white/80 flex items-start gap-2">
                             <span className="text-green-400 mt-0.5">✓</span>
                             <span>
@@ -385,7 +380,7 @@ export default function PurchaseTokensPage() {
           <div className="mt-8 text-center text-white/60 text-sm">
             <p>All purchases are secure and encrypted.</p>
             <p className="mt-2">
-              Tokens never expire and can be used for any presentation
+              Points never expire and can be used for any presentation
               generation.
             </p>
           </div>

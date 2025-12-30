@@ -10,6 +10,7 @@ interface GenerateFormProps {
   topics: string[];
   loading: boolean;
   error: string;
+  estimatedTokens: number;
   onPromptChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onRemoveTopic: (topic: string) => void;
@@ -21,6 +22,7 @@ export const GenerateForm: React.FC<GenerateFormProps> = ({
   topics,
   loading,
   error,
+  estimatedTokens,
   onPromptChange,
   onKeyDown,
   onRemoveTopic,
@@ -29,8 +31,14 @@ export const GenerateForm: React.FC<GenerateFormProps> = ({
   return (
     <Card className="shadow-2xl border border-white/20 bg-white/10 backdrop-blur-md">
       <CardHeader className="space-y-3 pb-8">
-        <CardTitle className="flex items-center gap-2 text-white text-4xl">
-          Generate Presentation
+        <CardTitle className="flex items-center justify-between text-white text-4xl">
+          <span>Generate Presentation</span>
+          {topics.length > 0 && (
+            <span className="text-lg font-normal text-white/70">
+              Est. {estimatedTokens.toFixed(1)}{" "}
+              <span className="text-base text-white/50">points</span>
+            </span>
+          )}
         </CardTitle>
         <div className="h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
       </CardHeader>

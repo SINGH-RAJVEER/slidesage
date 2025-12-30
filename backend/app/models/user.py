@@ -16,10 +16,11 @@ class User(db.Model):
     oauth_provider = db.Column(db.String(50), nullable=True)
     oauth_id = db.Column(db.String(255), nullable=True)
     
-    # Slide tokens - in-app currency (1 slide token = 1000 AI tokens)
-    # New users start with 100 slide tokens
-    # For existing databases, run: ALTER TABLE users ADD COLUMN slide_tokens FLOAT DEFAULT 100.0 NOT NULL;
-    slide_tokens = db.Column(db.Float, default=100.0, nullable=False)
+    # New users start with 10 slide tokens
+    slide_tokens = db.Column(db.Float, default=10.0, nullable=False)
+    
+    # Last login date for daily bonus tracking
+    last_login_date = db.Column(db.Date, nullable=True)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -56,6 +57,19 @@ class User(db.Model):
         """Check if user has enough slide tokens for generation (default estimate: 5 slide tokens)"""
         estimated_slide_tokens = estimated_tokens / 1000.0
         return self.slide_tokens >= estimated_slide_tokens
+    
+    def award_daily_login_bonus(self) -> bool:
+        from datetime import date
+        today = date.today()
+        
+        # Check if user has already received bonus today
+        if self.last_login_date == today:
+            return False
+        
+        # Award 2 points daily bonus
+        self.slide_tokens += 2.0
+        self.last_login_date = today
+        return True
     
     def __repr__(self):
         return f'<User {self.email}>'

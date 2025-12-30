@@ -93,6 +93,10 @@ def login():
         if not user or not user.check_password(password):
             return jsonify({'error': 'Invalid email or password'}), 401
         
+        # Award daily login bonus
+        bonus_awarded = user.award_daily_login_bonus()
+        db.session.commit()
+        
         # Generate tokens (identity must be a string)
         access_token = create_access_token(identity=str(user.id))
         refresh_token = create_refresh_token(identity=str(user.id))
@@ -351,6 +355,10 @@ def google_login():
                 db.session.add(user)
             
             db.session.commit()
+        
+        # Award daily login bonus
+        bonus_awarded = user.award_daily_login_bonus()
+        db.session.commit()
         
         # Generate JWT tokens
         access_token = create_access_token(identity=str(user.id))

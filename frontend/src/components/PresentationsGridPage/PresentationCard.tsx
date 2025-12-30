@@ -28,7 +28,7 @@ export const PresentationCard: React.FC<PresentationCardProps> = ({
 }) => {
   return (
     <Card
-      className="group cursor-pointer shadow-lg border border-white/20 bg-white/10 backdrop-blur-md hover:bg-white/15 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02]"
+      className="group cursor-pointer shadow-lg border border-white/20 bg-white/10 backdrop-blur-md hover:bg-white/15 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] flex flex-col h-full"
       onClick={() => onCardClick(presentation.id)}
     >
       <CardHeader className="pb-4">
@@ -49,8 +49,8 @@ export const PresentationCard: React.FC<PresentationCardProps> = ({
           </Button>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-white/70 text-sm line-clamp-3">
+      <CardContent className="space-y-3 flex-1 flex flex-col">
+        <p className="text-white/70 text-sm line-clamp-3 mt-auto">
           {presentation.prompt}
         </p>
         <div className="flex items-center gap-2 text-white/50 text-xs pt-2 border-t border-white/10">

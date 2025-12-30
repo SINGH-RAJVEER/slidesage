@@ -121,6 +121,29 @@ export default function GeneratePPTPage() {
     }
   };
 
+  // Calculate estimated token usage based on selections
+  const calculateEstimatedTokens = () => {
+    const count =
+      slideCountMode === "preset"
+        ? parseInt(slideCount)
+        : parseInt(customSlideCount);
+
+    // Base token cost per slide
+    let baseTokenPerSlide = 1.0;
+
+    // Adjust based on detail level
+    if (detailLevel === "concise") {
+      baseTokenPerSlide *= 0.7;
+    } else if (detailLevel === "detailed") {
+      baseTokenPerSlide *= 1.5;
+    }
+    // balanced stays at 1.0
+
+    // Calculate total
+    const estimatedTokens = count * baseTokenPerSlide;
+    return estimatedTokens;
+  };
+
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
       <Header />
@@ -145,6 +168,7 @@ export default function GeneratePPTPage() {
             topics={topics}
             loading={loading}
             error={error}
+            estimatedTokens={calculateEstimatedTokens()}
             onPromptChange={setPrompt}
             onKeyDown={handleKeyDown}
             onRemoveTopic={handleRemoveTopic}

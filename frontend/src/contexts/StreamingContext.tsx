@@ -164,9 +164,9 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
           setStreamingState((prev) => ({
             ...prev,
             isStreaming: false,
-            error: `Insufficient slide tokens. You have ${
+            error: `Insufficient points. You have ${
               errorData.slide_tokens_remaining?.toFixed(1) || 0
-            } tokens, but need at least ${
+            } points, but need at least ${
               errorData.slide_tokens_required || 1
             } to generate.`,
           }));
@@ -283,7 +283,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                         // Refresh user to get updated slide token balance
                         if (data.slide_tokens_deducted !== undefined) {
                           console.log(
-                            "Slide tokens deducted:",
+                            "Points deducted:",
                             data.slide_tokens_deducted,
                             "Remaining:",
                             data.slide_tokens_remaining
@@ -428,9 +428,9 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
           setStreamingState((prev) => ({
             ...prev,
             isStreaming: false,
-            error: `Insufficient slide tokens. You have ${
+            error: `Insufficient points. You have ${
               errorData.slide_tokens_remaining?.toFixed(1) || 0
-            } tokens, but need at least ${
+            } points, but need at least ${
               errorData.slide_tokens_required || 1
             } to iterate.`,
           }));
@@ -540,7 +540,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                         // Refresh user to get updated slide token balance
                         if (data.slide_tokens_deducted !== undefined) {
                           console.log(
-                            "Slide tokens deducted:",
+                            "Points deducted:",
                             data.slide_tokens_deducted,
                             "Remaining:",
                             data.slide_tokens_remaining
