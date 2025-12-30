@@ -20,20 +20,25 @@ def calculate_estimated_tokens(slide_count: int, detail_level: str, tonality: st
     1 slide token = 1000 AI tokens
     """
     # Base token cost per slide (in slide tokens)
-    base_token_per_slide = 2.5  # ~2500 AI tokens per slide
+    base_token_per_slide = 1  # ~2500 AI tokens per slide
     
     # Adjust based on detail level
-    if detail_level == 'concise':
-        base_token_per_slide = 1.5  # ~1500 AI tokens per slide
+    if detail_level == 'brief':
+        base_token_per_slide = 0.6  # ~1000 AI tokens per slide
+    elif detail_level == 'concise':
+        base_token_per_slide = 0.8  # ~1500 AI tokens per slide
     elif detail_level == 'detailed':
-        base_token_per_slide = 4.0  # ~4000 AI tokens per slide
-    # balanced stays at 2.5
+        base_token_per_slide = 2.0  # ~4000 AI tokens per slide
+    elif detail_level == 'comprehensive':
+        base_token_per_slide = 3.0  # ~5000 AI tokens per slide
     
     # Minor adjustment for tonality complexity
     tonality_multiplier = 1.0
     if tonality == 'casual':
         tonality_multiplier = 0.9
-    elif tonality == 'technical':
+    elif tonality == 'enthusiastic':
+        tonality_multiplier = 1.05
+    elif tonality == 'persuasive':
         tonality_multiplier = 1.1
     # professional stays at 1.0
     

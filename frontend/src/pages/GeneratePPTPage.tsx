@@ -93,13 +93,17 @@ export default function GeneratePPTPage() {
 
     // Base token cost per slide (in AI tokens, converted to slide tokens)
     // 1 slide token = 1000 AI tokens
-    let baseTokenPerSlide = 2.5; // Realistic estimate: ~2500 AI tokens per slide = 2.5 points
+    let baseTokenPerSlide = 2; // Realistic estimate: ~2500 AI tokens per slide = 2.5 points
 
     // Adjust based on detail level
-    if (detailLevel === "concise") {
-      baseTokenPerSlide = 1.5; // ~1500 AI tokens per slide
+    if (detailLevel === "brief") {
+      baseTokenPerSlide = 0.6;
+    } else if (detailLevel === "concise") {
+      baseTokenPerSlide = 0.8;
     } else if (detailLevel === "detailed") {
-      baseTokenPerSlide = 4.0; // ~4000 AI tokens per slide
+      baseTokenPerSlide = 2.0;
+    } else if (detailLevel === "comprehensive") {
+      baseTokenPerSlide = 3.0;
     }
     // balanced stays at 2.5
 
@@ -107,7 +111,9 @@ export default function GeneratePPTPage() {
     let tonalityMultiplier = 1.0;
     if (tonality === "casual") {
       tonalityMultiplier = 0.9;
-    } else if (tonality === "technical") {
+    } else if (tonality === "enthusiastic") {
+      tonalityMultiplier = 1.05;
+    } else if (tonality === "persuasive") {
       tonalityMultiplier = 1.1;
     }
     // professional stays at 1.0
