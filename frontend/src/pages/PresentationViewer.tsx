@@ -229,6 +229,31 @@ const PresentationViewer: React.FC = () => {
     }
   }, [streamingState.isStreaming, streamingSlidesCount]);
 
+  // Reset to first slide when streaming completes
+  useEffect(() => {
+    if (
+      streamingState.isComplete &&
+      !streamingState.isStreaming &&
+      streamingSlidesCount > 0
+    ) {
+      setCurrentSlide(0);
+      setTimeout(() => {
+        const slideElement = document.getElementById("slide-0");
+        if (slideElement) {
+          slideElement.scrollIntoView({
+            behavior: "smooth",
+            inline: "center",
+            block: "nearest",
+          });
+        }
+      }, 100);
+    }
+  }, [
+    streamingState.isComplete,
+    streamingState.isStreaming,
+    streamingSlidesCount,
+  ]);
+
   useEffect(() => {
     if (streamingState.presentationId && !presentationId) {
       setPresentationId(streamingState.presentationId);
@@ -751,13 +776,20 @@ const PresentationViewer: React.FC = () => {
             style={{ minHeight: 48, fontSize: "1rem" }}
           >
             <div className="flex items-center gap-4">
-              <Button
-                onClick={() => navigate("/")}
-                variant="outline"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-              >
-                ←
-              </Button>
+              <div className="relative group">
+                <Button
+                  onClick={() => navigate("/")}
+                  variant="outline"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                >
+                  ←
+                </Button>
+                <div className="absolute top-full left-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                  <div className="bg-white/10 backdrop-blur-lg border border-white/30 text-white px-4 py-2 rounded-lg shadow-lg whitespace-nowrap">
+                    Back to Generated
+                  </div>
+                </div>
+              </div>
               <TemplateSelector
                 selectedTemplate={currentTemplate}
                 onTemplateChange={changeTemplate}
