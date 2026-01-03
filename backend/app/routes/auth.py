@@ -2,10 +2,10 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from app.models import db, User
 from datetime import datetime
-import re
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from app.config import Config
+import re
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -15,8 +15,9 @@ def validate_email(email):
     return re.match(pattern, email) is not None
 
 def validate_password(password):
-    """Password validation - at least 8 characters"""
-    return len(password) >= 8
+    """Password validation"""
+    pattern= r'^(?=.*[A-Z])(?=.*\d).+$'
+    return re.match(pattern, password) is not None and len(password) >= 8
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
@@ -41,7 +42,7 @@ def register():
             return jsonify({'error': 'Password is required'}), 400
         
         if not validate_password(password):
-            return jsonify({'error': 'Password must be at least 8 characters long'}), 400
+            return jsonify({'error': 'Password must be at least 8 characters long and contain at least one uppercase letter and one number'}), 400
         
         # Check if user already exists
         if User.query.filter_by(email=email).first():
@@ -238,7 +239,7 @@ def update_profile():
             password = data.get('password', '')
             if password:
                 if not validate_password(password):
-                    return jsonify({'error': 'Password must be at least 8 characters long'}), 400
+                    return jsonify({'error': 'Password must be at least 8 characters long and contain at least one uppercase letter and one number'}), 400
                 user.set_password(password)
         
         # Update profile picture if provided

@@ -68,6 +68,17 @@ export default function ProfilePage() {
       return;
     }
 
+    if (password) {
+      const hasUpperCase = /[A-Z]/.test(password);
+      const hasNumber = /\d/.test(password);
+      if (!hasUpperCase || !hasNumber) {
+        setError(
+          "Password must contain at least one uppercase letter and one number"
+        );
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {

@@ -38,8 +38,11 @@ export const PasswordFields: React.FC<PasswordFieldsProps> = ({
           minLength={8}
           className="bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40 h-12 text-lg"
         />
-        {password.length > 0 && password.length < 8 && (
-          <p className="text-sm text-red-400">Must be at least 8 characters</p>
+        {password && (
+          <p className="text-sm text-white/60">
+            Password must be at least 8 characters long and contain at least one
+            uppercase letter and one number
+          </p>
         )}
       </div>
 
