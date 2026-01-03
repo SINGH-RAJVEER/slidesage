@@ -91,11 +91,9 @@ export default function GeneratePPTPage() {
         ? parseInt(slideCount)
         : parseInt(customSlideCount);
 
-    // Base token cost per slide (in AI tokens, converted to slide tokens)
     // 1 slide token = 1000 AI tokens
-    let baseTokenPerSlide = 2; // Realistic estimate: ~2500 AI tokens per slide = 2.5 points
+    let baseTokenPerSlide = 1;
 
-    // Adjust based on detail level
     if (detailLevel === "brief") {
       baseTokenPerSlide = 0.6;
     } else if (detailLevel === "concise") {
@@ -105,9 +103,7 @@ export default function GeneratePPTPage() {
     } else if (detailLevel === "comprehensive") {
       baseTokenPerSlide = 3.0;
     }
-    // balanced stays at 2.5
 
-    // Minor adjustment for tonality complexity
     let tonalityMultiplier = 1.0;
     if (tonality === "casual") {
       tonalityMultiplier = 0.9;
@@ -116,7 +112,6 @@ export default function GeneratePPTPage() {
     } else if (tonality === "persuasive") {
       tonalityMultiplier = 1.1;
     }
-    // professional stays at 1.0
 
     // Calculate total
     const estimatedTokens = count * baseTokenPerSlide * tonalityMultiplier;
@@ -134,7 +129,7 @@ export default function GeneratePPTPage() {
             slideCountMode={slideCountMode}
             slideCount={slideCount}
             customSlideCount={customSlideCount}
-            onBackClick={() => navigate("/")}
+            onBackClick={() => navigate("/presentations")}
             onDetailLevelChange={setDetailLevel}
             onTonalityChange={setTonality}
             onSlideCountModeChange={setSlideCountMode}

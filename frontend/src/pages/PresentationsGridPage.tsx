@@ -276,16 +276,24 @@ export default function PresentationsGridPage() {
                 : "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
             } gap-6`}
           >
-            {presentations.map((presentation) => (
-              <PresentationCard
-                key={presentation.id}
-                presentation={presentation}
-                isDeleting={deletingId === presentation.id}
-                onCardClick={handlePresentationClick}
-                onDelete={handleDeletePresentation}
-                formatDate={formatDate}
-              />
-            ))}
+            {presentations.length === 0 ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-96 text-center">
+                <h2 className="text-3xl text-white mb-2">
+                  No Presentations Generated Yet
+                </h2>
+              </div>
+            ) : (
+              presentations.map((presentation) => (
+                <PresentationCard
+                  key={presentation.id}
+                  presentation={presentation}
+                  isDeleting={deletingId === presentation.id}
+                  onCardClick={handlePresentationClick}
+                  onDelete={handleDeletePresentation}
+                  formatDate={formatDate}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>

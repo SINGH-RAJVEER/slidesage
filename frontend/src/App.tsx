@@ -7,6 +7,7 @@ import PresentationViewer from "./pages/PresentationViewer";
 import ProfilePage from "./pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import PurchaseTokensPage from "./pages/PurchaseTokensPage";
+import PresentationsGridPage from "./pages/PresentationsGridPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { StreamingProvider } from "./contexts/StreamingContext";
 
@@ -31,6 +32,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <GeneratePPTPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/presentations"
+            element={
+              <ProtectedRoute>
+                <PresentationsGridPage />
               </ProtectedRoute>
             }
           />

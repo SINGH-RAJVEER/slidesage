@@ -44,7 +44,7 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
         </Button>
         <div className="absolute bottom-full left-0 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
           <div className="bg-white/10 backdrop-blur-lg border border-white/30 text-white px-4 py-2 rounded-lg shadow-lg whitespace-nowrap">
-            Back to Generated
+            Back to Presentations
           </div>
         </div>
       </div>
