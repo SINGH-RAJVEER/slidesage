@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/react";
 import HomePage from "./pages/HomePage";
 import GeneratePPTPage from "./pages/GeneratePPTPage";
 import PresentationViewer from "./pages/PresentationViewer";
+import PresentationErrorPage from "./pages/PresentationErrorPage";
 import ProfilePage from "./pages/ProfilePage";
 import LoginPage from "./pages/LoginPage";
 import PurchaseTokensPage from "./pages/PurchaseTokensPage";
@@ -48,6 +49,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <PresentationViewer />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/presentation-error"
+            element={
+              <ProtectedRoute>
+                <PresentationErrorPage />
               </ProtectedRoute>
             }
           />

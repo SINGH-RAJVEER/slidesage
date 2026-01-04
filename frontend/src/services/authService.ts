@@ -65,13 +65,32 @@ class AuthService {
         body: JSON.stringify(credentials),
       });
 
-      const data: AuthResponse = await response.json();
+      const data = await response.json();
 
-      if (data.success && data.access_token && data.refresh_token) {
-        this.setTokens(data.access_token, data.refresh_token);
+      // Handle new API error format: {error: {message: "..."}}
+      if (data.error) {
+        return {
+          success: false,
+          error:
+            typeof data.error === "object" ? data.error.message : data.error,
+        };
       }
 
-      return data;
+      // Handle success response: {user: {...}, access_token: "...", refresh_token: "..."}
+      if (data.access_token && data.refresh_token) {
+        this.setTokens(data.access_token, data.refresh_token);
+        return {
+          success: true,
+          user: data.user,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        };
+      }
+
+      return {
+        success: false,
+        error: "Invalid response from server",
+      };
     } catch (error) {
       return {
         success: false,
@@ -90,13 +109,32 @@ class AuthService {
         body: JSON.stringify(credentials),
       });
 
-      const data: AuthResponse = await response.json();
+      const data = await response.json();
 
-      if (data.success && data.access_token && data.refresh_token) {
-        this.setTokens(data.access_token, data.refresh_token);
+      // Handle new API error format: {error: {message: "..."}}
+      if (data.error) {
+        return {
+          success: false,
+          error:
+            typeof data.error === "object" ? data.error.message : data.error,
+        };
       }
 
-      return data;
+      // Handle success response: {user: {...}, access_token: "...", refresh_token: "..."}
+      if (data.access_token && data.refresh_token) {
+        this.setTokens(data.access_token, data.refresh_token);
+        return {
+          success: true,
+          user: data.user,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        };
+      }
+
+      return {
+        success: false,
+        error: "Invalid response from server",
+      };
     } catch (error) {
       return {
         success: false,
@@ -112,16 +150,35 @@ class AuthService {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ credential: token }),
       });
 
-      const data: AuthResponse = await response.json();
+      const data = await response.json();
 
-      if (data.success && data.access_token && data.refresh_token) {
-        this.setTokens(data.access_token, data.refresh_token);
+      // Handle new API error format: {error: {message: "..."}}
+      if (data.error) {
+        return {
+          success: false,
+          error:
+            typeof data.error === "object" ? data.error.message : data.error,
+        };
       }
 
-      return data;
+      // Handle success response: {user: {...}, access_token: "...", refresh_token: "..."}
+      if (data.access_token && data.refresh_token) {
+        this.setTokens(data.access_token, data.refresh_token);
+        return {
+          success: true,
+          user: data.user,
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+        };
+      }
+
+      return {
+        success: false,
+        error: "Invalid response from server",
+      };
     } catch (error) {
       return {
         success: false,
@@ -183,7 +240,8 @@ class AuthService {
       }
 
       const data = await response.json();
-      return data.success ? data.user : null;
+      // New API format: {user: {...}} on success, {error: {...}} on error
+      return data.user || null;
     } catch (error) {
       console.error("Get current user error:", error);
       return null;
@@ -213,9 +271,10 @@ class AuthService {
         return false;
       }
 
-      const data: AuthResponse = await response.json();
+      const data = await response.json();
 
-      if (data.success && data.access_token) {
+      // New API format: {access_token: "..."} on success
+      if (data.access_token) {
         const currentRefreshToken = this.getRefreshToken();
         if (currentRefreshToken) {
           localStorage.setItem("access_token", data.access_token);
@@ -263,8 +322,31 @@ class AuthService {
         body: JSON.stringify(data),
       });
 
-      const result: AuthResponse = await response.json();
-      return result;
+      const result = await response.json();
+
+      // Handle new API error format: {error: {message: "..."}}
+      if (result.error) {
+        return {
+          success: false,
+          error:
+            typeof result.error === "object"
+              ? result.error.message
+              : result.error,
+        };
+      }
+
+      // Handle success response: {user: {...}}
+      if (result.user) {
+        return {
+          success: true,
+          user: result.user,
+        };
+      }
+
+      return {
+        success: false,
+        error: "Invalid response from server",
+      };
     } catch (error) {
       return {
         success: false,

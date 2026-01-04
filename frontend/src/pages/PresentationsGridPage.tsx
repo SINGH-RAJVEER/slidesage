@@ -73,10 +73,15 @@ export default function PresentationsGridPage() {
           }
 
           const retryResult = await retryResponse.json();
-          if (retryResult.success) {
-            setPresentations(retryResult.presentations);
+          // New API format: {presentations: [...]} or {error: {message: "..."}}
+          if (retryResult.error) {
+            setError(
+              typeof retryResult.error === "object"
+                ? retryResult.error.message
+                : retryResult.error
+            );
           } else {
-            setError(retryResult.error || "Failed to fetch presentations");
+            setPresentations(retryResult.presentations || []);
           }
           return;
         } else {
@@ -87,10 +92,13 @@ export default function PresentationsGridPage() {
 
       const result = await response.json();
 
-      if (result.success) {
-        setPresentations(result.presentations);
+      // New API format: {presentations: [...]} or {error: {message: "..."}}
+      if (result.error) {
+        setError(
+          typeof result.error === "object" ? result.error.message : result.error
+        );
       } else {
-        setError(result.error || "Failed to fetch presentations");
+        setPresentations(result.presentations || []);
       }
     } catch (err) {
       setError(`Error: ${err instanceof Error ? err.message : err}`);
@@ -126,10 +134,19 @@ export default function PresentationsGridPage() {
         }
 
         const retryResult = await retryResponse.json();
-        if (retryResult.success && retryResult.presentation) {
+        // New API format: {presentation: {...}} or {error: {message: "..."}}
+        if (retryResult.error) {
+          setError(
+            typeof retryResult.error === "object"
+              ? retryResult.error.message
+              : retryResult.error
+          );
+        } else if (retryResult.presentation) {
           navigate("/presentation", {
             state: {
-              presentation: retryResult.presentation.slides_data,
+              presentation:
+                retryResult.presentation.slides_data ||
+                retryResult.presentation.slides,
               presentationId: retryResult.presentation.id,
             },
           });
@@ -139,15 +156,21 @@ export default function PresentationsGridPage() {
 
       const result = await response.json();
 
-      if (result.success && result.presentation) {
+      // New API format: {presentation: {...}} or {error: {message: "..."}}
+      if (result.error) {
+        setError(
+          typeof result.error === "object" ? result.error.message : result.error
+        );
+      } else if (result.presentation) {
         navigate("/presentation", {
           state: {
-            presentation: result.presentation.slides_data,
+            presentation:
+              result.presentation.slides_data || result.presentation.slides,
             presentationId: result.presentation.id,
           },
         });
       } else {
-        setError(result.error || "Failed to load presentation");
+        setError("Failed to load presentation");
       }
     } catch (err) {
       setError(`Error: ${err instanceof Error ? err.message : err}`);
@@ -198,8 +221,15 @@ export default function PresentationsGridPage() {
           return;
         }
 
+        // New API format: {message: "..."} or {error: {message: "..."}}
         const retryResult = await retryResponse.json();
-        if (retryResult.success) {
+        if (retryResult.error) {
+          setError(
+            typeof retryResult.error === "object"
+              ? retryResult.error.message
+              : retryResult.error
+          );
+        } else {
           setPresentations(
             presentations.filter((p) => p.id !== presentationId)
           );
@@ -209,10 +239,13 @@ export default function PresentationsGridPage() {
 
       const result = await response.json();
 
-      if (result.success) {
-        setPresentations(presentations.filter((p) => p.id !== presentationId));
+      // New API format: {message: "..."} or {error: {message: "..."}}
+      if (result.error) {
+        setError(
+          typeof result.error === "object" ? result.error.message : result.error
+        );
       } else {
-        setError(result.error || "Failed to delete presentation");
+        setPresentations(presentations.filter((p) => p.id !== presentationId));
       }
     } catch (err) {
       setError(`Error: ${err instanceof Error ? err.message : err}`);

@@ -1,8 +1,29 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from app.config import Config
 from app.models import db
+
+
+def register_blueprints(app):
+    """Register all application blueprints"""
+    from app.api.auth import auth_bp
+    from app.api.presentations import presentations_bp
+    
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(presentations_bp)
+
+
+def register_error_handlers(app):
+    """Register global error handlers"""
+    
+    @app.errorhandler(404)
+    def not_found(e):
+        return jsonify({'error': {'message': 'Resource not found'}}), 404
+    
+    @app.errorhandler(500)
+    def internal_error(e):
+        return jsonify({'error': {'message': 'Internal server error'}}), 500
 
 
 def create_app(config_class=Config):
@@ -22,15 +43,16 @@ def create_app(config_class=Config):
     db.init_app(app)
     
     # Register blueprints
-    from app.routes import auth_bp, presentations_bp
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(presentations_bp)
+    register_blueprints(app)
+    
+    # Register error handlers
+    register_error_handlers(app)
     
     # Initialize database
     with app.app_context():
         try:
             db.create_all()
-            print("✓ Database initialized successfully")
+            print("Database initialized successfully")
         except Exception as e:
             error_msg = str(e)
             db_url = app.config.get('SQLALCHEMY_DATABASE_URI', 'Not set')
@@ -40,19 +62,6 @@ def create_app(config_class=Config):
             print("="*60)
             print(f"\nError: {error_msg}")
             print(f"\nConnection string: {db_url}")
-            print("\nTo fix this, start PostgreSQL:")
-            print("\n  Option 1 - Docker Compose (recommended):")
-            print("    cd /home/rajveer/Code/projects/SlideSage")
-            print("    docker compose up -d postgres")
-            print("\n  Option 2 - Local PostgreSQL:")
-            print("    # Install PostgreSQL first if needed")
-            print("    # Then create database:")
-            print("    #   createdb slidesage")
-            print("    #   createuser slidesage")
-            print("\n  Option 3 - Check if PostgreSQL is running:")
-            print("    # Linux: sudo systemctl status postgresql")
-            print("    # macOS: brew services list")
-            print("="*60 + "\n")
             
             # Don't raise in development mode
             import sys

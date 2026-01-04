@@ -19,6 +19,9 @@ class User(db.Model):
     # New users start with 50 slide tokens (enough for ~20 slides with balanced detail)
     slide_tokens = db.Column(db.Float, default=50.0, nullable=False)
     
+    # Flag for unlimited tokens (dev/admin users only)
+    is_unlimited = db.Column(db.Boolean, default=False, nullable=False)
+    
     # Last login date for daily bonus tracking
     last_login_date = db.Column(db.Date, nullable=True)
     
@@ -43,18 +46,25 @@ class User(db.Model):
             'email': self.email,
             'name': self.name,
             'profile_picture': self.profile_picture,
-            'slide_tokens': self.slide_tokens,
+            'slide_tokens': float('inf') if self.is_unlimited else self.slide_tokens,
+            'is_unlimited': self.is_unlimited,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
     
     def deduct_slide_tokens(self, tokens_used: int) -> float:
         """Deduct slide tokens based on AI token usage (1 slide token = 1000 AI tokens)"""
+        # Skip deduction for unlimited users
+        if self.is_unlimited:
+            return 0.0
         slide_tokens_to_deduct = tokens_used / 1000.0
         self.slide_tokens = max(0, self.slide_tokens - slide_tokens_to_deduct)
         return slide_tokens_to_deduct
     
     def has_sufficient_tokens(self, estimated_tokens: int = 5000) -> bool:
         """Check if user has enough slide tokens for generation (default estimate: 5 slide tokens)"""
+        # Unlimited users always have sufficient tokens
+        if self.is_unlimited:
+            return True
         estimated_slide_tokens = estimated_tokens / 1000.0
         return self.slide_tokens >= estimated_slide_tokens
     

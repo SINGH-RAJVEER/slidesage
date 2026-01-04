@@ -51,7 +51,9 @@ export default function Header() {
               title="Click to purchase more points"
             >
               <span className="text-sm font-medium text-white">
-                {user.slide_tokens?.toFixed(1) ?? "0.0"}
+                {(user as any).is_unlimited || user.slide_tokens === Infinity
+                  ? "∞"
+                  : user.slide_tokens?.toFixed(1) ?? "0.0"}
               </span>
               <span className="text-xs text-white/60">points</span>
             </button>

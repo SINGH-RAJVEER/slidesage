@@ -45,6 +45,9 @@ class AIService:
 
     def generate_presentation_stream(self, user_prompt: str, slide_count: int = 8, detail_level: str = 'balanced', tonality: str = 'professional') -> Generator[dict, None, None]:
         """Stream presentation generation, yielding each slide as it becomes available"""
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting generate_presentation_stream for prompt: {user_prompt[:50]}... with {slide_count} slides")
         try:
             # Detail level definitions with examples
             detail_level_guide = {
@@ -299,8 +302,12 @@ class AIService:
             
             # Yield initial event
             yield {"event": "start", "data": {"status": "generating"}}
+            
+            logger.info("Starting to process streaming chunks from LiteLLM")
+            chunk_count = 0
 
             for chunk in resp:
+                chunk_count += 1
                 # Extract content from chunk
                 chunk_content = ""
                 
@@ -308,6 +315,7 @@ class AIService:
                 if isinstance(chunk, dict):
                     if chunk.get("usage"):
                         total_tokens_used = chunk["usage"].get("total_tokens", 0)
+                        logger.info(f"Token usage detected: {total_tokens_used}")
                     choices = chunk.get("choices") or []
                     if choices:
                         delta = choices[0].get("delta") or {}
@@ -317,10 +325,18 @@ class AIService:
                         # Check for usage in the chunk object
                         if hasattr(chunk, 'usage') and chunk.usage:
                             total_tokens_used = getattr(chunk.usage, 'total_tokens', 0)
-                        if chunk.choices and chunk.choices[0].delta.content:
-                            chunk_content = chunk.choices[0].delta.content
-                    except Exception:
+                            logger.info(f"Token usage detected: {total_tokens_used}")
+                        if hasattr(chunk, 'choices') and chunk.choices:
+                            if len(chunk.choices) > 0 and hasattr(chunk.choices[0], 'delta'):
+                                delta = chunk.choices[0].delta
+                                if hasattr(delta, 'content') and delta.content:
+                                    chunk_content = delta.content
+                    except Exception as e:
+                        logger.warning(f"Error extracting chunk content: {e}")
                         pass
+                
+                if chunk_count % 10 == 0:
+                    logger.info(f"Processed {chunk_count} chunks, accumulated {len(accumulated_content)} characters")
 
                 if chunk_content:
                     accumulated_content += chunk_content
@@ -420,14 +436,33 @@ class AIService:
                                 }
 
             # Final processing of complete response
+            logger.info(f"Streaming complete. Total chunks: {chunk_count}, Total content length: {len(accumulated_content)}")
+            
             clean_content = accumulated_content.strip()
+            if not clean_content:
+                logger.error("No content received from LiteLLM API!")
+                yield {
+                    "event": "error",
+                    "data": {"error": "No response received from AI model. Check your API key and model configuration."}
+                }
+                return
+            
+            logger.info(f"First 200 chars of response: {clean_content[:200]}")
+            logger.info(f"Last 200 chars of response: {clean_content[-200:]}")
+            
+            # Clean markdown code blocks if present (only once, after streaming)
             if clean_content.startswith('```json'):
-                clean_content = clean_content.replace('```json', '').replace('```', '').strip()
+                clean_content = clean_content.replace('```json', '', 1).strip()
+                if clean_content.endswith('```'):
+                    clean_content = clean_content.rsplit('```', 1)[0].strip()
             elif clean_content.startswith('```'):
-                clean_content = clean_content.replace('```', '').strip()
+                clean_content = clean_content.replace('```', '', 1).strip()
+                if clean_content.endswith('```'):
+                    clean_content = clean_content.rsplit('```', 1)[0].strip()
 
             try:
                 parsed_content = json.loads(clean_content)
+                logger.info(f"Successfully parsed JSON response with {len(parsed_content.get('slides', []))} slides")
                 
                 # Process any remaining slides that weren't yielded during streaming
                 if 'slides' in parsed_content:
@@ -466,14 +501,136 @@ class AIService:
                 
             except json.JSONDecodeError as e:
                 logger.error(f"JSON parsing error in stream: {e}")
-                logger.error(f"Content: {clean_content}")
-                yield {
-                    "event": "error",
-                    "data": {"error": "Failed to parse AI response"}
-                }
+                logger.error(f"Content length: {len(clean_content)}, First 500 chars: {clean_content[:500]}")
+                logger.error(f"Error position: line {e.lineno} column {e.colno} (char {e.pos})")
+                
+                # Show context around the error
+                error_start = max(0, e.pos - 100)
+                error_end = min(len(clean_content), e.pos + 100)
+                logger.error(f"Error context: ...{clean_content[error_start:error_end]}...")
+                
+                # Try to salvage what we can by attempting to fix common JSON issues
+                try:
+                    fixed_content = clean_content
+                    
+                    # Strategy 1: Try to truncate at the error position and close properly
+                    # Find the last complete slide before the error
+                    content_before_error = clean_content[:e.pos]
+                    
+                    # Find the last complete slide object by counting braces
+                    last_valid_pos = 0
+                    brace_count = 0
+                    bracket_count = 0
+                    in_string = False
+                    escape_next = False
+                    in_slides_array = False
+                    
+                    for i, char in enumerate(content_before_error):
+                        if escape_next:
+                            escape_next = False
+                            continue
+                        if char == '\\':
+                            escape_next = True
+                            continue
+                        if char == '"' and not escape_next:
+                            in_string = not in_string
+                            continue
+                        if not in_string:
+                            if char == '{':
+                                brace_count += 1
+                            elif char == '}':
+                                brace_count -= 1
+                                # Track when we complete a slide object (back to slides array level)
+                                if in_slides_array and brace_count == 2:  # 1 for root object + 1 for slides array
+                                    last_valid_pos = i + 1
+                            elif char == '[':
+                                bracket_count += 1
+                                # Check if this is the slides array
+                                if i > 10 and content_before_error[max(0,i-10):i].find('"slides"') != -1:
+                                    in_slides_array = True
+                            elif char == ']':
+                                bracket_count -= 1
+                    
+                    if last_valid_pos > 0:
+                        logger.info(f"Found last valid position at {last_valid_pos}")
+                        fixed_content = content_before_error[:last_valid_pos]
+                        
+                        # Close the slides array and main object
+                        fixed_content += '],"totalSlides":'
+                        # Count how many complete slides we have
+                        slide_count = fixed_content.count('"id":"slide-')
+                        fixed_content += str(slide_count) + '}'
+                        
+                        logger.info("Attempting to parse truncated JSON...")
+                        parsed_content = json.loads(fixed_content)
+                        logger.info(f"Successfully parsed truncated JSON with {len(parsed_content.get('slides', []))} slides")
+                    else:
+                        # Strategy 2: Just try to balance braces
+                        bracket_balance = clean_content.count('[') - clean_content.count(']')
+                        brace_balance = clean_content.count('{') - clean_content.count('}')
+                        
+                        logger.info(f"JSON balance: {bracket_balance} unclosed brackets, {brace_balance} unclosed braces")
+                        
+                        # Attempt to complete the JSON
+                        fixed_content = clean_content
+                        if bracket_balance > 0:
+                            fixed_content += ']' * bracket_balance
+                        if brace_balance > 0:
+                            fixed_content += '}' * brace_balance
+                        
+                        logger.info("Attempting to parse fixed JSON...")
+                        parsed_content = json.loads(fixed_content)
+                        logger.info(f"Successfully parsed fixed JSON with {len(parsed_content.get('slides', []))} slides")
+                    
+                    # Process the recovered data
+                    if 'slides' in parsed_content:
+                        for idx in range(slides_yielded, len(parsed_content['slides'])):
+                            slide = parsed_content['slides'][idx]
+                            processed_slide = self._process_slide(slide, idx)
+                            if processed_slide:
+                                slides_yielded += 1
+                                yield {
+                                    "event": "slide",
+                                    "data": {
+                                        "slide": processed_slide,
+                                        "index": idx,
+                                        "title": title_extracted
+                                    }
+                                }
+                    
+                    if title_extracted:
+                        parsed_content['title'] = title_extracted
+                    else:
+                        parsed_content['title'] = 'Untitled Presentation'
+                    
+                    if 'slides' in parsed_content:
+                        parsed_content['totalSlides'] = len(parsed_content['slides'])
+                    
+                    parsed_content['tokens_used'] = total_tokens_used
+                    
+                    yield {
+                        "event": "complete",
+                        "data": parsed_content
+                    }
+                    
+                except Exception as fix_error:
+                    logger.error(f"Could not recover from JSON error: {fix_error}")
+                    # Save the malformed content to a file for debugging
+                    try:
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json', prefix='litellm_error_') as f:
+                            f.write(clean_content)
+                            logger.error(f"Saved malformed JSON to: {f.name}")
+                    except:
+                        pass
+                    
+                    yield {
+                        "event": "error",
+                        "data": {"error": "Failed to parse AI response"}
+                    }
 
         except Exception as e:
-            logger.error(f"Error in streaming presentation: {e}")
+            logger.error(f"Error in streaming presentation: {e}", exc_info=True)
             yield {
                 "event": "error",
                 "data": {"error": str(e)}

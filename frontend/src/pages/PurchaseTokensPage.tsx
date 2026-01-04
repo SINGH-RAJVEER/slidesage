@@ -94,11 +94,19 @@ export default function PurchaseTokensPage() {
                 Current Balance
               </h2>
               <div className="text-6xl font-bold text-white flex items-center justify-center gap-3">
-                {user?.slide_tokens?.toFixed(1) ?? "0.0"}
+                {(user as any)?.is_unlimited || user?.slide_tokens === Infinity
+                  ? "∞"
+                  : user?.slide_tokens?.toFixed(1) ?? "0.0"}
                 <span className="text-2xl text-blue-400 font-normal mt-4">
                   points
                 </span>
               </div>
+              {((user as any)?.is_unlimited ||
+                user?.slide_tokens === Infinity) && (
+                <div className="mt-3 text-sm text-green-400 font-medium">
+                  Unlimited Access
+                </div>
+              )}
             </div>
           </div>
 

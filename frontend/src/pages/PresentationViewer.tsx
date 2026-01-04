@@ -342,22 +342,44 @@ const PresentationViewer: React.FC = () => {
 
         if (response.ok) {
           const data = await response.json();
-          if (data.success && data.presentation) {
+          // New API format: {presentation: {...}} or {error: {message: "..."}}
+          if (data.error) {
+            console.error(
+              "Error loading presentation:",
+              data.error.message || data.error
+            );
+          } else if (data.presentation) {
             const pres = data.presentation;
-            const fetchedSlides = pres.slides_data?.slides || [];
+            // Handle both slides and slides_data fields
+            const slidesData = pres.slides || pres.slides_data || {};
+            const fetchedSlides = slidesData.slides || [];
 
             // Only update if fetched data has valid slides
             // This prevents overwriting good data with placeholder/empty data
             if (fetchedSlides.length > 0 && pres.title !== "Generating...") {
               setPresentation({
-                title: pres.title,
-                theme: pres.slides_data?.theme || "default",
+                title: pres.title || slidesData.title,
+                theme: slidesData.theme || "default",
                 slides: fetchedSlides,
                 totalSlides:
-                  pres.slides_data?.totalSlides || fetchedSlides.length || 0,
+                  slidesData.totalSlides || fetchedSlides.length || 0,
               });
               setPresentationId(pres.id);
               console.log("Loaded fresh presentation data from API");
+            } else if (
+              pres.title === "Generating..." ||
+              fetchedSlides.length === 0
+            ) {
+              // Presentation has no content - redirect to error page
+              console.log(
+                "Presentation has no content, redirecting to error page"
+              );
+              navigate("/presentation-error", {
+                state: {
+                  presentationId: pres.id,
+                  error: "This presentation failed to generate content.",
+                },
+              });
             } else {
               console.log(
                 "Fetched data appears incomplete, keeping current state"
