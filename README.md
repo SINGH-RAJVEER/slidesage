@@ -70,23 +70,49 @@ project-root/
 │   │   ├── schemas/         # Request/response validation
 │   │   ├── models/          # ORM models
 │   │   └── config.py        # Configuration
+│   ├── tests/
+│   │   ├── integration/     # Integration tests
+│   │   ├── unit/            # Unit tests
+│   │   └── conftest.py      # Pytest configuration
 │   ├── main.py              # Application entry point
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/                 # React SPA
 │   ├── src/
-│   │   ├── components/
-│   │   ├── contexts/
-│   │   ├── hooks/
-│   │   ├── pages/
-│   │   ├── services/
-│   │   └── types/
+│   │   ├── features/        # Feature-based modules
+│   │   │   ├── auth/        # Authentication feature
+│   │   │   │   ├── components/
+│   │   │   │   ├── contexts/
+│   │   │   │   ├── pages/
+│   │   │   │   ├── services/
+│   │   │   │   ├── types/
+│   │   │   │   └── index.ts
+│   │   │   ├── presentations/  # Presentations feature
+│   │   │   │   ├── components/
+│   │   │   │   ├── contexts/
+│   │   │   │   ├── pages/
+│   │   │   │   ├── types/
+│   │   │   │   └── index.ts
+│   │   │   └── profile/     # User profile feature
+│   │   │       ├── components/
+│   │   │       ├── pages/
+│   │   │       └── index.ts
+│   │   ├── components/      # Shared UI components
+│   │   │   ├── ui/          # Shadcn UI components
+│   │   │   └── Header.tsx
+│   │   ├── lib/             # Shared utilities
+│   │   │   └── utils.ts
+│   │   ├── pages/           # Top-level pages
+│   │   │   └── HomePage.tsx
+│   │   ├── test/            # Test files
+│   │   ├── App.tsx
+│   │   ├── main.tsx
+│   │   └── globals.css
 │   ├── package.json
 │   └── Dockerfile
 ├── instructions/
-│   ├── clean-code.md        # Clean code standards contract
+│   ├── CLEAN_CODE.md        # Clean code standards contract
 │   ├── API_CONTRACT.md      # Complete API documentation
-│   ├── DECISIONS.md         # Architecture decision records
 │   └── WORKFLOWS.md         # Development workflows
 ├── .env.example
 ├── docker-compose.yml
