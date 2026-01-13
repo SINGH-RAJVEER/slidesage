@@ -71,7 +71,7 @@ class AuthService:
             
             if user:
                 # Update profile picture if changed
-                if profile_picture and user.profile_picture_url != profile_picture:
+                if profile_picture and user.profile_picture != profile_picture:
                     self.user_repo.update(user, profile_picture_url=profile_picture)
                 return user
             

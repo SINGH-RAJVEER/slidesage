@@ -21,8 +21,9 @@ class UserRepository:
         user = User(
             email=email,
             name=name,
-            google_id=google_id,
-            profile_picture_url=profile_picture_url
+            oauth_provider='google',
+            oauth_id=google_id,
+            profile_picture=profile_picture_url
         )
         db.session.add(user)
         db.session.commit()
@@ -40,12 +41,20 @@ class UserRepository:
 
     @staticmethod
     def find_by_google_id(google_id: str) -> Optional[User]:
-        """Find user by Google ID"""
-        return User.query.filter_by(google_id=google_id).first()
+        """Find user by Google ID (oauth_id)"""
+        return User.query.filter_by(oauth_provider='google', oauth_id=google_id).first()
 
     @staticmethod
     def update(user: User, **kwargs) -> User:
         """Update user fields"""
+        # Map google_id to oauth_id for backward compatibility
+        if 'google_id' in kwargs:
+            kwargs['oauth_id'] = kwargs.pop('google_id')
+            if 'oauth_provider' not in kwargs:
+                kwargs['oauth_provider'] = 'google'
+        if 'profile_picture_url' in kwargs:
+            kwargs['profile_picture'] = kwargs.pop('profile_picture_url')
+        
         for key, value in kwargs.items():
             if hasattr(user, key):
                 setattr(user, key, value)
