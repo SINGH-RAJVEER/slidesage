@@ -14,12 +14,12 @@ from app.models import db, User
 
 
 # Secret key required for admin operations
-# Generate a secure secret: python -c "import secrets; print(secrets.token_hex(32))"
+# Generate a secure secret: 
+# python -c "import secrets; print(secrets.token_hex(32))"
 ADMIN_SECRET_HASH = os.getenv('ADMIN_SECRET_HASH')
 
-# List of allowed dev emails that can be granted unlimited status
 ALLOWED_DEV_EMAILS = [
-    'user@mail.com',  # Your dev user
+    'user@mail.com'
 ]
 
 
@@ -126,7 +126,6 @@ def migrate_add_unlimited_column():
     """Add the is_unlimited column if it doesn't exist"""
     app = create_app()
     with app.app_context():
-        # Check if column exists
         from sqlalchemy import inspect, text
         inspector = inspect(db.engine)
         columns = [col['name'] for col in inspector.get_columns('users')]

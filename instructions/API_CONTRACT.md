@@ -4,7 +4,7 @@ This document defines the complete API contract for the SlideSage application.
 
 ## Base URL
 
-- **Development**: `http://localhost:5000/api`
+- **Development**: `http://localhost:8000/api`
 - **Production**: Configure via `VITE_API_URL` environment variable
 
 ## Authentication

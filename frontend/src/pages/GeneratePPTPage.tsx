@@ -4,6 +4,7 @@ import { authService } from "@/services/authService";
 import Header from "@/components/Header";
 import { useStreaming } from "@/contexts/StreamingContext";
 import { GenerateOptionsBar, GenerateForm } from "@/components/GeneratePPTPage";
+import { useDebouncedCallback } from "@tanstack/react-pacer/debouncer";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -60,7 +61,7 @@ export default function GeneratePPTPage() {
     setTopics(topics.filter((topic) => topic !== topicToRemove));
   };
 
-  const handleGenerate = async () => {
+  const handleGenerateInternal = async () => {
     if (topics.length === 0) return;
 
     setLoading(true);
@@ -84,6 +85,11 @@ export default function GeneratePPTPage() {
     }
   };
 
+  const handleGenerate = useDebouncedCallback(handleGenerateInternal, {
+    wait: 500,
+    leading: true,
+  });
+
   // Calculate estimated token usage based on selections
   const calculateEstimatedTokens = () => {
     const count =
@@ -91,7 +97,6 @@ export default function GeneratePPTPage() {
         ? parseInt(slideCount)
         : parseInt(customSlideCount);
 
-    // 1 slide token = 1000 AI tokens
     let baseTokenPerSlide = 1;
 
     if (detailLevel === "brief") {
@@ -113,7 +118,6 @@ export default function GeneratePPTPage() {
       tonalityMultiplier = 1.1;
     }
 
-    // Calculate total
     const estimatedTokens = count * baseTokenPerSlide * tonalityMultiplier;
     return estimatedTokens;
   };
