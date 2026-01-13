@@ -2,15 +2,19 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Analytics } from "@vercel/analytics/react";
 import HomePage from "./pages/HomePage";
-import GeneratePPTPage from "./pages/GeneratePPTPage";
-import PresentationViewer from "./pages/PresentationViewer";
-import PresentationErrorPage from "./pages/PresentationErrorPage";
-import ProfilePage from "./pages/ProfilePage";
-import LoginPage from "./pages/LoginPage";
-import PurchaseTokensPage from "./pages/PurchaseTokensPage";
-import PresentationsGridPage from "./pages/PresentationsGridPage";
-import ProtectedRoute from "./components/ProtectedRoute";
-import { StreamingProvider } from "./contexts/StreamingContext";
+import {
+  LoginPage,
+  ProtectedRoute,
+} from "./features/auth";
+import {
+  GeneratePPTPage,
+  PresentationViewer,
+  PresentationErrorPage,
+  PurchaseTokensPage,
+  PresentationsGridPage,
+  StreamingProvider,
+} from "./features/presentations";
+import { ProfilePage } from "./features/profile";
 
 export default function App() {
   return (

@@ -25,27 +25,27 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import DownloadPPTXButton from "@/components/Viewer/DownloadPPTXButton";
-import ChartRenderer from "@/components/Charts/ChartRenderer";
-import TemplateApplier from "@/components/Viewer/TemplateApplier";
-import TemplateSelector from "@/components/Viewer/TemplateSelector";
-import IterateModal from "@/components/Viewer/IterateModal";
-import { useTemplate } from "@/hooks/useTemplate";
-import { AVAILABLE_TEMPLATES } from "@/types/template";
+import DownloadPPTXButton from "../components/Viewer/DownloadPPTXButton";
+import ChartRenderer from "../components/Charts/ChartRenderer";
+import TemplateApplier from "../components/Viewer/TemplateApplier";
+import TemplateSelector from "../components/Viewer/TemplateSelector";
+import IterateModal from "../components/Viewer/IterateModal";
+import { useTemplate } from "../useTemplate";
+import { AVAILABLE_TEMPLATES } from "../types/template";
 import type {
   PresentationData,
   Slide,
   HtmlSlide,
   ChartSlide,
-} from "@/types/presentation";
+} from "../types/presentation";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useStreaming } from "@/contexts/StreamingContext";
-import { authService } from "@/services/authService";
+import { useStreaming } from "@/features/presentations";
+import { authService } from "@/features/auth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 

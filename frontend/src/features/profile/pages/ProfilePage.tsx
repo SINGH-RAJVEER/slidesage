@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { authService } from "@/services/authService";
+import { useAuth, authService } from "@/features/auth";
 import Header from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +11,7 @@ import {
   BasicInfoFields,
   PasswordFields,
   ProfileSubmitButton,
-} from "@/components/ProfilePage";
+} from "../components/ProfilePage";
 
 export default function ProfilePage() {
   const navigate = useNavigate();

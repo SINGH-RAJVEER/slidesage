@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { authService } from "@/services/authService";
-import GeneratePPTPage from "./GeneratePPTPage";
-import PresentationsGridPage from "./PresentationsGridPage";
+import { authService } from "@/features/auth";
+import {
+  GeneratePPTPage,
+  PresentationsGridPage,
+} from "@/features/presentations";
 import Header from "@/components/Header";
 
 const API_URL = import.meta.env.VITE_API_URL;

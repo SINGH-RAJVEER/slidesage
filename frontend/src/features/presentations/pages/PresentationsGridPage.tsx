@@ -11,13 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { authService } from "@/services/authService";
+import { authService } from "@/features/auth";
 import Header from "@/components/Header";
 import {
   PresentationCard,
   GridSizeControl,
   CreatePresentationButton,
-} from "@/components/PresentationsGridPage";
+} from "../components/PresentationsGridPage";
 
 const API_URL = import.meta.env.VITE_API_URL;
 

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, Check, Sparkles } from "lucide-react";
-import { AVAILABLE_TEMPLATES } from "@/types/template";
+import { AVAILABLE_TEMPLATES } from "../../types/template";
 
 interface TemplateSelectorProps {
   selectedTemplate: string;

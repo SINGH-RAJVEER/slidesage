@@ -1,8 +1,8 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { TemplateSelector } from "@/components/Viewer/TemplateSelector";
+import { TemplateSelector } from "../Viewer/TemplateSelector";
 import { Sparkles, Loader2, Play, Pause, Maximize } from "lucide-react";
-import DownloadPPTXButton from "@/components/Viewer/DownloadPPTXButton";
+import DownloadPPTXButton from "../Viewer/DownloadPPTXButton";
 import { SlideIntervalSelector } from "./SlideIntervalSelector";
 
 interface HeaderControlsProps {

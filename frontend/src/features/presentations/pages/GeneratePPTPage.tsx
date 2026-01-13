@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { authService } from "@/services/authService";
+import { authService } from "@/features/auth";
 import Header from "@/components/Header";
-import { useStreaming } from "@/contexts/StreamingContext";
-import { GenerateOptionsBar, GenerateForm } from "@/components/GeneratePPTPage";
+import { useStreaming } from "@/features/presentations";
+import {
+  GenerateOptionsBar,
+  GenerateForm,
+} from "../components/GeneratePPTPage";
 import { useDebouncedCallback } from "@tanstack/react-pacer/debouncer";
 
 const API_URL = import.meta.env.VITE_API_URL;

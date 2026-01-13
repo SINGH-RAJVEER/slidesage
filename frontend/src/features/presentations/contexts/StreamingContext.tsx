@@ -6,9 +6,9 @@ import React, {
   useRef,
   useEffect,
 } from "react";
-import type { Slide, PresentationData } from "@/types/presentation";
-import { authService } from "@/services/authService";
-import { useAuth } from "@/contexts/AuthContext";
+import type { Slide, PresentationData } from "../types/presentation";
+import { authService } from "@/features/auth";
+import { useAuth } from "@/features/auth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 

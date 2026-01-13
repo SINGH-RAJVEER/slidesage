@@ -1,9 +1,9 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
-import { Slide, HtmlSlide, ChartSlide } from "@/types/presentation";
-import { AVAILABLE_TEMPLATES } from "@/types/template";
-import ChartRenderer from "@/components/Charts/ChartRenderer";
-import TemplateApplier from "@/components/Viewer/TemplateApplier";
+import { Slide, HtmlSlide, ChartSlide } from "../../types/presentation";
+import { AVAILABLE_TEMPLATES } from "../../types/template";
+import ChartRenderer from "../Charts/ChartRenderer";
+import TemplateApplier from "../Viewer/TemplateApplier";
 
 interface SlideCarouselProps {
   slides: Slide[];

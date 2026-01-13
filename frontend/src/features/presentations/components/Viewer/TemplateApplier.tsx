@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef } from "react";
-import { AVAILABLE_TEMPLATES } from "@/types/template";
+import { AVAILABLE_TEMPLATES } from "../../types/template";
 
 interface TemplateApplierProps {
   templateId: string;

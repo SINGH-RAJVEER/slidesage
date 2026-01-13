@@ -1,4 +1,4 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/features/auth";
 import { useNavigate } from "react-router-dom";
 import { LogOut, User } from "lucide-react";
 import {
