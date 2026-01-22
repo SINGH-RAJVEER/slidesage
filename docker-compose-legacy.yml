@@ -19,21 +19,15 @@ services:
 
   backend:
     build:
-      context: ./backend-ts
+      context: ./backend
       dockerfile: Dockerfile
     image: slidesage-backend:latest
     ports:
       - "8000:8000"
     restart: unless-stopped
     environment:
-      - PORT=8000
+      - FLASK_ENV=production
       - DATABASE_URL=postgresql://slidesage:slidesage@postgres:5432/slidesage
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-secret-key-in-production}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - LITELLM_MODEL=${LITELLM_MODEL:-openai/gpt-4}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
     depends_on:
       postgres:
         condition: service_healthy
