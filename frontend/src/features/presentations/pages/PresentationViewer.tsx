@@ -45,7 +45,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useStreaming } from "@/features/presentations";
-import { authService } from "@/features/auth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -336,7 +335,7 @@ const PresentationViewer: React.FC = () => {
         const response = await fetch(
           `${API_URL}/api/presentations/${idToFetch}`,
           {
-            headers: authService.getAuthHeaders(),
+            credentials: "include",
           }
         );
 
@@ -731,7 +730,7 @@ const PresentationViewer: React.FC = () => {
 
         const response = await fetch(url, {
           method: "DELETE",
-          headers: authService.getAuthHeaders(),
+          credentials: "include",
         });
 
         const data = await response.json();

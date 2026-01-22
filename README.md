@@ -4,19 +4,24 @@ AI-assisted presentation generator that creates professional slides with rich co
 
 ---
 
-## 🎉 NEW: TypeScript Backend with Bun!
-
-SlideSage backend has been ported to **TypeScript with Bun runtime** for better performance and developer experience!
-
 **Quick Start:**
 
 ```bash
-./setup-ts-backend.sh
-cd backend-ts && bun run dev
-```
+# Backend
+cd backend
+bun install
+cp .env.example .env
+# Edit .env if needed (default PORT is 8000)
+bun run db:push
+bun run dev
 
-📖 **See [QUICKSTART_TS.md](./QUICKSTART_TS.md) for setup guide**  
-📖 **See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for detailed migration info**
+# Frontend (in a new terminal)
+cd frontend
+bun install
+cp .env.example .env
+# Edit .env to point VITE_API_URL to http://localhost:8000
+bun dev
+```
 
 ---
 
@@ -24,10 +29,10 @@ cd backend-ts && bun run dev
 
 SlideSage is a modern web application that leverages AI to generate complete presentations from simple text prompts. It features real-time streaming of generated content, support for data visualization charts, and multiple professional design templates.
 
-- **Backend:** TypeScript + Bun + Hono with Drizzle ORM (or legacy Python/Flask)
+- **Backend:** TypeScript + Bun + Hono with Drizzle ORM
 - **Frontend:** React (Vite + Bun) app with a modern UI built using Tailwind CSS and Shadcn UI
 - **Database:** PostgreSQL for storing user data and presentation history
-- **Build system:** Docker for containerization and Nix flakes for reproducible environments
+- **Build system:** Docker for containerization
 
 ---
 
@@ -55,22 +60,15 @@ SlideSage is a modern web application that leverages AI to generate complete pre
 
 ## Tech Stack
 
-### Backend (TypeScript - NEW!)
+### Backend
 
 - **Runtime:** Bun (fast JavaScript/TypeScript runtime)
 - **Framework:** Hono (Express-like web framework)
 - **Database:** PostgreSQL with Drizzle ORM (type-safe queries)
 - **AI/LLM:** OpenAI API compatible endpoints
 - **Auth:** Jose JWT + Google OAuth 2.0
-- **Benefits:** 3x faster startup, type-safe, lower memory usage
-
-### Backend (Python - Legacy)
-
-- **Framework:** Flask with application factory pattern
-- **Database:** PostgreSQL (SQLAlchemy ORM)
-- **AI/LLM:** LiteLLM for LLM integration
-- **Auth:** Flask-JWT-Extended + Google OAuth 2.0
-- **Validation:** Marshmallow for request/response schemas
+- **Linter/Formatter:** Biome
+- **Benefits:** Fast startup, type-safe, low memory usage
 
 ### Frontend
 
@@ -87,61 +85,36 @@ SlideSage is a modern web application that leverages AI to generate complete pre
 
 ```
 project-root/
-├── backend/                  # Flask API
-│   ├── app/
-│   │   ├── api/             # Thin route handlers (API layer)
-│   │   ├── services/        # Business logic
+├── backend/                  # Hono API
+│   ├── src/
+│   │   ├── db/              # Database schema and migrations
+│   │   ├── lib/             # Shared libraries
+│   │   ├── middleware/      # Hono middleware
 │   │   ├── repositories/    # Database access layer
-│   │   ├── schemas/         # Request/response validation
-│   │   ├── models/          # ORM models
-│   │   └── config.py        # Configuration
-│   ├── tests/
-│   │   ├── integration/     # Integration tests
-│   │   ├── unit/            # Unit tests
-│   │   └── conftest.py      # Pytest configuration
-│   ├── main.py              # Application entry point
-│   ├── requirements.txt
-│   └── Dockerfile
+│   │   ├── routes/          # API route definitions
+│   │   ├── services/        # Business logic and AI integration
+│   │   ├── types/           # TypeScript type definitions
+│   │   ├── utils/           # Utility functions
+│   │   └── index.ts         # Application entry point
+│   ├── biome.json           # Linter/Formatter config
+│   ├── drizzle.config.ts    # ORM config
+│   └── package.json
 ├── frontend/                 # React SPA
 │   ├── src/
 │   │   ├── features/        # Feature-based modules
-│   │   │   ├── auth/        # Authentication feature
-│   │   │   │   ├── components/
-│   │   │   │   ├── contexts/
-│   │   │   │   ├── pages/
-│   │   │   │   ├── services/
-│   │   │   │   ├── types/
-│   │   │   │   └── index.ts
-│   │   │   ├── presentations/  # Presentations feature
-│   │   │   │   ├── components/
-│   │   │   │   ├── contexts/
-│   │   │   │   ├── pages/
-│   │   │   │   ├── types/
-│   │   │   │   └── index.ts
-│   │   │   └── profile/     # User profile feature
-│   │   │       ├── components/
-│   │   │       ├── pages/
-│   │   │       └── index.ts
+│   │   │   ├── auth/
+│   │   │   ├── presentations/
+│   │   │   └── profile/
 │   │   ├── components/      # Shared UI components
-│   │   │   ├── ui/          # Shadcn UI components
-│   │   │   └── Header.tsx
 │   │   ├── lib/             # Shared utilities
-│   │   │   └── utils.ts
 │   │   ├── pages/           # Top-level pages
-│   │   │   └── HomePage.tsx
-│   │   ├── test/            # Test files
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   └── globals.css
-│   ├── package.json
-│   └── Dockerfile
-├── instructions/
-│   ├── CLEAN_CODE.md        # Clean code standards contract
+│   │   └── App.tsx
+│   └── package.json
+├── documentation/           # Project documentation
 │   ├── API_CONTRACT.md      # Complete API documentation
+│   ├── CLEAN_CODE.md        # Clean code standards contract
 │   └── WORKFLOWS.md         # Development workflows
-├── .env.example
 ├── docker-compose.yml
-├── Makefile
 └── README.md
 ```
 
@@ -149,20 +122,21 @@ project-root/
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill with your credentials:
+Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to `frontend/.env` and fill with your credentials:
 
-**Backend (.env):**
+**Backend (backend/.env):**
 
-- `FLASK_DEBUG` - Enable debug mode (default: True)
-- `JWT_SECRET_KEY` - **REQUIRED**: Secret key for JWT tokens
+- `PORT` - API Port (default: 8000)
 - `DATABASE_URL` - PostgreSQL connection string
+- `JWT_SECRET_KEY` - **REQUIRED**: Secret key for JWT tokens
+- `GEMINI_API_KEY`, `GROQ_API_KEY` - API keys for AI services
+- `LITELLM_MODEL` - AI model to use
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` - **OPTIONAL**: For Google OAuth
-- `LITELLM_MODEL` - AI model to use (e.g., gpt-4)
 - `CORS_ORIGINS` - Allowed CORS origins
 
 **Frontend (frontend/.env):**
 
-- `VITE_API_URL` - Backend API URL (e.g., http://localhost:5000/api)
+- `VITE_API_URL` - Backend API URL (e.g., http://localhost:8000)
 - `VITE_GOOGLE_CLIENT_ID` - **OPTIONAL**: Google OAuth Client ID
 
 ---
@@ -179,49 +153,52 @@ Copy `.env.example` to `.env` and fill with your credentials:
 
 2. **Access Application:**
    - Frontend: `http://localhost:5173`
-   - Backend API: `http://localhost:5000`
+   - Backend API: `http://localhost:8000`
    - PostgreSQL: `localhost:5432`
 
 ### Local Development
 
-1. **Install Dependencies:**
+1. **Backend Setup:**
 
    ```bash
-   make install
+   cd backend
+   bun install
+   # Configure .env
+   bun run db:push
+   bun run dev
    ```
 
-2. **Start Backend:**
+2. **Frontend Setup:**
 
    ```bash
-   make dev-backend
-   ```
-
-3. **Start Frontend (in another terminal):**
-
-   ```bash
-   make dev-frontend
+   cd frontend
+   bun install
+   # Configure .env
+   bun dev
    ```
 
 ---
 
 ## Development Commands
 
-Use the provided Makefile for common tasks:
+**Backend:**
 
-- `make help` - Show all available commands
-- `make dev` - Start full development environment with Docker
-- `make install` - Install all dependencies
-- `make test` - Run all tests
-- `make lint` - Run linters on all code
-- `make docker-up` - Start Docker services
-- `make docker-down` - Stop Docker services
-- `make clean` - Clean build artifacts
+- `bun run dev` - Start development server
+- `bun run lint` - Run Biome check
+- `bun run format` - Format code with Biome
+- `bun run db:push` - Push schema changes to database
+- `bun run db:studio` - Open Drizzle Studio
+
+**Frontend:**
+
+- `bun dev` - Start development server
+- `bun lint` - Run linting
 
 ---
 
 ## API Documentation
 
-Complete API documentation is available in `instructions/API_CONTRACT.md`.
+Complete API documentation is available in `documentation/API_CONTRACT.md`.
 
 ### Authentication Endpoints (No auth required)
 
@@ -247,19 +224,18 @@ Complete API documentation is available in `instructions/API_CONTRACT.md`.
 
 SlideSage follows clean architecture principles with clear separation of concerns:
 
-### Backend Layers
+### Backend Layers (Hono + Drizzle)
 
-1. **API Layer** (`app/api/`): Thin HTTP handlers for request/response
-2. **Services Layer** (`app/services/`): Business logic and orchestration
-3. **Repositories Layer** (`app/repositories/`): Database access
-4. **Schemas Layer** (`app/schemas/`): Validation and serialization
-5. **Models Layer** (`app/models/`): Domain models (SQLAlchemy ORM)
+1. **Routes Layer** (`src/routes/`): API route definitions and validation
+2. **Services Layer** (`src/services/`): Business logic and orchestration
+3. **Repositories Layer** (`src/repositories/`): Database access via Drizzle
+4. **Middleware** (`src/middleware/`): Authentication and request processing
+5. **DB** (`src/db/`): Schema definitions and migrations
 
 ### Key Principles
 
-- Follows clean code guidelines (see `instructions/clean-code.md`)
-- All API endpoints documented in `instructions/API_CONTRACT.md`
-- Architecture decisions tracked in `instructions/DECISIONS.md`
+- Follows clean code guidelines (see `documentation/CLEAN_CODE.md`)
+- All API endpoints documented in `documentation/API_CONTRACT.md`
 - Consistent error handling and validation
 - Separation of HTTP concerns from business logic
 
@@ -269,11 +245,11 @@ SlideSage follows clean architecture principles with clear separation of concern
 
 When contributing to this project:
 
-1. Follow the clean code guidelines in `instructions/clean-code.md`
-2. Update `instructions/API_CONTRACT.md` when changing API contracts
-3. Document architectural decisions in `instructions/DECISIONS.md`
-4. Write tests for new features
-5. Run linters before committing: `make lint`
+1. Follow the clean code guidelines in `documentation/CLEAN_CODE.md`
+2. Update `documentation/API_CONTRACT.md` when changing API contracts
+3. Run linters before committing:
+   - Backend: `cd backend && bun run lint`
+   - Frontend: `cd frontend && bun lint`
 
 ---
 
@@ -291,24 +267,5 @@ When contributing to this project:
 
 ## Notes & troubleshooting
 
-- If Nix flakes hit GitHub rate limits, pin inputs and commit `flake.lock` or supply a `GITHUB_TOKEN` during builds:
-
-```bash
-export GITHUB_TOKEN=ghp_xxx
-docker compose build --build-arg GITHUB_TOKEN=$GITHUB_TOKEN
-docker compose up --build
-```
-
----
-
-## Local dev tips
-
-- Backend: use the Nix devShell in `backend/` or run a Python venv and start the app with:
-
-```bash
-uv run main.py
-```
-
-- Frontend: run the dev server with `bun dev` and set `API_URL` to your backend.
-
----
+- Backend: Ensure `DATABASE_URL` is correct and PostgreSQL is running.
+- Frontend: Ensure `VITE_API_URL` matches the running backend port.

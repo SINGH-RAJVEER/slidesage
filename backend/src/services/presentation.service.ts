@@ -1,7 +1,8 @@
-import type { Presentation } from "../db/schema";
-import { PresentationRepository } from "../repositories/presentation.repository";
-import { UserRepository } from "../repositories/user.repository";
-import { AIService } from "./ai.service";
+import type { Presentation } from '../db/schema';
+import { PresentationRepository } from '../repositories/presentation.repository';
+import { UserRepository } from '../repositories/user.repository';
+import type { PresentationJSON, PresentationStreamEvent } from '../types';
+import { AIService } from './ai.service';
 
 export class PresentationService {
   private presentationRepo: PresentationRepository;
@@ -14,11 +15,7 @@ export class PresentationService {
     this.aiService = new AIService();
   }
 
-  calculateEstimatedTokens(
-    slideCount: number,
-    detailLevel: string,
-    tonality: string,
-  ): number {
+  calculateEstimatedTokens(slideCount: number, detailLevel: string, tonality: string): number {
     // Base token cost per slide (in slide tokens)
     let baseTokenPerSlide = 1.0;
 
@@ -50,55 +47,41 @@ export class PresentationService {
     userId: string,
     topic: string,
     slideCount: number,
-    detailLevel = "balanced",
-    tonality = "professional",
-  ): AsyncGenerator<any, void, unknown> {
+    detailLevel = 'balanced',
+    tonality = 'professional'
+  ): AsyncGenerator<PresentationStreamEvent, void, unknown> {
     // Verify user exists and has enough tokens
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw new Error("User not found");
+      throw new Error('User not found');
     }
 
-    const estimatedTokens = this.calculateEstimatedTokens(
-      slideCount,
-      detailLevel,
-      tonality,
-    );
+    const estimatedTokens = this.calculateEstimatedTokens(slideCount, detailLevel, tonality);
 
     // Check tokens only for non-unlimited users
     if (!user.isUnlimited && user.slideTokens < estimatedTokens) {
-      throw new Error("Insufficient tokens");
+      throw new Error('Insufficient tokens');
     }
 
     // Deduct tokens upfront (will be skipped for unlimited users in the repo)
     await this.userRepo.deductTokens(userId, estimatedTokens);
 
     // Stream presentation generation
-    yield* this.aiService.generatePresentationStream(
-      topic,
-      slideCount,
-      detailLevel,
-      tonality,
-    );
+    yield* this.aiService.generatePresentationStream(topic, slideCount, detailLevel, tonality);
   }
 
   async createPresentation(
-    userId: number,
+    userId: string,
     title: string,
     prompt: string,
-    slidesData: any,
+    slidesData: PresentationJSON
   ): Promise<Presentation> {
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw new Error("User not found");
+      throw new Error('User not found');
     }
 
-    const presentation = await this.presentationRepo.create(
-      userId,
-      title,
-      prompt,
-      slidesData,
-    );
+    const presentation = await this.presentationRepo.create(userId, title, prompt, slidesData);
     return presentation;
   }
 
@@ -106,35 +89,29 @@ export class PresentationService {
     return await this.presentationRepo.findByUserId(userId);
   }
 
-  async getPresentation(
-    presentationId: string,
-    userId: string,
-  ): Promise<Presentation> {
+  async getPresentation(presentationId: string, userId: string): Promise<Presentation> {
     const presentation = await this.presentationRepo.findById(presentationId);
 
     if (!presentation) {
-      throw new Error("Presentation not found");
+      throw new Error('Presentation not found');
     }
 
     if (presentation.userId !== userId) {
-      throw new Error("Unauthorized access");
+      throw new Error('Unauthorized access');
     }
 
     return presentation;
   }
 
-  async deletePresentation(
-    presentationId: string,
-    userId: string,
-  ): Promise<void> {
+  async deletePresentation(presentationId: string, userId: string): Promise<void> {
     const presentation = await this.presentationRepo.findById(presentationId);
 
     if (!presentation) {
-      throw new Error("Presentation not found");
+      throw new Error('Presentation not found');
     }
 
     if (presentation.userId !== userId) {
-      throw new Error("Unauthorized access");
+      throw new Error('Unauthorized access');
     }
 
     await this.presentationRepo.delete(presentationId);

@@ -1,5 +1,10 @@
+node_modules/
+dist/
 .env
-.flaskenv
-__pycache__
-generated
-public
+.env.local
+*.log
+.DS_Store
+drizzle/
+*.sqlite
+*.db
+.biome-cache/

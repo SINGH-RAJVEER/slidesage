@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { authService } from "@/features/auth";
 import {
   GeneratePPTPage,
   PresentationsGridPage,
@@ -19,26 +18,14 @@ export default function HomePage() {
 
   const checkPresentations = async () => {
     try {
-      const headers = authService.getAuthHeaders();
       const response = await fetch(`${API_URL}/api/presentations`, {
-        headers,
+        credentials: "include",
       });
 
       if (response.status === 401) {
-        const refreshed = await authService.refreshToken();
-        if (refreshed) {
-          const newHeaders = authService.getAuthHeaders();
-          const retryResponse = await fetch(`${API_URL}/api/presentations`, {
-            headers: newHeaders,
-          });
-
-          if (retryResponse.ok) {
-            const retryResult = await retryResponse.json();
-            setHasPresentations(
-              retryResult.success && retryResult.presentations.length > 0
-            );
-          }
-        }
+        // If unauthorized, assume no presentations available (or let ProtectedRoute handle redirect if needed)
+        // But for HomePage we might want to show GeneratePPTPage anyway
+        setHasPresentations(false);
         return;
       }
 

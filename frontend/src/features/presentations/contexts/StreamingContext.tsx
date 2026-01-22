@@ -7,7 +7,6 @@ import React, {
   useEffect,
 } from "react";
 import type { Slide, PresentationData } from "../types/presentation";
-import { authService } from "@/features/auth";
 import { useAuth } from "@/features/auth";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -105,12 +104,11 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
       abortControllerRef.current = new AbortController();
 
       try {
-        const headers = authService.getAuthHeaders();
         let response = await fetch(
           `${API_URL}/api/generate-presentation-stream`,
           {
             method: "POST",
-            headers,
+            credentials: "include",
             body: JSON.stringify({
               topic: prompt,
               slide_count: slideCount,
@@ -123,31 +121,12 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
 
         // Handle 401 Unauthorized - token might be expired
         if (response.status === 401) {
-          const refreshed = await authService.refreshToken();
-          if (refreshed) {
-            const newHeaders = authService.getAuthHeaders();
-            response = await fetch(
-              `${API_URL}/api/generate-presentation-stream`,
-              {
-                method: "POST",
-                headers: newHeaders,
-                body: JSON.stringify({
-                  topic: prompt,
-                  slide_count: slideCount,
-                  detail_level: detailLevel,
-                  tonality,
-                }),
-                signal: abortControllerRef.current.signal,
-              }
-            );
-          } else {
-            setStreamingState((prev) => ({
-              ...prev,
-              isStreaming: false,
-              error: "Session expired. Please log in again.",
-            }));
-            return false;
-          }
+          setStreamingState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            error: "Session expired. Please log in again.",
+          }));
+          return false;
         }
 
         if (response.status === 422) {
@@ -367,12 +346,11 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
       abortControllerRef.current = new AbortController();
 
       try {
-        const headers = authService.getAuthHeaders();
         let response = await fetch(
           `${API_URL}/api/iterate-presentation-stream`,
           {
             method: "POST",
-            headers,
+            credentials: "include",
             body: JSON.stringify({
               topic: prompt,
               parent_presentation_id: parentPresentationId,
@@ -386,32 +364,12 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
 
         // Handle 401 Unauthorized - token might be expired
         if (response.status === 401) {
-          const refreshed = await authService.refreshToken();
-          if (refreshed) {
-            const newHeaders = authService.getAuthHeaders();
-            response = await fetch(
-              `${API_URL}/api/iterate-presentation-stream`,
-              {
-                method: "POST",
-                headers: newHeaders,
-                body: JSON.stringify({
-                  topic: prompt,
-                  parent_presentation_id: parentPresentationId,
-                  slide_count: slideCount,
-                  detail_level: detailLevel,
-                  tonality,
-                }),
-                signal: abortControllerRef.current.signal,
-              }
-            );
-          } else {
-            setStreamingState((prev) => ({
-              ...prev,
-              isStreaming: false,
-              error: "Session expired. Please log in again.",
-            }));
-            return false;
-          }
+          setStreamingState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            error: "Session expired. Please log in again.",
+          }));
+          return false;
         }
 
         if (response.status === 422) {

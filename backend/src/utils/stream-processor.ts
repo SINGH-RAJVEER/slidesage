@@ -1,15 +1,4 @@
-// Stream Processing Utilities
-
-interface StreamChunk {
-  choices?: Array<{
-    delta?: {
-      content?: string;
-    };
-  }>;
-  usage?: {
-    total_tokens?: number;
-  };
-}
+import type { Slide, StreamChunk } from '../types';
 
 export class StreamProcessor {
   accumulatedContent = '';
@@ -19,7 +8,7 @@ export class StreamProcessor {
   totalTokensUsed = 0;
   chunkCount = 0;
 
-  processChunk(chunk: any): string {
+  processChunk(chunk: StreamChunk): string {
     this.chunkCount++;
     let chunkContent = '';
 
@@ -66,9 +55,9 @@ export class StreamProcessor {
     return null;
   }
 
-  extractSlides(): Array<[number, any]> {
+  extractSlides(): Array<[number, Slide]> {
     const clean = this.getCleanContent();
-    const newSlides: Array<[number, any]> = [];
+    const newSlides: Array<[number, Slide]> = [];
 
     try {
       // Try to find complete slide objects
@@ -90,8 +79,8 @@ export class StreamProcessor {
     return newSlides;
   }
 
-  private parseSlideObjects(content: string): any[] {
-    const slides: any[] = [];
+  private parseSlideObjects(content: string): Slide[] {
+    const slides: Slide[] = [];
     let depth = 0;
     let currentSlide = '';
     let inString = false;
@@ -137,7 +126,7 @@ export class StreamProcessor {
     return slides;
   }
 
-  extractTitleFromSlide(slide: any): string | null {
+  extractTitleFromSlide(slide: Slide): string | null {
     if (!slide?.html) return null;
 
     // Extract title from HTML

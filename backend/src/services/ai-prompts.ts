@@ -101,7 +101,9 @@ Response must be valid JSON with this structure:
 }`;
 }
 
-export function buildIterationPrompt(currentSlides: any[], feedback: string): string {
+import type { Slide } from '../types';
+
+export function buildIterationPrompt(currentSlides: Slide[], feedback: string): string {
   return `You are editing an existing presentation. Apply the following changes: ${feedback}
 
 Current presentation structure:

@@ -1,25 +1,16 @@
-FROM python:3.11-slim
+FROM oven/bun:1 as base
 
 WORKDIR /app
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Install dependencies
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
 
-# Copy dependency files
-COPY requirements.txt .
+# Copy source code
+COPY . .
 
-# Install dependencies using uv
-RUN uv pip install --system --no-cache -r requirements.txt
-
-# Copy backend sources
-COPY . /app
-
-# Expose Flask port
+# Expose port
 EXPOSE 8000
 
-# Set environment variables
-ENV FLASK_APP=main
-ENV FLASK_ENV=production
-
-# Run Flask
-CMD ["flask", "run", "--host=0.0.0.0", "--port=8000"]
+# Run migrations and start server
+CMD ["sh", "-c", "bun run db:migrate && bun run start"]

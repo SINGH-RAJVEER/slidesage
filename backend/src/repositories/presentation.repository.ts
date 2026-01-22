@@ -1,17 +1,14 @@
-import { desc, eq } from "drizzle-orm";
-import { db } from "../db";
-import {
-  type NewPresentation,
-  type Presentation,
-  presentations,
-} from "../db/schema";
+import { desc, eq } from 'drizzle-orm';
+import { db } from '../db';
+import { type NewPresentation, type Presentation, presentations } from '../db/schema';
+import type { PresentationJSON } from '../types';
 
 export class PresentationRepository {
   async create(
     userId: string,
     title: string,
     prompt: string,
-    slidesData: any,
+    slidesData: PresentationJSON
   ): Promise<Presentation> {
     const [presentation] = await db
       .insert(presentations)
@@ -51,7 +48,7 @@ export class PresentationRepository {
 
   async update(
     presentationId: string,
-    updates: Partial<Presentation>,
+    updates: Partial<Presentation>
   ): Promise<Presentation | undefined> {
     const [presentation] = await db
       .update(presentations)

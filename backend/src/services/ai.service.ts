@@ -1,8 +1,9 @@
+import type { LiteLLMMessage, PresentationStreamEvent, Slide } from '../types';
 import { StreamProcessor } from '../utils/stream-processor';
 import { buildGenerationPrompt } from './ai-prompts';
 
 // Using dynamic import for litellm compatibility
-const completion: any = null;
+const completion: unknown = null;
 
 async function initLiteLLM() {
   if (!completion) {
@@ -14,13 +15,6 @@ async function initLiteLLM() {
       console.warn('LiteLLM SDK not available:', error);
     }
   }
-}
-
-interface Slide {
-  id?: string;
-  type?: string;
-  html?: string;
-  chartConfig?: any;
 }
 
 export class AIService {
@@ -58,7 +52,7 @@ export class AIService {
     slideCount = 8,
     detailLevel = 'balanced',
     tonality = 'professional'
-  ): AsyncGenerator<any, void, unknown> {
+  ): AsyncGenerator<PresentationStreamEvent, void, unknown> {
     console.log(
       `Starting generate presentation for: ${userPrompt.substring(0, 50)}... with ${slideCount} slides`
     );
@@ -222,7 +216,7 @@ export class AIService {
     }
   }
 
-  private async callLiteLLMStreaming(model: string, messages: any[]): Promise<Response> {
+  private async callLiteLLMStreaming(model: string, messages: LiteLLMMessage[]): Promise<Response> {
     // Use OpenAI-compatible API endpoint
     const apiEndpoint =
       process.env.LITELLM_API_BASE || 'https://api.openai.com/v1/chat/completions';

@@ -11,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { authService } from "@/features/auth";
 import Header from "@/components/Header";
 import {
   PresentationCard,
@@ -54,40 +53,13 @@ export default function PresentationsGridPage() {
   const fetchPresentations = async () => {
     try {
       setLoading(true);
-      const headers = authService.getAuthHeaders();
       const response = await fetch(`${API_URL}/api/presentations`, {
-        headers,
+        credentials: "include",
       });
 
       if (response.status === 401) {
-        const refreshed = await authService.refreshToken();
-        if (refreshed) {
-          const newHeaders = authService.getAuthHeaders();
-          const retryResponse = await fetch(`${API_URL}/api/presentations`, {
-            headers: newHeaders,
-          });
-
-          if (!retryResponse.ok) {
-            setError("Authentication failed. Please log in again.");
-            return;
-          }
-
-          const retryResult = await retryResponse.json();
-          // New API format: {presentations: [...]} or {error: {message: "..."}}
-          if (retryResult.error) {
-            setError(
-              typeof retryResult.error === "object"
-                ? retryResult.error.message
-                : retryResult.error
-            );
-          } else {
-            setPresentations(retryResult.presentations || []);
-          }
-          return;
-        } else {
-          setError("Session expired. Please log in again.");
-          return;
-        }
+        setError("Authentication failed. Please log in again.");
+        return;
       }
 
       const result = await response.json();
@@ -109,48 +81,13 @@ export default function PresentationsGridPage() {
 
   const handlePresentationClick = async (presentationId: number) => {
     try {
-      const headers = authService.getAuthHeaders();
       const response = await fetch(
         `${API_URL}/api/presentations/${presentationId}`,
-        { headers }
+        { credentials: "include" }
       );
 
       if (response.status === 401) {
-        const refreshed = await authService.refreshToken();
-        if (!refreshed) {
-          setError("Session expired. Please log in again.");
-          return;
-        }
-
-        const newHeaders = authService.getAuthHeaders();
-        const retryResponse = await fetch(
-          `${API_URL}/api/presentations/${presentationId}`,
-          { headers: newHeaders }
-        );
-
-        if (!retryResponse.ok) {
-          setError("Failed to load presentation");
-          return;
-        }
-
-        const retryResult = await retryResponse.json();
-        // New API format: {presentation: {...}} or {error: {message: "..."}}
-        if (retryResult.error) {
-          setError(
-            typeof retryResult.error === "object"
-              ? retryResult.error.message
-              : retryResult.error
-          );
-        } else if (retryResult.presentation) {
-          navigate("/presentation", {
-            state: {
-              presentation:
-                retryResult.presentation.slides_data ||
-                retryResult.presentation.slides,
-              presentationId: retryResult.presentation.id,
-            },
-          });
-        }
+        setError("Session expired. Please log in again.");
         return;
       }
 
@@ -191,49 +128,16 @@ export default function PresentationsGridPage() {
 
     try {
       setDeletingId(presentationId);
-      const headers = authService.getAuthHeaders();
       const response = await fetch(
         `${API_URL}/api/presentations/${presentationId}`,
         {
           method: "DELETE",
-          headers,
+          credentials: "include",
         }
       );
 
       if (response.status === 401) {
-        const refreshed = await authService.refreshToken();
-        if (!refreshed) {
-          setError("Session expired. Please log in again.");
-          return;
-        }
-
-        const newHeaders = authService.getAuthHeaders();
-        const retryResponse = await fetch(
-          `${API_URL}/api/presentations/${presentationId}`,
-          {
-            method: "DELETE",
-            headers: newHeaders,
-          }
-        );
-
-        if (!retryResponse.ok) {
-          setError("Failed to delete presentation");
-          return;
-        }
-
-        // New API format: {message: "..."} or {error: {message: "..."}}
-        const retryResult = await retryResponse.json();
-        if (retryResult.error) {
-          setError(
-            typeof retryResult.error === "object"
-              ? retryResult.error.message
-              : retryResult.error
-          );
-        } else {
-          setPresentations(
-            presentations.filter((p) => p.id !== presentationId)
-          );
-        }
+        setError("Session expired. Please log in again.");
         return;
       }
 
