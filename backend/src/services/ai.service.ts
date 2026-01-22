@@ -217,10 +217,31 @@ export class AIService {
   }
 
   private async callLiteLLMStreaming(model: string, messages: LiteLLMMessage[]): Promise<Response> {
-    // Use OpenAI-compatible API endpoint
-    const apiEndpoint =
-      process.env.LITELLM_API_BASE || 'https://api.openai.com/v1/chat/completions';
-    const apiKey = process.env.OPENAI_API_KEY || process.env.LITELLM_API_KEY;
+    // Determine provider based on model prefix or configuration
+    let apiEndpoint = process.env.LITELLM_API_BASE;
+    let apiKey = process.env.LITELLM_API_KEY;
+
+    // Auto-configure for Groq
+    if (model.startsWith('groq/')) {
+      apiEndpoint = apiEndpoint || 'https://api.groq.com/openai/v1/chat/completions';
+      apiKey = apiKey || process.env.GROQ_API_KEY;
+    }
+    // Auto-configure for Gemini
+    else if (model.startsWith('gemini/')) {
+      apiEndpoint =
+        apiEndpoint || 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+      apiKey = apiKey || process.env.GEMINI_API_KEY;
+    }
+    // Default to OpenAI
+    else {
+      apiEndpoint = apiEndpoint || 'https://api.openai.com/v1/chat/completions';
+      apiKey = apiKey || process.env.OPENAI_API_KEY;
+    }
+
+    if (!apiKey) {
+      console.error(`Missing API Key for model ${model}`);
+      throw new Error(`Missing API Key for model ${model}`);
+    }
 
     const response = await fetch(apiEndpoint, {
       method: 'POST',
@@ -237,7 +258,11 @@ export class AIService {
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`API request failed: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(
+        `API request failed: ${response.status} ${response.statusText} - ${errorText}`
+      );
     }
 
     return response;
