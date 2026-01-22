@@ -123,6 +123,10 @@ class AIService:
                 # Process chunk and update token usage
                 chunk_content = processor.process_chunk(chunk)
                 
+                # Accumulate content for final processing
+                if chunk_content:
+                    processor.accumulate_content(chunk_content)
+                
                 if chunk_count % 10 == 0:
                     logger.info(f"Processed {chunk_count} chunks, accumulated {len(processor.accumulated_content)} characters")
 
@@ -328,6 +332,10 @@ Please create an updated presentation with approximately {slide_count} slides th
                 # Process chunk and update token usage
                 chunk_content = processor.process_chunk(chunk)
 
+                # Accumulate content for final processing
+                if chunk_content:
+                    processor.accumulate_content(chunk_content)
+                
                 if chunk_content:
                     # Extract and yield theme if not yet yielded
                     if not processor.theme_yielded:

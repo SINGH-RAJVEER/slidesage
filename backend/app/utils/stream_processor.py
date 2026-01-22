@@ -87,12 +87,12 @@ class StreamProcessor:
             return theme_match.group(1)
         return None
     
-    def extract_slides(self) -> List[Dict[str, Any]]:
+    def extract_slides(self) -> List[tuple[int, Dict[str, Any]]]:
         """
         Extract complete slide objects from accumulated content.
         
         Returns:
-            List of newly extracted slide dictionaries
+            List of tuples containing (index, slide_dict) for newly extracted slides
         """
         clean_content = self.get_clean_content()
         
@@ -147,11 +147,12 @@ class StreamProcessor:
                 # End of slides array
                 break
         
-        # Return only newly extracted slides
+        # Return only newly extracted slides with their indices
+        start_idx = self.slides_yielded
         new_slides = extracted_slides[self.slides_yielded:]
         self.slides_yielded = len(extracted_slides)
         
-        return new_slides
+        return [(start_idx + i, slide) for i, slide in enumerate(new_slides)]
     
     def extract_title_from_slide(self, slide: Dict[str, Any]) -> str | None:
         """
