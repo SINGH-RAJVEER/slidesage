@@ -1,20 +1,21 @@
+import { authClient } from "../../../lib/auth-client";
+
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export type User = {
-  id: number;
+  id: string;
   email: string;
   name: string;
-  profile_picture?: string;
+  image?: string;
   slide_tokens: number;
-  created_at?: string;
+  emailVerified: boolean;
+  createdAt?: string;
 };
 
 export type AuthResponse = {
   success: boolean;
   message?: string;
   user?: User;
-  access_token?: string;
-  refresh_token?: string;
   error?: string;
 };
 
@@ -24,7 +25,7 @@ export type LoginCredentials = {
 };
 
 export type RegisterCredentials = {
-  name?: string;
+  name: string;
   email: string;
   password: string;
 };
@@ -32,238 +33,144 @@ export type RegisterCredentials = {
 export type UpdateProfileData = {
   name?: string;
   email?: string;
-  password?: string;
-  profile_picture?: string;
+  image?: string;
 };
 
 class AuthService {
-  private getToken(): string | null {
-    return localStorage.getItem("access_token");
-  }
-
-  private getRefreshToken(): string | null {
-    return localStorage.getItem("refresh_token");
-  }
-
-  private setTokens(accessToken: string, refreshToken: string): void {
-    localStorage.setItem("access_token", accessToken);
-    localStorage.setItem("refresh_token", refreshToken);
-  }
-
-  private clearTokens(): void {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-  }
-
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(credentials),
-      });
+      const { data, error } = await authClient.signIn.email(credentials);
 
-      const data = await response.json();
-
-      // Handle new API error format: {error: {message: "..."}}
-      if (data.error) {
+      if (error) {
         return {
           success: false,
-          error:
-            typeof data.error === "object" ? data.error.message : data.error,
-        };
-      }
-
-      // Handle success response: {user: {...}, access_token: "...", refresh_token: "..."}
-      if (data.access_token && data.refresh_token) {
-        this.setTokens(data.access_token, data.refresh_token);
-        return {
-          success: true,
-          user: data.user,
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
+          error: error.message || "Login failed",
         };
       }
 
       return {
-        success: false,
-        error: "Invalid response from server",
+        success: true,
+        user: data?.user as User,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Network error",
+        error: error.message || "Login failed",
       };
     }
   }
 
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(credentials),
+      const { data, error } = await authClient.signUp.email({
+        email: credentials.email,
+        password: credentials.password,
+        name: credentials.name,
       });
 
-      const data = await response.json();
-
-      // Handle new API error format: {error: {message: "..."}}
-      if (data.error) {
+      if (error) {
         return {
           success: false,
-          error:
-            typeof data.error === "object" ? data.error.message : data.error,
-        };
-      }
-
-      // Handle success response: {user: {...}, access_token: "...", refresh_token: "..."}
-      if (data.access_token && data.refresh_token) {
-        this.setTokens(data.access_token, data.refresh_token);
-        return {
-          success: true,
-          user: data.user,
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
+          error: error.message || "Registration failed",
         };
       }
 
       return {
-        success: false,
-        error: "Invalid response from server",
+        success: true,
+        user: data?.user as User,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Network error",
-      };
-    }
-  }
-
-  async googleLogin(token: string): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_URL}/api/auth/google`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ credential: token }),
-      });
-
-      const data = await response.json();
-
-      // Handle new API error format: {error: {message: "..."}}
-      if (data.error) {
-        return {
-          success: false,
-          error:
-            typeof data.error === "object" ? data.error.message : data.error,
-        };
-      }
-
-      // Handle success response: {user: {...}, access_token: "...", refresh_token: "..."}
-      if (data.access_token && data.refresh_token) {
-        this.setTokens(data.access_token, data.refresh_token);
-        return {
-          success: true,
-          user: data.user,
-          access_token: data.access_token,
-          refresh_token: data.refresh_token,
-        };
-      }
-
-      return {
-        success: false,
-        error: "Invalid response from server",
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Network error",
+        error: error.message || "Registration failed",
       };
     }
   }
 
   async logout(): Promise<void> {
-    const token = this.getToken();
-
-    if (token) {
-      try {
-        await fetch(`${API_URL}/api/auth/logout`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      } catch (error) {
-        // Ignore errors on logout
-        console.error("Logout error:", error);
-      }
-    }
-
-    this.clearTokens();
+    await authClient.signOut();
   }
 
   async getCurrentUser(): Promise<User | null> {
-    const token = this.getToken();
-
-    if (!token) {
-      return null;
-    }
-
     try {
-      const response = await fetch(`${API_URL}/api/auth/me`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.status === 401) {
-        // Token expired, try to refresh
-        const refreshed = await this.refreshToken();
-        if (refreshed) {
-          return this.getCurrentUser(); // Retry with new token
-        }
-        return null;
-      }
-
-      // Handle 422 - invalid token format (e.g., old tokens with integer identity)
-      if (response.status === 422) {
-        this.clearTokens();
-        return null;
-      }
-
-      const data = await response.json();
-      // New API format: {user: {...}} on success, {error: {...}} on error
-      return data.user || null;
+      const { data } = await authClient.getSession();
+      return data?.user as User | null;
     } catch (error) {
-      console.error("Get current user error:", error);
       return null;
     }
   }
 
-  async refreshToken(): Promise<boolean> {
-    const refreshToken = this.getRefreshToken();
-
-    if (!refreshToken) {
-      return false;
-    }
-
+  async googleLogin(credential: string): Promise<AuthResponse> {
+    // Better Auth handles Google OAuth differently
+    // This would typically be done through a redirect flow
     try {
-      const response = await fetch(`${API_URL}/api/auth/refresh`, {
+      const response = await fetch(`${API_URL}/api/auth/callback/google`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${refreshToken}`,
         },
+        credentials: "include",
+        body: JSON.stringify({ credential }),
       });
 
+      const data = await response.json();
+
+      if (data.error) {
+        return {
+          success: false,
+          error: data.error.message || "Google login failed",
+        };
+      }
+
+      const user = await this.getCurrentUser();
+      return {
+        success: true,
+        user: user || undefined,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Google login failed",
+      };
+    }
+  }
+
+  async updateProfile(data: UpdateProfileData): Promise<AuthResponse> {
+    try {
+      // Better Auth doesn't have a built-in update profile
+      // We would need to implement this in the backend
+      const response = await fetch(`${API_URL}/api/auth/update-profile`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (result.error) {
+        return {
+          success: false,
+          error: result.error.message || "Update failed",
+        };
+      }
+
+      return {
+        success: true,
+        user: result.user,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message || "Update failed",
+      };
+    }
+  }
+}
+
+export const authService = new AuthService();
       // Handle errors - clear tokens for 422, 500, or other failures
       if (response.status === 422 || response.status === 500 || !response.ok) {
         console.warn("Invalid or expired refresh token, clearing tokens");

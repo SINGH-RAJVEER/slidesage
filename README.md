@@ -4,11 +4,27 @@ AI-assisted presentation generator that creates professional slides with rich co
 
 ---
 
+## 🎉 NEW: TypeScript Backend with Bun!
+
+SlideSage backend has been ported to **TypeScript with Bun runtime** for better performance and developer experience!
+
+**Quick Start:**
+
+```bash
+./setup-ts-backend.sh
+cd backend-ts && bun run dev
+```
+
+📖 **See [QUICKSTART_TS.md](./QUICKSTART_TS.md) for setup guide**  
+📖 **See [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for detailed migration info**
+
+---
+
 ## Overview
 
 SlideSage is a modern web application that leverages AI to generate complete presentations from simple text prompts. It features real-time streaming of generated content, support for data visualization charts, and multiple professional design templates.
 
-- **Backend:** Flask app with clean layered architecture (API, Services, Repositories, Models)
+- **Backend:** TypeScript + Bun + Hono with Drizzle ORM (or legacy Python/Flask)
 - **Frontend:** React (Vite + Bun) app with a modern UI built using Tailwind CSS and Shadcn UI
 - **Database:** PostgreSQL for storing user data and presentation history
 - **Build system:** Docker for containerization and Nix flakes for reproducible environments
@@ -39,7 +55,16 @@ SlideSage is a modern web application that leverages AI to generate complete pre
 
 ## Tech Stack
 
-### Backend
+### Backend (TypeScript - NEW!)
+
+- **Runtime:** Bun (fast JavaScript/TypeScript runtime)
+- **Framework:** Hono (Express-like web framework)
+- **Database:** PostgreSQL with Drizzle ORM (type-safe queries)
+- **AI/LLM:** OpenAI API compatible endpoints
+- **Auth:** Jose JWT + Google OAuth 2.0
+- **Benefits:** 3x faster startup, type-safe, lower memory usage
+
+### Backend (Python - Legacy)
 
 - **Framework:** Flask with application factory pattern
 - **Database:** PostgreSQL (SQLAlchemy ORM)
@@ -153,7 +178,6 @@ Copy `.env.example` to `.env` and fill with your credentials:
    ```
 
 2. **Access Application:**
-
    - Frontend: `http://localhost:5173`
    - Backend API: `http://localhost:5000`
    - PostgreSQL: `localhost:5432`

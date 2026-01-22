@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: slidesage-postgres
+    environment:
+      POSTGRES_USER: slidesage
+      POSTGRES_PASSWORD: slidesage
+      POSTGRES_DB: slidesage
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slidesage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend-ts
+      dockerfile: Dockerfile
+    image: slidesage-backend:latest
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgresql://slidesage:slidesage@postgres:5432/slidesage
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-secret-key-in-production}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - LITELLM_MODEL=${LITELLM_MODEL:-openai/gpt-4}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: slidesage-frontend:latest
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
