@@ -4,8 +4,12 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 export default defineConfig({
-  plugins: [react(), tsconfigPaths()],
-  css: {
-    transformer: "lightningcss",
-  },
+  plugins: [
+    react({
+      babel: {
+        plugins: [["babel-plugin-react-compiler", {}]],
+      },
+    }),
+    tsconfigPaths(),
+  ],
 });

@@ -38,7 +38,7 @@ export default function Header() {
           <img
             src="/icon.png"
             alt="SlideSage"
-            className="h-32 w-55 object-cover drop-shadow-2xl -my-8"
+            className="h-32 w-60 object-contain drop-shadow-2xl -my-8"
           />
         </div>
 
@@ -53,7 +53,7 @@ export default function Header() {
               <span className="text-sm font-medium text-white">
                 {(user as any).is_unlimited || user.slide_tokens === Infinity
                   ? "∞"
-                  : user.slide_tokens?.toFixed(1) ?? "0.0"}
+                  : (user.slide_tokens?.toFixed(1) ?? "0.0")}
               </span>
               <span className="text-xs text-white/60">points</span>
             </button>
