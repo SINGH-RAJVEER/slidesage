@@ -11,6 +11,13 @@ from app.schemas.presentations import (
     PresentationListSchema
 )
 from app.services.presentation_service import PresentationService
+from app.utils.api_helpers import (
+    get_current_user_id,
+    format_sse_message,
+    create_error_response,
+    cleanup_presentation_on_error,
+    map_error_to_status_code
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,37 +25,18 @@ presentations_bp = Blueprint('presentations', __name__, url_prefix='/api')
 presentation_service = PresentationService()
 
 
-def _get_current_user_id() -> int:
-    """Helper to get and convert current user ID from JWT"""
-    current_user_id = get_jwt_identity()
-    try:
-        return int(current_user_id) if isinstance(current_user_id, str) else current_user_id
-    except (ValueError, TypeError):
-        raise ValueError('Invalid token format')
-
-
 @presentations_bp.errorhandler(ValidationError)
 def handle_validation_error(e):
     """Handle marshmallow validation errors"""
-    return jsonify({'error': {'message': 'Validation failed', 'details': e.messages}}), 400
+    return create_error_response('Validation failed', 400, e.messages)
 
 
 @presentations_bp.errorhandler(ValueError)
 def handle_value_error(e):
     """Handle service layer value errors"""
     error_message = str(e)
-    
-    # Map specific errors to appropriate HTTP codes
-    if 'not found' in error_message.lower():
-        status_code = 404
-    elif 'unauthorized' in error_message.lower():
-        status_code = 403
-    elif 'insufficient tokens' in error_message.lower():
-        status_code = 402  # Payment Required
-    else:
-        status_code = 400
-    
-    return jsonify({'error': {'message': error_message}}), status_code
+    status_code = map_error_to_status_code(error_message)
+    return create_error_response(error_message, status_code)
 
 
 @presentations_bp.route('/generate-presentation-stream', methods=['POST'])
@@ -61,7 +49,7 @@ def generate_presentation_stream():
     # This is critical because current_app won't be available in the generator
     app = current_app._get_current_object()
     
-    user_id = _get_current_user_id()
+    user_id = get_current_user_id()
     
     # Validate and deserialize input
     schema = GeneratePresentationSchema()
@@ -152,42 +140,21 @@ def generate_presentation_stream():
                         db.session.commit()
                         logger.info(f"Saved presentation {presentation_id} with {len(all_slides)} slides")
                     
-                    yield f"event: saved\n"
-                    yield f"data: {json.dumps({'presentation_id': presentation_id, 'success': True})}\n\n"
+                    yield format_sse_message("saved", {'presentation_id': presentation_id, 'success': True})
                 else:
                     # No slides generated - delete the placeholder presentation
                     logger.error(f"No slides generated for presentation {presentation_id}")
-                    from app.models import Presentation, db
-                    pres = db.session.get(Presentation, presentation_id)
-                    if pres:
-                        db.session.delete(pres)
-                        db.session.commit()
-                    
-                    yield f"event: error\n"
-                    yield f"data: {json.dumps({'error': 'Failed to generate presentation content'})}\n\n"
+                    cleanup_presentation_on_error(presentation_id)
+                    yield format_sse_message("error", {'error': 'Failed to generate presentation content'})
                 
             except ValueError as e:
                 logger.error(f"Error during generation: {e}")
-                # Delete the placeholder presentation on error
-                from app.models import Presentation, db
-                pres = db.session.get(Presentation, presentation_id)
-                if pres:
-                    db.session.delete(pres)
-                    db.session.commit()
-                
-                yield f"event: error\n"
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                cleanup_presentation_on_error(presentation_id)
+                yield format_sse_message("error", {'error': str(e)})
             except Exception as e:
                 logger.error(f"Unexpected error during generation: {e}")
-                # Delete the placeholder presentation on error
-                from app.models import Presentation, db
-                pres = db.session.get(Presentation, presentation_id)
-                if pres:
-                    db.session.delete(pres)
-                    db.session.commit()
-                
-                yield f"event: error\n"
-                yield f"data: {json.dumps({'error': 'An unexpected error occurred'})}\n\n"
+                cleanup_presentation_on_error(presentation_id)
+                yield format_sse_message("error", {'error': 'An unexpected error occurred'})
     
     return Response(
         generate(),
@@ -204,7 +171,7 @@ def generate_presentation_stream():
 @jwt_required()
 def get_presentations():
     """Get all presentations for the current user"""
-    user_id = _get_current_user_id()
+    user_id = get_current_user_id()
     
     # Call service
     presentations = presentation_service.get_user_presentations(user_id)
@@ -230,7 +197,7 @@ def get_presentations():
 @jwt_required()
 def get_presentation(presentation_id):
     """Get a specific presentation with full slide data"""
-    user_id = _get_current_user_id()
+    user_id = get_current_user_id()
     
     # Call service
     presentation = presentation_service.get_presentation(presentation_id, user_id)
@@ -260,7 +227,7 @@ def get_presentation(presentation_id):
 @jwt_required()
 def delete_presentation(presentation_id):
     """Delete a specific presentation"""
-    user_id = _get_current_user_id()
+    user_id = get_current_user_id()
     
     # Call service
     presentation_service.delete_presentation(presentation_id, user_id)
@@ -272,7 +239,7 @@ def delete_presentation(presentation_id):
 @jwt_required()
 def cleanup_incomplete_presentations():
     """Delete all incomplete presentations (Generating...) for the current user"""
-    user_id = _get_current_user_id()
+    user_id = get_current_user_id()
     
     from app.models import Presentation, db
     
