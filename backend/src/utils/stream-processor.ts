@@ -1,140 +1,275 @@
-import type { Slide, StreamChunk } from '../types';
+/**
+ * Stream Processing Utilities
+ * Handles streaming content extraction and slide parsing
+ */
+
+export interface StreamChunk {
+  choices?: Array<{
+    delta?: {
+      content?: string;
+    };
+  }>;
+  usage?: {
+    total_tokens?: number;
+  };
+}
+
+export interface ExtractedSlide {
+  index: number;
+  slide: Record<string, any>;
+}
 
 export class StreamProcessor {
-  accumulatedContent = '';
-  slidesYielded = 0;
-  themeYielded = false;
-  titleExtracted: string | null = null;
-  totalTokensUsed = 0;
-  chunkCount = 0;
+  private accumulatedContent = '';
+  private slidesYielded = 0;
+  public themeYielded = false;
+  public titleExtracted: string | null = null;
+  private totalTokensUsed = 0;
+  private chunkCount = 0;
 
-  processChunk(chunk: StreamChunk): string {
+  /**
+   * Extract content from a streaming chunk.
+   */
+  processChunk(chunk: any): string {
     this.chunkCount++;
     let chunkContent = '';
 
-    // Extract content from chunk
-    if (chunk?.choices?.[0]?.delta?.content) {
-      chunkContent = chunk.choices[0].delta.content;
+    // Try to extract usage from final chunk
+    if (typeof chunk === 'object' && chunk !== null) {
+      if (chunk.usage) {
+        this.totalTokensUsed = chunk.usage.total_tokens || 0;
+        console.info(`Token usage detected: ${this.totalTokensUsed}`);
+      }
+
+      const choices = chunk.choices || [];
+      if (choices.length > 0) {
+        const delta = choices[0].delta || {};
+        chunkContent = delta.content || '';
+      }
+    } else {
+      try {
+        // Check for usage in the chunk object
+        if (chunk?.usage) {
+          this.totalTokensUsed = chunk.usage.total_tokens || 0;
+          console.info(`Token usage detected: ${this.totalTokensUsed}`);
+        }
+
+        if (chunk?.choices?.[0]?.delta?.content) {
+          chunkContent = chunk.choices[0].delta.content;
+        }
+      } catch (e) {
+        console.warn('Error extracting chunk content:', e);
+      }
     }
 
-    // Extract usage from final chunk
-    if (chunk?.usage?.total_tokens) {
-      this.totalTokensUsed = chunk.usage.total_tokens;
-      console.log(`Token usage detected: ${this.totalTokensUsed}`);
+    if (this.chunkCount % 10 === 0) {
+      console.info(
+        `Processed ${this.chunkCount} chunks, accumulated ${this.accumulatedContent.length} characters`
+      );
     }
 
     return chunkContent;
   }
 
+  /**
+   * Add chunk content to accumulated content
+   */
   accumulateContent(chunkContent: string): void {
     this.accumulatedContent += chunkContent;
   }
 
+  /**
+   * Get content with markdown code blocks removed
+   */
   getCleanContent(): string {
-    let clean = this.accumulatedContent.trim();
-    if (clean.startsWith('```json')) {
-      clean = clean
-        .replace(/```json/g, '')
-        .replace(/```/g, '')
-        .trim();
-    } else if (clean.startsWith('```')) {
-      clean = clean.replace(/```/g, '').trim();
+    let cleanContent = this.accumulatedContent.trim();
+
+    if (cleanContent.startsWith('```json')) {
+      cleanContent = cleanContent.replace('```json', '').replace(/```$/, '').trim();
+    } else if (cleanContent.startsWith('```')) {
+      cleanContent = cleanContent.replace(/^```/, '').replace(/```$/, '').trim();
     }
-    return clean;
+
+    return cleanContent;
   }
 
+  /**
+   * Try to extract theme from accumulated content
+   */
   extractTheme(): string | null {
-    if (this.themeYielded) return null;
+    if (this.themeYielded) {
+      return null;
+    }
 
-    const clean = this.getCleanContent();
-    const themeMatch = clean.match(/"theme"\s*:\s*"([^"]*)"/);
+    const cleanContent = this.getCleanContent();
+    const themeMatch = cleanContent.match(/"theme"\s*:\s*"([^"]*)"/);
+
     if (themeMatch) {
       this.themeYielded = true;
       return themeMatch[1];
     }
+
     return null;
   }
 
-  extractSlides(): Array<[number, Slide]> {
-    const clean = this.getCleanContent();
-    const newSlides: Array<[number, Slide]> = [];
+  /**
+   * Extract complete slide objects from accumulated content.
+   * Returns list of tuples containing (index, slide_dict) for newly extracted slides
+   */
+  extractSlides(): ExtractedSlide[] {
+    const cleanContent = this.getCleanContent();
 
-    try {
-      // Try to find complete slide objects
-      const slidesMatch = clean.match(/"slides"\s*:\s*\[(.*)\]/s);
-      if (!slidesMatch) return newSlides;
+    // Look for complete slide objects in the slides array
+    const slidesPattern = /"slides"\s*:\s*\[/;
+    const slidesMatch = cleanContent.match(slidesPattern);
 
-      const slidesContent = slidesMatch[1];
-      const slideObjects = this.parseSlideObjects(slidesContent);
-
-      // Return only new slides that haven't been yielded yet
-      for (let i = this.slidesYielded; i < slideObjects.length; i++) {
-        newSlides.push([i, slideObjects[i]]);
-        this.slidesYielded++;
-      }
-    } catch (error) {
-      // Parsing failed, no new slides to yield
+    if (!slidesMatch) {
+      return [];
     }
 
-    return newSlides;
-  }
+    // Find all complete slide objects
+    const slidesStart = slidesMatch.index! + slidesMatch[0].length;
+    const remaining = cleanContent.slice(slidesStart);
 
-  private parseSlideObjects(content: string): Slide[] {
-    const slides: Slide[] = [];
-    let depth = 0;
-    let currentSlide = '';
+    // Parse complete slide objects
+    let bracketCount = 0;
+    let slideStart = -1;
     let inString = false;
     let escapeNext = false;
 
-    for (let i = 0; i < content.length; i++) {
-      const char = content[i];
+    const extractedSlides: Record<string, any>[] = [];
+
+    for (let i = 0; i < remaining.length; i++) {
+      const char = remaining[i];
 
       if (escapeNext) {
-        currentSlide += char;
         escapeNext = false;
         continue;
       }
-
       if (char === '\\') {
         escapeNext = true;
-        currentSlide += char;
+        continue;
+      }
+      if (char === '"' && !escapeNext) {
+        inString = !inString;
+        continue;
+      }
+      if (inString) {
         continue;
       }
 
-      if (char === '"') {
-        inString = !inString;
+      if (char === '{') {
+        if (bracketCount === 0) {
+          slideStart = i;
+        }
+        bracketCount++;
+      } else if (char === '}') {
+        bracketCount--;
+        if (bracketCount === 0 && slideStart >= 0) {
+          // Found a complete slide object
+          const slideJson = remaining.slice(slideStart, i + 1);
+          try {
+            const slideObj = JSON.parse(slideJson);
+            extractedSlides.push(slideObj);
+          } catch (e) {
+            // Invalid JSON, skip
+          }
+          slideStart = -1;
+        }
+      } else if (char === ']' && bracketCount === 0) {
+        // End of slides array
+        break;
       }
+    }
 
-      if (!inString) {
-        if (char === '{') depth++;
-        if (char === '}') depth--;
-      }
+    // Return only newly extracted slides with their indices
+    const startIdx = this.slidesYielded;
+    const newSlides = extractedSlides.slice(this.slidesYielded);
+    this.slidesYielded = extractedSlides.length;
 
-      currentSlide += char;
+    return newSlides.map((slide, i) => ({
+      index: startIdx + i,
+      slide,
+    }));
+  }
 
-      if (!inString && depth === 0 && char === '}') {
-        try {
-          const slide = JSON.parse(currentSlide.trim());
-          slides.push(slide);
-          currentSlide = '';
-        } catch (error) {
-          // Failed to parse, keep accumulating
+  /**
+   * Extract title from a slide.
+   */
+  extractTitleFromSlide(slide: Record<string, any>): string | null {
+    if (this.titleExtracted) {
+      return this.titleExtracted;
+    }
+
+    if (slide.title && typeof slide.title === 'string') {
+      this.titleExtracted = slide.title;
+    } else if (slide.html && typeof slide.html === 'string') {
+      const html = slide.html;
+
+      // Try to find title with id="slide-title"
+      const titleMatch = html.match(/<h[12][^>]*id=["']slide-title["'][^>]*>([^<]+)<\/h[12]>/);
+      if (titleMatch) {
+        this.titleExtracted = titleMatch[1].trim();
+      } else {
+        // Fallback to any h1/h2
+        const headerMatch = html.match(/<h[12][^>]*>([^<]+)<\/h[12]>/);
+        if (headerMatch) {
+          this.titleExtracted = headerMatch[1].trim();
         }
       }
     }
 
-    return slides;
+    return this.titleExtracted;
   }
 
-  extractTitleFromSlide(slide: Slide): string | null {
-    if (!slide?.html) return null;
+  /**
+   * Clean the final accumulated content, removing markdown code blocks.
+   */
+  cleanFinalContent(): string {
+    let cleanContent = this.accumulatedContent.trim();
 
-    // Extract title from HTML
-    const titleMatch = slide.html.match(/<h[12][^>]*id="slide-title"[^>]*>(.*?)<\/h[12]>/i);
-    if (titleMatch) {
-      return titleMatch[1].replace(/<[^>]*>/g, '').trim();
+    if (cleanContent.startsWith('```json')) {
+      cleanContent = cleanContent.replace('```json', '').trim();
+      if (cleanContent.endsWith('```')) {
+        cleanContent = cleanContent.replace(/```$/, '').trim();
+      }
+    } else if (cleanContent.startsWith('```')) {
+      cleanContent = cleanContent.replace(/^```/, '').trim();
+      if (cleanContent.endsWith('```')) {
+        cleanContent = cleanContent.replace(/```$/, '').trim();
+      }
     }
 
-    return null;
+    return cleanContent;
+  }
+
+  // Getters for accessing internal state
+  get totalTokens(): number {
+    return this.totalTokensUsed;
+  }
+
+  get processedChunks(): number {
+    return this.chunkCount;
+  }
+
+  get extractedTitle(): string | null {
+    return this.titleExtracted;
+  }
+
+  get slidesProcessed(): number {
+    return this.slidesYielded;
+  }
+
+  // Public accessors for AI service
+  get currentSlidesYielded(): number {
+    return this.slidesYielded;
+  }
+
+  set currentSlidesYielded(value: number) {
+    this.slidesYielded = value;
+  }
+
+  get currentTotalTokensUsed(): number {
+    return this.totalTokensUsed;
   }
 }

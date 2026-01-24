@@ -1,6 +1,7 @@
 import type { LiteLLMMessage, PresentationStreamEvent, Slide } from '../types';
+import { JSONRecoveryError, recoverJson } from '../utils/json-recovery';
 import { StreamProcessor } from '../utils/stream-processor';
-import { buildGenerationPrompt } from './ai-prompts';
+import { buildGenerationPrompt, buildIterationPrompt } from './ai-prompts';
 
 // Using dynamic import for litellm compatibility
 const completion: unknown = null;
@@ -161,7 +162,16 @@ export class AIService {
       }
 
       try {
-        const parsedContent = JSON.parse(cleanContent);
+        let parsedContent;
+        try {
+          parsedContent = JSON.parse(cleanContent);
+        } catch (jsonError) {
+          console.warn('Initial JSON parse failed, attempting recovery...');
+          const recoveryResult = recoverJson(cleanContent, jsonError as Error);
+          parsedContent = recoveryResult.content;
+          console.log(`JSON recovery successful using ${recoveryResult.strategy} strategy`);
+        }
+
         console.log(
           `Successfully parsed JSON response with ${parsedContent.slides?.length || 0} slides`
         );
@@ -191,9 +201,9 @@ export class AIService {
         if (parsedContent.slides) {
           parsedContent.totalSlides = parsedContent.slides.length;
         }
-        parsedContent.tokens_used = processor.totalTokensUsed;
+        parsedContent.tokens_used = processor.currentTotalTokensUsed;
 
-        console.log(`Generation completed. Total tokens used: ${processor.totalTokensUsed}`);
+        console.log(`Generation completed. Total tokens used: ${processor.currentTotalTokensUsed}`);
 
         // Yield completion event
         yield {
@@ -201,11 +211,18 @@ export class AIService {
           data: parsedContent,
         };
       } catch (error) {
-        console.error('JSON parsing error:', error);
-        yield {
-          event: 'error',
-          data: { error: 'Failed to parse AI response' },
-        };
+        console.error('JSON parsing and recovery failed:', error);
+        if (error instanceof JSONRecoveryError) {
+          yield {
+            event: 'error',
+            data: { error: 'AI response could not be recovered. Please try again.' },
+          };
+        } else {
+          yield {
+            event: 'error',
+            data: { error: 'Failed to parse AI response' },
+          };
+        }
       }
     } catch (error) {
       console.error('Error during generation:', error);
@@ -266,5 +283,184 @@ export class AIService {
     }
 
     return response;
+  }
+
+  /**
+   * Generate presentation iteration based on user feedback
+   */
+  async *iteratePresentationStream(
+    currentSlides: Slide[],
+    feedback: string,
+    detailLevel = 'balanced',
+    tonality = 'professional'
+  ): AsyncGenerator<PresentationStreamEvent, void, unknown> {
+    console.log(`Starting presentation iteration with feedback: ${feedback.substring(0, 100)}...`);
+
+    try {
+      const systemPrompt = buildIterationPrompt(currentSlides, feedback, detailLevel, tonality);
+
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: `Apply the following changes to the presentation: ${feedback}`,
+        },
+      ];
+
+      const model = process.env.LITELLM_MODEL || 'openai/gpt-4';
+
+      // Call LiteLLM API via Bun's fetch
+      const response = await this.callLiteLLMStreaming(model, messages);
+
+      const processor = new StreamProcessor();
+
+      // Yield initial event
+      yield { event: 'start', data: { status: 'iterating' } };
+
+      let chunkCount = 0;
+
+      // Process streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              chunkCount++;
+
+              const chunkContent = processor.processChunk(parsed);
+              if (chunkContent) {
+                processor.accumulateContent(chunkContent);
+              }
+
+              // Extract and yield theme if not yet yielded
+              if (!processor.themeYielded) {
+                const theme = processor.extractTheme();
+                if (theme) {
+                  yield { event: 'theme', data: { theme } };
+                }
+              }
+
+              // Extract and yield any new complete slides
+              const newSlides = processor.extractSlides();
+              for (const [idx, slide] of newSlides) {
+                const processedSlide = this.processSlide(slide, idx);
+                if (processedSlide) {
+                  yield {
+                    event: 'slide',
+                    data: {
+                      slide: processedSlide,
+                      index: idx,
+                      title: processor.titleExtracted,
+                    },
+                  };
+                }
+              }
+            } catch (error) {
+              // Skip invalid JSON chunks
+            }
+          }
+        }
+      }
+
+      // Final processing
+      console.log(`Iteration streaming complete. Total chunks: ${chunkCount}`);
+
+      const cleanContent = processor.getCleanContent();
+      if (!cleanContent) {
+        console.error('No content received from AI model during iteration!');
+        yield {
+          event: 'error',
+          data: {
+            error: 'No response received from AI model during iteration.',
+          },
+        };
+        return;
+      }
+
+      try {
+        let parsedContent;
+        try {
+          parsedContent = JSON.parse(cleanContent);
+        } catch (jsonError) {
+          console.warn('Initial JSON parse failed during iteration, attempting recovery...');
+          const recoveryResult = recoverJson(cleanContent, jsonError as Error);
+          parsedContent = recoveryResult.content;
+          console.log(`JSON recovery successful using ${recoveryResult.strategy} strategy`);
+        }
+
+        console.log(
+          `Successfully parsed iteration JSON response with ${parsedContent.slides?.length || 0} slides`
+        );
+
+        // Process any remaining slides
+        if (parsedContent.slides) {
+          for (let idx = processor.slidesYielded; idx < parsedContent.slides.length; idx++) {
+            const slide = parsedContent.slides[idx];
+            const processedSlide = this.processSlide(slide, idx);
+            if (processedSlide) {
+              processor.slidesYielded++;
+              yield {
+                event: 'slide',
+                data: {
+                  slide: processedSlide,
+                  index: idx,
+                  title: processor.titleExtracted,
+                },
+              };
+            }
+          }
+        }
+
+        // Add metadata
+        parsedContent.title = parsedContent.title || 'Updated Presentation';
+        if (parsedContent.slides) {
+          parsedContent.totalSlides = parsedContent.slides.length;
+        }
+        parsedContent.tokens_used = processor.totalTokensUsed;
+
+        console.log(`Iteration completed. Total tokens used: ${processor.totalTokensUsed}`);
+
+        // Yield completion event
+        yield {
+          event: 'complete',
+          data: parsedContent,
+        };
+      } catch (error) {
+        console.error('JSON parsing and recovery failed during iteration:', error);
+        if (error instanceof JSONRecoveryError) {
+          yield {
+            event: 'error',
+            data: { error: 'AI iteration response could not be recovered. Please try again.' },
+          };
+        } else {
+          yield {
+            event: 'error',
+            data: { error: 'Failed to parse AI iteration response' },
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error during iteration:', error);
+      yield {
+        event: 'error',
+        data: { error: `An error occurred during iteration: ${error}` },
+      };
+    }
   }
 }

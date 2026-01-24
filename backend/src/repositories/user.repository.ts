@@ -1,87 +1,247 @@
-import bcrypt from 'bcryptjs';
-import { and, eq, isNotNull } from 'drizzle-orm';
+/**
+ * User Repository
+ * Handles user data operations including token management
+ */
+
+import { eq } from 'drizzle-orm';
 import { db } from '../db';
-import { type User, accounts, users } from '../db/schema';
+import { type NewUser, type User, users } from '../db/schema';
+import { TokenCalculator } from '../services/token-calculator';
 
 export class UserRepository {
-  async findById(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+  /**
+   * Find user by ID
+   */
+  static async findById(id: string): Promise<User | null> {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0] || null;
   }
 
-  async findByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+  /**
+   * Find user by email
+   */
+  static async findByEmail(email: string): Promise<User | null> {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0] || null;
   }
 
-  async findByName(name: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.name, name));
-    return user;
+  /**
+   * Create a new user
+   */
+  static async create(userData: NewUser): Promise<User> {
+    const result = await db.insert(users).values(userData).returning();
+    return result[0];
   }
 
-  async deductTokens(userId: string, amount: number): Promise<void> {
+  /**
+   * Update user fields
+   */
+  static async update(id: string, updates: Partial<User>): Promise<User> {
+    const result = await db
+      .update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+
+    if (!result[0]) {
+      throw new Error('User not found');
+    }
+
+    return result[0];
+  }
+
+  /**
+   * Deduct tokens from user account
+   */
+  static async deductTokens(userId: string, tokens: number): Promise<User> {
     const user = await this.findById(userId);
+
     if (!user) {
       throw new Error('User not found');
     }
 
-    if (!user.isUnlimited && user.slideTokens < amount) {
+    // Skip deduction for unlimited users
+    if (user.isUnlimited) {
+      return user;
+    }
+
+    if (user.slideTokens < tokens) {
       throw new Error('Insufficient tokens');
     }
 
-    if (!user.isUnlimited) {
-      await db
-        .update(users)
-        .set({
-          slideTokens: user.slideTokens - amount,
-        })
-        .where(eq(users.id, userId));
-    }
+    return await this.update(userId, {
+      slideTokens: user.slideTokens - tokens,
+    });
   }
 
-  async awardDailyLoginBonus(userId: string): Promise<void> {
+  /**
+   * Add tokens to user account
+   */
+  static async addTokens(userId: string, tokens: number): Promise<User> {
     const user = await this.findById(userId);
+
     if (!user) {
       throw new Error('User not found');
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    return await this.update(userId, {
+      slideTokens: user.slideTokens + tokens,
+    });
+  }
 
-    if (!user.lastLoginDate || user.lastLoginDate.toISOString().split('T')[0] !== today) {
-      await db
-        .update(users)
-        .set({
-          lastLoginDate: new Date(today),
-          slideTokens: user.slideTokens + 10,
-        })
-        .where(eq(users.id, userId));
+  /**
+   * Check if user has sufficient tokens for generation
+   */
+  static async hasSufficientTokens(
+    userId: string,
+    estimatedTokens: number
+  ): Promise<{ sufficient: boolean; user: User; shortfall?: number }> {
+    const user = await this.findById(userId);
+
+    if (!user) {
+      throw new Error('User not found');
     }
+
+    const validation = TokenCalculator.validateSufficientTokens(
+      user.slideTokens,
+      estimatedTokens,
+      user.isUnlimited
+    );
+
+    return {
+      sufficient: validation.sufficient,
+      user,
+      shortfall: validation.shortfall,
+    };
   }
 
-  async update(userId: string, data: Partial<User>): Promise<User | undefined> {
-    const [updatedUser] = await db
-      .update(users)
-      .set({ ...data, updatedAt: new Date() })
-      .where(eq(users.id, userId))
-      .returning();
-    return updatedUser;
+  /**
+   * Award daily login bonus if eligible
+   */
+  static async awardDailyLoginBonus(userId: string): Promise<{ awarded: boolean; user: User }> {
+    const user = await this.findById(userId);
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of day
+
+    // Check if user has already received bonus today
+    if (user.lastLoginDate && user.lastLoginDate.getTime() === today.getTime()) {
+      return { awarded: false, user };
+    }
+
+    // Award daily bonus
+    const bonus = TokenCalculator.getDailyLoginBonus();
+    const updatedUser = await this.update(userId, {
+      slideTokens: user.slideTokens + bonus,
+      lastLoginDate: today,
+    });
+
+    return { awarded: true, user: updatedUser };
   }
 
-  async verifyPassword(user: User, password: string): Promise<boolean> {
-    const [account] = await db
-      .select()
-      .from(accounts)
-      .where(and(eq(accounts.userId, user.id), isNotNull(accounts.password)));
-
-    if (!account || !account.password) return false;
-    return await bcrypt.compare(password, account.password);
+  /**
+   * Grant unlimited tokens to a user (admin function)
+   */
+  static async grantUnlimitedTokens(userId: string): Promise<User> {
+    return await this.update(userId, {
+      isUnlimited: true,
+      slideTokens: Number.POSITIVE_INFINITY, // Symbolic value
+    });
   }
 
-  async updatePassword(userId: string, newPassword: string): Promise<void> {
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await db
-      .update(accounts)
-      .set({ password: hashedPassword })
-      .where(and(eq(accounts.userId, userId), isNotNull(accounts.password)));
+  /**
+   * Revoke unlimited tokens from a user (admin function)
+   */
+  static async revokeUnlimitedTokens(userId: string, newTokenAmount = 50.0): Promise<User> {
+    return await this.update(userId, {
+      isUnlimited: false,
+      slideTokens: newTokenAmount,
+    });
+  }
+
+  /**
+   * Get all unlimited users (admin function)
+   */
+  static async getUnlimitedUsers(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.isUnlimited, true));
+  }
+
+  /**
+   * Get user token balance with display formatting
+   */
+  static async getTokenBalance(userId: string): Promise<{
+    user: User;
+    displayBalance: string;
+    isUnlimited: boolean;
+  }> {
+    const user = await this.findById(userId);
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return {
+      user,
+      displayBalance: user.isUnlimited ? '∞' : user.slideTokens.toFixed(1),
+      isUnlimited: user.isUnlimited,
+    };
+  }
+
+  /**
+   * Refund tokens for failed generation
+   */
+  static async refundTokens(
+    userId: string,
+    estimatedTokens: number,
+    actualTokensUsed = 0
+  ): Promise<User> {
+    const user = await this.findById(userId);
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Skip refund for unlimited users
+    if (user.isUnlimited) {
+      return user;
+    }
+
+    const refundAmount = TokenCalculator.calculateRefund(estimatedTokens, actualTokensUsed);
+
+    if (refundAmount > 0) {
+      return await this.addTokens(userId, refundAmount);
+    }
+
+    return user;
+  }
+
+  /**
+   * Get user statistics
+   */
+  static async getUserStats(userId: string): Promise<{
+    user: User;
+    totalPresentations: number;
+    tokensUsedThisMonth: number;
+    averageTokensPerPresentation: number;
+  }> {
+    const user = await this.findById(userId);
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // TODO: Implement presentation counting and token usage tracking
+    // This would require additional database queries or tracking tables
+
+    return {
+      user,
+      totalPresentations: 0, // Placeholder
+      tokensUsedThisMonth: 0, // Placeholder
+      averageTokensPerPresentation: 0, // Placeholder
+    };
   }
 }

@@ -58,11 +58,9 @@ const TONALITY_GUIDE: Record<string, { description: string; example: string }> =
   },
 };
 
-export function buildGenerationPrompt(detailLevel = 'balanced', tonality = 'professional'): string {
-  const detailConfig = DETAIL_LEVEL_GUIDE[detailLevel] || DETAIL_LEVEL_GUIDE.balanced;
-  const tonalityConfig = TONALITY_GUIDE[tonality] || TONALITY_GUIDE.professional;
-
-  return `You are an expert presentation designer. Create comprehensive presentations with structured HTML, standardized IDs, data tables, and appropriate content.
+// Base system prompt template for presentation generation
+const GENERATION_SYSTEM_PROMPT_TEMPLATE = `
+You are an expert presentation designer. Create comprehensive presentations with structured HTML, standardized IDs, data tables, and appropriate content.
 
 IMPORTANT: Analyze the content depth and create the APPROPRIATE number of slides (as many slides as requested by the user).
 
@@ -81,33 +79,288 @@ CRITICAL HTML STRUCTURE REQUIREMENTS:
 - This wrapper is essential for template styling to work properly
 - Never generate HTML without the slide-content wrapper
 
-DETAIL LEVEL: ${detailConfig.description}
-Example: ${detailConfig.example}
+STANDARDIZED HTML ID CONVENTIONS (MUST USE THESE EXACT IDs):
+- id="slide-content" - Main content area (div) - REQUIRED: ALL slides MUST start with <div id="slide-content">
+- id="slide-title" - Main slide title (h1/h2)
+- id="slide-subtitle" - Subtitle or secondary heading (h2/h3)
+- id="slide-list" - Lists (ul/ol)
+- id="slide-table" - Data tables (table)
+- id="slide-image" - Images (img)
+- id="slide-quote" - Quotes or emphasis (blockquote/div)
+- id="slide-description" - Descriptions or captions (p)
+- id="slide-header" - Header section (header/div)
+- id="slide-footer" - Footer section (footer/div)
+- id="slide-highlight" - Highlighted content (div/span)
+- id="slide-stats" - Statistical data (div)
+- id="slide-keypoint" - Key points (div)
+- class="two-column" - Use on a div to create a two-column layout
+- class="column" - Use inside .two-column for each column
 
-TONALITY: ${tonalityConfig.description}
-Example: ${tonalityConfig.example}
+SLIDE LAYOUT EXAMPLES:
 
-Response must be valid JSON with this structure:
+1. Title Slide:
+<div id="slide-content" class="layout-title">
+    <h1 id="slide-title">Presentation Title</h1>
+    <h2 id="slide-subtitle">Subtitle or Presenter Name</h2>
+</div>
+
+2. Standard Content Slide:
+<div id="slide-content" class="layout-content">
+    <h2 id="slide-title">Slide Title</h2>
+    <ul id="slide-list">
+        <li>Point 1</li>
+        <li>Point 2</li>
+    </ul>
+</div>
+
+3. Two-Column Slide (Comparison/Pros & Cons):
+<div id="slide-content" class="layout-two-col">
+    <h2 id="slide-title">Comparison Title</h2>
+    <div class="two-column">
+        <div class="column">
+            <h3 id="slide-subtitle">Left Side</h3>
+            <ul id="slide-list"><li>Item A</li></ul>
+        </div>
+        <div class="column">
+            <h3 id="slide-subtitle">Right Side</h3>
+            <ul id="slide-list"><li>Item B</li></ul>
+        </div>
+    </div>
+</div>
+
+4. Highlight/Quote Slide:
+<div id="slide-content" class="layout-highlight">
+    <blockquote id="slide-quote">"Big impactful quote here"</blockquote>
+    <p id="slide-description">- Author Name</p>
+</div>
+
+5. Image & Content Slide:
+<div id="slide-content" class="layout-image-right">
+    <h2 id="slide-title">Visual Concept</h2>
+    <div class="two-column">
+        <div class="column">
+            <ul id="slide-list">
+                <li>Key visual point 1</li>
+                <li>Key visual point 2</li>
+            </ul>
+        </div>
+        <div class="column">
+            <img id="slide-image" src="https://placehold.co/600x400/e2e8f0/1e293b?text=Visual+Placeholder" alt="Descriptive alt text">
+            <p id="slide-description">Image caption or credit</p>
+        </div>
+    </div>
+</div>
+
+HTML TABLE GUIDELINES:
+- Use proper HTML table structure: <table><thead><tbody><tr><th><td>
+- Add id="slide-table" to all tables
+- Include meaningful headers in <thead>
+- Use <tbody> for data rows
+- Add class="data-table" for styling hooks
+- Include tables for: comparisons, statistics, schedules, specifications, etc.
+
+IMAGE GUIDELINES:
+- Use <img id="slide-image"> for all images
+- Use "https://placehold.co/600x400/e2e8f0/1e293b?text=Topic+Placeholder" as the src, replacing "Topic+Placeholder" with relevant keywords
+- Always include descriptive alt text
+- Place images in a column for side-by-side layouts or centered for full-width
+
+Required JSON structure (MUST match exactly):
 {
-  "title": "Presentation Title",
-  "theme": "professional/creative/minimal/corporate",
+  "theme": "string", 
   "slides": [
     {
-      "id": "slide-1",
-      "type": "title/content/chart",
-      "html": "<div id=\\"slide-content\\">...</div>"
+      "id": "string",
+      "type": "string",
+      "html": "string" (for regular slides)
+    },
+    {
+      "id": "string",
+      "type": "chart",
+      "chartConfig": {
+        "type": "bar|line|pie|doughnut|radar|polarArea",
+        "title": "string",
+        "description": "string",
+        "data": {
+          "labels": ["string"],
+          "datasets": [
+            {
+              "label": "string",
+              "data": [numbers],
+              "backgroundColor": ["string"] or "string",
+              "borderColor": ["string"] or "string",
+              "borderWidth": number
+            }
+          ]
+        },
+        "options": {}
+      }
     }
-  ]
-}`;
+  ],
+  "totalSlides": number
+}
+
+DETAIL LEVEL REQUIREMENT:
+{detail_description}
+Example: {detail_example}
+
+TONALITY REQUIREMENT:
+{tonality_description}
+Example: {tonality_example}
+
+Generate slides that are:
+- Well-structured with proper HTML and standardized IDs
+- VARY THE LAYOUTS: Use a mix of standard, two-column, highlight, and image-based slides to keep the presentation engaging.
+- Include relevant data tables using proper HTML structure
+- Include relevant data visualizations using charts
+- Include placeholder images where appropriate to break up text
+- Follow the specified detail level: {detail_level}
+- Match the specified tonality: {tonality}
+- Professional and clear with consistent ID usage
+- Data-driven where appropriate
+- Template-ready with standardized element IDs
+`;
+
+// System prompt template for presentation iteration
+const ITERATION_SYSTEM_PROMPT_TEMPLATE = `
+You are an expert presentation designer iterating on an existing presentation. Create comprehensive presentations with structured HTML, standardized IDs, data tables, and appropriate content.
+
+IMPORTANT: You are ITERATING on an existing presentation based on user feedback. The user will provide specific instructions on how to modify, enhance, or adjust the presentation.
+
+CRITICAL JSON FORMATTING RULES:
+1. The response MUST be a single, valid JSON object
+2. NO additional text, markdown, or code blocks before or after the JSON
+3. NO comments within the JSON
+4. ALL strings must be properly escaped and enclosed in double quotes
+5. NO trailing commas
+6. NO single quotes for strings
+7. ALL HTML content must be properly escaped within the JSON strings
+
+CRITICAL HTML STRUCTURE REQUIREMENTS:
+- EVERY slide's HTML content MUST start with <div id="slide-content">
+- ALL content must be wrapped inside the slide-content div
+- This wrapper is essential for template styling to work properly
+- Never generate HTML without the slide-content wrapper
+
+STANDARDIZED HTML ID CONVENTIONS (MUST USE THESE EXACT IDs):
+- id="slide-content" - Main content area (div) - REQUIRED: ALL slides MUST start with <div id="slide-content">
+- id="slide-title" - Main slide title (h1/h2)
+- id="slide-subtitle" - Subtitle or secondary heading (h2/h3)
+- id="slide-list" - Lists (ul/ol)
+- id="slide-table" - Data tables (table)
+- id="slide-image" - Images (img)
+- id="slide-quote" - Quotes or emphasis (blockquote/div)
+- id="slide-description" - Descriptions or captions (p)
+- id="slide-header" - Header section (header/div)
+- id="slide-footer" - Footer section (footer/div)
+- id="slide-highlight" - Highlighted content (div/span)
+- id="slide-stats" - Statistical data (div)
+- id="slide-keypoint" - Key points (div)
+
+HTML TABLE GUIDELINES:
+- Use proper HTML table structure: <table><thead><tbody><tr><th><td>
+- Add id="slide-table" to all tables
+- Include meaningful headers in <thead>
+- Use <tbody> for data rows
+- Add class="data-table" for styling hooks
+- Include tables for: comparisons, statistics, schedules, specifications, etc.
+
+Required JSON structure (MUST match exactly):
+{
+  "theme": "string", 
+  "slides": [
+    {
+      "id": "string",
+      "type": "string",
+      "html": "string" (for regular slides)
+    },
+    {
+      "id": "string",
+      "type": "chart",
+      "chartConfig": {
+        "type": "bar|line|pie|doughnut|radar|polarArea",
+        "title": "string",
+        "description": "string",
+        "data": {
+          "labels": ["string"],
+          "datasets": [
+            {
+              "label": "string",
+              "data": [numbers],
+              "backgroundColor": ["string"] or "string",
+              "borderColor": ["string"] or "string",
+              "borderWidth": number
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "totalSlides": number
+}
+
+DETAIL LEVEL REQUIREMENT:
+{detail_description}
+Example: {detail_example}
+
+TONALITY REQUIREMENT:
+{tonality_description}
+Example: {tonality_example}
+
+ITERATION INSTRUCTIONS:
+- Analyze the previous presentation content carefully
+- Apply the user's specific modifications, enhancements, or changes
+- Maintain consistency with the original theme unless instructed otherwise
+- Keep slides that are still relevant unless instructed to remove them
+- Add, modify, or remove slides based on the user's instructions
+- Ensure all slides follow the specified detail level: {detail_level}
+- Match the specified tonality: {tonality}
+`;
+
+export function buildGenerationPrompt(detailLevel = 'balanced', tonality = 'professional'): string {
+  const selectedDetail = DETAIL_LEVEL_GUIDE[detailLevel] || DETAIL_LEVEL_GUIDE.balanced;
+  const selectedTonality = TONALITY_GUIDE[tonality] || TONALITY_GUIDE.professional;
+
+  return GENERATION_SYSTEM_PROMPT_TEMPLATE.replace(
+    '{detail_description}',
+    selectedDetail.description
+  )
+    .replace('{detail_example}', selectedDetail.example)
+    .replace('{tonality_description}', selectedTonality.description)
+    .replace('{tonality_example}', selectedTonality.example)
+    .replace('{detail_level}', detailLevel)
+    .replace('{tonality}', tonality);
 }
 
 import type { Slide } from '../types';
 
-export function buildIterationPrompt(currentSlides: Slide[], feedback: string): string {
-  return `You are editing an existing presentation. Apply the following changes: ${feedback}
+export function buildIterationPrompt(
+  currentSlides: Slide[],
+  feedback: string,
+  detailLevel = 'balanced',
+  tonality = 'professional'
+): string {
+  const selectedDetail = DETAIL_LEVEL_GUIDE[detailLevel] || DETAIL_LEVEL_GUIDE.balanced;
+  const selectedTonality = TONALITY_GUIDE[tonality] || TONALITY_GUIDE.professional;
 
-Current presentation structure:
+  const basePrompt = ITERATION_SYSTEM_PROMPT_TEMPLATE.replace(
+    '{detail_description}',
+    selectedDetail.description
+  )
+    .replace('{detail_example}', selectedDetail.example)
+    .replace('{tonality_description}', selectedTonality.description)
+    .replace('{tonality_example}', selectedTonality.example)
+    .replace('{detail_level}', detailLevel)
+    .replace('{tonality}', tonality);
+
+  return `${basePrompt}
+
+USER FEEDBACK AND INSTRUCTIONS:
+${feedback}
+
+CURRENT PRESENTATION STRUCTURE:
 ${JSON.stringify(currentSlides, null, 2)}
 
-Respond with the complete updated presentation in the same JSON format.`;
+Apply the user's feedback to modify, enhance, or adjust this presentation while maintaining the required JSON structure and HTML standards.`;
 }
