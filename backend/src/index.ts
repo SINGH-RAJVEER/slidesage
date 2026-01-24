@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import authRoutes from './routes/auth.routes';
 import presentationRoutes from './routes/presentation.routes';
+import { env } from 'bun';
 
 const app = new Hono();
 
