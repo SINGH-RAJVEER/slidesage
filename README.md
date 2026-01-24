@@ -110,7 +110,7 @@ project-root/
 │   │   ├── pages/           # Top-level pages
 │   │   └── App.tsx
 │   └── package.json
-├── documentation/           # Project documentation
+├── docs/                    # Project documentation
 │   ├── API_CONTRACT.md      # Complete API documentation
 │   ├── CLEAN_CODE.md        # Clean code standards contract
 │   └── WORKFLOWS.md         # Development workflows
@@ -198,7 +198,7 @@ Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to `fr
 
 ## API Documentation
 
-Complete API documentation is available in `documentation/API_CONTRACT.md`.
+Complete API documentation is available in `docs/API_CONTRACT.md`.
 
 ### Authentication Endpoints (No auth required)
 
@@ -234,8 +234,9 @@ SlideSage follows clean architecture principles with clear separation of concern
 
 ### Key Principles
 
-- Follows clean code guidelines (see `documentation/CLEAN_CODE.md`)
-- All API endpoints documented in `documentation/API_CONTRACT.md`
+- Follows clean code guidelines (see `docs/CLEAN_CODE.md`)
+- All API endpoints documented in `docs/API_CONTRACT.md`
+- Type-safe development with TypeScript
 - Consistent error handling and validation
 - Separation of HTTP concerns from business logic
 
@@ -245,8 +246,8 @@ SlideSage follows clean architecture principles with clear separation of concern
 
 When contributing to this project:
 
-1. Follow the clean code guidelines in `documentation/CLEAN_CODE.md`
-2. Update `documentation/API_CONTRACT.md` when changing API contracts
+1. Follow the clean code guidelines in `docs/CLEAN_CODE.md`
+2. Update `docs/API_CONTRACT.md` when changing API contracts
 3. Run linters before committing:
    - Backend: `cd backend && bun run lint`
    - Frontend: `cd frontend && bun lint`

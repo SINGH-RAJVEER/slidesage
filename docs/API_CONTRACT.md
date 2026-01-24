@@ -508,7 +508,7 @@ Currently not implemented. Future consideration for production.
 
 ## CORS
 
-CORS is enabled for all origins in development. Configure allowed origins for production via Flask-CORS settings.
+CORS is enabled for all origins in development. Configure allowed origins for production via the `CORS_ORIGINS` environment variable (comma-separated list of origins).
 
 ---
 
