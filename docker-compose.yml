@@ -1,7 +1,9 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: slidesage-postgres
+  database:
+    build:
+      context: ./database
+    image: slide-sage:postgres
+    container_name: slide-sage-postgres
     environment:
       POSTGRES_USER: slidesage
       POSTGRES_PASSWORD: slidesage
@@ -19,21 +21,23 @@ services:
 
   backend:
     build:
-      context: ./backend-ts
+      context: ./backend
       dockerfile: Dockerfile
     image: slidesage-backend:latest
     ports:
       - "8000:8000"
     restart: unless-stopped
+    env_file:
+      - backend/.env
     environment:
-      - PORT=8000
+      - PORT=${PORT:-8000}
       - DATABASE_URL=postgresql://slidesage:slidesage@postgres:5432/slidesage
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-this-secret-key-in-production}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - LITELLM_MODEL=${LITELLM_MODEL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - LITELLM_MODEL=${LITELLM_MODEL:-openai/gpt-4}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
+      - CORS_ORIGINS=${CORS_ORIGINS}
     depends_on:
       postgres:
         condition: service_healthy
