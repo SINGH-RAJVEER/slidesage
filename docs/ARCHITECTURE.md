@@ -1,11 +1,31 @@
-# TypeScript Backend Architecture
+# SlideSage Monorepo Architecture
+
+## Monorepo Structure
 
 ```
+slide-sage/
 ┌─────────────────────────────────────────────────────────────┐
-│                     Client (Frontend)                        │
-│                  React + Vite + Tailwind                     │
+│                      Monorepo Root                         │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │              Turbo + Bun Workspaces                  │ │
+│  │  • Task orchestration                                 │ │
+│  │  • Shared dependencies                                 │ │
+│  │  • Build caching                                      │ │
+│  │  • Parallel execution                                 │ │
+│  └──────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
                             │
+         ┌──────────────────┴──────────────────┐
+         ▼                                   ▼
+┌──────────────────────┐           ┌──────────────────────┐
+│   Frontend App       │           │    Backend App       │
+│ (apps/frontend/)     │           │  (apps/backend/)     │
+│                      │           │                      │
+│ React + Vite +       │           │ TypeScript + Bun +   │
+│ Tailwind + Shadcn    │           │ Hono + Drizzle       │
+└──────────────────────┘           └──────────────────────┘
+         │                                   │
+         └──────────────────┬────────────────┘
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    Hono Web Framework                        │
@@ -238,16 +258,37 @@ PostgreSQL
 
 ## Technology Stack Visualization
 
+### Monorepo Infrastructure
+
 ```
 ┌─────────────────────────────────────────────┐
-│         Runtime: Bun (1.0+)                 │
-│  Fast JavaScript/TypeScript runtime         │
+│         Package Manager: Bun (1.0+)        │
+│  Fast JavaScript/TypeScript runtime +      │
+│  Native monorepo workspaces support        │
+└─────────────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────────┐
+│       Build System: Turbo                  │
+│  • Task orchestration                      │
+│  • Intelligent caching                     │
+│  • Parallel execution                      │
+│  • Dependency graph                        │
 └─────────────────────────────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────────────┐
 │      Language: TypeScript (5.0+)            │
 │  Type-safe, compiled to efficient JS        │
+└─────────────────────────────────────────────┘
+```
+
+### Backend Stack
+
+```
+┌─────────────────────────────────────────────┐
+│         Runtime: Bun (1.0+)                 │
+│  Fast JavaScript/TypeScript runtime         │
 └─────────────────────────────────────────────┘
               │
               ▼
@@ -269,7 +310,42 @@ PostgreSQL
                   Google OAuth verification
 ```
 
+### Frontend Stack
+
+```
+┌─────────────────────────────────────────────┐
+│      Framework: React (18+)                 │
+│  Component-based UI library                 │
+└─────────────────────────────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────────────┐
+│       Build Tool: Vite                      │
+│  Fast development server and bundler         │
+└─────────────────────────────────────────────┘
+              │
+              ├─► Styling: Tailwind CSS (3.x+)
+              │   Utility-first CSS framework
+              │
+              ├─► Components: Shadcn UI
+              │   High-quality component library
+              │
+              └─► Icons: Lucide React
+                  Beautiful icon library
+```
+
 ## Key Advantages
+
+### Monorepo Benefits
+
+1. **Shared Dependencies**: Common packages managed centrally
+2. **Atomic Commits**: Changes across frontend and backend in one PR
+3. **Unified Tooling**: Single configuration for linting, formatting
+4. **Code Sharing**: Easy sharing of types and utilities between apps
+5. **Simplified CI/CD**: Build and test everything together
+6. **Consistent Environment**: Same versions across all packages
+
+### Technical Benefits
 
 1. **Type Safety**: TypeScript catches errors at compile time
 2. **Performance**: Bun is 3x faster than Node.js
@@ -279,3 +355,5 @@ PostgreSQL
 6. **Better Concurrency**: Native async/await, no GIL
 7. **Lower Memory**: ~30MB vs ~80MB with Flask
 8. **Faster Startup**: 0.3s vs 2.1s with Flask
+9. **Turbo Caching**: Intelligent build caching for faster iterations
+10. **Parallel Builds**: Multiple apps built simultaneously

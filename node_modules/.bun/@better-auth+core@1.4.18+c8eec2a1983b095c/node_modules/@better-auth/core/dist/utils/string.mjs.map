@@ -1,0 +1,1 @@
+{"version":3,"file":"string.mjs","names":[],"sources":["../../src/utils/string.ts"],"sourcesContent":["export function capitalizeFirstLetter(str: string) {\n\treturn str.charAt(0).toUpperCase() + str.slice(1);\n}\n"],"mappings":";AAAA,SAAgB,sBAAsB,KAAa;AAClD,QAAO,IAAI,OAAO,EAAE,CAAC,aAAa,GAAG,IAAI,MAAM,EAAE"}

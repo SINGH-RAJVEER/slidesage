@@ -2,25 +2,26 @@
 
 AI-assisted presentation generator that creates professional slides with rich content, charts, and beautiful templates.
 
+This is a **monorepo** managed with Turbo and Bun, containing the frontend and backend applications.
+
 ---
 
 **Quick Start:**
 
 ```bash
-# Backend
-cd backend
+# Install dependencies (from root)
 bun install
-cp .env.example .env
-# Edit .env if needed (default PORT is 8000)
-bun run db:push
-bun run dev
 
-# Frontend (in a new terminal)
-cd frontend
-bun install
-cp .env.example .env
-# Edit .env to point VITE_API_URL to http://localhost:8000
+# Set up environment variables
+cp apps/backend/.env.example apps/backend/.env
+cp apps/frontend/.env.example apps/frontend/.env
+# Edit .env files with your configuration
+
+# Start all services in development mode
 bun dev
+
+# Or use Turbo directly
+turbo run dev
 ```
 
 ---
@@ -29,10 +30,14 @@ bun dev
 
 SlideSage is a modern web application that leverages AI to generate complete presentations from simple text prompts. It features real-time streaming of generated content, support for data visualization charts, and multiple professional design templates.
 
-- **Backend:** TypeScript + Bun + Hono with Drizzle ORM
-- **Frontend:** React (Vite + Bun) app with a modern UI built using Tailwind CSS and Shadcn UI
+This project is structured as a **monorepo** using:
+
+- **Package Manager:** Bun workspaces
+- **Build System:** Turbo for task orchestration and caching
+- **Backend:** TypeScript + Bun + Hono with Drizzle ORM (`apps/backend/`)
+- **Frontend:** React (Vite + Bun) app with Tailwind CSS and Shadcn UI (`apps/frontend/`)
 - **Database:** PostgreSQL for storing user data and presentation history
-- **Build system:** Docker for containerization
+- **Containerization:** Docker for deployment
 
 ---
 
@@ -83,37 +88,45 @@ SlideSage is a modern web application that leverages AI to generate complete pre
 
 ## Project Structure
 
+This is a monorepo managed with Turbo and Bun workspaces:
+
 ```
-project-root/
-├── backend/                  # Hono API
-│   ├── src/
-│   │   ├── db/              # Database schema and migrations
-│   │   ├── lib/             # Shared libraries
-│   │   ├── middleware/      # Hono middleware
-│   │   ├── repositories/    # Database access layer
-│   │   ├── routes/          # API route definitions
-│   │   ├── services/        # Business logic and AI integration
-│   │   ├── types/           # TypeScript type definitions
-│   │   ├── utils/           # Utility functions
-│   │   └── index.ts         # Application entry point
-│   ├── biome.json           # Linter/Formatter config
-│   ├── drizzle.config.ts    # ORM config
-│   └── package.json
-├── frontend/                 # React SPA
-│   ├── src/
-│   │   ├── features/        # Feature-based modules
-│   │   │   ├── auth/
-│   │   │   ├── presentations/
-│   │   │   └── profile/
-│   │   ├── components/      # Shared UI components
-│   │   ├── lib/             # Shared utilities
-│   │   ├── pages/           # Top-level pages
-│   │   └── App.tsx
-│   └── package.json
+slide-sage/
+├── apps/                     # Applications
+│   ├── backend/             # Hono API server
+│   │   ├── src/
+│   │   │   ├── db/          # Database schema and migrations
+│   │   │   ├── lib/         # Shared libraries
+│   │   │   ├── middleware/  # Hono middleware
+│   │   │   ├── repositories/# Database access layer
+│   │   │   ├── routes/      # API route definitions
+│   │   │   ├── services/    # Business logic and AI integration
+│   │   │   ├── types/       # TypeScript type definitions
+│   │   │   ├── utils/       # Utility functions
+│   │   │   └── index.ts     # Application entry point
+│   │   ├── biome.json       # Linter/Formatter config
+│   │   ├── drizzle.config.ts # ORM config
+│   │   └── package.json
+│   ├── frontend/            # React SPA
+│   │   ├── src/
+│   │   │   ├── features/    # Feature-based modules
+│   │   │   │   ├── auth/
+│   │   │   │   ├── presentations/
+│   │   │   │   └── profile/
+│   │   │   ├── components/  # Shared UI components
+│   │   │   ├── lib/         # Shared utilities
+│   │   │   ├── pages/       # Top-level pages
+│   │   │   └── App.tsx
+│   │   └── package.json
+│   └── database/            # Database configuration
+├── packages/                 # Shared packages (if any)
 ├── docs/                    # Project documentation
 │   ├── API_CONTRACT.md      # Complete API documentation
-│   ├── CLEAN_CODE.md        # Clean code standards contract
+│   ├── ARCHITECTURE.md      # System architecture
+│   ├── CLEAN_CODE.md        # Clean code standards
 │   └── WORKFLOWS.md         # Development workflows
+├── turbo.json               # Turbo configuration
+├── package.json             # Root package.json (workspaces)
 ├── docker-compose.yml
 └── README.md
 ```
@@ -122,9 +135,17 @@ project-root/
 
 ## Environment Variables
 
-Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to `frontend/.env` and fill with your credentials:
+Copy the example environment files and configure them:
 
-**Backend (backend/.env):**
+```bash
+# Backend environment
+cp apps/backend/.env.example apps/backend/.env
+
+# Frontend environment
+cp apps/frontend/.env.example apps/frontend/.env
+```
+
+**Backend (apps/backend/.env):**
 
 - `PORT` - API Port (default: 8000)
 - `DATABASE_URL` - PostgreSQL connection string
@@ -134,7 +155,7 @@ Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to `fr
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` - **OPTIONAL**: For Google OAuth
 - `CORS_ORIGINS` - Allowed CORS origins
 
-**Frontend (frontend/.env):**
+**Frontend (apps/frontend/.env):**
 
 - `VITE_API_URL` - Backend API URL (e.g., http://localhost:8000)
 - `VITE_GOOGLE_CLIENT_ID` - **OPTIONAL**: Google OAuth Client ID
@@ -158,41 +179,85 @@ Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to `fr
 
 ### Local Development
 
-1. **Backend Setup:**
+**From the monorepo root:**
+
+1. **Install all dependencies:**
 
    ```bash
-   cd backend
    bun install
-   # Configure .env
+   ```
+
+2. **Configure environment variables:**
+
+   ```bash
+   cp apps/backend/.env.example apps/backend/.env
+   cp apps/frontend/.env.example apps/frontend/.env
+   # Edit both .env files with your configuration
+   ```
+
+3. **Start all services:**
+
+   ```bash
+   bun dev              # Starts both backend and frontend
+   # or
+   turbo run dev        # Explicit turbo command
+   ```
+
+4. **Initialize database (first time only):**
+
+   ```bash
+   cd apps/backend
    bun run db:push
-   bun run dev
    ```
 
-2. **Frontend Setup:**
+**Individual service development:**
 
-   ```bash
-   cd frontend
-   bun install
-   # Configure .env
-   bun dev
-   ```
+```bash
+# Backend only
+turbo run dev --filter=backend
+
+# Frontend only
+turbo run dev --filter=frontend
+```
 
 ---
 
 ## Development Commands
 
+This monorepo uses Turbo for task orchestration. Run these commands from the **root directory**:
+
+### General Commands
+
+- `bun dev` / `turbo run dev` - Start all development servers
+- `bun build` / `turbo run build` - Build all applications
+- `bun lint` / `turbo run lint` - Lint all code
+- `bun format` / `turbo run format` - Format all code
+
+### Application-Specific Commands
+
 **Backend:**
 
-- `bun run dev` - Start development server
-- `bun run lint` - Run Biome check
-- `bun run format` - Format code with Biome
-- `bun run db:push` - Push schema changes to database
-- `bun run db:studio` - Open Drizzle Studio
+- `turbo run dev --filter=backend` - Start backend development server
+- `turbo run lint --filter=backend` - Lint backend code
+- `turbo run format --filter=backend` - Format backend code
+- `cd apps/backend && bun run db:push` - Push schema changes to database
+- `cd apps/backend && bun run db:studio` - Open Drizzle Studio
 
 **Frontend:**
 
-- `bun dev` - Start development server
-- `bun lint` - Run linting
+- `turbo run dev --filter=frontend` - Start frontend development server
+- `turbo run lint --filter=frontend` - Lint frontend code
+- `turbo run build --filter=frontend` - Build frontend for production
+
+### Database Commands (Backend)
+
+```bash
+cd apps/backend
+bun run db:push      # Push schema changes
+bun run db:studio    # Open Drizzle Studio
+bun run db:generate  # Generate migrations
+bun run db:migrate   # Run migrations
+```
 
 ---
 
@@ -244,13 +309,25 @@ SlideSage follows clean architecture principles with clear separation of concern
 
 ## Contributing
 
-When contributing to this project:
+When contributing to this monorepo:
 
 1. Follow the clean code guidelines in `docs/CLEAN_CODE.md`
 2. Update `docs/API_CONTRACT.md` when changing API contracts
 3. Run linters before committing:
-   - Backend: `cd backend && bun run lint`
-   - Frontend: `cd frontend && bun lint`
+   ```bash
+   # From root directory
+   bun lint          # Lint all applications
+   # or
+   turbo run lint    # Explicit turbo command
+   ```
+4. Test your changes:
+   ```bash
+   bun dev           # Start development servers
+   ```
+5. Follow monorepo best practices:
+   - Make changes in the appropriate app directory
+   - Use workspace dependencies when sharing code
+   - Test changes across all affected applications
 
 ---
 

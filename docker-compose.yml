@@ -1,7 +1,7 @@
 services:
   database:
     build:
-      context: ./database
+      context: ./apps/database
     image: slide-sage:postgres
     container_name: slide-sage-postgres
     environment:
@@ -21,17 +21,17 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: ./apps/backend
       dockerfile: Dockerfile
     image: slidesage-backend:latest
     ports:
       - "8000:8000"
     restart: unless-stopped
     env_file:
-      - backend/.env
+      - apps/backend/.env
     environment:
       - PORT=${PORT:-8000}
-      - DATABASE_URL=postgresql://slidesage:slidesage@postgres:5432/slidesage
+      - DATABASE_URL=postgresql://slidesage:slidesage@database:5432/slidesage
       - GROQ_API_KEY=${GROQ_API_KEY}
       - LITELLM_MODEL=${LITELLM_MODEL}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
@@ -39,12 +39,12 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
     depends_on:
-      postgres:
+      database:
         condition: service_healthy
 
   frontend:
     build:
-      context: ./frontend
+      context: ./apps/frontend
       dockerfile: Dockerfile
     image: slidesage-frontend:latest
     ports:

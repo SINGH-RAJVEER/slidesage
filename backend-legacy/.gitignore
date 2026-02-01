@@ -1,5 +1,0 @@
-.env
-.flaskenv
-__pycache__
-generated
-public
