@@ -2,348 +2,244 @@
 
 AI-assisted presentation generator that creates professional slides with rich content, charts, and beautiful templates.
 
-This is a **monorepo** managed with Turbo and Bun, containing the frontend and backend applications.
-
----
-
-**Quick Start:**
+## 🚀 Quick Start
 
 ```bash
-# Install dependencies (from root)
+# Clone and setup
+git clone https://github.com/your-username/slide-sage.git
+cd slide-sage
+
+# Install dependencies
 bun install
 
-# Set up environment variables
+# Configure environment
 cp apps/backend/.env.example apps/backend/.env
 cp apps/frontend/.env.example apps/frontend/.env
 # Edit .env files with your configuration
 
-# Start all services in development mode
+# Start development (Docker recommended)
+docker-compose up --build
+# or
 bun dev
-
-# Or use Turbo directly
-turbo run dev
 ```
 
----
+**Access Application:**
 
-## Overview
-
-SlideSage is a modern web application that leverages AI to generate complete presentations from simple text prompts. It features real-time streaming of generated content, support for data visualization charts, and multiple professional design templates.
-
-This project is structured as a **monorepo** using:
-
-- **Package Manager:** Bun workspaces
-- **Build System:** Turbo for task orchestration and caching
-- **Backend:** TypeScript + Bun + Hono with Drizzle ORM (`apps/backend/`)
-- **Frontend:** React (Vite + Bun) app with Tailwind CSS and Shadcn UI (`apps/frontend/`)
-- **Database:** PostgreSQL for storing user data and presentation history
-- **Containerization:** Docker for deployment
+- **Frontend**: `http://localhost:5173`
+- **Backend API**: `http://localhost:8000/api`
+- **Database**: `localhost:5432`
 
 ---
 
-## Key Features
+## 📋 Key Features
 
-- **AI Generation:** Generates comprehensive slide decks including titles, bullet points, and summaries
-- **Smart Charts:** Automatically creates data visualizations (Bar, Line, Pie, etc.) based on the context
-- **Streaming:** Watch your presentation being built in real-time with Server-Sent Events (SSE)
-- **Templates:** Choose from multiple professional themes (Modern Dark, Corporate Blue, Minimalist, etc.)
-- **Authentication:** Secure user accounts with email/password or Google OAuth
-- **Export:** Download your presentations as editable PPTX files
-
----
-
-## Architecture & Flow
-
-1. **User → Frontend:** User logs in, selects a template, and enters a prompt
-2. **Frontend → Backend:** `POST /api/generate-presentation-stream` initiates the generation process
-3. **Backend → AI:** Backend uses LiteLLM to interface with LLMs to generate content and chart data
-4. **Streaming:** Slides are streamed back to the frontend one by one as they are generated
-5. **Storage:** Completed presentations are saved to the PostgreSQL database
-6. **Frontend → User:** User previews the slides, applies different templates, and downloads the final PPTX
+- **🤖 AI Generation**: Comprehensive slide decks from simple prompts
+- **📊 Smart Charts**: Automatic data visualizations (Bar, Line, Pie, etc.)
+- **⚡ Real-time Streaming**: Watch presentations build via Server-Sent Events
+- **🎨 Professional Templates**: Multiple themes (Modern Dark, Corporate Blue, Minimalist)
+- **🔐 Secure Authentication**: Email/password or Google OAuth
+- **📄 Export Support**: Download presentations as editable PPTX files
 
 ---
 
-## Tech Stack
+## 📚 Documentation
 
-### Backend
+### 🚀 Getting Started
 
-- **Runtime:** Bun (fast JavaScript/TypeScript runtime)
-- **Framework:** Hono (Express-like web framework)
-- **Database:** PostgreSQL with Drizzle ORM (type-safe queries)
-- **AI/LLM:** OpenAI API compatible endpoints
-- **Auth:** Jose JWT + Google OAuth 2.0
-- **Linter/Formatter:** Biome
-- **Benefits:** Fast startup, type-safe, low memory usage
+| Document                                              | Description                           |
+| ----------------------------------------------------- | ------------------------------------- |
+| [**DEVELOPMENT_SETUP.md**](docs/DEVELOPMENT_SETUP.md) | Complete environment setup guide      |
+| [**CODE_STANDARDS.md**](docs/CODE_STANDARDS.md)       | Coding conventions and best practices |
 
-### Frontend
+### 🏗️ Architecture & Technology
 
-- **Framework:** React + TypeScript
-- **Build Tool:** Vite
-- **Runtime:** Bun
-- **Styling:** Tailwind CSS
-- **Components:** Shadcn UI
-- **Icons:** Lucide React
+| Document                                                    | Description                                 |
+| ----------------------------------------------------------- | ------------------------------------------- |
+| [**MONOREPO_STRUCTURE.md**](docs/MONOREPO_STRUCTURE.md)     | Monorepo layout and workspace configuration |
+| [**TECH_STACK.md**](docs/TECH_STACK.md)                     | Detailed technology stack overview          |
+| [**BACKEND_ARCHITECTURE.md**](docs/BACKEND_ARCHITECTURE.md) | Backend layers and component design         |
+| [**REQUEST_FLOWS.md**](docs/REQUEST_FLOWS.md)               | Request flow diagrams and sequences         |
 
----
+### 🔌 API Documentation
 
-## Project Structure
+| Document                                              | Description                                       |
+| ----------------------------------------------------- | ------------------------------------------------- |
+| [**API_OVERVIEW.md**](docs/API_OVERVIEW.md)           | General API standards and conventions             |
+| [**AUTH_API.md**](docs/AUTH_API.md)                   | Authentication endpoints (login, register, OAuth) |
+| [**PRESENTATIONS_API.md**](docs/PRESENTATIONS_API.md) | Presentation CRUD and AI generation endpoints     |
 
-This is a monorepo managed with Turbo and Bun workspaces:
+### 💻 Development Workflows
 
-```
-slide-sage/
-├── apps/                     # Applications
-│   ├── backend/             # Hono API server
-│   │   ├── src/
-│   │   │   ├── db/          # Database schema and migrations
-│   │   │   ├── lib/         # Shared libraries
-│   │   │   ├── middleware/  # Hono middleware
-│   │   │   ├── repositories/# Database access layer
-│   │   │   ├── routes/      # API route definitions
-│   │   │   ├── services/    # Business logic and AI integration
-│   │   │   ├── types/       # TypeScript type definitions
-│   │   │   ├── utils/       # Utility functions
-│   │   │   └── index.ts     # Application entry point
-│   │   ├── biome.json       # Linter/Formatter config
-│   │   ├── drizzle.config.ts # ORM config
-│   │   └── package.json
-│   ├── frontend/            # React SPA
-│   │   ├── src/
-│   │   │   ├── features/    # Feature-based modules
-│   │   │   │   ├── auth/
-│   │   │   │   ├── presentations/
-│   │   │   │   └── profile/
-│   │   │   ├── components/  # Shared UI components
-│   │   │   ├── lib/         # Shared utilities
-│   │   │   ├── pages/       # Top-level pages
-│   │   │   └── App.tsx
-│   │   └── package.json
-│   └── database/            # Database configuration
-├── packages/                 # Shared packages (if any)
-├── docs/                    # Project documentation
-│   ├── API_CONTRACT.md      # Complete API documentation
-│   ├── ARCHITECTURE.md      # System architecture
-│   ├── CLEAN_CODE.md        # Clean code standards
-│   └── WORKFLOWS.md         # Development workflows
-├── turbo.json               # Turbo configuration
-├── package.json             # Root package.json (workspaces)
-├── docker-compose.yml
-└── README.md
-```
+| Document                                                      | Description                                   |
+| ------------------------------------------------------------- | --------------------------------------------- |
+| [**DEVELOPMENT_WORKFLOWS.md**](docs/DEVELOPMENT_WORKFLOWS.md) | Feature development, testing, and code review |
+| [**DEPLOYMENT_WORKFLOWS.md**](docs/DEPLOYMENT_WORKFLOWS.md)   | Docker deployment and CI/CD pipelines         |
 
 ---
 
-## Environment Variables
+## 🛠️ Common Commands
 
-Copy the example environment files and configure them:
+### From Root Directory
 
 ```bash
-# Backend environment
-cp apps/backend/.env.example apps/backend/.env
-
-# Frontend environment
-cp apps/frontend/.env.example apps/frontend/.env
+bun dev              # Start all development servers
+bun build            # Build all applications
+bun lint             # Lint all code
+bun format           # Format all code
+bun test             # Run all tests
 ```
 
-**Backend (apps/backend/.env):**
-
-- `PORT` - API Port (default: 8000)
-- `DATABASE_URL` - PostgreSQL connection string
-- `JWT_SECRET_KEY` - **REQUIRED**: Secret key for JWT tokens
-- `GEMINI_API_KEY`, `GROQ_API_KEY` - API keys for AI services
-- `LITELLM_MODEL` - AI model to use
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` - **OPTIONAL**: For Google OAuth
-- `CORS_ORIGINS` - Allowed CORS origins
-
-**Frontend (apps/frontend/.env):**
-
-- `VITE_API_URL` - Backend API URL (e.g., http://localhost:8000)
-- `VITE_GOOGLE_CLIENT_ID` - **OPTIONAL**: Google OAuth Client ID
-
----
-
-## Getting Started
-
-### Using Docker (Recommended)
-
-1. **Start Services:**
-
-   ```bash
-   docker-compose up --build
-   ```
-
-2. **Access Application:**
-   - Frontend: `http://localhost:5173`
-   - Backend API: `http://localhost:8000`
-   - PostgreSQL: `localhost:5432`
-
-### Local Development
-
-**From the monorepo root:**
-
-1. **Install all dependencies:**
-
-   ```bash
-   bun install
-   ```
-
-2. **Configure environment variables:**
-
-   ```bash
-   cp apps/backend/.env.example apps/backend/.env
-   cp apps/frontend/.env.example apps/frontend/.env
-   # Edit both .env files with your configuration
-   ```
-
-3. **Start all services:**
-
-   ```bash
-   bun dev              # Starts both backend and frontend
-   # or
-   turbo run dev        # Explicit turbo command
-   ```
-
-4. **Initialize database (first time only):**
-
-   ```bash
-   cd apps/backend
-   bun run db:push
-   ```
-
-**Individual service development:**
+### App-Specific Commands
 
 ```bash
 # Backend only
 turbo run dev --filter=backend
+cd apps/backend && bun run db:studio
 
 # Frontend only
 turbo run dev --filter=frontend
+turbo run build --filter=frontend
 ```
 
----
-
-## Development Commands
-
-This monorepo uses Turbo for task orchestration. Run these commands from the **root directory**:
-
-### General Commands
-
-- `bun dev` / `turbo run dev` - Start all development servers
-- `bun build` / `turbo run build` - Build all applications
-- `bun lint` / `turbo run lint` - Lint all code
-- `bun format` / `turbo run format` - Format all code
-
-### Application-Specific Commands
-
-**Backend:**
-
-- `turbo run dev --filter=backend` - Start backend development server
-- `turbo run lint --filter=backend` - Lint backend code
-- `turbo run format --filter=backend` - Format backend code
-- `cd apps/backend && bun run db:push` - Push schema changes to database
-- `cd apps/backend && bun run db:studio` - Open Drizzle Studio
-
-**Frontend:**
-
-- `turbo run dev --filter=frontend` - Start frontend development server
-- `turbo run lint --filter=frontend` - Lint frontend code
-- `turbo run build --filter=frontend` - Build frontend for production
-
-### Database Commands (Backend)
+### Database Operations
 
 ```bash
 cd apps/backend
 bun run db:push      # Push schema changes
-bun run db:studio    # Open Drizzle Studio
-bun run db:generate  # Generate migrations
-bun run db:migrate   # Run migrations
+bun run db:migrate    # Run migrations
+bun run db:studio     # Open Drizzle Studio
 ```
 
 ---
 
-## API Documentation
+## 🏗️ Project Structure
 
-Complete API documentation is available in `docs/API_CONTRACT.md`.
+```
+slide-sage/
+├── apps/                     # Applications
+│   ├── backend/             # Hono API server (TypeScript + Drizzle)
+│   ├── frontend/            # React SPA (Vite + Tailwind + Shadcn UI)
+│   └── database/            # PostgreSQL service container
+├── docs/                    # 📚 Documentation (this directory)
+│   ├── API_OVERVIEW.md      # API standards and overview
+│   ├── AUTH_API.md          # Authentication endpoints
+│   ├── PRESENTATIONS_API.md # Presentation endpoints
+│   ├── MONOREPO_STRUCTURE.md # Workspace structure
+│   ├── TECH_STACK.md        # Technology stack details
+│   ├── BACKEND_ARCHITECTURE.md # Backend layers
+│   ├── REQUEST_FLOWS.md     # Request flow diagrams
+│   ├── DEVELOPMENT_SETUP.md  # Environment setup guide
+│   ├── DEVELOPMENT_WORKFLOWS.md # Development processes
+│   ├── DEPLOYMENT_WORKFLOWS.md # Deployment guide
+│   └── CODE_STANDARDS.md    # Coding standards
+├── turbo.json              # Turbo build system config
+├── package.json            # Root workspace configuration
+└── docker-compose.yml      # Development containers
+```
 
-### Authentication Endpoints (No auth required)
+### Technology Stack
 
-- `POST /api/auth/register` — Register new user
-- `POST /api/auth/login` — Login with email/password
-- `POST /api/auth/google` — Google OAuth login
-- `POST /api/auth/refresh` — Refresh access token
-- `GET /api/auth/me` — Get current user (requires auth)
-- `PUT /api/auth/profile` — Update user profile (requires auth)
-- `POST /api/auth/logout` — Logout (requires auth)
-
-### Presentation Endpoints (Auth required)
-
-- `POST /api/generate-presentation-stream` — Generate presentation with SSE streaming
-- `GET /api/presentations` — Get all user presentations
-- `GET /api/presentations/:id` — Get specific presentation
-- `DELETE /api/presentations/:id` — Delete presentation
-- `GET /api/health` — Health check (no auth required)
-
----
-
-## Architecture
-
-SlideSage follows clean architecture principles with clear separation of concerns:
-
-### Backend Layers (Hono + Drizzle)
-
-1. **Routes Layer** (`src/routes/`): API route definitions and validation
-2. **Services Layer** (`src/services/`): Business logic and orchestration
-3. **Repositories Layer** (`src/repositories/`): Database access via Drizzle
-4. **Middleware** (`src/middleware/`): Authentication and request processing
-5. **DB** (`src/db/`): Schema definitions and migrations
-
-### Key Principles
-
-- Follows clean code guidelines (see `docs/CLEAN_CODE.md`)
-- All API endpoints documented in `docs/API_CONTRACT.md`
-- Type-safe development with TypeScript
-- Consistent error handling and validation
-- Separation of HTTP concerns from business logic
+- **Package Manager**: Bun workspaces for dependency management
+- **Build System**: Turbo for task orchestration and caching
+- **Backend**: TypeScript + Bun + Hono + Drizzle ORM + PostgreSQL
+- **Frontend**: React + Vite + Tailwind CSS + Shadcn UI
+- **Infrastructure**: Docker for containerization
 
 ---
 
-## Contributing
+## 🔄 Development Workflow
 
-When contributing to this monorepo:
+### 1. Feature Development
 
-1. Follow the clean code guidelines in `docs/CLEAN_CODE.md`
-2. Update `docs/API_CONTRACT.md` when changing API contracts
-3. Run linters before committing:
-   ```bash
-   # From root directory
-   bun lint          # Lint all applications
-   # or
-   turbo run lint    # Explicit turbo command
-   ```
-4. Test your changes:
-   ```bash
-   bun dev           # Start development servers
-   ```
-5. Follow monorepo best practices:
-   - Make changes in the appropriate app directory
-   - Use workspace dependencies when sharing code
-   - Test changes across all affected applications
+1. **Plan**: Read [DEVELOPMENT_WORKFLOWS.md](docs/DEVELOPMENT_WORKFLOWS.md)
+2. **Setup**: Follow [DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md)
+3. **Code**: Follow [CODE_STANDARDS.md](docs/CODE_STANDARDS.md)
+4. **Test**: Use test commands and follow guidelines
+5. **Review**: Check code quality and standards
 
----
+### 2. API Development
 
-## Data Flow
+1. **Design**: Reference [API_OVERVIEW.md](docs/API_OVERVIEW.md)
+2. **Backend**: Follow [BACKEND_ARCHITECTURE.md](docs/BACKEND_ARCHITECTURE.md)
+3. **Documentation**: Update appropriate API docs:
+   - [AUTH_API.md](docs/AUTH_API.md) for authentication
+   - [PRESENTATIONS_API.md](docs/PRESENTATIONS_API.md) for presentations
 
-1. User authenticates via email/password or Google OAuth
-2. Frontend sends presentation request to `POST /api/generate-presentation-stream`
-3. Backend validates request, checks user tokens, and streams generation
-4. AI service (LiteLLM) generates slides with content and optional charts
-5. Slides are streamed to frontend in real-time via Server-Sent Events
-6. Completed presentation is saved to PostgreSQL database
-7. User can view, edit, and export presentation as PPTX
+### 3. Deployment
+
+1. **Local**: Use `docker-compose up --build`
+2. **Production**: Follow [DEPLOYMENT_WORKFLOWS.md](docs/DEPLOYMENT_WORKFLOWS.md)
+3. **CI/CD**: Use automated pipelines and monitoring
 
 ---
 
-## Notes & troubleshooting
+## 🔧 Configuration
 
-- Backend: Ensure `DATABASE_URL` is correct and PostgreSQL is running.
-- Frontend: Ensure `VITE_API_URL` matches the running backend port.
+### Required Environment Variables
+
+**Backend (apps/backend/.env):**
+
+```bash
+DATABASE_URL=postgresql://user:password@localhost:5432/slide_sage
+JWT_SECRET_KEY=your-super-secret-jwt-key
+GEMINI_API_KEY=your-gemini-api-key
+GROQ_API_KEY=your-groq-api-key
+CORS_ORIGINS=http://localhost:5173
+```
+
+**Frontend (apps/frontend/.env):**
+
+```bash
+VITE_API_URL=http://localhost:8000/api
+VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id
+```
+
+---
+
+## 📝 Notes & Troubleshooting
+
+### Common Issues
+
+- **Database Connection**: Ensure PostgreSQL is running and `DATABASE_URL` is correct
+- **Frontend API**: Verify `VITE_API_URL` matches backend port
+- **Authentication**: Check that `JWT_SECRET_KEY` is set and consistent
+- **Token Issues**: Ensure AI API keys are valid and have sufficient credits
+
+### Getting Help
+
+1. **Check Documentation**: Start with relevant docs in `/docs` folder
+2. **Review Logs**: Check `docker-compose logs` for service issues
+3. **Test API**: Use `/api/health` endpoint to verify backend
+4. **Validate Setup**: Ensure all environment variables are configured
+
+---
+
+## 🎯 Monorepo Benefits
+
+- **🔄 Shared Dependencies**: Common packages managed centrally
+- **⚡ Parallel Development**: Multiple apps developed simultaneously
+- **🔧 Unified Tooling**: Single configuration for linting, formatting
+- **📦 Atomic Commits**: Changes across frontend and backend in one PR
+- **🚀 Simplified CI/CD**: Build and test everything together
+- **💡 Code Sharing**: Easy sharing of types and utilities
+
+---
+
+## 📖 Documentation Guide
+
+- **New to project?** → Start with [DEVELOPMENT_SETUP.md](docs/DEVELOPMENT_SETUP.md)
+- **Adding features?** → Read [DEVELOPMENT_WORKFLOWS.md](docs/DEVELOPMENT_WORKFLOWS.md)
+- **Working with API?** → Check [API_OVERVIEW.md](docs/API_OVERVIEW.md) first
+- **Deploying?** → Follow [DEPLOYMENT_WORKFLOWS.md](docs/DEPLOYMENT_WORKFLOWS.md)
+- **Need architecture info?** → See [MONOREPO_STRUCTURE.md](docs/MONOREPO_STRUCTURE.md)
+
+---
+
+## 🤝 Contributing
+
+1. **Follow Standards**: Adhere to [CODE_STANDARDS.md](docs/CODE_STANDARDS.md)
+2. **Update Documentation**: Keep API docs current when making changes
+3. **Test Thoroughly**: Ensure tests pass for new features
+4. **Use Conventional Commits**: Follow the commit message format in standards
+
+---

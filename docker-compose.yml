@@ -21,34 +21,24 @@ services:
 
   backend:
     build:
-      context: ./apps/backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/backend/Dockerfile
     image: slidesage-backend:latest
     ports:
       - "8000:8000"
     restart: unless-stopped
     env_file:
-      - apps/backend/.env
-    environment:
-      - PORT=${PORT:-8000}
-      - DATABASE_URL=postgresql://slidesage:slidesage@database:5432/slidesage
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - LITELLM_MODEL=${LITELLM_MODEL}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - CORS_ORIGINS=${CORS_ORIGINS}
-    depends_on:
-      database:
-        condition: service_healthy
+      - .env
 
   frontend:
     build:
-      context: ./apps/frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/frontend/Dockerfile
     image: slidesage-frontend:latest
     ports:
       - "5173:5173"
+    env_file:
+      - .env
     depends_on:
       - backend
     restart: unless-stopped

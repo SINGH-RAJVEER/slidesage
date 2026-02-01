@@ -13,11 +13,12 @@ app.use(
   '*',
   cors({
     origin: (origin) => {
-      const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173'];
-      // Allow all origins if CORS_ORIGINS is '*'
-      if (process.env.CORS_ORIGINS === '*') {
+      const corsOrigins = process.env.CORS_ORIGINS;
+      // Allow all origins if CORS_ORIGINS is '*' or '"*"' or empty (dev convenience)
+      if (!corsOrigins || corsOrigins === '*' || corsOrigins === '"*"' || corsOrigins === "'*'") {
         return origin || '*';
       }
+      const allowedOrigins = corsOrigins.split(',').map(o => o.trim());
       return allowedOrigins.includes(origin || '') ? origin || '*' : allowedOrigins[0];
     },
     credentials: true,

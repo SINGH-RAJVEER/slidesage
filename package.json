@@ -8,9 +8,17 @@
   ],
   "scripts": {
     "build": "turbo run build",
+    "build:backend": "turbo run build --filter=slide-sage-backend",
+    "build:frontend": "turbo run build --filter=slide-sage-frontend",
     "dev": "turbo run dev",
+    "dev:backend": "turbo run dev --filter=slide-sage-backend",
+    "dev:frontend": "turbo run dev --filter=slide-sage-frontend",
     "lint": "turbo run lint",
-    "format": "turbo run format"
+    "lint:backend": "turbo run lint --filter=slide-sage-backend",
+    "lint:frontend": "turbo run lint --filter=slide-sage-frontend",
+    "format": "turbo run format",
+    "format:backend": "turbo run format --filter=slide-sage-backend",
+    "format:frontend": "turbo run format --filter=slide-sage-frontend"
   },
   "devDependencies": {
     "turbo": "latest",

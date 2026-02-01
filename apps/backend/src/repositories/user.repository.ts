@@ -3,9 +3,9 @@
  * Handles user data operations including token management
  */
 
-import { eq } from 'drizzle-orm';
-import { db } from '../db';
-import { type NewUser, type User, users } from '../db/schema';
+import { eq, sql } from 'drizzle-orm';
+import { db } from '@slide-sage/database';
+import { users, type NewUser, type User } from '@slide-sage/database/schema';
 import { TokenCalculator } from '../services/token-calculator';
 
 export class UserRepository {

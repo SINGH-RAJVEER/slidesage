@@ -8,8 +8,8 @@
 import { createHash } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
-import { db } from './db';
-import { accounts, users } from './db/schema';
+import { db } from '@slide-sage/database';
+import { users } from '@slide-sage/database/schema';
 
 // Secret key required for admin operations
 // Generate a secure secret:
@@ -147,7 +147,7 @@ async function migrateAddUnlimitedColumn(): Promise<void> {
   // Note: In Drizzle, schema changes should be done through migrations
   // This function is kept for compatibility but should use migrations instead
   console.log(
-    'Note: Schema changes should be done through Drizzle migrations (bun src/db/migrate.ts)'
+    'Note: Schema changes should be done through Drizzle migrations (bun run --filter=@slide-sage/database db:migrate)'
   );
   console.log('The is_unlimited column should already exist in the schema.');
 }

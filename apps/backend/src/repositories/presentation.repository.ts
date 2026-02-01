@@ -1,6 +1,6 @@
-import { desc, eq } from 'drizzle-orm';
-import { db } from '../db';
-import { type NewPresentation, type Presentation, presentations } from '../db/schema';
+import { eq, desc, and, sql } from 'drizzle-orm';
+import { db } from '@slide-sage/database';
+import { presentations, type NewPresentation, type Presentation } from '@slide-sage/database/schema';
 import type { PresentationJSON } from '../types';
 
 export class PresentationRepository {

@@ -1,32 +1,38 @@
-FROM oven/bun:latest AS builder
+FROM oven/bun:1.3.6 AS builder
 
 WORKDIR /app
 
-# Set API URL for build
-ENV VITE_API_URL=http://localhost:8000
+# Copy all package.json files and lockfile
+COPY package.json bun.lock ./
+COPY apps/backend/package.json ./apps/backend/
+COPY apps/frontend/package.json ./apps/frontend/
+COPY packages/database/package.json ./packages/database/
+COPY tsconfig.json ./
 
-# Copy package files
-COPY package.json bun.lockb* ./
+# Copy packages
+COPY packages ./packages
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy source files
-COPY . .
+COPY apps/frontend ./apps/frontend
+COPY .env ./apps/frontend/.env
 
 # Build the application
+WORKDIR /app/apps/frontend
 RUN bun run build
 
-FROM oven/bun:latest
+FROM oven/bun:1.3.6
 
-WORKDIR /app
+WORKDIR /app/apps/frontend
 
-# Copy package.json and install only vite for preview
-COPY --from=builder /app/package.json /app/bun.lockb* ./
-RUN bun install --frozen-lockfile
+# Copy package.json and install only necessary deps
+COPY --from=builder /app/apps/frontend/package.json ./
+RUN bun install
 
 # Copy built static site from builder stage
-COPY --from=builder /app/dist /app/dist
+COPY --from=builder /app/apps/frontend/dist ./dist
 
 EXPOSE 5173
 
