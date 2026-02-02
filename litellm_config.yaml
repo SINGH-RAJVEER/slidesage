@@ -1,0 +1,25 @@
+model_list:
+  - model_name: kimi
+    litellm_params:
+      model: groq/moonshotai/kimi-k2-instruct-0905
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: llama-3.3-70b
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: gemini-3.0
+    litellm_params:
+      model: gemini/gemini-2.0-flash-exp
+      api_key: os.environ/GEMINI_API_KEY
+
+general_settings:
+  master_key: dev_master_key_12345 # Change in production!
+  database_url: null # No database setup
+
+# Logging
+litellm_settings:
+  drop_params: true
+  success_callback: []
+  failure_callback: []
