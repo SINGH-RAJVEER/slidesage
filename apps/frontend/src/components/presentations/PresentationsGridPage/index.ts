@@ -1,3 +1,3 @@
-export { PresentationCard } from "./PresentationCard";
-export { GridSizeControl } from "./GridSizeControl";
 export { CreatePresentationButton } from "./CreatePresentationButton";
+export { GridSizeControl } from "./GridSizeControl";
+export { PresentationCard } from "./PresentationCard";

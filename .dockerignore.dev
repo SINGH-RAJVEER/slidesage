@@ -1,5 +1,4 @@
 # Development-specific Docker ignore
-# Used during development with volume mounts
 
 # Exclude from image but allow for volume mounts
 node_modules

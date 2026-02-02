@@ -1,1 +1,1 @@
-export { default } from './TemplateApplier';
+export { default } from "./TemplateApplier";

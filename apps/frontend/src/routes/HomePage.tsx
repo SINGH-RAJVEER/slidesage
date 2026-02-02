@@ -1,56 +1,56 @@
-import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import {
-  GeneratePPTPage,
-  PresentationsGridPage,
-} from "@/modules/presentations";
+import { useEffect, useState } from "react";
 import Header from "@/components/Header";
+import {
+	GeneratePPTPage,
+	PresentationsGridPage,
+} from "@/modules/presentations";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function HomePage() {
-  const [loading, setLoading] = useState(true);
-  const [hasPresentations, setHasPresentations] = useState(false);
+	const [loading, setLoading] = useState(true);
+	const [hasPresentations, setHasPresentations] = useState(false);
 
-  useEffect(() => {
-    checkPresentations();
-  }, []);
+	useEffect(() => {
+		checkPresentations();
+	}, []);
 
-  const checkPresentations = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/presentations`, {
-        credentials: "include",
-      });
+	const checkPresentations = async () => {
+		try {
+			const response = await fetch(`${API_URL}/api/presentations`, {
+				credentials: "include",
+			});
 
-      if (response.status === 401) {
-        // If unauthorized, assume no presentations available (or let ProtectedRoute handle redirect if needed)
-        // But for HomePage we might want to show GeneratePPTPage anyway
-        setHasPresentations(false);
-        return;
-      }
+			if (response.status === 401) {
+				// If unauthorized, assume no presentations available (or let ProtectedRoute handle redirect if needed)
+				// But for HomePage we might want to show GeneratePPTPage anyway
+				setHasPresentations(false);
+				return;
+			}
 
-      const result = await response.json();
-      setHasPresentations(result.success && result.presentations.length > 0);
-    } catch (err) {
-      console.error("Error checking presentations:", err);
-      // If there's an error, default to showing the generate page
-      setHasPresentations(false);
-    } finally {
-      setLoading(false);
-    }
-  };
+			const result = await response.json();
+			setHasPresentations(result.success && result.presentations.length > 0);
+		} catch (err) {
+			console.error("Error checking presentations:", err);
+			// If there's an error, default to showing the generate page
+			setHasPresentations(false);
+		} finally {
+			setLoading(false);
+		}
+	};
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-        <Header />
-        <div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <Loader2 className="h-12 w-12 animate-spin text-white" />
-        </div>
-      </div>
-    );
-  }
+	if (loading) {
+		return (
+			<div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+				<Header />
+				<div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-64px)]">
+					<Loader2 className="h-12 w-12 animate-spin text-white" />
+				</div>
+			</div>
+		);
+	}
 
-  // If user has presentations, show the grid; otherwise show the generate page
-  return hasPresentations ? <PresentationsGridPage /> : <GeneratePPTPage />;
+	// If user has presentations, show the grid; otherwise show the generate page
+	return hasPresentations ? <PresentationsGridPage /> : <GeneratePPTPage />;
 }
