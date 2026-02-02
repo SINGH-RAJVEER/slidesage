@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, Check, Sparkles } from "lucide-react";
-import { AVAILABLE_TEMPLATES } from "../../types/template";
+import { AVAILABLE_TEMPLATES } from "@/modules/types/template";
 
 interface TemplateSelectorProps {
   selectedTemplate: string;
@@ -64,7 +64,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
   className = "",
 }) => {
   const currentTemplate = AVAILABLE_TEMPLATES.find(
-    (t) => t.id === selectedTemplate
+    (t) => t.id === selectedTemplate,
   );
 
   return (
@@ -80,7 +80,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
               {currentTemplate && (
                 <div className="flex gap-1">
                   {Object.values(
-                    getTemplatePreviewColors(currentTemplate.id)
+                    getTemplatePreviewColors(currentTemplate.id),
                   ).map((color, i) => (
                     <div key={i} className={`w-2 h-2 rounded-full ${color}`} />
                   ))}

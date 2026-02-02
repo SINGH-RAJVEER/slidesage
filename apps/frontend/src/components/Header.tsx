@@ -1,5 +1,5 @@
 import { useUser, UserButton } from "@clerk/clerk-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 interface UserMetadata {
   is_unlimited?: boolean;
@@ -16,11 +16,13 @@ export default function Header() {
     <header className="border-b border-white/20 bg-white/5 backdrop-blur-md">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between h-18">
         <div className="flex items-center gap-2">
-          <img
-            src="/icon.png"
-            alt="SlideSage"
-            className="h-32 w-60 object-contain drop-shadow-2xl -my-8"
-          />
+          <Link to="/" aria-label="Go to home">
+            <img
+              src="/icon.png"
+              alt="SlideSage"
+              className="h-32 w-60 object-contain drop-shadow-2xl -my-8"
+            />
+          </Link>
         </div>
 
         {user && (

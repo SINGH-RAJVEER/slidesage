@@ -16,7 +16,7 @@ import {
   PresentationCard,
   GridSizeControl,
   CreatePresentationButton,
-} from "../components/PresentationsGridPage";
+} from "@/components/presentations/PresentationsGridPage";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -67,7 +67,9 @@ export default function PresentationsGridPage() {
       // New API format: {presentations: [...]} or {error: {message: "..."}}
       if (result.error) {
         setError(
-          typeof result.error === "object" ? result.error.message : result.error
+          typeof result.error === "object"
+            ? result.error.message
+            : result.error,
         );
       } else {
         setPresentations(result.presentations || []);
@@ -83,7 +85,7 @@ export default function PresentationsGridPage() {
     try {
       const response = await fetch(
         `${API_URL}/api/presentations/${presentationId}`,
-        { credentials: "include" }
+        { credentials: "include" },
       );
 
       if (response.status === 401) {
@@ -96,7 +98,9 @@ export default function PresentationsGridPage() {
       // New API format: {presentation: {...}} or {error: {message: "..."}}
       if (result.error) {
         setError(
-          typeof result.error === "object" ? result.error.message : result.error
+          typeof result.error === "object"
+            ? result.error.message
+            : result.error,
         );
       } else if (result.presentation) {
         navigate("/presentation", {
@@ -116,7 +120,7 @@ export default function PresentationsGridPage() {
 
   const handleDeletePresentation = (
     e: React.MouseEvent,
-    presentationId: number
+    presentationId: number,
   ) => {
     e.stopPropagation();
     setPresentationToDelete(presentationId);
@@ -133,7 +137,7 @@ export default function PresentationsGridPage() {
         {
           method: "DELETE",
           credentials: "include",
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -146,7 +150,9 @@ export default function PresentationsGridPage() {
       // New API format: {message: "..."} or {error: {message: "..."}}
       if (result.error) {
         setError(
-          typeof result.error === "object" ? result.error.message : result.error
+          typeof result.error === "object"
+            ? result.error.message
+            : result.error,
         );
       } else {
         setPresentations(presentations.filter((p) => p.id !== presentationId));
@@ -209,8 +215,8 @@ export default function PresentationsGridPage() {
               gridSize === 2
                 ? "md:grid-cols-2"
                 : gridSize === 3
-                ? "md:grid-cols-2 lg:grid-cols-3"
-                : "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  ? "md:grid-cols-2 lg:grid-cols-3"
+                  : "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
             } gap-6`}
           >
             {presentations.length === 0 ? (

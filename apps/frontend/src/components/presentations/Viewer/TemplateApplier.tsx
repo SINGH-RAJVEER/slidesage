@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useRef } from "react";
-import { AVAILABLE_TEMPLATES } from "../../types/template";
+import { AVAILABLE_TEMPLATES } from "@/modules/types/template";
 
 interface TemplateApplierProps {
   templateId: string;
@@ -25,7 +25,7 @@ const TemplateApplier: React.FC<TemplateApplierProps> = ({
 
     // Determine alignment based on slide type
     const isCenteredSlide = ["title", "quote", "conclusion"].includes(
-      slideType
+      slideType,
     );
     const contentJustify = isCenteredSlide ? "center" : "flex-start";
     const contentPaddingTop = isCenteredSlide
@@ -44,7 +44,7 @@ const TemplateApplier: React.FC<TemplateApplierProps> = ({
     // Apply styles to elements with specific classes
     const applyClassStyles = (
       className: string,
-      elementStyles: React.CSSProperties
+      elementStyles: React.CSSProperties,
     ) => {
       const elements = container.querySelectorAll(`.${className}`);
       elements.forEach((element) => {

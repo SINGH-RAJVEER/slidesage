@@ -116,6 +116,7 @@ docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-com
 | ------------------------------------------------------------- | --------------------------------------------- |
 | [**DEVELOPMENT_WORKFLOWS.md**](docs/DEVELOPMENT_WORKFLOWS.md) | Feature development, testing, and code review |
 | [**DEPLOYMENT_WORKFLOWS.md**](docs/DEPLOYMENT_WORKFLOWS.md)   | Docker deployment and CI/CD pipelines         |
+| [**FRONTEND_ROUTING.md**](docs/FRONTEND_ROUTING.md)           | Frontend route map and auth guard             |
 
 ---
 

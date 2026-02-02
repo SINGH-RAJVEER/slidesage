@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import {
   GeneratePPTPage,
   PresentationsGridPage,
-} from "@/features/presentations";
+} from "@/modules/presentations";
 import Header from "@/components/Header";
 
 const API_URL = import.meta.env.VITE_API_URL;

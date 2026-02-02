@@ -1,18 +1,24 @@
 /// <reference lib="dom" />
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, mock } from "bun:test";
 import { render } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
-import { ClerkProvider } from "@clerk/clerk-react";
-import Header from "../../components/Header";
+
+mock.module("@clerk/clerk-react", () => {
+  return {
+    useUser: () => ({ user: null }),
+    UserButton: () => null,
+  };
+});
 
 describe("Header", () => {
-  it("renders header component", () => {
+  it("renders header component", async () => {
+    // Import after mocking Clerk.
+    const { default: Header } = await import("../../components/Header");
+
     const { container } = render(
       <BrowserRouter>
-        <ClerkProvider publishableKey="pk_test_mock">
-          <Header />
-        </ClerkProvider>
+        <Header />
       </BrowserRouter>,
     );
 

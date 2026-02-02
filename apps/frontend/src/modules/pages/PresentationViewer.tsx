@@ -25,26 +25,26 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import DownloadPPTXButton from "../components/Viewer/DownloadPPTXButton";
-import ChartRenderer from "../components/Charts/ChartRenderer";
-import TemplateApplier from "../components/Viewer/TemplateApplier";
-import TemplateSelector from "../components/Viewer/TemplateSelector";
-import IterateModal from "../components/Viewer/IterateModal";
-import { useTemplate } from "../useTemplate";
-import { AVAILABLE_TEMPLATES } from "../types/template";
+import DownloadPPTXButton from "@/components/presentations/Viewer/DownloadPPTXButton";
+import ChartRenderer from "@/components/presentations/Charts/ChartRenderer";
+import TemplateApplier from "@/components/presentations/Viewer/TemplateApplier";
+import TemplateSelector from "@/components/presentations/Viewer/TemplateSelector";
+import IterateModal from "@/components/presentations/Viewer/IterateModal";
+import { useTemplate } from "@/modules/useTemplate";
+import { AVAILABLE_TEMPLATES } from "@/modules/types/template";
 import type {
   PresentationData,
   Slide,
   HtmlSlide,
   ChartSlide,
-} from "../types/presentation";
+} from "@/modules/types/presentation";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useStreaming } from "@/features/presentations";
+import { useStreaming } from "@/modules/presentations";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
