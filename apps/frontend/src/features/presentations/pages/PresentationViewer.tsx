@@ -107,7 +107,7 @@ const SlideRenderer = React.memo(
       return prevProps.isActive === nextProps.isActive;
     }
     return true; // Ignore isActive changes for HTML slides
-  }
+  },
 );
 
 const PresentationViewer: React.FC = () => {
@@ -131,12 +131,12 @@ const PresentationViewer: React.FC = () => {
     PresentationData | undefined
   >(getInitialPresentation());
   const [presentationId, setPresentationId] = useState<number | undefined>(
-    location.state?.presentationId || streamingState.presentationId
+    location.state?.presentationId || streamingState.presentationId,
   );
   const [isLoadingPresentation, setIsLoadingPresentation] = useState(
     !isStreamingMode &&
       !location.state?.isNewGeneration &&
-      !!location.state?.presentationId
+      !!location.state?.presentationId,
   );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -191,7 +191,7 @@ const PresentationViewer: React.FC = () => {
       console.log(
         "Streaming completed - capturing final presentation state with",
         streamingState.slides.length,
-        "slides"
+        "slides",
       );
       setPresentation({
         title: streamingState.title,
@@ -215,7 +215,7 @@ const PresentationViewer: React.FC = () => {
 
       setTimeout(() => {
         const slideElement = document.getElementById(
-          `slide-${latestSlideIndex}`
+          `slide-${latestSlideIndex}`,
         );
         if (slideElement) {
           slideElement.scrollIntoView({
@@ -272,7 +272,7 @@ const PresentationViewer: React.FC = () => {
     ) {
       streamingJustCompletedRef.current = true;
       console.log(
-        "Streaming just completed, will skip fetch and use streamed data"
+        "Streaming just completed, will skip fetch and use streamed data",
       );
     }
     wasStreamingRef.current = streamingState.isStreaming;
@@ -336,7 +336,7 @@ const PresentationViewer: React.FC = () => {
           `${API_URL}/api/presentations/${idToFetch}`,
           {
             credentials: "include",
-          }
+          },
         );
 
         if (response.ok) {
@@ -345,7 +345,7 @@ const PresentationViewer: React.FC = () => {
           if (data.error) {
             console.error(
               "Error loading presentation:",
-              data.error.message || data.error
+              data.error.message || data.error,
             );
           } else if (data.presentation) {
             const pres = data.presentation;
@@ -371,7 +371,7 @@ const PresentationViewer: React.FC = () => {
             ) {
               // Presentation has no content - redirect to error page
               console.log(
-                "Presentation has no content, redirecting to error page"
+                "Presentation has no content, redirecting to error page",
               );
               navigate("/presentation-error", {
                 state: {
@@ -381,7 +381,7 @@ const PresentationViewer: React.FC = () => {
               });
             } else {
               console.log(
-                "Fetched data appears incomplete, keeping current state"
+                "Fetched data appears incomplete, keeping current state",
               );
             }
           }
@@ -441,7 +441,7 @@ const PresentationViewer: React.FC = () => {
     thumbnailScrollTimeoutRef.current = setTimeout(() => {
       requestAnimationFrame(() => {
         const currentThumbnail = document.querySelector(
-          `[data-slide-index="${currentSlide}"]`
+          `[data-slide-index="${currentSlide}"]`,
         );
 
         if (currentThumbnail) {
@@ -476,7 +476,7 @@ const PresentationViewer: React.FC = () => {
         root: slideContainerRef.current,
         threshold: [0.9],
         rootMargin: "0px",
-      }
+      },
     );
 
     const slideElements = document.querySelectorAll(".slide-carousel__item");
@@ -689,7 +689,7 @@ const PresentationViewer: React.FC = () => {
   const skipToLastSlide = (scrollBehavior: ScrollBehavior = "smooth") => {
     setCurrentSlide(presentationState.slides.length - 1);
     const slideElement = document.getElementById(
-      `slide-${presentationState.slides.length - 1}`
+      `slide-${presentationState.slides.length - 1}`,
     );
     if (slideElement) {
       slideElement.scrollIntoView({
@@ -709,7 +709,7 @@ const PresentationViewer: React.FC = () => {
     console.log("Deleting slide:", { presentationId, slideId, currentSlide });
 
     const newSlides = presentationState.slides.filter(
-      (_, idx) => idx !== currentSlide
+      (_, idx) => idx !== currentSlide,
     );
     let newCurrent = currentSlide;
     if (currentSlide >= newSlides.length) {
@@ -756,7 +756,7 @@ const PresentationViewer: React.FC = () => {
     prompt: string,
     slideCount: number,
     detailLevel: string,
-    tonality: string
+    tonality: string,
   ) => {
     if (!prompt.trim() || !presentationId) return;
 
@@ -765,7 +765,7 @@ const PresentationViewer: React.FC = () => {
       presentationId,
       slideCount,
       detailLevel,
-      tonality
+      tonality,
     );
 
     if (success) {
@@ -1007,14 +1007,6 @@ const PresentationViewer: React.FC = () => {
               aria-label="Slides carousel"
             >
               {presentationState.slides.map((slide, idx) => {
-                const isFirstSlide = idx === 0;
-                const isLastSlide = idx === presentationState.slides.length - 1;
-                const marginLeft = isFirstSlide
-                  ? "calc((100vw - 75vw) / 2 - 2rem)"
-                  : "0";
-                const marginRight = isLastSlide
-                  ? "calc((100vw - 75vw) / 2 - 2rem)"
-                  : "0";
                 const isActive = visibleSlide === idx;
 
                 return (
@@ -1025,18 +1017,11 @@ const PresentationViewer: React.FC = () => {
                     aria-selected={isActive}
                     className="slide-carousel__item"
                     data-active={isActive}
-                    style={{
-                      width: "75vw",
-                      minWidth: "75vw",
-                      maxWidth: "75vw",
-                      marginLeft,
-                      marginRight,
-                    }}
                     onClick={() => {
                       if (idx !== currentSlide) {
                         setCurrentSlide(idx);
                         const slideElement = document.getElementById(
-                          `slide-${idx}`
+                          `slide-${idx}`,
                         );
                         if (slideElement) {
                           slideElement.scrollIntoView({
@@ -1048,7 +1033,7 @@ const PresentationViewer: React.FC = () => {
                       }
                     }}
                   >
-                    <div className="w-full aspect-video flex-shrink-0 cursor-pointer">
+                    <div className="ss-slide-stage flex-shrink-0 cursor-pointer">
                       <Card
                         className={`w-full h-full rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 flex items-stretch ${
                           currentSlide === idx ? "ring-2 ring-blue-500" : ""
@@ -1160,7 +1145,7 @@ const PresentationViewer: React.FC = () => {
                       setCurrentSlide(index);
                       setIsPlaying(false);
                       const slideElement = document.getElementById(
-                        `slide-${index}`
+                        `slide-${index}`,
                       );
                       if (slideElement) {
                         slideElement.scrollIntoView({
@@ -1205,9 +1190,9 @@ const PresentationViewer: React.FC = () => {
         )}
         {/* Single Slide (fullscreen mode) */}
         {isFullscreen && (
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <div className="w-full max-w-[98vw] h-full flex items-center justify-center">
-              <Card className="w-full h-full rounded-none bg-black flex items-center justify-center aspect-video">
+          <div className="flex-1 flex flex-col items-center justify-center overflow-auto">
+            <div className="ss-slide-stage">
+              <Card className="w-full h-full rounded-none bg-black flex items-center justify-center">
                 <SlideRenderer
                   slide={presentationState.slides[currentSlide]}
                   currentTemplate={currentTemplate}
@@ -1251,7 +1236,7 @@ const PresentationViewer: React.FC = () => {
                     }`}
                   >
                     {!["2", "3", "5", "10", "15"].includes(
-                      slideInterval.toString()
+                      slideInterval.toString(),
                     ) && slideInterval !== 0 ? (
                       <span>{slideInterval}s</span>
                     ) : (

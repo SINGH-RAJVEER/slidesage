@@ -1,29 +1,37 @@
-import type { Context, Next } from 'hono';
-import { auth } from '../lib/auth';
+import type { Context } from "hono";
+import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
+import { UserRepository } from "../repositories/user.repository";
 
-export async function authMiddleware(c: Context, next: Next) {
-  const session = await auth.api.getSession({
-    headers: c.req.raw.headers,
-  });
+export const authMiddleware = clerkMiddleware();
 
-  if (!session) {
-    return c.json({ error: { message: 'Missing or invalid authorization' } }, 401);
-  }
+// Ensure an authenticated Clerk user exists in our database.
+// Must run AFTER `authMiddleware` and BEFORE route handlers.
+export async function ensureUserInDbMiddleware(
+  c: Context,
+  next: () => Promise<void>,
+): Promise<void> {
+  const auth = getAuth(c);
 
-  c.set('user', session.user);
-  c.set('session', session.session);
+  if (!auth?.userId) throw new Error("User not authenticated");
+
+  await UserRepository.findOrCreateByClerkId(auth.userId);
   await next();
 }
 
-export function getCurrentUser(c: Context) {
-  const user = c.get('user');
-  if (!user) {
-    throw new Error('User not authenticated');
-  }
-  return user;
+type ClerkAuth = ReturnType<typeof getAuth>;
+
+export function getCurrentUser(c: Context): NonNullable<ClerkAuth> {
+  const auth = getAuth(c);
+
+  if (!auth?.userId) throw new Error("User not authenticated");
+  
+  return auth as NonNullable<ClerkAuth>;
 }
 
 export function getCurrentUserId(c: Context): string {
-  const user = getCurrentUser(c);
-  return user.id;
+  const auth = getAuth(c);
+
+  if (!auth?.userId) throw new Error("User not authenticated");
+  
+  return auth.userId;
 }

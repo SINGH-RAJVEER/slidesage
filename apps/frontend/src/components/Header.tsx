@@ -44,7 +44,7 @@ export default function Header() {
               afterSignOutUrl="/sign-in"
               appearance={{
                 elements: {
-                  avatarBox: "h-14 w-14",
+                  avatarBox: "h-25 w-25",
                 },
               }}
             />

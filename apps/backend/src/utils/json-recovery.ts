@@ -3,15 +3,19 @@
  * Handles malformed JSON recovery for AI-generated responses
  */
 
+import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 export class JSONRecoveryError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'JSONRecoveryError';
+    this.name = "JSONRecoveryError";
   }
 }
 
 export interface RecoveryResult {
-  content: any;
+  content: unknown;
   recovered: boolean;
   strategy?: string;
 }
@@ -29,150 +33,231 @@ export interface RecoveryResult {
  * @throws JSONRecoveryError if recovery fails
  */
 export function recoverJson(content: string, error: Error): RecoveryResult {
-  console.error('JSON parsing error:', error.message);
-  console.error(`Content length: ${content.length}, First 500 chars:`, content.slice(0, 500));
+  console.error("JSON parsing error:", error.message);
+  console.error(
+    `Content length: ${content.length}, First 500 chars:`,
+    content.slice(0, 500),
+  );
 
-  // Try to extract error position from different error types
-  let errorPos = 0;
-  if ('position' in error) {
-    errorPos = (error as any).position;
-  } else if (error.message.includes('position')) {
-    const match = error.message.match(/position (\d+)/);
-    if (match) {
-      errorPos = Number.parseInt(match[1]);
+  // Strategy 1: Extract the first JSON value (handles model adding trailing text).
+  try {
+    const extracted = extractFirstJsonValue(content);
+    if (extracted) {
+      const sanitized = removeTrailingCommas(extracted);
+      const parsedContent = JSON.parse(sanitized);
+      console.info(
+        `Successfully parsed extracted JSON with ${parsedContent.slides?.length || 0} slides`,
+      );
+      return {
+        content: parsedContent,
+        recovered: true,
+        strategy: "extract",
+      };
     }
+  } catch (_extractError) {
+    console.warn("Extraction strategy failed, trying structural closure");
   }
 
-  console.error(`Error position: ${errorPos}`);
-
-  // Show context around the error
-  const errorStart = Math.max(0, errorPos - 100);
-  const errorEnd = Math.min(content.length, errorPos + 100);
-  console.error(`Error context: ...${content.slice(errorStart, errorEnd)}...`);
-
-  // Strategy 1: Try to truncate at the error position and close properly
+  // Strategy 2: Try to close any unclosed structures (handles truncated streaming).
   try {
-    const fixedContent = truncateAndClose(content, errorPos);
-    const parsedContent = JSON.parse(fixedContent);
+    const candidate = extractFromFirstJsonStart(content) ?? content;
+    const closed = closeOpenStructures(candidate);
+    const sanitized = removeTrailingCommas(closed);
+    const parsedContent = JSON.parse(sanitized);
     console.info(
-      `Successfully parsed truncated JSON with ${parsedContent.slides?.length || 0} slides`
+      `Successfully parsed structurally-closed JSON with ${parsedContent.slides?.length || 0} slides`,
     );
     return {
       content: parsedContent,
       recovered: true,
-      strategy: 'truncate',
+      strategy: "close",
     };
-  } catch (truncateError) {
-    console.warn('Truncation strategy failed, trying brace balancing');
-  }
-
-  // Strategy 2: Just try to balance braces
-  try {
-    const fixedContent = balanceBraces(content);
-    const parsedContent = JSON.parse(fixedContent);
-    console.info(`Successfully parsed fixed JSON with ${parsedContent.slides?.length || 0} slides`);
-    return {
-      content: parsedContent,
-      recovered: true,
-      strategy: 'balance',
-    };
-  } catch (balanceError) {
-    console.error('Could not recover from JSON error:', balanceError);
+  } catch (closeError) {
+    console.error("Could not recover from JSON error:", closeError);
     saveMalformedJson(content);
-    throw new JSONRecoveryError(`All recovery strategies failed: ${balanceError}`);
+    throw new JSONRecoveryError(
+      `All recovery strategies failed: ${closeError}`,
+    );
   }
 }
 
-/**
- * Truncate content at the last valid slide before the error position.
- */
-function truncateAndClose(content: string, errorPos: number): string {
-  const contentBeforeError = content.slice(0, errorPos);
+function findFirstJsonStart(input: string): number {
+  const idxObj = input.indexOf("{");
+  const idxArr = input.indexOf("[");
 
-  // Find the last complete slide object by counting braces
-  let lastValidPos = 0;
-  let braceCount = 0;
-  let bracketCount = 0;
+  if (idxObj === -1) return idxArr;
+  if (idxArr === -1) return idxObj;
+  return Math.min(idxObj, idxArr);
+}
+
+function extractFromFirstJsonStart(input: string): string | null {
+  const start = findFirstJsonStart(input);
+  if (start < 0) return null;
+  return input.slice(start).trim();
+}
+
+/**
+ * Extract the first complete JSON value from a string.
+ * This is the most common failure mode for LLMs: valid JSON plus trailing explanation.
+ */
+function extractFirstJsonValue(input: string): string | null {
+  const start = findFirstJsonStart(input);
+  if (start < 0) return null;
+
+  const s = input.slice(start).trimStart();
+
+  const stack: Array<"{" | "["> = [];
   let inString = false;
   let escapeNext = false;
-  let inSlidesArray = false;
 
-  for (let i = 0; i < contentBeforeError.length; i++) {
-    const char = contentBeforeError[i];
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
 
     if (escapeNext) {
       escapeNext = false;
       continue;
     }
-    if (char === '\\') {
-      escapeNext = true;
+
+    if (ch === "\\") {
+      if (inString) {
+        escapeNext = true;
+      }
       continue;
     }
-    if (char === '"' && !escapeNext) {
+
+    if (ch === '"') {
       inString = !inString;
       continue;
     }
-    if (!inString) {
-      if (char === '{') {
-        braceCount++;
-      } else if (char === '}') {
-        braceCount--;
-        // Track when we complete a slide object (back to slides array level)
-        if (inSlidesArray && braceCount === 2) {
-          // 1 for root object + 1 for slides array
-          lastValidPos = i + 1;
-        }
-      } else if (char === '[') {
-        bracketCount++;
-        // Check if this is the slides array
-        if (i > 10 && contentBeforeError.slice(Math.max(0, i - 10), i).includes('"slides"')) {
-          inSlidesArray = true;
-        }
-      } else if (char === ']') {
-        bracketCount--;
+
+    if (inString) {
+      continue;
+    }
+
+    if (ch === "{" || ch === "[") {
+      stack.push(ch);
+      continue;
+    }
+    if (ch === "}" || ch === "]") {
+      const expected = ch === "}" ? "{" : "[";
+      // If stack is empty, we already completed the root earlier; treat as trailing junk.
+      if (stack.length === 0) {
+        return s.slice(0, i).trim();
+      }
+      const last = stack[stack.length - 1];
+      if (last === expected) {
+        stack.pop();
+      }
+      if (stack.length === 0) {
+        return s.slice(0, i + 1).trim();
       }
     }
   }
 
-  if (lastValidPos > 0) {
-    console.info(`Found last valid position at ${lastValidPos}`);
-    let fixedContent = contentBeforeError.slice(0, lastValidPos);
-
-    // Close the slides array and main object
-    fixedContent += '],"totalSlides":';
-    // Count how many complete slides we have
-    const slideCount = (fixedContent.match(/"id":"slide-/g) || []).length;
-    fixedContent += slideCount + '}';
-
-    console.info('Attempting to parse truncated JSON...');
-    return fixedContent;
-  } else {
-    throw new Error('Could not find valid truncation point');
-  }
+  // Incomplete JSON; return what we have so it can be closed.
+  return s.trim();
 }
 
-/*
- * Balance unclosed brackets and braces in the content.
+/**
+ * Close any remaining open objects/arrays using a stack-based scan.
+ * This ignores braces/brackets inside strings.
  */
-function balanceBraces(content: string): string {
-  const bracketBalance = (content.match(/\[/g) || []).length - (content.match(/\]/g) || []).length;
-  const braceBalance = (content.match(/\{/g) || []).length - (content.match(/\}/g) || []).length;
+function closeOpenStructures(input: string): string {
+  const s = extractFromFirstJsonStart(input) ?? input.trim();
+  const stack: Array<"{" | "["> = [];
+  let inString = false;
+  let escapeNext = false;
 
-  console.info(
-    `JSON balance: ${bracketBalance} unclosed brackets, ${braceBalance} unclosed braces`
-  );
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
 
-  // Attempt to complete the JSON
-  let fixedContent = content;
-  if (bracketBalance > 0) {
-    fixedContent += ']'.repeat(bracketBalance);
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    if (ch === "\\") {
+      if (inString) {
+        escapeNext = true;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) {
+      continue;
+    }
+
+    if (ch === "{" || ch === "[") {
+      stack.push(ch);
+    } else if (ch === "}" || ch === "]") {
+      const expected = ch === "}" ? "{" : "[";
+      if (stack.length > 0 && stack[stack.length - 1] === expected) {
+        stack.pop();
+      }
+    }
   }
-  if (braceBalance > 0) {
-    fixedContent += '}'.repeat(braceBalance);
+
+  if (stack.length === 0) {
+    return s;
   }
 
-  console.info('Attempting to parse fixed JSON...');
-  return fixedContent;
+  let out = s;
+  for (let i = stack.length - 1; i >= 0; i--) {
+    out += stack[i] === "{" ? "}" : "]";
+  }
+  return out;
+}
+
+/**
+ * Remove trailing commas before `}` or `]` (outside strings).
+ */
+function removeTrailingCommas(input: string): string {
+  let out = "";
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+
+    if (escapeNext) {
+      out += ch;
+      escapeNext = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      out += ch;
+      if (inString) {
+        escapeNext = true;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      out += ch;
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString && ch === ",") {
+      // Look ahead to the next non-whitespace char
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) {
+        j++;
+      }
+      const next = input[j];
+      if (next === "}" || next === "]") {
+        // Skip the trailing comma
+        continue;
+      }
+    }
+
+    out += ch;
+  }
+
+  return out;
 }
 
 /*
@@ -180,14 +265,10 @@ function balanceBraces(content: string): string {
  */
 function saveMalformedJson(content: string): void {
   try {
-    const fs = require('fs');
-    const path = require('path');
-    const os = require('os');
-
-    const tempFile = path.join(os.tmpdir(), `litellm_error_${Date.now()}.json`);
-    fs.writeFileSync(tempFile, content);
+    const tempFile = join(tmpdir(), `litellm_error_${Date.now()}.json`);
+    writeFileSync(tempFile, content);
     console.error(`Saved malformed JSON to: ${tempFile}`);
   } catch (e) {
-    console.warn('Could not save malformed JSON:', e);
+    console.warn("Could not save malformed JSON:", e);
   }
 }

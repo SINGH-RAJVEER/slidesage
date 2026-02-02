@@ -1,6 +1,29 @@
 # Development Docker Compose
 
 services:
+  litellm:
+    build:
+      context: ../..
+      dockerfile: docker/dockerfiles/litellm.Dockerfile
+    image: slide-sage/litellm:dev
+    container_name: slide-sage-litellm-dev
+    ports:
+      - "4000:4000"
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - ../../litellm_config.yaml:/app/litellm_config.yaml:ro
+    restart: "no"
+    networks:
+      - slide-sage-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   database:
     build:
       context: ../..
@@ -51,6 +74,8 @@ services:
     command: sh -c "cd /app/apps/database && bun run db:push && cd /app/apps/backend && bun run dev"
     depends_on:
       database:
+        condition: service_healthy
+      litellm:
         condition: service_healthy
     healthcheck:
       test:

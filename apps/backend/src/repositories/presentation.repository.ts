@@ -1,14 +1,14 @@
-import { eq, desc, and, sql } from 'drizzle-orm';
-import { db } from '@slide-sage/database';
-import { presentations, type NewPresentation, type Presentation } from '@slide-sage/database/schema';
-import type { PresentationJSON } from '../types';
+import { db } from "@slide-sage/database";
+import { presentations, type Presentation } from "@slide-sage/database/schema";
+import { desc, eq, sql } from "drizzle-orm";
+import type { PresentationJSON } from "../types";
 
 export class PresentationRepository {
   async create(
     userId: string,
     title: string,
     prompt: string,
-    slidesData: PresentationJSON
+    slidesData: PresentationJSON,
   ): Promise<Presentation> {
     const [presentation] = await db
       .insert(presentations)
@@ -32,14 +32,37 @@ export class PresentationRepository {
     return presentation;
   }
 
-  async findByUserId(userId: string): Promise<Presentation[]> {
+  async findByUserId(
+    userId: string,
+    limit = 20,
+    offset = 0,
+  ): Promise<{
+    presentations: Presentation[];
+    total: number;
+    hasMore: boolean;
+  }> {
+    // Get total count
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(presentations)
+      .where(eq(presentations.userId, userId));
+
+    const total = Number(countResult.count);
+
+    // Get paginated results
     const userPresentations = await db
       .select()
       .from(presentations)
       .where(eq(presentations.userId, userId))
-      .orderBy(desc(presentations.createdAt));
+      .orderBy(desc(presentations.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    return userPresentations;
+    return {
+      presentations: userPresentations,
+      total,
+      hasMore: offset + userPresentations.length < total,
+    };
   }
 
   async delete(presentationId: string): Promise<void> {
@@ -48,7 +71,7 @@ export class PresentationRepository {
 
   async update(
     presentationId: string,
-    updates: Partial<Presentation>
+    updates: Partial<Presentation>,
   ): Promise<Presentation | undefined> {
     const [presentation] = await db
       .update(presentations)
@@ -57,5 +80,15 @@ export class PresentationRepository {
       .returning();
 
     return presentation;
+  }
+
+  async findIterations(presentationId: string): Promise<Presentation[]> {
+    const iterations = await db
+      .select()
+      .from(presentations)
+      .where(eq(presentations.parentPresentationId, presentationId))
+      .orderBy(desc(presentations.createdAt));
+
+    return iterations;
   }
 }

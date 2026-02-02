@@ -153,10 +153,17 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 
         if (!response.ok) {
           const errorData = await response.json();
+          const errorMessage =
+            typeof errorData.error === "string"
+              ? errorData.error
+              : errorData.error?.message ||
+                errorData.message ||
+                "Failed to generate presentation";
+
           setStreamingState((prev) => ({
             ...prev,
             isStreaming: false,
-            error: errorData.error || "Failed to generate presentation",
+            error: errorMessage,
           }));
           return false;
         }

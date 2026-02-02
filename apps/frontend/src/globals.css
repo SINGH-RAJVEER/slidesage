@@ -41,6 +41,10 @@ body {
   --sidebar-accent-foreground: hsl(240 5.9% 10%);
   --sidebar-border: hsl(220 13% 91%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
+
+  /* Slide viewer stage sizing (fixed; does not respond to viewport changes) */
+  --ss-slide-width: 1280px;
+  --ss-slide-height: 720px;
 }
 
 .dark {
@@ -121,7 +125,11 @@ input.hide-number-spin[type="number"] {
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  padding: 1rem 2rem;
+
+  /* Ensure the first/last fixed-size slide can snap centered */
+  padding-block: 1rem;
+  padding-inline: max(2rem, calc(50vw - (var(--ss-slide-width) / 2)));
+
   align-items: center;
   position: relative;
 }
@@ -135,6 +143,14 @@ input.hide-number-spin[type="number"] {
   justify-content: center;
   align-items: center;
   width: auto;
+  position: relative;
+}
+
+/* Fixed slide stage: never flexes or resizes with viewport */
+.ss-slide-stage {
+  width: var(--ss-slide-width);
+  height: var(--ss-slide-height);
+  flex: 0 0 auto;
   position: relative;
 }
 
@@ -160,13 +176,6 @@ input.hide-number-spin[type="number"] {
   opacity: 0.8;
   transition: opacity 0.6s ease-in-out;
   border-radius: 1rem;
-}
-
-@media (max-width: 768px) {
-  .slide-carousel__item {
-    flex: 0 0 auto;
-    width: 100%;
-  }
 }
 
 /* Hide horizontal scrollbar while keeping scroll accessible */

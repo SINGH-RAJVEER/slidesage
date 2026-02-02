@@ -7,7 +7,7 @@ export interface ChartConfig {
 
 export interface Slide {
   id: string;
-  type: 'title' | 'content' | 'chart' | string;
+  type: "title" | "content" | "chart" | string;
   html: string;
   chartConfig?: ChartConfig;
   notes?: string;
@@ -24,11 +24,17 @@ export interface PresentationJSON {
 }
 
 export type PresentationStreamEvent =
-  | { event: 'start'; data: { status: string } }
-  | { event: 'theme'; data: { theme: string } }
-  | { event: 'slide'; data: { slide: Slide; index: number; title: string | null } }
-  | { event: 'complete'; data: PresentationJSON }
-  | { event: 'error'; data: { error: string } };
+  | { event: "start"; data: { status: string } }
+  | { event: "theme"; data: { theme: string } }
+  | {
+      event: "slide";
+      data: { slide: Slide; index: number; title: string | null };
+    }
+  | { event: "complete"; data: PresentationJSON }
+  | {
+      event: "error";
+      data: { error: string; details?: unknown; [key: string]: unknown };
+    };
 
 export interface LiteLLMMessage {
   role: string;
