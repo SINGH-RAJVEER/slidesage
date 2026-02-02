@@ -13,18 +13,13 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-dev-master-key}
     volumes:
       - ../../litellm_config.yaml:/app/litellm_config.yaml:ro
     restart: "no"
     networks:
       - slide-sage-network
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl -fsS -H 'Authorization: Bearer ${LITELLM_MASTER_KEY:-dev-master-key}' -H 'x-api-key: ${LITELLM_MASTER_KEY:-dev-master-key}' http://localhost:4000/health >/dev/null",
-        ]
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -71,12 +66,16 @@ services:
       LOG_LEVEL: debug
       DATABASE_URL: postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD:-slidesage}@database:5432/${POSTGRES_DB:-slidesage}
     volumes:
+      - ../../package.json:/app/package.json:ro
+      - ../../bun.lock:/app/bun.lock:ro
+      - ../../tsconfig.json:/app/tsconfig.json:ro
       - ../../apps/backend:/app/apps/backend
       - ../../apps/database:/app/apps/database
-      - /app/apps/backend/node_modules
-      - /app/apps/database/node_modules
+      - root_node_modules:/app/node_modules
+      - backend_node_modules:/app/apps/backend/node_modules
+      - database_node_modules:/app/apps/database/node_modules
       - bun_cache:/root/.bun
-    command: sh -c "cd /app/apps/database && bun run db:push && cd /app/apps/backend && bun run dev"
+    command: sh -c "cd /app && bun install --no-save --ignore-scripts && cd /app/apps/database && bun run db:push && cd /app/apps/backend && bun run dev"
     depends_on:
       database:
         condition: service_healthy
@@ -94,7 +93,7 @@ services:
         ]
       interval: 30s
       timeout: 10s
-      start_period: 5s
+      start_period: 180s
       retries: 3
     networks:
       - slide-sage-network
@@ -116,12 +115,16 @@ services:
       NODE_ENV: development
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     volumes:
+      - ../../package.json:/app/package.json:ro
+      - ../../bun.lock:/app/bun.lock:ro
+      - ../../tsconfig.json:/app/tsconfig.json:ro
       - ../../apps/frontend:/app/apps/frontend
       - ../../apps/database:/app/apps/database
-      - /app/apps/frontend/node_modules
-      - /app/apps/database/node_modules
+      - root_node_modules:/app/node_modules
+      - frontend_node_modules:/app/apps/frontend/node_modules
+      - database_node_modules:/app/apps/database/node_modules
       - bun_cache:/root/.bun
-    command: sh -c "cd /app/apps/frontend && bun run dev --host 0.0.0.0"
+    command: sh -c "cd /app && bun install --no-save --ignore-scripts && cd /app/apps/frontend && bun run dev --host 0.0.0.0"
     depends_on:
       backend:
         condition: service_healthy
@@ -138,7 +141,7 @@ services:
         ]
       interval: 30s
       timeout: 10s
-      start_period: 5s
+      start_period: 180s
       retries: 3
     networks:
       - slide-sage-network
@@ -150,3 +153,7 @@ networks:
 volumes:
   bun_cache:
   postgres_data:
+  root_node_modules:
+  backend_node_modules:
+  frontend_node_modules:
+  database_node_modules:

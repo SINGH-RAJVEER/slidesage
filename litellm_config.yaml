@@ -15,8 +15,8 @@ model_list:
       api_key: os.environ/GEMINI_API_KEY
 
 general_settings:
-  master_key: dev_master_key_12345 # Change in production!
-  database_url: null # No database setup
+  master_key: null # Dev: no auth
+  database_url: null # Dev: no database
 
 # Logging
 litellm_settings:
