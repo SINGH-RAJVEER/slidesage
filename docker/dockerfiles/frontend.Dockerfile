@@ -1,0 +1,67 @@
+# Multi-stage build for optimized frontend image
+FROM oven/bun:1.3.6-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+WORKDIR /app
+
+# Copy all package.json files and lockfile
+COPY package.json ./
+COPY bun.lock ./
+COPY apps/frontend/package.json ./apps/frontend/
+COPY apps/backend/package.json ./apps/backend/
+COPY apps/database/package.json ./apps/database/
+
+# Install dependencies with BuildKit cache mount for faster builds
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --no-save
+
+# Build the application
+FROM base AS builder
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
+COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
+COPY --from=deps /app/apps/database/node_modules ./apps/database/node_modules
+
+# Copy source code
+COPY apps/database ./apps/database
+COPY apps/frontend ./apps/frontend
+COPY apps/backend ./apps/backend
+COPY tsconfig.json ./
+
+# Copy environment variables
+ARG NODE_ENV=production
+ARG VITE_API_URL=http://localhost:8000
+ENV NODE_ENV=${NODE_ENV}
+ENV VITE_API_URL=${VITE_API_URL}
+
+# Build the frontend application
+WORKDIR /app/apps/frontend
+RUN bun run build
+
+# Production image
+FROM oven/bun:1.3.6-alpine AS runner
+WORKDIR /app
+
+# Install wget for healthcheck
+RUN apk add --no-cache wget
+
+# Set production environment
+ENV NODE_ENV=production
+ENV PORT=5173
+
+# Copy built static files and serve with bun
+COPY --from=builder /app/apps/frontend/dist ./dist
+COPY --from=builder /app/apps/frontend/package.json ./package.json
+
+# Expose port
+EXPOSE 5173
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:5173 || exit 1
+
+# Start static file server using bun
+CMD ["bun", "x", "serve", "dist", "-l", "5173"]

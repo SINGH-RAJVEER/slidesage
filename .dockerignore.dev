@@ -1,0 +1,17 @@
+# Development-specific Docker ignore
+# Used during development with volume mounts
+
+# Exclude from image but allow for volume mounts
+node_modules
+bun.lockb
+dist
+build
+
+# Keep for development
+.env
+.env.example
+tsconfig.json
+*.ts
+*.tsx
+*.js
+*.jsx

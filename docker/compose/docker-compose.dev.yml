@@ -1,0 +1,122 @@
+# Development Docker Compose
+
+services:
+  database:
+    build:
+      context: ../..
+      dockerfile: docker/dockerfiles/database.Dockerfile
+    image: slide-sage/database:dev
+    container_name: slide-sage-postgres-dev
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-slidesage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-slidesage}
+      POSTGRES_DB: ${POSTGRES_DB:-slidesage}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/scripts/init-dev-db.sql:/docker-entrypoint-initdb.d/init-dev-db.sql
+    restart: "no"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-slidesage}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - slide-sage-network
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: docker/dockerfiles/backend.Dockerfile
+      args:
+        NODE_ENV: development
+    image: slide-sage/backend:dev
+    container_name: slide-sage-backend-dev
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    restart: "no"
+    env_file:
+      - ../../.env
+    environment:
+      NODE_ENV: development
+      LOG_LEVEL: debug
+      DATABASE_URL: postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD:-slidesage}@database:5432/${POSTGRES_DB:-slidesage}
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - ./apps/database:/app/apps/database
+      - /app/apps/backend/node_modules
+      - /app/apps/database/node_modules
+      - bun_cache:/root/.bun
+    command: sh -c "cd /app/apps/database && bun run db:push && cd /app/apps/backend && bun run dev"
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8000/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+    networks:
+      - slide-sage-network
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: docker/dockerfiles/frontend.Dockerfile
+      args:
+        NODE_ENV: development
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    image: slide-sage/frontend:dev
+    container_name: slide-sage-frontend-dev
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    env_file:
+      - ../../.env
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    volumes:
+      - ./apps/frontend:/app/apps/frontend
+      - ./apps/database:/app/apps/database
+      - /app/apps/frontend/node_modules
+      - /app/apps/database/node_modules
+      - bun_cache:/root/.bun
+    command: sh -c "cd /app/apps/frontend && bun run dev --host 0.0.0.0"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: "no"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:5173",
+        ]
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      retries: 3
+    networks:
+      - slide-sage-network
+
+networks:
+  slide-sage-network:
+    driver: bridge
+
+volumes:
+  bun_cache:
+  postgres_data:
