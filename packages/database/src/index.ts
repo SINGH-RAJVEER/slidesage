@@ -7,7 +7,7 @@ const connectionString =
 
 // Create postgres client with SSL configuration
 export const client = postgres(connectionString, {
-  ssl: 'require',
+  ssl: connectionString.includes('ssl=require') ? 'require' : false,
   connection: {
     application_name: 'slidesage-backend',
   },

@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { db } from '@slide-sage/database';
-import * as schema from '../db/schema';
+import * as schema from '@slide-sage/database';
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
