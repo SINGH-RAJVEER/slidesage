@@ -1,5 +1,6 @@
 # Multi-stage build for optimized frontend image
-FROM oven/bun:1.3.6-alpine AS base
+# Use Debian-based Bun image for better native-dependency compatibility.
+FROM oven/bun:1.3.6 AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -13,7 +14,8 @@ COPY apps/backend/package.json ./apps/backend/
 COPY apps/database/package.json ./apps/database/
 
 # Install dependencies with BuildKit cache mount for faster builds
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --no-save
+# Skip lifecycle scripts to avoid failing optional native deps (e.g. node-canvas).
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --no-save --ignore-scripts
 
 # Build the application
 FROM base AS builder
@@ -42,11 +44,13 @@ WORKDIR /app/apps/frontend
 RUN bun run build
 
 # Production image
-FROM oven/bun:1.3.6-alpine AS runner
+FROM oven/bun:1.3.6 AS runner
 WORKDIR /app
 
 # Install wget for healthcheck
-RUN apk add --no-cache wget
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set production environment
 ENV NODE_ENV=production

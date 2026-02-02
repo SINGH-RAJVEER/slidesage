@@ -13,13 +13,18 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-dev-master-key}
     volumes:
       - ../../litellm_config.yaml:/app/litellm_config.yaml:ro
     restart: "no"
     networks:
       - slide-sage-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS -H 'Authorization: Bearer ${LITELLM_MASTER_KEY:-dev-master-key}' -H 'x-api-key: ${LITELLM_MASTER_KEY:-dev-master-key}' http://localhost:4000/health >/dev/null",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -38,7 +43,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/scripts/init-dev-db.sql:/docker-entrypoint-initdb.d/init-dev-db.sql
+      - ./initdb/init-dev-db.sql:/docker-entrypoint-initdb.d/init-dev-db.sql:ro
     restart: "no"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-slidesage}"]
@@ -66,8 +71,8 @@ services:
       LOG_LEVEL: debug
       DATABASE_URL: postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD:-slidesage}@database:5432/${POSTGRES_DB:-slidesage}
     volumes:
-      - ./apps/backend:/app/apps/backend
-      - ./apps/database:/app/apps/database
+      - ../../apps/backend:/app/apps/backend
+      - ../../apps/database:/app/apps/database
       - /app/apps/backend/node_modules
       - /app/apps/database/node_modules
       - bun_cache:/root/.bun
@@ -111,8 +116,8 @@ services:
       NODE_ENV: development
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     volumes:
-      - ./apps/frontend:/app/apps/frontend
-      - ./apps/database:/app/apps/database
+      - ../../apps/frontend:/app/apps/frontend
+      - ../../apps/database:/app/apps/database
       - /app/apps/frontend/node_modules
       - /app/apps/database/node_modules
       - bun_cache:/root/.bun
