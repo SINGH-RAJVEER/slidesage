@@ -125,7 +125,8 @@ docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-com
 ### From Root Directory
 
 ```bash
-bun dev              # Start all development servers
+bun dev              # Start all development servers (Turbo TUI)
+bun dev:stream       # Start all development servers (plain logs)
 bun build            # Build all applications
 bun lint             # Lint all code
 bun format           # Format all code
