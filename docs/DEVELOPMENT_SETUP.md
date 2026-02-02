@@ -133,7 +133,7 @@ curl http://localhost:8000/api/health
 open http://localhost:5173
 
 # Verify database connection
-cd apps/backend && bun run db:studio
+cd apps/database && bun run db:studio
 ```
 
 ### Expected Responses
@@ -246,7 +246,7 @@ bun run build
 
 ```bash
 # Database operations
-cd apps/backend
+cd apps/database
 bun run db:push      # Push schema changes
 bun run db:studio    # Open Drizzle Studio
 bun run db:generate  # Generate migrations
@@ -265,7 +265,7 @@ turbo run test --filter=frontend
 
 ```bash
 # View tables and data
-cd apps/backend
+cd apps/database
 bun run db:studio
 
 # Reset database (development only)

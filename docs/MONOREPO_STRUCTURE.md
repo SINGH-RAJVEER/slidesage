@@ -9,7 +9,6 @@ slide-sage/
 ├── apps/                     # Applications
 │   ├── backend/             # Hono API server
 │   │   ├── src/
-│   │   │   ├── db/          # Database schema and connections
 │   │   │   ├── lib/         # Shared libraries
 │   │   │   ├── middleware/  # Hono middleware
 │   │   │   ├── repositories/# Database access layer
@@ -19,7 +18,6 @@ slide-sage/
 │   │   │   ├── utils/       # Utility functions
 │   │   │   └── index.ts     # Application entry point
 │   │   ├── biome.json       # Linter/Formatter config
-│   │   ├── drizzle.config.ts # ORM config
 │   │   └── package.json
 │   ├── frontend/            # React SPA
 │   │   ├── src/
@@ -32,8 +30,12 @@ slide-sage/
 │   │   │   ├── pages/       # Top-level pages
 │   │   │   └── App.tsx
 │   │   └── package.json
-│   └── database/            # PostgreSQL service container
-│       └── Dockerfile       # Container definition
+│   └── database/            # Shared database package
+│       ├── src/
+│       │   ├── index.ts     # Database connection
+│       │   └── schema.ts    # Drizzle schema definitions
+│       ├── drizzle.config.ts # ORM config
+│       └── package.json     # @slide-sage/database
 ├── docs/                    # Documentation
 ├── turbo.json              # Turbo configuration
 ├── package.json            # Root workspace configuration
@@ -48,7 +50,7 @@ slide-sage/
 ```json
 {
   "name": "slide-sage-monorepo",
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": ["apps/*"],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
@@ -95,7 +97,7 @@ slide-sage/
 
 ## Benefits
 
-1. **Shared Dependencies**: Common packages managed centrally
+1. **Shared Code**: Database schema and utilities shared across apps
 2. **Atomic Commits**: Changes across frontend and backend in one PR
 3. **Unified Tooling**: Single configuration for linting, formatting
 4. **Code Sharing**: Easy sharing of types and utilities between apps

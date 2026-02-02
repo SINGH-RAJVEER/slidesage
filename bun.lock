@@ -26,6 +26,19 @@
         "@types/bun": "latest",
       },
     },
+    "apps/database": {
+      "name": "@slide-sage/database",
+      "version": "0.1.0",
+      "dependencies": {
+        "drizzle-orm": "^0.36.4",
+        "postgres": "^3.4.5",
+      },
+      "devDependencies": {
+        "@biomejs/biome": "^1.9.4",
+        "@types/bun": "latest",
+        "drizzle-kit": "^0.28.1",
+      },
+    },
     "apps/frontend": {
       "name": "slide-sage-frontend",
       "version": "0.1.0",
@@ -87,19 +100,6 @@
         "tailwindcss": "^4.0.0",
         "vite-tsconfig-paths": "^5.1.4",
         "vitest": "^1.0.4",
-      },
-    },
-    "packages/database": {
-      "name": "@slide-sage/database",
-      "version": "0.1.0",
-      "dependencies": {
-        "drizzle-orm": "^0.36.4",
-        "postgres": "^3.4.5",
-      },
-      "devDependencies": {
-        "@biomejs/biome": "^1.9.4",
-        "@types/bun": "latest",
-        "drizzle-kit": "^0.28.1",
       },
     },
   },
@@ -416,7 +416,7 @@
 
     "@sinclair/typebox": ["@sinclair/typebox@0.27.8", "", {}, "sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA=="],
 
-    "@slide-sage/database": ["@slide-sage/database@workspace:packages/database"],
+    "@slide-sage/database": ["@slide-sage/database@workspace:apps/database"],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 

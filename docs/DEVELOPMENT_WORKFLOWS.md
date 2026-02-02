@@ -69,7 +69,7 @@ export interface DashboardStats {
 #### Step 2: Update Database Schema (if needed)
 
 ```sql
--- apps/backend/src/db/schema.ts
+-- apps/database/src/schema.ts
 -- Add any new tables or columns
 -- Or create views for aggregated data
 ```
@@ -388,7 +388,7 @@ Adds user dashboard with presentation statistics
 ### 1. Schema Changes
 
 ```typescript
-// apps/backend/src/db/schema.ts
+// apps/database/src/schema.ts
 export const users = pgTable("users", {
   // existing fields...
   last_login_at: timestamp("last_login_at").defaultNow(),
@@ -398,7 +398,7 @@ export const users = pgTable("users", {
 ### 2. Migration Generation
 
 ```bash
-cd apps/backend
+cd apps/database
 bun run db:generate
 ```
 

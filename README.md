@@ -13,21 +13,63 @@ cd slide-sage
 bun install
 
 # Configure environment
-cp apps/backend/.env.example apps/backend/.env
-cp apps/frontend/.env.example apps/frontend/.env
-# Edit .env files with your configuration
+cp .env.example .env
+# Edit .env with your configuration
 
 # Start development (Docker recommended)
-docker-compose up --build
-# or
+./docker/scripts/dev.sh start
+# or for manual development
 bun dev
 ```
 
 **Access Application:**
 
 - **Frontend**: `http://localhost:5173`
-- **Backend API**: `http://localhost:8000/api`
+- **Backend API**: `http://localhost:8000`
 - **Database**: `localhost:5432`
+
+### Docker Development Commands
+
+```bash
+# Start development environment with hot reload
+./docker/scripts/dev.sh start
+
+# View logs
+./docker/scripts/dev.sh logs
+./docker/scripts/dev.sh logs backend
+
+# Stop development environment
+./docker/scripts/dev.sh stop
+
+# Restart development environment
+./docker/scripts/dev.sh restart
+
+# Clean up containers and images
+./docker/scripts/dev.sh clean
+```
+
+### Docker Build Commands
+
+```bash
+# Build production images
+./docker/scripts/build.sh prod
+
+# Build development images
+./docker/scripts/build.sh dev
+
+# Build specific service
+./docker/scripts/build.sh backend v1.0.0
+```
+
+### Manual Docker Compose
+
+```bash
+# Development (from project root)
+docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.dev.yml up
+
+# Production (from project root)
+docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.prod.yml up
+```
 
 ---
 
@@ -120,7 +162,21 @@ slide-sage/
 │   ├── backend/             # Hono API server (TypeScript + Drizzle)
 │   ├── frontend/            # React SPA (Vite + Tailwind + Shadcn UI)
 │   └── database/            # PostgreSQL service container
-├── docs/                    # 📚 Documentation (this directory)
+├── docker/                  # 🐳 Docker configuration
+│   ├── compose/            # Docker Compose files
+│   │   ├── docker-compose.yml      # Base configuration
+│   │   ├── docker-compose.dev.yml  # Development overrides
+│   │   └── docker-compose.prod.yml # Production overrides
+│   ├── dockerfiles/        # Optimized Dockerfiles
+│   │   ├── backend.Dockerfile      # Backend service
+│   │   ├── frontend.Dockerfile     # Frontend service
+│   │   └── database.Dockerfile    # Database service
+│   ├── nginx/             # Production reverse proxy
+│   ├── scripts/           # Helper scripts
+│   │   ├── build.sh     # Build automation
+│   │   └── dev.sh       # Development automation
+│   └── README.md          # Docker documentation
+├── docs/                    # 📚 Documentation
 │   ├── API_OVERVIEW.md      # API standards and overview
 │   ├── AUTH_API.md          # Authentication endpoints
 │   ├── PRESENTATIONS_API.md # Presentation endpoints
@@ -132,9 +188,11 @@ slide-sage/
 │   ├── DEVELOPMENT_WORKFLOWS.md # Development processes
 │   ├── DEPLOYMENT_WORKFLOWS.md # Deployment guide
 │   └── CODE_STANDARDS.md    # Coding standards
+├── .env.example             # Environment template
+├── .env                    # Environment configuration
 ├── turbo.json              # Turbo build system config
 ├── package.json            # Root workspace configuration
-└── docker-compose.yml      # Development containers
+└── bun.lock               # Bun lockfile
 ```
 
 ### Technology Stack
@@ -143,7 +201,9 @@ slide-sage/
 - **Build System**: Turbo for task orchestration and caching
 - **Backend**: TypeScript + Bun + Hono + Drizzle ORM + PostgreSQL
 - **Frontend**: React + Vite + Tailwind CSS + Shadcn UI
-- **Infrastructure**: Docker for containerization
+- **Infrastructure**: Docker with multi-stage builds and optimized images
+- **Database**: PostgreSQL 16 Alpine with health checks
+- **Production**: Nginx reverse proxy with SSL support
 
 ---
 
@@ -167,31 +227,42 @@ slide-sage/
 
 ### 3. Deployment
 
-1. **Local**: Use `docker-compose up --build`
-2. **Production**: Follow [DEPLOYMENT_WORKFLOWS.md](docs/DEPLOYMENT_WORKFLOWS.md)
+1. **Local Development**: Use `./docker/scripts/dev.sh start`
+2. **Production**:
+   - Build with `./docker/scripts/build.sh prod`
+   - Deploy with `docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.prod.yml up`
 3. **CI/CD**: Use automated pipelines and monitoring
 
 ---
 
 ## 🔧 Configuration
 
-### Required Environment Variables
+### Environment Variables
 
-**Backend (apps/backend/.env):**
+All services use a single `.env` file in the project root:
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/slide_sage
-JWT_SECRET_KEY=your-super-secret-jwt-key
-GEMINI_API_KEY=your-gemini-api-key
+# Copy example configuration
+cp .env.example .env
+
+# Backend Configuration
+DATABASE_URL=postgresql://slidesage:slidesage@localhost:5432/slidesage
+JWT_SECRET_KEY=change-this-secret-key-in-production
 GROQ_API_KEY=your-groq-api-key
-CORS_ORIGINS=http://localhost:5173
-```
+LITELLM_MODEL=groq/moonshotai/kimi-k2-instruct-0905
 
-**Frontend (apps/frontend/.env):**
-
-```bash
-VITE_API_URL=http://localhost:8000/api
+# Frontend Configuration
+VITE_API_URL=http://localhost:8000
 VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+
+# Server Configuration
+PORT=8000
+BASE_URL=http://localhost:8000
+
+# CORS
+CORS_ORIGINS=*
 ```
 
 ---
@@ -204,6 +275,10 @@ VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id
 - **Frontend API**: Verify `VITE_API_URL` matches backend port
 - **Authentication**: Check that `JWT_SECRET_KEY` is set and consistent
 - **Token Issues**: Ensure AI API keys are valid and have sufficient credits
+- **Docker Build Failures**:
+  - Check that `.env` file exists in project root
+  - Ensure Docker is running and has sufficient permissions
+  - Try `./docker/scripts/dev.sh clean` to reset containers
 
 ### Getting Help
 
