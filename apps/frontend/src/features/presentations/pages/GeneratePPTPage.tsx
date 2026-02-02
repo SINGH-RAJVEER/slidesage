@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { authService } from "@/features/auth";
 import Header from "@/components/Header";
 import { useStreaming } from "@/features/presentations";
 import {
@@ -80,7 +79,7 @@ export default function GeneratePPTPage() {
       topics.join(", "),
       count,
       detailLevel,
-      tonality
+      tonality,
     );
 
     if (!success) {

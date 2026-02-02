@@ -11,12 +11,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/features/auth";
+import { useUser } from "@clerk/clerk-react";
 import Header from "@/components/Header";
 
 export default function PurchaseTokensPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useUser();
   const [customAmount, setCustomAmount] = useState<string>("");
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -94,9 +94,11 @@ export default function PurchaseTokensPage() {
                 Current Balance
               </h2>
               <div className="text-6xl font-bold text-white flex items-center justify-center gap-3">
-                {(user as any)?.is_unlimited || user?.slide_tokens === Infinity
+                {(user?.publicMetadata as any)?.is_unlimited ||
+                (user?.publicMetadata as any)?.slide_tokens === Infinity
                   ? "∞"
-                  : user?.slide_tokens?.toFixed(1) ?? "0.0"}
+                  : ((user?.publicMetadata as any)?.slide_tokens?.toFixed(1) ??
+                    "0.0")}
                 <span className="text-2xl text-blue-400 font-normal mt-4">
                   points
                 </span>

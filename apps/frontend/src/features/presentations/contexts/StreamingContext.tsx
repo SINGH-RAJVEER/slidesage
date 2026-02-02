@@ -1,4 +1,5 @@
-import React, {
+import type { ReactNode } from "react";
+import {
   createContext,
   useContext,
   useState,
@@ -7,7 +8,6 @@ import React, {
   useEffect,
 } from "react";
 import type { Slide, PresentationData } from "../types/presentation";
-import { useAuth } from "@/features/auth";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -28,14 +28,14 @@ interface StreamingContextValue {
     prompt: string,
     slideCount: number,
     detailLevel: string,
-    tonality: string
+    tonality: string,
   ) => Promise<boolean>;
   startIterating: (
     prompt: string,
     parentPresentationId: number,
     slideCount: number,
     detailLevel: string,
-    tonality: string
+    tonality: string,
   ) => Promise<boolean>;
   stopStreaming: () => void;
   resetStreaming: () => void;
@@ -53,14 +53,13 @@ const initialState: StreamingState = {
 
 const StreamingContext = createContext<StreamingContextValue | null>(null);
 
-export function StreamingProvider({ children }: { children: React.ReactNode }) {
+export function StreamingProvider({ children }: { children: ReactNode }) {
   const [streamingState, setStreamingState] =
     useState<StreamingState>(initialState);
   const abortControllerRef = useRef<AbortController | null>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(
-    null
+    null,
   );
-  const { refreshUser } = useAuth();
 
   const resetStreaming = useCallback(() => {
     setStreamingState(initialState);
@@ -93,7 +92,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
       prompt: string,
       slideCount: number,
       detailLevel: string,
-      tonality: string
+      tonality: string,
     ): Promise<boolean> => {
       // Reset state
       setStreamingState({
@@ -116,7 +115,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
               tonality,
             }),
             signal: abortControllerRef.current.signal,
-          }
+          },
         );
 
         // Handle 401 Unauthorized - token might be expired
@@ -222,7 +221,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                             "Adding slide",
                             data.slide.id,
                             "Total slides:",
-                            newSlides.length
+                            newSlides.length,
                           );
                           return {
                             ...prev,
@@ -257,7 +256,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                         }));
                         console.log(
                           "Presentation saved:",
-                          data.presentation_id
+                          data.presentation_id,
                         );
                         // Refresh user to get updated slide token balance
                         if (data.slide_tokens_deducted !== undefined) {
@@ -265,9 +264,9 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                             "Points deducted:",
                             data.slide_tokens_deducted,
                             "Remaining:",
-                            data.slide_tokens_remaining
+                            data.slide_tokens_remaining,
                           );
-                          refreshUser();
+                          // Note: User metadata refresh with Clerk happens automatically
                         }
                         break;
 
@@ -326,7 +325,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [refreshUser]
+    [],
   );
 
   const startIterating = useCallback(
@@ -335,7 +334,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
       parentPresentationId: number,
       slideCount: number,
       detailLevel: string,
-      tonality: string
+      tonality: string,
     ): Promise<boolean> => {
       // Reset state
       setStreamingState({
@@ -359,7 +358,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
               tonality,
             }),
             signal: abortControllerRef.current.signal,
-          }
+          },
         );
 
         // Handle 401 Unauthorized - token might be expired
@@ -457,7 +456,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                             "Adding slide",
                             data.slide.id,
                             "Total slides:",
-                            newSlides.length
+                            newSlides.length,
                           );
                           return {
                             ...prev,
@@ -493,7 +492,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                         }));
                         console.log(
                           "Iteration saved to presentation:",
-                          data.presentation_id
+                          data.presentation_id,
                         );
                         // Refresh user to get updated slide token balance
                         if (data.slide_tokens_deducted !== undefined) {
@@ -501,16 +500,16 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
                             "Points deducted:",
                             data.slide_tokens_deducted,
                             "Remaining:",
-                            data.slide_tokens_remaining
+                            data.slide_tokens_remaining,
                           );
-                          refreshUser();
+                          // Note: User metadata refresh with Clerk happens automatically
                         }
                         break;
 
                       case "save_error":
                         console.error(
                           "Save error during iteration:",
-                          data.error
+                          data.error,
                         );
                         break;
 
@@ -564,7 +563,7 @@ export function StreamingProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
     },
-    [refreshUser]
+    [],
   );
 
   // Cleanup on unmount
