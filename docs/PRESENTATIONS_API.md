@@ -35,7 +35,12 @@ Content-Type: application/json
   "topic": "Introduction to Machine Learning",
   "slide_count": 8,
   "detail_level": "balanced",
-  "tonality": "professional"
+  "tonality": "professional",
+  "research": {
+    "enabled": true,
+    "freshness": "week",
+    "maxResults": 5
+  }
 }
 ```
 
@@ -45,6 +50,10 @@ Content-Type: application/json
 - `slide_count` (required): Integer, 1-50
 - `detail_level` (optional): One of `brief`, `concise`, `balanced`, `detailed`, `comprehensive`. Default: `balanced`
 - `tonality` (optional): One of `professional`, `casual`, `enthusiastic`, `persuasive`. Default: `professional`
+- `research` (optional): Web research settings. When enabled, the backend performs a search prepass and injects sources into the prompt.
+  - `enabled` (boolean): Enable/disable web research.
+  - `freshness` (optional): One of `day`, `week`, `month`, `year`.
+  - `maxResults` (optional): Number of results to fetch (1–10). Default: 5.
 
 ### Response (200 OK - SSE Stream)
 

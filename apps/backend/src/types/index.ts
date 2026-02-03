@@ -23,8 +23,28 @@ export interface PresentationJSON {
   [key: string]: unknown;
 }
 
+export type ResearchFreshness = "day" | "week" | "month" | "year";
+
+export interface ResearchOptions {
+  enabled: boolean;
+  provider?: "brave";
+  freshness?: ResearchFreshness;
+  maxResults?: number;
+}
+
+export interface Source {
+  url: string;
+  title?: string;
+  snippet?: string;
+  retrieved_at?: string;
+}
+
 export type PresentationStreamEvent =
   | { event: "start"; data: { status: string } }
+  | {
+      event: "midwayspace";
+      data: { summary: string; sources: Source[] };
+    }
   | { event: "theme"; data: { theme: string } }
   | {
       event: "slide";

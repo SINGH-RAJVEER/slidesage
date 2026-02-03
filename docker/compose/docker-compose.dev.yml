@@ -66,6 +66,7 @@ services:
       LOG_LEVEL: debug
       DATABASE_URL: postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD:-slidesage}@database:5432/${POSTGRES_DB:-slidesage}
       LITELLM_PROXY_BASE: http://litellm:4000
+      LITELLM_SEARCH_MODEL: ${LITELLM_SEARCH_MODEL:-llama-3.1-8b-instant}
     volumes:
       - ../../package.json:/app/package.json:ro
       - ../../bun.lock:/app/bun.lock:ro

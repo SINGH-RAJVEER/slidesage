@@ -7,7 +7,42 @@ import {
 } from "../middleware/auth.middleware";
 import { PresentationRepository } from "../repositories/presentation.repository";
 import { PresentationService } from "../services/presentation.service";
-import type { PresentationJSON, Slide } from "../types";
+import type {
+  PresentationJSON,
+  ResearchOptions,
+  Slide,
+  Source,
+} from "../types";
+
+function parseResearchOptions(input: unknown): ResearchOptions | undefined {
+  if (!input || typeof input !== "object") return undefined;
+
+  const value = input as Record<string, unknown>;
+  const enabled = Boolean(value.enabled);
+  if (!enabled) return { enabled: false };
+
+  const freshnessRaw = value.freshness;
+  const freshness =
+    freshnessRaw === "day" ||
+    freshnessRaw === "week" ||
+    freshnessRaw === "month" ||
+    freshnessRaw === "year"
+      ? freshnessRaw
+      : undefined;
+
+  const maxResultsRaw = value.maxResults;
+  const maxResults =
+    typeof maxResultsRaw === "number" && Number.isFinite(maxResultsRaw)
+      ? maxResultsRaw
+      : undefined;
+
+  return {
+    enabled: true,
+    provider: "brave",
+    freshness,
+    maxResults,
+  };
+}
 
 const presentations = new Hono();
 const presentationService = new PresentationService();
@@ -24,6 +59,7 @@ presentations.post(
       const body = await c.req.json();
 
       const { topic, slide_count, detail_level, tonality } = body;
+      const research = parseResearchOptions(body?.research);
 
       if (!topic || !slide_count) {
         return c.json({ error: { message: "Missing required fields" } }, 400);
@@ -50,6 +86,7 @@ presentations.post(
           const allSlides: Slide[] = [];
           let theme = "default";
           let title = "Untitled Presentation";
+          let sources: Source[] | undefined;
           // tokensUsed variable was defined but unused in the original code, removing or using if needed.
           // It's assigned later: tokensUsed = eventData.tokens_used || 0;
           // But not used in the save part. I'll keep it if I need to pass it, but createPresentation doesn't seem to take tokensUsed in schema?
@@ -65,6 +102,7 @@ presentations.post(
               slideCount: slide_count,
               detailLevel: detail_level || "balanced",
               tonality: tonality || "professional",
+              research,
             },
           )) {
             const eventType = event.event || "data";
@@ -97,6 +135,9 @@ presentations.post(
               if (eventData.title) {
                 title = eventData.title;
               }
+              if (Array.isArray(eventData.sources)) {
+                sources = eventData.sources;
+              }
               tokensUsed = eventData.tokens_used || 0;
             }
 
@@ -127,6 +168,10 @@ presentations.post(
               totalSlides: allSlides.length,
               tokens_used: tokensUsed,
             };
+
+            if (sources?.length) {
+              finalData.sources = sources;
+            }
 
             // Update the existing presentation with final data
             await presentationRepo.update(presentationId, {
@@ -190,6 +235,7 @@ presentations.post(
       const slideCount = body?.slide_count ?? body?.slideCount;
       const detailLevel = body?.detail_level ?? body?.detailLevel;
       const tonality = body?.tonality;
+      const research = parseResearchOptions(body?.research);
 
       if (!parentPresentationId || !feedback) {
         return c.json({ error: { message: "Missing required fields" } }, 400);
@@ -210,14 +256,18 @@ presentations.post(
           let theme = "default";
           let title = "Updated Presentation";
           let tokensUsed = 0;
+          let sources: Source[] | undefined;
 
-          for await (const event of presentationService.iteratePresentationStream({
-            userId,
-            presentationId,
-            feedback: effectiveFeedback,
-            detailLevel: detailLevel || "balanced",
-            tonality: tonality || "professional",
-          })) {
+          for await (const event of presentationService.iteratePresentationStream(
+            {
+              userId,
+              presentationId,
+              feedback: effectiveFeedback,
+              detailLevel: detailLevel || "balanced",
+              tonality: tonality || "professional",
+              research,
+            },
+          )) {
             const eventType = event.event || "data";
             // biome-ignore lint/suspicious/noExplicitAny: Data varies by event type
             const eventData = (event as any).data || {};
@@ -247,6 +297,9 @@ presentations.post(
               if (eventData.title) {
                 title = eventData.title;
               }
+              if (Array.isArray(eventData.sources)) {
+                sources = eventData.sources;
+              }
               tokensUsed = eventData.tokens_used || 0;
             }
 
@@ -268,6 +321,10 @@ presentations.post(
               tokens_used: tokensUsed,
             };
 
+            if (sources?.length) {
+              finalData.sources = sources;
+            }
+
             await presentationRepo.update(presentationId, {
               title: finalTitle,
               slidesData: finalData,
@@ -284,7 +341,8 @@ presentations.post(
             );
           }
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : "Unknown error";
+          const message =
+            error instanceof Error ? error.message : "Unknown error";
           console.error("Error during iteration:", error);
           await stream.write("event: error\n");
           await stream.write(`data: ${JSON.stringify({ error: message })}\n\n`);

@@ -1,60 +1,61 @@
 import { UserButton, useUser } from "@clerk/clerk-react";
 import { Link, useNavigate } from "react-router-dom";
 import { clerkAppearance } from "@/lib/clerk-appearance";
+import { ROUTES } from "@/router/paths";
 
 interface UserMetadata {
-	is_unlimited?: boolean;
-	slide_tokens?: number;
+  is_unlimited?: boolean;
+  slide_tokens?: number;
 }
 
 export default function Header() {
-	const { user } = useUser();
-	const navigate = useNavigate();
+  const { user } = useUser();
+  const navigate = useNavigate();
 
-	const metadata = (user?.publicMetadata || {}) as UserMetadata;
+  const metadata = (user?.publicMetadata || {}) as UserMetadata;
 
-	return (
-		<header className="border-b border-white/20 bg-white/5 backdrop-blur-md">
-			<div className="container mx-auto px-4 py-3 flex items-center justify-between h-18">
-				<div className="flex items-center gap-2">
-					<Link to="/" aria-label="Go to home">
-						<img
-							src="/icon.png"
-							alt="SlideSage"
-							className="h-32 w-60 object-contain drop-shadow-2xl -my-8"
-						/>
-					</Link>
-				</div>
+  return (
+    <header className="border-b border-white/20 bg-white/5 backdrop-blur-md">
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between h-18">
+        <div className="flex items-center gap-2">
+          <Link to={ROUTES.home} aria-label="Go to home">
+            <img
+              src="/icon.png"
+              alt="SlideSage"
+              className="h-32 w-60 object-contain drop-shadow-2xl -my-8"
+            />
+          </Link>
+        </div>
 
-				{user && (
-					<div className="flex items-center gap-4">
-						{/* Slide Points Display */}
-						<button
-							type="button"
-							onClick={() => navigate("/purchase")}
-							className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:scale-105 transition-all duration-200 cursor-pointer"
-							title="Click to purchase more points"
-						>
-							<span className="text-sm font-medium text-white">
-								{metadata.is_unlimited || metadata.slide_tokens === Infinity
-									? "∞"
-									: (metadata.slide_tokens?.toFixed(1) ?? "0.0")}
-							</span>
-							<span className="text-xs text-white/60">points</span>
-						</button>
+        {user && (
+          <div className="flex items-center gap-4">
+            {/* Slide Points Display */}
+            <button
+              type="button"
+              onClick={() => navigate(ROUTES.purchase)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 hover:scale-105 transition-all duration-200 cursor-pointer"
+              title="Click to purchase more points"
+            >
+              <span className="text-sm font-medium text-white">
+                {metadata.is_unlimited || metadata.slide_tokens === Infinity
+                  ? "∞"
+                  : (metadata.slide_tokens?.toFixed(1) ?? "0.0")}
+              </span>
+              <span className="text-xs text-white/60">points</span>
+            </button>
 
-						<UserButton
-							afterSignOutUrl="/sign-in"
-							userProfileProps={{ appearance: clerkAppearance }}
-							appearance={{
-								elements: {
-									avatarBox: "h-10 w-10",
-								},
-							}}
-						/>
-					</div>
-				)}
-			</div>
-		</header>
-	);
+            <UserButton
+              afterSignOutUrl={ROUTES.signIn}
+              userProfileProps={{ appearance: clerkAppearance }}
+              appearance={{
+                elements: {
+                  avatarBox: "h-10 w-10",
+                },
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </header>
+  );
 }

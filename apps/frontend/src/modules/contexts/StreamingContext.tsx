@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { PresentationData, Slide } from "../types/presentation";
+import type { PresentationData, Slide, Source } from "../types/presentation";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -20,6 +20,8 @@ interface StreamingState {
   presentationId?: number;
   error?: string;
   isComplete: boolean;
+  researchSummary?: string;
+  researchSources?: Source[];
 }
 
 interface StreamingContextValue {
@@ -29,6 +31,7 @@ interface StreamingContextValue {
     slideCount: number,
     detailLevel: string,
     tonality: string,
+    researchEnabled?: boolean,
   ) => Promise<boolean>;
   startIterating: (
     prompt: string,
@@ -36,6 +39,7 @@ interface StreamingContextValue {
     slideCount: number,
     detailLevel: string,
     tonality: string,
+    researchEnabled?: boolean,
   ) => Promise<boolean>;
   stopStreaming: () => void;
   resetStreaming: () => void;
@@ -49,6 +53,8 @@ const initialState: StreamingState = {
   title: "Untitled Presentation",
   totalSlides: 0,
   isComplete: false,
+  researchSummary: undefined,
+  researchSources: undefined,
 };
 
 const StreamingContext = createContext<StreamingContextValue | null>(null);
@@ -93,6 +99,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
       slideCount: number,
       detailLevel: string,
       tonality: string,
+      researchEnabled = false,
     ): Promise<boolean> => {
       // Reset state
       setStreamingState({
@@ -108,11 +115,17 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
           {
             method: "POST",
             credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
               topic: prompt,
               slide_count: slideCount,
               detail_level: detailLevel,
               tonality,
+              research: {
+                enabled: Boolean(researchEnabled),
+              },
             }),
             signal: abortControllerRef.current.signal,
           },
@@ -204,6 +217,14 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
                     switch (currentEvent) {
                       case "start":
                         // Generation started
+                        break;
+
+                      case "midwayspace":
+                        setStreamingState((prev) => ({
+                          ...prev,
+                          researchSummary: data.summary,
+                          researchSources: data.sources,
+                        }));
                         break;
 
                       case "created":
@@ -306,13 +327,19 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
               isStreaming: false,
               isComplete: true,
             }));
-          } catch (streamErr: any) {
-            if (streamErr.name !== "AbortError") {
+          } catch (streamErr: unknown) {
+            const isAbort =
+              streamErr instanceof Error && streamErr.name === "AbortError";
+            if (!isAbort) {
               console.error("Stream error:", streamErr);
+              const message =
+                streamErr instanceof Error
+                  ? streamErr.message
+                  : String(streamErr);
               setStreamingState((prev) => ({
                 ...prev,
                 isStreaming: false,
-                error: `Streaming error: ${streamErr.message || streamErr}`,
+                error: `Streaming error: ${message}`,
               }));
             }
           }
@@ -321,12 +348,14 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
         // Start processing the stream in the background
         processStream();
         return true;
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
+      } catch (err: unknown) {
+        const isAbort = err instanceof Error && err.name === "AbortError";
+        if (!isAbort) {
+          const message = err instanceof Error ? err.message : String(err);
           setStreamingState((prev) => ({
             ...prev,
             isStreaming: false,
-            error: `Error: ${err.message || err}`,
+            error: `Error: ${message}`,
           }));
         }
         return false;
@@ -342,6 +371,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
       slideCount: number,
       detailLevel: string,
       tonality: string,
+      researchEnabled = false,
     ): Promise<boolean> => {
       // Reset state
       setStreamingState({
@@ -357,12 +387,18 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
           {
             method: "POST",
             credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
             body: JSON.stringify({
               topic: prompt,
               parent_presentation_id: parentPresentationId,
               slide_count: slideCount,
               detail_level: detailLevel,
               tonality,
+              research: {
+                enabled: Boolean(researchEnabled),
+              },
             }),
             signal: abortControllerRef.current.signal,
           },
@@ -453,6 +489,14 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
                     switch (currentEvent) {
                       case "start":
                         // Generation started
+                        break;
+
+                      case "midwayspace":
+                        setStreamingState((prev) => ({
+                          ...prev,
+                          researchSummary: data.summary,
+                          researchSources: data.sources,
+                        }));
                         break;
 
                       case "theme":
@@ -550,13 +594,19 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
               isStreaming: false,
               isComplete: true,
             }));
-          } catch (streamErr: any) {
-            if (streamErr.name !== "AbortError") {
+          } catch (streamErr: unknown) {
+            const isAbort =
+              streamErr instanceof Error && streamErr.name === "AbortError";
+            if (!isAbort) {
               console.error("Stream error:", streamErr);
+              const message =
+                streamErr instanceof Error
+                  ? streamErr.message
+                  : String(streamErr);
               setStreamingState((prev) => ({
                 ...prev,
                 isStreaming: false,
-                error: `Streaming error: ${streamErr.message || streamErr}`,
+                error: `Streaming error: ${message}`,
               }));
             }
           }
@@ -565,12 +615,14 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
         // Start processing the stream in the background
         processStream();
         return true;
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
+      } catch (err: unknown) {
+        const isAbort = err instanceof Error && err.name === "AbortError";
+        if (!isAbort) {
+          const message = err instanceof Error ? err.message : String(err);
           setStreamingState((prev) => ({
             ...prev,
             isStreaming: false,
-            error: `Error: ${err.message || err}`,
+            error: `Error: ${message}`,
           }));
         }
         return false;
