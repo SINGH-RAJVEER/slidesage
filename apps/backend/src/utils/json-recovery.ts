@@ -1,7 +1,4 @@
-/*
- * JSON Recovery Utilities
- * Handles malformed JSON recovery for AI-generated responses
- */
+// JSON Recovery Utilities
 
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,23 +18,15 @@ export interface RecoveryResult {
 }
 
 /*
- * Attempt to recover valid JSON from malformed content.
- *
- * Strategies:
- * 1. Truncate at error position and close structures properly
- * 2. Balance unclosed brackets and braces
- *
- * @param content - The malformed JSON string
- * @param error - The JSONError that was raised
- * @returns Recovered JSON as an object
- * @throws JSONRecoveryError if recovery fails
- */
+@param content - The malformed JSON string
+@param error - The JSONError that was raised
+@returns Recovered JSON as an object
+@throws JSONRecoveryError if recovery fails
+*/
+
 export function recoverJson(content: string, error: Error): RecoveryResult {
   console.error("JSON parsing error:", error.message);
-  console.error(
-    `Content length: ${content.length}, First 500 chars:`,
-    content.slice(0, 500),
-  );
+  console.error(`Content length: ${content.length}`, content);
 
   // Strategy 1: Extract the first JSON value (handles model adding trailing text).
   try {
@@ -45,9 +34,9 @@ export function recoverJson(content: string, error: Error): RecoveryResult {
     if (extracted) {
       const sanitized = removeTrailingCommas(extracted);
       const parsedContent = JSON.parse(sanitized);
-      console.info(
-        `Successfully parsed extracted JSON with ${parsedContent.slides?.length || 0} slides`,
-      );
+
+      console.info(`Successfully parsed extracted JSON with ${parsedContent.slides?.length || 0} slides`,);
+
       return {
         content: parsedContent,
         recovered: true,
@@ -64,9 +53,9 @@ export function recoverJson(content: string, error: Error): RecoveryResult {
     const closed = closeOpenStructures(candidate);
     const sanitized = removeTrailingCommas(closed);
     const parsedContent = JSON.parse(sanitized);
-    console.info(
-      `Successfully parsed structurally-closed JSON with ${parsedContent.slides?.length || 0} slides`,
-    );
+
+    console.info(`Successfully parsed structurally-closed JSON with ${parsedContent.slides?.length || 0} slides`,);
+
     return {
       content: parsedContent,
       recovered: true,
@@ -75,9 +64,7 @@ export function recoverJson(content: string, error: Error): RecoveryResult {
   } catch (closeError) {
     console.error("Could not recover from JSON error:", closeError);
     saveMalformedJson(content);
-    throw new JSONRecoveryError(
-      `All recovery strategies failed: ${closeError}`,
-    );
+    throw new JSONRecoveryError(`Unable to recover JSON: ${closeError}`);
   }
 }
 
@@ -96,10 +83,8 @@ function extractFromFirstJsonStart(input: string): string | null {
   return input.slice(start).trim();
 }
 
-/**
- * Extract the first complete JSON value from a string.
- * This is the most common failure mode for LLMs: valid JSON plus trailing explanation.
- */
+// Extract the first complete JSON value from a string.
+
 function extractFirstJsonValue(input: string): string | null {
   const start = findFirstJsonStart(input);
   if (start < 0) return null;
@@ -140,28 +125,26 @@ function extractFirstJsonValue(input: string): string | null {
     }
     if (ch === "}" || ch === "]") {
       const expected = ch === "}" ? "{" : "[";
-      // If stack is empty, we already completed the root earlier; treat as trailing junk.
-      if (stack.length === 0) {
-        return s.slice(0, i).trim();
-      }
+
+      if (stack.length === 0) return s.slice(0, i).trim();
+    
       const last = stack[stack.length - 1];
-      if (last === expected) {
-        stack.pop();
-      }
-      if (stack.length === 0) {
-        return s.slice(0, i + 1).trim();
-      }
+
+      if (last === expected) stack.pop();
+      
+      if (stack.length === 0) return s.slice(0, i + 1).trim();
+      
     }
   }
 
-  // Incomplete JSON; return what we have so it can be closed.
   return s.trim();
 }
 
-/**
- * Close any remaining open objects/arrays using a stack-based scan.
- * This ignores braces/brackets inside strings.
- */
+/*
+* Close any remaining open objects/arrays using a stack-based scan.
+* Ignores braces/brackets inside strings.
+*/
+
 function closeOpenStructures(input: string): string {
   const s = extractFromFirstJsonStart(input) ?? input.trim();
   const stack: Array<"{" | "["> = [];
@@ -176,9 +159,7 @@ function closeOpenStructures(input: string): string {
       continue;
     }
     if (ch === "\\") {
-      if (inString) {
-        escapeNext = true;
-      }
+      if (inString) escapeNext = true;
       continue;
     }
     if (ch === '"') {
@@ -193,26 +174,23 @@ function closeOpenStructures(input: string): string {
       stack.push(ch);
     } else if (ch === "}" || ch === "]") {
       const expected = ch === "}" ? "{" : "[";
-      if (stack.length > 0 && stack[stack.length - 1] === expected) {
-        stack.pop();
-      }
+
+      if (stack.length > 0 && stack[stack.length - 1] === expected) stack.pop();
     }
   }
 
-  if (stack.length === 0) {
-    return s;
-  }
+  if (stack.length === 0) return s;
 
   let out = s;
-  for (let i = stack.length - 1; i >= 0; i--) {
-    out += stack[i] === "{" ? "}" : "]";
-  }
+  for (let i = stack.length - 1; i >= 0; i--) out += stack[i] === "{" ? "}" : "]";
+  
   return out;
 }
 
-/**
- * Remove trailing commas before `}` or `]` (outside strings).
- */
+/*
+* Remove trailing commas before `}` or `]`.
+*/
+
 function removeTrailingCommas(input: string): string {
   let out = "";
   let inString = false;
@@ -229,9 +207,7 @@ function removeTrailingCommas(input: string): string {
 
     if (ch === "\\") {
       out += ch;
-      if (inString) {
-        escapeNext = true;
-      }
+      if (inString) escapeNext = true;
       continue;
     }
 
@@ -242,16 +218,12 @@ function removeTrailingCommas(input: string): string {
     }
 
     if (!inString && ch === ",") {
-      // Look ahead to the next non-whitespace char
       let j = i + 1;
-      while (j < input.length && /\s/.test(input[j])) {
-        j++;
-      }
+      while (j < input.length && /\s/.test(input[j])) j++;
+      
       const next = input[j];
-      if (next === "}" || next === "]") {
-        // Skip the trailing comma
-        continue;
-      }
+      if (next === "}" || next === "]") continue;
+      
     }
 
     out += ch;
@@ -260,9 +232,8 @@ function removeTrailingCommas(input: string): string {
   return out;
 }
 
-/*
- * Save malformed JSON to a temp file for debugging
- */
+// Save malformed JSON to a temp file for debugging
+
 function saveMalformedJson(content: string): void {
   try {
     const tempFile = join(tmpdir(), `litellm_error_${Date.now()}.json`);

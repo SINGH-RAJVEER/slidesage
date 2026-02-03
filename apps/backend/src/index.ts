@@ -5,8 +5,6 @@ import { logger } from "hono/logger";
 
 import presentationRoutes from "./routes/presentation.routes";
 
-// Ensure env vars are available when running backend from `apps/backend`
-// (turbo runs `bun --watch src/index.ts` with CWD = apps/backend)
 loadEnv({ path: new URL("../../../.env", import.meta.url) });
 
 const app = new Hono();
@@ -18,19 +16,7 @@ app.use(
   cors({
     origin: (origin) => {
       const corsOrigins = process.env.CORS_ORIGINS;
-      // Allow all origins if CORS_ORIGINS is '*' or '"*"' or empty (dev convenience)
-      if (
-        !corsOrigins ||
-        corsOrigins === "*" ||
-        corsOrigins === '"*"' ||
-        corsOrigins === "'*'"
-      ) {
-        return origin || "*";
-      }
-      const allowedOrigins = corsOrigins.split(",").map((o) => o.trim());
-      return allowedOrigins.includes(origin || "")
-        ? origin || "*"
-        : allowedOrigins[0];
+      if (!corsOrigins) return origin || "*";
     },
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
