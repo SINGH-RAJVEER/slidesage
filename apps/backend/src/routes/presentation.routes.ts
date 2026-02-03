@@ -171,6 +171,132 @@ presentations.post(
   },
 );
 
+// Iterate on an existing presentation with streaming
+presentations.post(
+  "/iterate-presentation-stream",
+  authMiddleware,
+  ensureUserInDbMiddleware,
+  async (c) => {
+    try {
+      const userId = getCurrentUserId(c);
+      const body = await c.req.json();
+
+      const parentPresentationId =
+        body?.parent_presentation_id ??
+        body?.presentation_id ??
+        body?.parentPresentationId ??
+        body?.presentationId;
+      const feedback = body?.feedback ?? body?.topic ?? body?.prompt;
+      const slideCount = body?.slide_count ?? body?.slideCount;
+      const detailLevel = body?.detail_level ?? body?.detailLevel;
+      const tonality = body?.tonality;
+
+      if (!parentPresentationId || !feedback) {
+        return c.json({ error: { message: "Missing required fields" } }, 400);
+      }
+
+      const presentationId = String(parentPresentationId);
+      const effectiveFeedback = (() => {
+        const count = Number(slideCount);
+        if (Number.isFinite(count) && count > 0) {
+          return `${String(feedback)}\n\nTarget slide count: ${count}.`;
+        }
+        return String(feedback);
+      })();
+
+      return stream(c, async (stream) => {
+        try {
+          const allSlides: Slide[] = [];
+          let theme = "default";
+          let title = "Updated Presentation";
+          let tokensUsed = 0;
+
+          for await (const event of presentationService.iteratePresentationStream({
+            userId,
+            presentationId,
+            feedback: effectiveFeedback,
+            detailLevel: detailLevel || "balanced",
+            tonality: tonality || "professional",
+          })) {
+            const eventType = event.event || "data";
+            // biome-ignore lint/suspicious/noExplicitAny: Data varies by event type
+            const eventData = (event as any).data || {};
+
+            if (eventType === "theme") {
+              theme = eventData.theme || theme;
+            }
+
+            if (eventType === "slide") {
+              const slide = eventData.slide;
+              if (slide) {
+                allSlides.push(slide);
+              }
+              if (eventData.title) {
+                title = eventData.title;
+              }
+            }
+
+            if (eventType === "complete") {
+              if (eventData.slides) {
+                allSlides.length = 0;
+                allSlides.push(...eventData.slides);
+              }
+              if (eventData.theme) {
+                theme = eventData.theme;
+              }
+              if (eventData.title) {
+                title = eventData.title;
+              }
+              tokensUsed = eventData.tokens_used || 0;
+            }
+
+            await stream.write(`event: ${eventType}\n`);
+            await stream.write(`data: ${JSON.stringify(eventData)}\n\n`);
+          }
+
+          if (allSlides.length > 0) {
+            const finalTitle = (() => {
+              const trimmed = typeof title === "string" ? title.trim() : "";
+              return (trimmed || "Updated Presentation").slice(0, 255);
+            })();
+
+            const finalData: PresentationJSON = {
+              slides: allSlides,
+              theme,
+              title: finalTitle,
+              totalSlides: allSlides.length,
+              tokens_used: tokensUsed,
+            };
+
+            await presentationRepo.update(presentationId, {
+              title: finalTitle,
+              slidesData: finalData,
+            });
+
+            await stream.write("event: saved\n");
+            await stream.write(
+              `data: ${JSON.stringify({ presentation_id: presentationId, success: true })}\n\n`,
+            );
+          } else {
+            await stream.write("event: error\n");
+            await stream.write(
+              `data: ${JSON.stringify({ error: "Failed to iterate presentation content" })}\n\n`,
+            );
+          }
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : "Unknown error";
+          console.error("Error during iteration:", error);
+          await stream.write("event: error\n");
+          await stream.write(`data: ${JSON.stringify({ error: message })}\n\n`);
+        }
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return c.json({ error: { message } }, 400);
+    }
+  },
+);
+
 // Get all presentations
 presentations.get("/presentations", authMiddleware, async (c) => {
   try {
