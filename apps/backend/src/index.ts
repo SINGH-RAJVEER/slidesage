@@ -16,7 +16,25 @@ app.use(
   cors({
     origin: (origin) => {
       const corsOrigins = process.env.CORS_ORIGINS;
+
+      const normalizeOrigin = (value: string) =>
+        value.trim().replace(/\/+$/, "");
+
       if (!corsOrigins) return origin || "*";
+
+      const configured = corsOrigins
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+      if (configured.includes("*")) return origin || "*";
+
+      if (!origin) return "*";
+
+      const normalizedOrigin = normalizeOrigin(origin);
+      const allowList = new Set(configured.map(normalizeOrigin));
+
+      return allowList.has(normalizedOrigin) ? origin : undefined;
     },
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
