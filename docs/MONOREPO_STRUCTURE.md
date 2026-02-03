@@ -11,12 +11,15 @@ slide-sage/
 │   │   ├── src/
 │   │   │   ├── lib/         # Shared libraries
 │   │   │   ├── middleware/  # Hono middleware
+│   │   │   ├── db/          # Drizzle schema + DB client
 │   │   │   ├── repositories/# Database access layer
 │   │   │   ├── routes/      # API route definitions
 │   │   │   ├── services/    # Business logic and orchestration
 │   │   │   ├── types/       # TypeScript type definitions
 │   │   │   ├── utils/       # Utility functions
 │   │   │   └── index.ts     # Application entry point
+│   │   ├── drizzle/         # Drizzle migrations + snapshots
+│   │   ├── drizzle.config.ts # Drizzle-kit config
 │   │   ├── biome.json       # Linter/Formatter config
 │   │   └── package.json
 │   ├── frontend/            # React SPA
@@ -30,12 +33,6 @@ slide-sage/
 │   │   │   ├── pages/       # Top-level pages
 │   │   │   └── App.tsx
 │   │   └── package.json
-│   └── database/            # Shared database package
-│       ├── src/
-│       │   ├── index.ts     # Database connection
-│       │   └── schema.ts    # Drizzle schema definitions
-│       ├── drizzle.config.ts # ORM config
-│       └── package.json     # @slide-sage/database
 ├── docs/                    # Documentation
 ├── turbo.json              # Turbo configuration
 ├── package.json            # Root workspace configuration

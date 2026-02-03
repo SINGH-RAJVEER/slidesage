@@ -11,7 +11,6 @@ COPY package.json ./
 COPY bun.lock ./
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/backend/package.json ./apps/backend/
-COPY apps/database/package.json ./apps/database/
 
 # Install dependencies with BuildKit cache mount for faster builds
 # Skip lifecycle scripts to avoid failing optional native deps (e.g. node-canvas).
@@ -25,10 +24,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
 COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
-COPY --from=deps /app/apps/database/node_modules ./apps/database/node_modules
 
 # Copy source code
-COPY apps/database ./apps/database
 COPY apps/frontend ./apps/frontend
 COPY apps/backend ./apps/backend
 COPY tsconfig.json ./

@@ -10,7 +10,6 @@ WORKDIR /app
 COPY package.json ./
 COPY bun.lock ./
 COPY apps/backend/package.json ./apps/backend/
-COPY apps/database/package.json ./apps/database/
 
 # Install dependencies with BuildKit cache mount for faster builds
 # Omit optional deps to keep Docker builds reliable.
@@ -23,10 +22,8 @@ WORKDIR /app
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
-COPY --from=deps /app/apps/database/node_modules ./apps/database/node_modules
 
 # Copy source code
-COPY apps/database ./apps/database
 COPY apps/backend ./apps/backend
 COPY tsconfig.json ./
 
@@ -46,8 +43,6 @@ ENV PORT=8000
 
 # Copy application code and dependencies
 COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
-COPY --from=deps /app/apps/database/node_modules ./apps/database/node_modules
-COPY --from=builder /app/apps/database ./apps/database
 COPY --from=builder /app/apps/backend ./apps/backend
 COPY --from=builder /app/apps/backend/package.json ./apps/backend/
 
@@ -62,4 +57,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 WORKDIR /app/apps/backend
 
 # Run migrations and start server
-CMD ["sh", "-c", "cd /app/apps/database && bun run db:push && cd /app/apps/backend && bun run start"]
+CMD ["sh", "-c", "set -e; bun run db:push; bun run start"]

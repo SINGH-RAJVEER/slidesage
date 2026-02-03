@@ -73,8 +73,11 @@ JWT_SECRET_KEY=your-super-secret-jwt-key-here
 GEMINI_API_KEY=your-gemini-api-key
 GROQ_API_KEY=your-groq-api-key
 LITELLM_MODEL=gemini-pro
+LITELLM_PROXY_BASE=http://localhost:4000
 CORS_ORIGINS=http://localhost:5173
 ```
+
+If you're using Docker development (recommended), the backend is configured to talk to the LiteLLM container automatically via `http://litellm:4000`.
 
 #### Frontend Configuration
 
@@ -133,7 +136,7 @@ curl http://localhost:8000/api/health
 open http://localhost:5173
 
 # Verify database connection
-cd apps/database && bun run db:studio
+cd apps/backend && bun run db:studio
 ```
 
 ### Expected Responses
@@ -246,7 +249,7 @@ bun run build
 
 ```bash
 # Database operations
-cd apps/database
+cd apps/backend
 bun run db:push      # Push schema changes
 bun run db:studio    # Open Drizzle Studio
 bun run db:generate  # Generate migrations
@@ -265,7 +268,7 @@ turbo run test --filter=frontend
 
 ```bash
 # View tables and data
-cd apps/database
+cd apps/backend
 bun run db:studio
 
 # Reset database (development only)

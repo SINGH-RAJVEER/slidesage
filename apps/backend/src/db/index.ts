@@ -5,7 +5,6 @@ import * as schema from './schema';
 const connectionString =
   process.env.DATABASE_URL || 'postgresql://slidesage:slidesage@localhost:5432/slidesage';
 
-// Create postgres client with SSL configuration
 export const client = postgres(connectionString, {
   ssl: connectionString.includes('ssl=require') ? 'require' : false,
   connection: {
@@ -13,7 +12,6 @@ export const client = postgres(connectionString, {
   },
 });
 
-// Create drizzle instance
 export const db = drizzle(client, { schema });
 
 export type Database = typeof db;

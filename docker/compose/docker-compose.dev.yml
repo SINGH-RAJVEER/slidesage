@@ -65,17 +65,16 @@ services:
       NODE_ENV: development
       LOG_LEVEL: debug
       DATABASE_URL: postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD:-slidesage}@database:5432/${POSTGRES_DB:-slidesage}
+      LITELLM_PROXY_BASE: http://litellm:4000
     volumes:
       - ../../package.json:/app/package.json:ro
       - ../../bun.lock:/app/bun.lock:ro
       - ../../tsconfig.json:/app/tsconfig.json:ro
       - ../../apps/backend:/app/apps/backend
-      - ../../apps/database:/app/apps/database
       - root_node_modules:/app/node_modules
       - backend_node_modules:/app/apps/backend/node_modules
-      - database_node_modules:/app/apps/database/node_modules
       - bun_cache:/root/.bun
-    command: sh -c "cd /app && bun install --no-save --ignore-scripts && cd /app/apps/database && bun run db:push && cd /app/apps/backend && bun run dev"
+    command: sh -c "cd /app && bun install --no-save --ignore-scripts && cd /app/apps/backend && bun run db:push && bun run dev"
     depends_on:
       database:
         condition: service_healthy
@@ -119,10 +118,8 @@ services:
       - ../../bun.lock:/app/bun.lock:ro
       - ../../tsconfig.json:/app/tsconfig.json:ro
       - ../../apps/frontend:/app/apps/frontend
-      - ../../apps/database:/app/apps/database
       - root_node_modules:/app/node_modules
       - frontend_node_modules:/app/apps/frontend/node_modules
-      - database_node_modules:/app/apps/database/node_modules
       - bun_cache:/root/.bun
     command: sh -c "cd /app && bun install --no-save --ignore-scripts && cd /app/apps/frontend && bun run dev --host 0.0.0.0"
     depends_on:
@@ -156,4 +153,3 @@ volumes:
   root_node_modules:
   backend_node_modules:
   frontend_node_modules:
-  database_node_modules:
