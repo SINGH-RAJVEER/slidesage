@@ -1,21 +1,17 @@
-import { Hono } from "hono";
-import { stream } from "hono/streaming";
+import { Hono } from 'hono';
+import { stream } from 'hono/streaming';
 import {
   authMiddleware,
   ensureUserInDbMiddleware,
   getCurrentUserId,
-} from "../middleware/auth.middleware";
-import { PresentationRepository } from "../repositories/presentation.repository";
-import { PresentationService } from "../services/presentation.service";
-import type {
-  PresentationJSON,
-  ResearchOptions,
-  Slide,
-  Source,
-} from "../types";
+} from '../middleware/auth.middleware';
+import { PresentationRepository } from '../repositories/presentation.repository';
+import { PresentationService } from '../services/presentation.service';
+import { SearchService } from '../services/search.service';
+import type { PresentationJSON, ResearchOptions, ResearchPayload, Slide, Source } from '../types';
 
 function parseResearchOptions(input: unknown): ResearchOptions | undefined {
-  if (!input || typeof input !== "object") return undefined;
+  if (!input || typeof input !== 'object') return undefined;
 
   const value = input as Record<string, unknown>;
   const enabled = Boolean(value.enabled);
@@ -23,34 +19,63 @@ function parseResearchOptions(input: unknown): ResearchOptions | undefined {
 
   const freshnessRaw = value.freshness;
   const freshness =
-    freshnessRaw === "day" ||
-    freshnessRaw === "week" ||
-    freshnessRaw === "month" ||
-    freshnessRaw === "year"
+    freshnessRaw === 'day' ||
+    freshnessRaw === 'week' ||
+    freshnessRaw === 'month' ||
+    freshnessRaw === 'year'
       ? freshnessRaw
       : undefined;
 
   const maxResultsRaw = value.maxResults;
   const maxResults =
-    typeof maxResultsRaw === "number" && Number.isFinite(maxResultsRaw)
-      ? maxResultsRaw
-      : undefined;
+    typeof maxResultsRaw === 'number' && Number.isFinite(maxResultsRaw) ? maxResultsRaw : undefined;
 
   return {
     enabled: true,
-    provider: "brave",
+    provider: 'brave',
     freshness,
     maxResults,
+  };
+}
+
+function parseResearchPayload(input: unknown): ResearchPayload | undefined {
+  if (!input || typeof input !== 'object') return undefined;
+
+  const value = input as Record<string, unknown>;
+  const sourcesRaw = value.sources;
+  if (!Array.isArray(sourcesRaw)) return undefined;
+
+  const sources: Source[] = [];
+  for (const source of sourcesRaw) {
+    if (!source || typeof source !== 'object') continue;
+    const src = source as Record<string, unknown>;
+    const url = typeof src.url === 'string' ? src.url.trim() : '';
+    if (!url) continue;
+    sources.push({
+      url,
+      title: typeof src.title === 'string' ? src.title : undefined,
+      snippet: typeof src.snippet === 'string' ? src.snippet : undefined,
+      retrieved_at: typeof src.retrieved_at === 'string' ? src.retrieved_at : undefined,
+    });
+  }
+
+  const summaryRaw = value.summary;
+  const summary = typeof summaryRaw === 'string' ? summaryRaw : null;
+
+  return {
+    summary,
+    sources,
   };
 }
 
 const presentations = new Hono();
 const presentationService = new PresentationService();
 const presentationRepo = new PresentationRepository();
+const searchService = new SearchService();
 
 // Generate presentation with streaming
 presentations.post(
-  "/generate-presentation-stream",
+  '/generate-presentation-stream',
   authMiddleware,
   ensureUserInDbMiddleware,
   async (c) => {
@@ -60,32 +85,30 @@ presentations.post(
 
       const { topic, slide_count, detail_level, tonality } = body;
       const research = parseResearchOptions(body?.research);
+      const researchPayload = parseResearchPayload(body?.research_payload ?? body?.researchPayload);
 
       if (!topic || !slide_count) {
-        return c.json({ error: { message: "Missing required fields" } }, 400);
+        return c.json({ error: { message: 'Missing required fields' } }, 400);
       }
 
       // Create initial presentation record
-      const presentation = await presentationRepo.create(
-        userId,
-        "Generating...",
-        topic,
-        { slides: [], theme: "default", title: "Generating..." },
-      );
+      const presentation = await presentationRepo.create(userId, 'Generating...', topic, {
+        slides: [],
+        theme: 'default',
+        title: 'Generating...',
+      });
 
       const presentationId = presentation.id;
 
       return stream(c, async (stream) => {
         // Send presentation ID immediately
-        await stream.write("event: created\n");
-        await stream.write(
-          `data: ${JSON.stringify({ presentation_id: presentationId })}\n\n`,
-        );
+        await stream.write('event: created\n');
+        await stream.write(`data: ${JSON.stringify({ presentation_id: presentationId })}\n\n`);
 
         try {
           const allSlides: Slide[] = [];
-          let theme = "default";
-          let title = "Untitled Presentation";
+          let theme = 'default';
+          let title = 'Untitled Presentation';
           let sources: Source[] | undefined;
           // tokensUsed variable was defined but unused in the original code, removing or using if needed.
           // It's assigned later: tokensUsed = eventData.tokens_used || 0;
@@ -95,26 +118,25 @@ presentations.post(
           let tokensUsed = 0;
 
           // Stream presentation generation
-          for await (const event of presentationService.generatePresentationStream(
-            {
-              userId,
-              topic,
-              slideCount: slide_count,
-              detailLevel: detail_level || "balanced",
-              tonality: tonality || "professional",
-              research,
-            },
-          )) {
-            const eventType = event.event || "data";
+          for await (const event of presentationService.generatePresentationStream({
+            userId,
+            topic,
+            slideCount: slide_count,
+            detailLevel: detail_level || 'balanced',
+            tonality: tonality || 'professional',
+            research,
+            researchPayload,
+          })) {
+            const eventType = event.event || 'data';
             // biome-ignore lint/suspicious/noExplicitAny: Data varies by event type
             const eventData = (event as any).data || {};
 
             // Accumulate data
-            if (eventType === "theme") {
+            if (eventType === 'theme') {
               theme = eventData.theme || theme;
             }
 
-            if (eventType === "slide") {
+            if (eventType === 'slide') {
               const slide = eventData.slide;
               if (slide) {
                 allSlides.push(slide);
@@ -124,7 +146,7 @@ presentations.post(
               }
             }
 
-            if (eventType === "complete") {
+            if (eventType === 'complete') {
               if (eventData.slides) {
                 allSlides.length = 0;
                 allSlides.push(...eventData.slides);
@@ -149,13 +171,13 @@ presentations.post(
           // Save final presentation data
           if (allSlides.length > 0) {
             const finalTitle = (() => {
-              const trimmed = typeof title === "string" ? title.trim() : "";
-              const fromTopic = typeof topic === "string" ? topic.trim() : "";
+              const trimmed = typeof title === 'string' ? title.trim() : '';
+              const fromTopic = typeof topic === 'string' ? topic.trim() : '';
 
               const candidate =
-                trimmed && trimmed !== "Untitled Presentation"
+                trimmed && trimmed !== 'Untitled Presentation'
                   ? trimmed
-                  : fromTopic || "Untitled Presentation";
+                  : fromTopic || 'Untitled Presentation';
 
               // DB schema sets varchar(255)
               return candidate.slice(0, 255);
@@ -179,46 +201,74 @@ presentations.post(
               slidesData: finalData,
             });
 
-            console.log(
-              `Saved presentation ${presentationId} with ${allSlides.length} slides`,
-            );
+            console.log(`Saved presentation ${presentationId} with ${allSlides.length} slides`);
 
-            await stream.write("event: saved\n");
+            await stream.write('event: saved\n');
             await stream.write(
-              `data: ${JSON.stringify({ presentation_id: presentationId, success: true })}\n\n`,
+              `data: ${JSON.stringify({ presentation_id: presentationId, success: true })}\n\n`
             );
           } else {
-            console.error(
-              `No slides generated for presentation ${presentationId}`,
-            );
-            await presentationService.deletePresentation(
-              presentationId,
-              userId,
-            );
-            await stream.write("event: error\n");
+            console.error(`No slides generated for presentation ${presentationId}`);
+            await presentationService.deletePresentation(presentationId, userId);
+            await stream.write('event: error\n');
             await stream.write(
-              `data: ${JSON.stringify({ error: "Failed to generate presentation content" })}\n\n`,
+              `data: ${JSON.stringify({ error: 'Failed to generate presentation content' })}\n\n`
             );
           }
         } catch (error: unknown) {
-          const message =
-            error instanceof Error ? error.message : "Unknown error";
-          console.error("Error during generation:", error);
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          console.error('Error during generation:', error);
           await presentationService.deletePresentation(presentationId, userId);
-          await stream.write("event: error\n");
+          await stream.write('event: error\n');
           await stream.write(`data: ${JSON.stringify({ error: message })}\n\n`);
         }
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : 'Unknown error';
       return c.json({ error: { message } }, 400);
     }
-  },
+  }
+);
+
+// Perform research prepass before generation
+presentations.post(
+  '/research-presentation',
+  authMiddleware,
+  ensureUserInDbMiddleware,
+  async (c) => {
+    try {
+      const body = await c.req.json();
+      const topic = body?.topic ?? body?.prompt ?? body?.query;
+      const research = parseResearchOptions(body?.research);
+
+      if (!topic || !research?.enabled) {
+        return c.json({ error: { message: 'Missing required fields' } }, 400);
+      }
+
+      const sources = await searchService.webSearch(String(topic), research);
+      const summaryResult = sources.length
+        ? await searchService.summarizeSourcesDetailed(String(topic), sources)
+        : { summary: null, tokensUsed: 0, tokensEstimated: 0 };
+
+      return c.json(
+        {
+          summary: summaryResult.summary,
+          sources,
+          tokens_used: summaryResult.tokensUsed,
+          tokens_estimated: summaryResult.tokensEstimated,
+        },
+        200
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return c.json({ error: { message } }, 400);
+    }
+  }
 );
 
 // Iterate on an existing presentation with streaming
 presentations.post(
-  "/iterate-presentation-stream",
+  '/iterate-presentation-stream',
   authMiddleware,
   ensureUserInDbMiddleware,
   async (c) => {
@@ -238,7 +288,7 @@ presentations.post(
       const research = parseResearchOptions(body?.research);
 
       if (!parentPresentationId || !feedback) {
-        return c.json({ error: { message: "Missing required fields" } }, 400);
+        return c.json({ error: { message: 'Missing required fields' } }, 400);
       }
 
       const presentationId = String(parentPresentationId);
@@ -253,30 +303,28 @@ presentations.post(
       return stream(c, async (stream) => {
         try {
           const allSlides: Slide[] = [];
-          let theme = "default";
-          let title = "Updated Presentation";
+          let theme = 'default';
+          let title = 'Updated Presentation';
           let tokensUsed = 0;
           let sources: Source[] | undefined;
 
-          for await (const event of presentationService.iteratePresentationStream(
-            {
-              userId,
-              presentationId,
-              feedback: effectiveFeedback,
-              detailLevel: detailLevel || "balanced",
-              tonality: tonality || "professional",
-              research,
-            },
-          )) {
-            const eventType = event.event || "data";
+          for await (const event of presentationService.iteratePresentationStream({
+            userId,
+            presentationId,
+            feedback: effectiveFeedback,
+            detailLevel: detailLevel || 'balanced',
+            tonality: tonality || 'professional',
+            research,
+          })) {
+            const eventType = event.event || 'data';
             // biome-ignore lint/suspicious/noExplicitAny: Data varies by event type
             const eventData = (event as any).data || {};
 
-            if (eventType === "theme") {
+            if (eventType === 'theme') {
               theme = eventData.theme || theme;
             }
 
-            if (eventType === "slide") {
+            if (eventType === 'slide') {
               const slide = eventData.slide;
               if (slide) {
                 allSlides.push(slide);
@@ -286,7 +334,7 @@ presentations.post(
               }
             }
 
-            if (eventType === "complete") {
+            if (eventType === 'complete') {
               if (eventData.slides) {
                 allSlides.length = 0;
                 allSlides.push(...eventData.slides);
@@ -309,8 +357,8 @@ presentations.post(
 
           if (allSlides.length > 0) {
             const finalTitle = (() => {
-              const trimmed = typeof title === "string" ? title.trim() : "";
-              return (trimmed || "Updated Presentation").slice(0, 255);
+              const trimmed = typeof title === 'string' ? title.trim() : '';
+              return (trimmed || 'Updated Presentation').slice(0, 255);
             })();
 
             const finalData: PresentationJSON = {
@@ -330,33 +378,32 @@ presentations.post(
               slidesData: finalData,
             });
 
-            await stream.write("event: saved\n");
+            await stream.write('event: saved\n');
             await stream.write(
-              `data: ${JSON.stringify({ presentation_id: presentationId, success: true })}\n\n`,
+              `data: ${JSON.stringify({ presentation_id: presentationId, success: true })}\n\n`
             );
           } else {
-            await stream.write("event: error\n");
+            await stream.write('event: error\n');
             await stream.write(
-              `data: ${JSON.stringify({ error: "Failed to iterate presentation content" })}\n\n`,
+              `data: ${JSON.stringify({ error: 'Failed to iterate presentation content' })}\n\n`
             );
           }
         } catch (error: unknown) {
-          const message =
-            error instanceof Error ? error.message : "Unknown error";
-          console.error("Error during iteration:", error);
-          await stream.write("event: error\n");
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          console.error('Error during iteration:', error);
+          await stream.write('event: error\n');
           await stream.write(`data: ${JSON.stringify({ error: message })}\n\n`);
         }
       });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown error";
+      const message = error instanceof Error ? error.message : 'Unknown error';
       return c.json({ error: { message } }, 400);
     }
-  },
+  }
 );
 
 // Get all presentations
-presentations.get("/presentations", authMiddleware, async (c) => {
+presentations.get('/presentations', authMiddleware, async (c) => {
   try {
     const userId = getCurrentUserId(c);
 
@@ -375,25 +422,22 @@ presentations.get("/presentations", authMiddleware, async (c) => {
 
     return c.json({ presentations: presentationsData }, 200);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return c.json({ error: { message } }, 400);
   }
 });
 
 // Get specific presentation
-presentations.get("/presentations/:id", authMiddleware, async (c) => {
+presentations.get('/presentations/:id', authMiddleware, async (c) => {
   try {
     const userId = getCurrentUserId(c);
-    const presentationId = c.req.param("id");
+    const presentationId = c.req.param('id');
 
     if (!presentationId) {
-      return c.json({ error: { message: "Invalid presentation ID" } }, 400);
+      return c.json({ error: { message: 'Invalid presentation ID' } }, 400);
     }
 
-    const presentation = await presentationService.getPresentation(
-      presentationId,
-      userId,
-    );
+    const presentation = await presentationService.getPresentation(presentationId, userId);
 
     return c.json(
       {
@@ -406,14 +450,14 @@ presentations.get("/presentations/:id", authMiddleware, async (c) => {
           updated_at: presentation.updatedAt,
         },
       },
-      200,
+      200
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    if (message.includes("not found")) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    if (message.includes('not found')) {
       return c.json({ error: { message } }, 404);
     }
-    if (message.includes("Unauthorized")) {
+    if (message.includes('Unauthorized')) {
       return c.json({ error: { message } }, 403);
     }
     return c.json({ error: { message } }, 400);
@@ -421,24 +465,24 @@ presentations.get("/presentations/:id", authMiddleware, async (c) => {
 });
 
 // Delete presentation
-presentations.delete("/presentations/:id", authMiddleware, async (c) => {
+presentations.delete('/presentations/:id', authMiddleware, async (c) => {
   try {
     const userId = getCurrentUserId(c);
-    const presentationId = c.req.param("id");
+    const presentationId = c.req.param('id');
 
     if (!presentationId) {
-      return c.json({ error: { message: "Invalid presentation ID" } }, 400);
+      return c.json({ error: { message: 'Invalid presentation ID' } }, 400);
     }
 
     await presentationService.deletePresentation(presentationId, userId);
 
-    return c.json({ message: "Presentation deleted successfully" }, 200);
+    return c.json({ message: 'Presentation deleted successfully' }, 200);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    if (message.includes("not found")) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    if (message.includes('not found')) {
       return c.json({ error: { message } }, 404);
     }
-    if (message.includes("Unauthorized")) {
+    if (message.includes('Unauthorized')) {
       return c.json({ error: { message } }, 403);
     }
     return c.json({ error: { message } }, 400);

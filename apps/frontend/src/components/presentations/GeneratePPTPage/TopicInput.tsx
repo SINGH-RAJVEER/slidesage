@@ -20,41 +20,47 @@ export const TopicInput: React.FC<TopicInputProps> = ({
 	disabled,
 }) => {
 	return (
-		<div className="space-y-3">
-			<label
-				htmlFor="prompt"
-				className="block text-lg font-medium text-white/80"
-			>
-				Presentation Topics
-			</label>
+		<div className="space-y-6">
 			{topics.length > 0 && (
-				<div className="flex flex-wrap gap-1.5 p-2 bg-white/5 rounded-lg border border-white/10">
-					{topics.map((topic, index) => (
+				<div className="flex flex-wrap gap-2 justify-center">
+					{topics.map((topic) => (
 						<div
-							key={index}
-							className="flex items-center gap-1.5 px-2.5 py-1 bg-white/20 border border-white/30 rounded-full text-white text-sm backdrop-blur-sm hover:bg-white/25 transition-all duration-200"
+							key={topic}
+							className="group flex items-center gap-3 pl-5 pr-3 py-3 bg-white/5 border border-white/10 rounded-full text-white/90 backdrop-blur-sm transition-all hover:bg-white/10 hover:border-white/20"
 						>
-							<span className="font-medium">{topic}</span>
+							<span className="font-light tracking-wide text-lg">{topic}</span>
 							<button
+								type="button"
 								onClick={() => onRemoveTopic(topic)}
-								className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+								className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
 								disabled={disabled}
 							>
-								<X className="h-3 w-3" />
+								<X className="h-4 w-4" />
 							</button>
 						</div>
 					))}
 				</div>
 			)}
-			<Input
-				id="prompt"
-				placeholder="Type a topic and press Enter"
-				value={prompt}
-				onChange={(e) => onPromptChange(e.target.value)}
-				onKeyDown={onKeyDown}
-				className="text-xl bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:border-white/40 h-14"
-				disabled={disabled}
-			/>
+			<div className="relative group max-w-xl mx-auto">
+				<Input
+					id="prompt"
+					placeholder={
+						topics.length === 0
+							? "What's on your mind ?"
+							: "Add additional context ?"
+					}
+					value={prompt}
+					onChange={(e) => onPromptChange(e.target.value)}
+					onKeyDown={onKeyDown}
+					className="w-full text-center bg-black/20 border border-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] rounded-xl text-3xl md:text-4xl px-6 py-10 h-auto text-white placeholder:text-white/20 focus-visible:ring-0 focus-visible:border-white/30 font-light tracking-wide transition-all"
+					disabled={disabled}
+					autoFocus
+				/>
+			</div>
+
+			<p className="text-center text-white/30 font-light text-base">
+				Press <span className="text-white/50">Enter</span> to add a topic
+			</p>
 		</div>
 	);
 };

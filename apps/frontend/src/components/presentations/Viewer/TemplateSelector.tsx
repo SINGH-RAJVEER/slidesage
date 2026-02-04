@@ -81,8 +81,11 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 								<div className="flex gap-1">
 									{Object.values(
 										getTemplatePreviewColors(currentTemplate.id),
-									).map((color, i) => (
-										<div key={i} className={`w-2 h-2 rounded-full ${color}`} />
+									).map((color) => (
+										<div
+											key={`${currentTemplate.id}-${color}`}
+											className={`w-2 h-2 rounded-full ${color}`}
+										/>
 									))}
 								</div>
 							)}

@@ -85,7 +85,7 @@ export const SlideIntervalSelector: React.FC<SlideIntervalSelectorProps> = ({
 					}}
 					onBlur={() => {
 						let val = Number(customInterval);
-						if (isNaN(val) || val < 0) val = 0;
+						if (Number.isNaN(val) || val < 0) val = 0;
 						if (val > 10000) val = 10000;
 						onSlideIntervalChange(val);
 						onCustomIntervalChange(val.toString());
@@ -94,7 +94,7 @@ export const SlideIntervalSelector: React.FC<SlideIntervalSelectorProps> = ({
 					onKeyDown={(e) => {
 						if (e.key === "Enter") {
 							let val = Number(customInterval);
-							if (isNaN(val) || val < 0) val = 0;
+							if (Number.isNaN(val) || val < 0) val = 0;
 							if (val > 10000) val = 10000;
 							onSlideIntervalChange(val);
 							onCustomIntervalChange(val.toString());

@@ -1,13 +1,13 @@
 // JSON Recovery Utilities
 
-import { writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 export class JSONRecoveryError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "JSONRecoveryError";
+    this.name = 'JSONRecoveryError';
   }
 }
 
@@ -25,7 +25,7 @@ export interface RecoveryResult {
 */
 
 export function recoverJson(content: string, error: Error): RecoveryResult {
-  console.error("JSON parsing error:", error.message);
+  console.error('JSON parsing error:', error.message);
   console.error(`Content length: ${content.length}`, content);
 
   // Strategy 1: Extract the first JSON value (handles model adding trailing text).
@@ -35,16 +35,18 @@ export function recoverJson(content: string, error: Error): RecoveryResult {
       const sanitized = removeTrailingCommas(extracted);
       const parsedContent = JSON.parse(sanitized);
 
-      console.info(`Successfully parsed extracted JSON with ${parsedContent.slides?.length || 0} slides`,);
+      console.info(
+        `Successfully parsed extracted JSON with ${parsedContent.slides?.length || 0} slides`
+      );
 
       return {
         content: parsedContent,
         recovered: true,
-        strategy: "extract",
+        strategy: 'extract',
       };
     }
   } catch (_extractError) {
-    console.warn("Extraction strategy failed, trying structural closure");
+    console.warn('Extraction strategy failed, trying structural closure');
   }
 
   // Strategy 2: Try to close any unclosed structures (handles truncated streaming).
@@ -54,23 +56,25 @@ export function recoverJson(content: string, error: Error): RecoveryResult {
     const sanitized = removeTrailingCommas(closed);
     const parsedContent = JSON.parse(sanitized);
 
-    console.info(`Successfully parsed structurally-closed JSON with ${parsedContent.slides?.length || 0} slides`,);
+    console.info(
+      `Successfully parsed structurally-closed JSON with ${parsedContent.slides?.length || 0} slides`
+    );
 
     return {
       content: parsedContent,
       recovered: true,
-      strategy: "close",
+      strategy: 'close',
     };
   } catch (closeError) {
-    console.error("Could not recover from JSON error:", closeError);
+    console.error('Could not recover from JSON error:', closeError);
     saveMalformedJson(content);
     throw new JSONRecoveryError(`Unable to recover JSON: ${closeError}`);
   }
 }
 
 function findFirstJsonStart(input: string): number {
-  const idxObj = input.indexOf("{");
-  const idxArr = input.indexOf("[");
+  const idxObj = input.indexOf('{');
+  const idxArr = input.indexOf('[');
 
   if (idxObj === -1) return idxArr;
   if (idxArr === -1) return idxObj;
@@ -91,7 +95,7 @@ function extractFirstJsonValue(input: string): string | null {
 
   const s = input.slice(start).trimStart();
 
-  const stack: Array<"{" | "["> = [];
+  const stack: Array<'{' | '['> = [];
   let inString = false;
   let escapeNext = false;
 
@@ -103,7 +107,7 @@ function extractFirstJsonValue(input: string): string | null {
       continue;
     }
 
-    if (ch === "\\") {
+    if (ch === '\\') {
       if (inString) {
         escapeNext = true;
       }
@@ -119,21 +123,20 @@ function extractFirstJsonValue(input: string): string | null {
       continue;
     }
 
-    if (ch === "{" || ch === "[") {
+    if (ch === '{' || ch === '[') {
       stack.push(ch);
       continue;
     }
-    if (ch === "}" || ch === "]") {
-      const expected = ch === "}" ? "{" : "[";
+    if (ch === '}' || ch === ']') {
+      const expected = ch === '}' ? '{' : '[';
 
       if (stack.length === 0) return s.slice(0, i).trim();
-    
+
       const last = stack[stack.length - 1];
 
       if (last === expected) stack.pop();
-      
+
       if (stack.length === 0) return s.slice(0, i + 1).trim();
-      
     }
   }
 
@@ -141,13 +144,13 @@ function extractFirstJsonValue(input: string): string | null {
 }
 
 /*
-* Close any remaining open objects/arrays using a stack-based scan.
-* Ignores braces/brackets inside strings.
-*/
+ * Close any remaining open objects/arrays using a stack-based scan.
+ * Ignores braces/brackets inside strings.
+ */
 
 function closeOpenStructures(input: string): string {
   const s = extractFromFirstJsonStart(input) ?? input.trim();
-  const stack: Array<"{" | "["> = [];
+  const stack: Array<'{' | '['> = [];
   let inString = false;
   let escapeNext = false;
 
@@ -158,7 +161,7 @@ function closeOpenStructures(input: string): string {
       escapeNext = false;
       continue;
     }
-    if (ch === "\\") {
+    if (ch === '\\') {
       if (inString) escapeNext = true;
       continue;
     }
@@ -170,10 +173,10 @@ function closeOpenStructures(input: string): string {
       continue;
     }
 
-    if (ch === "{" || ch === "[") {
+    if (ch === '{' || ch === '[') {
       stack.push(ch);
-    } else if (ch === "}" || ch === "]") {
-      const expected = ch === "}" ? "{" : "[";
+    } else if (ch === '}' || ch === ']') {
+      const expected = ch === '}' ? '{' : '[';
 
       if (stack.length > 0 && stack[stack.length - 1] === expected) stack.pop();
     }
@@ -182,17 +185,17 @@ function closeOpenStructures(input: string): string {
   if (stack.length === 0) return s;
 
   let out = s;
-  for (let i = stack.length - 1; i >= 0; i--) out += stack[i] === "{" ? "}" : "]";
-  
+  for (let i = stack.length - 1; i >= 0; i--) out += stack[i] === '{' ? '}' : ']';
+
   return out;
 }
 
 /*
-* Remove trailing commas before `}` or `]`.
-*/
+ * Remove trailing commas before `}` or `]`.
+ */
 
 function removeTrailingCommas(input: string): string {
-  let out = "";
+  let out = '';
   let inString = false;
   let escapeNext = false;
 
@@ -205,7 +208,7 @@ function removeTrailingCommas(input: string): string {
       continue;
     }
 
-    if (ch === "\\") {
+    if (ch === '\\') {
       out += ch;
       if (inString) escapeNext = true;
       continue;
@@ -217,13 +220,12 @@ function removeTrailingCommas(input: string): string {
       continue;
     }
 
-    if (!inString && ch === ",") {
+    if (!inString && ch === ',') {
       let j = i + 1;
       while (j < input.length && /\s/.test(input[j])) j++;
-      
+
       const next = input[j];
-      if (next === "}" || next === "]") continue;
-      
+      if (next === '}' || next === ']') continue;
     }
 
     out += ch;
@@ -240,6 +242,6 @@ function saveMalformedJson(content: string): void {
     writeFileSync(tempFile, content);
     console.error(`Saved malformed JSON to: ${tempFile}`);
   } catch (e) {
-    console.warn("Could not save malformed JSON:", e);
+    console.warn('Could not save malformed JSON:', e);
   }
 }

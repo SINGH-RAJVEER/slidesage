@@ -18,40 +18,42 @@ export const TonalitySelector: React.FC<TonalitySelectorProps> = ({
 	onTonalityChange,
 }) => {
 	return (
-		<div className="flex items-center gap-2">
-			<span className="text-white/70 text-sm">Tonality:</span>
+		<div className="flex items-center">
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button
-						variant="outline"
-						className="w-36 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
+						variant="ghost"
+						className="h-12 px-5 text-white/70 hover:text-white hover:bg-white/5 transition-all text-base font-light flex gap-3 items-center rounded-lg"
 					>
-						{tonality.charAt(0).toUpperCase() + tonality.slice(1)}
-						<ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+						<span className="opacity-50">Tonality:</span>
+						<span className="text-white">
+							{tonality.charAt(0).toUpperCase() + tonality.slice(1)}
+						</span>
+						<ChevronDown className="h-4 w-4 opacity-50" />
 					</Button>
 				</DropdownMenuTrigger>
-				<DropdownMenuContent className="w-36 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
+				<DropdownMenuContent className="w-36 border border-white/10 bg-black/40 backdrop-blur-xl shadow-2xl text-white rounded-xl">
 					<DropdownMenuItem
 						onClick={() => onTonalityChange("professional")}
-						className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+						className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 					>
 						Professional
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onClick={() => onTonalityChange("casual")}
-						className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+						className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 					>
 						Casual
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onClick={() => onTonalityChange("enthusiastic")}
-						className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+						className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 					>
 						Enthusiastic
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onClick={() => onTonalityChange("persuasive")}
-						className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+						className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 					>
 						Persuasive
 					</DropdownMenuItem>

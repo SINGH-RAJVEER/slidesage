@@ -26,20 +26,20 @@ export const SlideCountSelector: React.FC<SlideCountSelectorProps> = ({
 	onCustomSlideCountChange,
 }) => {
 	return (
-		<div className="flex items-center gap-2">
-			<span className="text-white/70 text-sm">Slides:</span>
+		<div className="flex items-center">
 			{slideCountMode === "preset" ? (
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
-							variant="outline"
-							className="w-24 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
+							variant="ghost"
+							className="h-12 px-5 text-white/70 hover:text-white hover:bg-white/5 transition-all text-base font-light flex gap-3 items-center rounded-lg"
 						>
-							{slideCount}
-							<ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+							<span className="opacity-50">Length:</span>
+							<span className="text-white">{slideCount} Slides</span>
+							<ChevronDown className="h-4 w-4 opacity-50" />
 						</Button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent className="w-24 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
+					<DropdownMenuContent className="w-32 border border-white/10 bg-black/40 backdrop-blur-xl shadow-2xl text-white rounded-xl">
 						{[5, 10, 15, 20, 25, 30].map((count) => (
 							<DropdownMenuItem
 								key={count}
@@ -48,56 +48,73 @@ export const SlideCountSelector: React.FC<SlideCountSelectorProps> = ({
 									onCustomSlideCountChange(count.toString());
 									onSlideCountModeChange("preset");
 								}}
-								className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+								className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 							>
-								{count}
+								{count} slides
 							</DropdownMenuItem>
 						))}
 						<DropdownMenuItem
 							onClick={() => onSlideCountModeChange("custom")}
-							className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+							className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer border-t border-white/10 mt-1 pt-2 rounded-lg"
 						>
-							Custom
+							Custom...
 						</DropdownMenuItem>
 					</DropdownMenuContent>
 				</DropdownMenu>
 			) : (
-				<input
-					type="number"
-					min={1}
-					max={35}
-					value={customSlideCount}
-					onChange={(e) => {
-						const val = e.target.value;
-						if (/^\d{0,2}$/.test(val) && Number(val) <= 35) {
-							onCustomSlideCountChange(val);
-						}
-					}}
-					onBlur={() => {
-						let val = Number(customSlideCount);
-						if (isNaN(val) || val < 1) val = 1;
-						if (val > 35) val = 35;
-						onCustomSlideCountChange(val.toString());
-						onSlideCountChange(val.toString());
-						onSlideCountModeChange("preset");
-					}}
-					onKeyDown={(e) => {
-						if (e.key === "Enter") {
+				<div className="flex items-center gap-2 h-9 px-3 bg-white/5 rounded-lg border border-white/10">
+					<span className="text-white/50 text-sm font-light">Length:</span>
+					<input
+						type="number"
+						value={customSlideCount}
+						onChange={(e) => {
+							const val = e.target.value;
+							// Allow empty string or numbers up to 50
+							if (val === "" || (/^\d{0,2}$/.test(val) && Number(val) <= 50)) {
+								onCustomSlideCountChange(val);
+							}
+						}}
+						onBlur={() => {
+							// On blur, revert to preset if invalid or empty, otherwise save
 							let val = Number(customSlideCount);
-							if (isNaN(val) || val < 1) val = 1;
-							if (val > 35) val = 35;
-							onCustomSlideCountChange(val.toString());
-							onSlideCountChange(val.toString());
-							onSlideCountModeChange("preset");
-						} else if (e.key === "Escape") {
-							onSlideCountModeChange("preset");
-						}
-					}}
-					className="w-24 px-3 py-2 rounded-md border border-white/20 bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-blue-400 hide-number-spin"
-					placeholder="1-35"
-					inputMode="numeric"
-					style={{ MozAppearance: "textfield" }}
-				/>
+							if (Number.isNaN(val) || val < 1) {
+								onSlideCountModeChange("preset");
+							} else {
+								if (val > 50) val = 50;
+								onCustomSlideCountChange(val.toString());
+								onSlideCountChange(val.toString());
+								// Keep in custom mode but sanitized
+							}
+						}}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") {
+								// Commit
+								let val = Number(customSlideCount);
+								if (Number.isNaN(val) || val < 1) val = 1;
+								if (val > 50) val = 50;
+								onCustomSlideCountChange(val.toString());
+								onSlideCountChange(val.toString());
+								// Switch back to preset if it matches one? No, just keep custom.
+								// Actually user might want to submit form, but this is a selector.
+								e.currentTarget.blur();
+							} else if (e.key === "Escape") {
+								onSlideCountModeChange("preset");
+							}
+						}}
+						className="w-12 bg-transparent text-white border-0 p-0 text-sm focus:ring-0 text-center"
+						placeholder="#"
+					/>
+					<div className="hidden">
+						{/* Hidden controls to match original structure if needed, but not needed */}
+					</div>
+					<button
+						type="button"
+						onClick={() => onSlideCountModeChange("preset")}
+						className="text-white/40 hover:text-white transition-colors"
+					>
+						<ChevronDown className="h-3 w-3" />
+					</button>
+				</div>
 			)}
 		</div>
 	);

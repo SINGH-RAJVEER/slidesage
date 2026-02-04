@@ -18,46 +18,48 @@ export const DetailLevelSelector: React.FC<DetailLevelSelectorProps> = ({
 	onDetailLevelChange,
 }) => {
 	return (
-		<div className="flex items-center gap-2">
-			<span className="text-white/70 text-sm">Detail Level:</span>
+		<div className="flex items-center">
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
 					<Button
-						variant="outline"
-						className="min-w-36 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 hover:border-white/30 justify-between"
+						variant="ghost"
+						className="h-12 px-5 text-white/70 hover:text-white hover:bg-white/5 transition-all text-base font-light flex gap-3 items-center rounded-lg"
 					>
-						{detailLevel.charAt(0).toUpperCase() + detailLevel.slice(1)}
-						<ChevronDown className="h-4 w-4 ml-2 opacity-50" />
+						<span className="opacity-50">Detail:</span>
+						<span className="text-white">
+							{detailLevel.charAt(0).toUpperCase() + detailLevel.slice(1)}
+						</span>
+						<ChevronDown className="h-4 w-4 opacity-50" />
 					</Button>
 				</DropdownMenuTrigger>
-				<DropdownMenuContent className="min-w-36 border-white/20 bg-white/10 backdrop-blur-md shadow-2xl text-white">
+				<DropdownMenuContent className="min-w-36 border border-white/10 bg-black/40 backdrop-blur-xl shadow-2xl text-white rounded-xl">
 					<DropdownMenuItem
 						onClick={() => onDetailLevelChange("brief")}
-						className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+						className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 					>
 						Brief
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onClick={() => onDetailLevelChange("concise")}
-						className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+						className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 					>
 						Concise
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onClick={() => onDetailLevelChange("balanced")}
-						className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+						className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 					>
 						Balanced
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onClick={() => onDetailLevelChange("detailed")}
-						className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+						className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 					>
 						Detailed
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						onClick={() => onDetailLevelChange("comprehensive")}
-						className="text-white/80 focus:text-white focus:bg-white/20 cursor-pointer"
+						className="text-white/80 focus:text-white focus:bg-white/10 cursor-pointer rounded-lg my-1"
 					>
 						Comprehensive
 					</DropdownMenuItem>

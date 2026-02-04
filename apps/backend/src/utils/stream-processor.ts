@@ -1,7 +1,7 @@
 /**
-* Stream Processing Utilities
-* Handles streaming content extraction and slide parsing
-*/
+ * Stream Processing Utilities
+ * Handles streaming content extraction and slide parsing
+ */
 
 export interface StreamChunk {
   choices?: Array<{

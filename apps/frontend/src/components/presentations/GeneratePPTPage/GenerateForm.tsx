@@ -1,8 +1,6 @@
 import { Loader2, Sparkles } from "lucide-react";
 import type React from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TopicInput } from "./TopicInput";
 
 interface GenerateFormProps {
@@ -29,20 +27,16 @@ export const GenerateForm: React.FC<GenerateFormProps> = ({
 	onGenerate,
 }) => {
 	return (
-		<Card className="shadow-2xl border border-white/20 bg-white/10 backdrop-blur-md">
-			<CardHeader className="space-y-3 pb-8">
-				<CardTitle className="flex items-center justify-between text-white text-4xl">
-					<span>Generate Presentation</span>
-					{topics.length > 0 && (
-						<span className="text-lg font-normal text-white/70">
-							Est. {estimatedTokens.toFixed(1)}{" "}
-							<span className="text-base text-white/50">points</span>
-						</span>
-					)}
-				</CardTitle>
-				<div className="h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
-			</CardHeader>
-			<CardContent className="px-8 pb-8 space-y-6">
+		<div className="w-full max-w-2xl mx-auto py-16">
+			<div className="space-y-2 mb-16 text-center">
+				{topics.length > 0 && (
+					<p className="text-xl font-light text-white/60">
+						Est. {estimatedTokens.toFixed(1)} points
+					</p>
+				)}
+			</div>
+
+			<div className="space-y-16">
 				<TopicInput
 					prompt={prompt}
 					topics={topics}
@@ -52,35 +46,34 @@ export const GenerateForm: React.FC<GenerateFormProps> = ({
 					disabled={loading}
 				/>
 
-				<div className="flex justify-center my-8">
+				<div className="flex justify-center">
 					<Button
 						onClick={onGenerate}
 						disabled={loading || topics.length === 0}
-						className="w-1/3 bg-white/10 hover:bg-white/20 backdrop-blur-lg border border-white/30 text-white shadow-[0_8px_32px_0_rgba(255,255,255,0.1)] transition-all duration-300 hover:shadow-[0_8px_32px_0_rgba(255,255,255,0.2)] h-14 text-lg font-semibold"
+						className="relative group overflow-hidden px-10 py-8 bg-white/10 hover:bg-white/15 backdrop-blur-md rounded-full border border-white/20 text-white transition-all duration-300 hover:border-white/40 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]"
 					>
-						{loading ? (
-							<>
-								<Loader2 className="mr-2 h-5 w-5 animate-spin" />
-								Generating
-							</>
-						) : (
-							<>
-								<Sparkles className="mr-2 h-5 w-5" />
-								Generate Presentation
-							</>
-						)}
+						<span className="relative flex items-center gap-4 text-xl font-light tracking-wide">
+							{loading ? (
+								<>
+									<Loader2 className="h-6 w-6 animate-spin" />
+									Creating...
+								</>
+							) : (
+								<>
+									<Sparkles className="h-6 w-6 opacity-70 group-hover:opacity-100 transition-opacity" />
+									Start Generating
+								</>
+							)}
+						</span>
 					</Button>
 				</div>
+
 				{error && (
-					<Alert
-						variant="destructive"
-						className="bg-red-500/20 border-red-500/50 text-white"
-					>
-						<AlertTitle>Error</AlertTitle>
-						<AlertDescription>{error}</AlertDescription>
-					</Alert>
+					<div className="bg-red-500/10 border border-red-500/20 text-red-200 px-6 py-4 rounded-xl backdrop-blur-sm text-center font-light">
+						{error}
+					</div>
 				)}
-			</CardContent>
-		</Card>
+			</div>
+		</div>
 	);
 };
