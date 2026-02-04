@@ -7,162 +7,162 @@ import { useStreaming } from "@/modules/presentations";
 import { ROUTES } from "@/router/paths";
 
 export default function GeneratePPTPage() {
-	const [prompt, setPrompt] = useState("");
-	const [topics, setTopics] = useState<string[]>([]);
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState("");
-	const [slideCount, setSlideCount] = useState("5");
-	const [slideCountMode, setSlideCountMode] = useState("preset");
-	const [customSlideCount, setCustomSlideCount] = useState("5");
-	const [detailLevel, setDetailLevel] = useState("balanced");
-	const [tonality, setTonality] = useState("professional");
-	const [useWebResearch, setUseWebResearch] = useState(false);
-	const navigate = useNavigate();
-	const { streamingState, startStreaming, resetStreaming } = useStreaming();
+  const [prompt, setPrompt] = useState("");
+  const [topics, setTopics] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [slideCount, setSlideCount] = useState("5");
+  const [slideCountMode, setSlideCountMode] = useState("preset");
+  const [customSlideCount, setCustomSlideCount] = useState("5");
+  const [detailLevel, setDetailLevel] = useState("balanced");
+  const [tonality, setTonality] = useState("professional");
+  const [useWebResearch, setUseWebResearch] = useState(false);
+  const navigate = useNavigate();
+  const { streamingState, startStreaming, resetStreaming } = useStreaming();
 
-	useEffect(() => {
-		resetStreaming();
-	}, [resetStreaming]);
+  useEffect(() => {
+    resetStreaming();
+  }, [resetStreaming]);
 
-	// Navigate to viewer when first slide arrives
-	useEffect(() => {
-		if (streamingState.slides.length >= 1 && loading) {
-			setLoading(false);
-			navigate(ROUTES.presentation, {
-				state: {
-					isStreaming: true,
-				},
-			});
-		}
-	}, [streamingState.slides.length, loading, navigate]);
+  // Navigate to viewer when first slide arrives
+  useEffect(() => {
+    if (streamingState.slides.length >= 1 && loading) {
+      setLoading(false);
+      navigate(ROUTES.presentation, {
+        state: {
+          isStreaming: true,
+        },
+      });
+    }
+  }, [streamingState.slides.length, loading, navigate]);
 
-	// Handle streaming errors
-	useEffect(() => {
-		if (streamingState.error) {
-			setError(streamingState.error);
-			setLoading(false);
-		}
-	}, [streamingState.error]);
-	const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-		if (e.key === "Enter" && prompt.trim()) {
-			e.preventDefault();
-			if (!topics.includes(prompt.trim())) {
-				setTopics([...topics, prompt.trim()]);
-			}
-			setPrompt("");
-		}
-	};
+  // Handle streaming errors
+  useEffect(() => {
+    if (streamingState.error) {
+      setError(streamingState.error);
+      setLoading(false);
+    }
+  }, [streamingState.error]);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && prompt.trim()) {
+      e.preventDefault();
+      if (!topics.includes(prompt.trim())) {
+        setTopics([...topics, prompt.trim()]);
+      }
+      setPrompt("");
+    }
+  };
 
-	const handleRemoveTopic = (topicToRemove: string) => {
-		setTopics(topics.filter((topic) => topic !== topicToRemove));
-	};
+  const handleRemoveTopic = (topicToRemove: string) => {
+    setTopics(topics.filter((topic) => topic !== topicToRemove));
+  };
 
-	const handleGenerateInternal = async () => {
-		if (topics.length === 0) return;
+  const handleGenerateInternal = async () => {
+    if (topics.length === 0) return;
 
-		setLoading(true);
-		setError("");
+    setLoading(true);
+    setError("");
 
-		// Get the slide count (either from preset or custom)
-		const count =
-			slideCountMode === "preset"
-				? parseInt(slideCount, 10)
-				: parseInt(customSlideCount, 10);
+    // Get the slide count (either from preset or custom)
+    const count =
+      slideCountMode === "preset"
+        ? parseInt(slideCount, 10)
+        : parseInt(customSlideCount, 10);
 
-		if (useWebResearch) {
-			navigate(ROUTES.research, {
-				state: {
-					prompt: topics.join(", "),
-					slideCount: count,
-					detailLevel,
-					tonality,
-				},
-			});
-			return;
-		}
+    if (useWebResearch) {
+      navigate(ROUTES.research, {
+        state: {
+          prompt: topics.join(", "),
+          slideCount: count,
+          detailLevel,
+          tonality,
+        },
+      });
+      return;
+    }
 
-		const success = await startStreaming(
-			topics.join(", "),
-			count,
-			detailLevel,
-			tonality,
-			false,
-		);
+    const success = await startStreaming(
+      topics.join(", "),
+      count,
+      detailLevel,
+      tonality,
+      false,
+    );
 
-		if (!success) {
-			setLoading(false);
-		}
-	};
+    if (!success) {
+      setLoading(false);
+    }
+  };
 
-	const handleGenerate = useDebouncedCallback(handleGenerateInternal, {
-		wait: 500,
-		leading: true,
-	});
+  const handleGenerate = useDebouncedCallback(handleGenerateInternal, {
+    wait: 500,
+    leading: true,
+  });
 
-	// Calculate estimated token usage based on selections
-	const calculateEstimatedTokens = () => {
-		const count =
-			slideCountMode === "preset"
-				? parseInt(slideCount, 10)
-				: parseInt(customSlideCount, 10);
+  // Calculate estimated token usage based on selections
+  const calculateEstimatedTokens = () => {
+    const count =
+      slideCountMode === "preset"
+        ? parseInt(slideCount, 10)
+        : parseInt(customSlideCount, 10);
 
-		let baseTokenPerSlide = 1;
+    let baseTokenPerSlide = 1;
 
-		if (detailLevel === "brief") {
-			baseTokenPerSlide = 0.6;
-		} else if (detailLevel === "concise") {
-			baseTokenPerSlide = 0.8;
-		} else if (detailLevel === "detailed") {
-			baseTokenPerSlide = 2.0;
-		} else if (detailLevel === "comprehensive") {
-			baseTokenPerSlide = 3.0;
-		}
+    if (detailLevel === "brief") {
+      baseTokenPerSlide = 0.6;
+    } else if (detailLevel === "concise") {
+      baseTokenPerSlide = 0.8;
+    } else if (detailLevel === "detailed") {
+      baseTokenPerSlide = 2.0;
+    } else if (detailLevel === "comprehensive") {
+      baseTokenPerSlide = 3.0;
+    }
 
-		let tonalityMultiplier = 1.0;
-		if (tonality === "casual") {
-			tonalityMultiplier = 0.9;
-		} else if (tonality === "enthusiastic") {
-			tonalityMultiplier = 1.05;
-		} else if (tonality === "persuasive") {
-			tonalityMultiplier = 1.1;
-		}
+    let tonalityMultiplier = 1.0;
+    if (tonality === "casual") {
+      tonalityMultiplier = 0.9;
+    } else if (tonality === "enthusiastic") {
+      tonalityMultiplier = 1.05;
+    } else if (tonality === "persuasive") {
+      tonalityMultiplier = 1.1;
+    }
 
-		const estimatedTokens = count * baseTokenPerSlide * tonalityMultiplier;
-		return estimatedTokens;
-	};
+    const estimatedTokens = count * baseTokenPerSlide * tonalityMultiplier;
+    return estimatedTokens;
+  };
 
-	return (
-		<div className="h-screen overflow-hidden bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col">
-			<Header />
-			<div className="flex-1 p-4 md:p-8 flex items-center justify-center overflow-y-auto">
-				<div className="w-full max-w-4xl relative">
-					<GenerateOptionsBar
-						detailLevel={detailLevel}
-						tonality={tonality}
-						useWebResearch={useWebResearch}
-						slideCountMode={slideCountMode}
-						slideCount={slideCount}
-						customSlideCount={customSlideCount}
-						onDetailLevelChange={setDetailLevel}
-						onTonalityChange={setTonality}
-						onUseWebResearchChange={setUseWebResearch}
-						onSlideCountModeChange={setSlideCountMode}
-						onSlideCountChange={setSlideCount}
-						onCustomSlideCountChange={setCustomSlideCount}
-					/>
-					<GenerateForm
-						prompt={prompt}
-						topics={topics}
-						loading={loading}
-						error={error}
-						estimatedTokens={calculateEstimatedTokens()}
-						onPromptChange={setPrompt}
-						onKeyDown={handleKeyDown}
-						onRemoveTopic={handleRemoveTopic}
-						onGenerate={handleGenerate}
-					/>
-				</div>
-			</div>
-		</div>
-	);
+  return (
+    <div className="h-screen overflow-hidden bg-transparent flex flex-col">
+      <Header />
+      <div className="flex-1 p-4 md:p-8 flex items-center justify-center overflow-y-auto">
+        <div className="w-full max-w-4xl relative">
+          <GenerateOptionsBar
+            detailLevel={detailLevel}
+            tonality={tonality}
+            useWebResearch={useWebResearch}
+            slideCountMode={slideCountMode}
+            slideCount={slideCount}
+            customSlideCount={customSlideCount}
+            onDetailLevelChange={setDetailLevel}
+            onTonalityChange={setTonality}
+            onUseWebResearchChange={setUseWebResearch}
+            onSlideCountModeChange={setSlideCountMode}
+            onSlideCountChange={setSlideCount}
+            onCustomSlideCountChange={setCustomSlideCount}
+          />
+          <GenerateForm
+            prompt={prompt}
+            topics={topics}
+            loading={loading}
+            error={error}
+            estimatedTokens={calculateEstimatedTokens()}
+            onPromptChange={setPrompt}
+            onKeyDown={handleKeyDown}
+            onRemoveTopic={handleRemoveTopic}
+            onGenerate={handleGenerate}
+          />
+        </div>
+      </div>
+    </div>
+  );
 }
