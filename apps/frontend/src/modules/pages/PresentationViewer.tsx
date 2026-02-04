@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -20,7 +21,6 @@ import TemplateApplier from "@/components/presentations/Viewer/TemplateApplier";
 import TemplateSelector from "@/components/presentations/Viewer/TemplateSelector";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { useStreaming } from "@/modules/presentations";
 import type {
   ChartSlide,
@@ -91,6 +92,7 @@ const SlideRenderer = React.memo(
         >
           <div
             className="w-full h-full flex flex-col justify-center"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: Rendering user content from html slide
             dangerouslySetInnerHTML={{
               __html: htmlSlide.html,
             }}
@@ -467,7 +469,11 @@ const PresentationViewer: React.FC = () => {
   }, [isPlaying, currentSlide, presentationState, slideInterval]);
 
   useEffect(() => {
-    if (isPlaying && currentSlide === presentationState!.slides.length - 1) {
+    if (
+      isPlaying &&
+      presentationState &&
+      currentSlide === presentationState.slides.length - 1
+    ) {
       setIsPlaying(false);
     }
   }, [currentSlide, presentationState, isPlaying]);
@@ -500,13 +506,14 @@ const PresentationViewer: React.FC = () => {
     };
   }, [currentSlide]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Re-run on presentation changes
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting && entry.intersectionRatio >= 0.9) {
             const slideId = entry.target.id;
-            const slideIndex = parseInt(slideId.split("-")[1]);
+            const slideIndex = parseInt(slideId.split("-")[1], 10);
             setVisibleSlide(slideIndex);
           }
         });
@@ -519,13 +526,18 @@ const PresentationViewer: React.FC = () => {
     );
 
     const slideElements = document.querySelectorAll(".slide-carousel__item");
-    slideElements.forEach((slide) => observer.observe(slide));
+    slideElements.forEach((slide) => {
+      observer.observe(slide);
+    });
 
     return () => {
-      slideElements.forEach((slide) => observer.unobserve(slide));
+      slideElements.forEach((slide) => {
+        observer.unobserve(slide);
+      });
     };
   }, [presentationState]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: unstable function refs
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") {
@@ -564,6 +576,7 @@ const PresentationViewer: React.FC = () => {
     }
   }, [intervalMode]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: update only on slide count
   useEffect(() => {
     const container = slideContainerRef.current;
     if (!container || !presentationState) return;
@@ -834,24 +847,25 @@ const PresentationViewer: React.FC = () => {
         {/* Header Controls */}
         {showControls && !isFullscreen && (
           <div
-            className="relative flex items-center justify-between bg-white/10 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/20 flex-shrink-0"
+            className="relative flex items-center justify-between px-6 py-4 flex-shrink-0"
             style={{ minHeight: 48, fontSize: "1rem" }}
           >
             <div className="flex items-center gap-4">
-              <div className="relative group">
-                <Button
-                  onClick={() => navigate(ROUTES.home)}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  ←
-                </Button>
-                <div className="absolute top-full left-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                  <div className="bg-white/10 backdrop-blur-lg border border-white/30 text-white px-4 py-2 rounded-lg shadow-lg whitespace-nowrap">
-                    Back to Generated
-                  </div>
-                </div>
-              </div>
+              <Button
+                onClick={() => navigate(ROUTES.home)}
+                className="bg-transparent hover:bg-white/5 text-white/40 hover:text-white transition-all duration-300 rounded-full p-2 h-10 w-10 border-none shadow-none"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              {/* Title moved to left */}
+              {presentationState?.title && (
+                <span className="text-white/60 text-lg font-light tracking-wide select-none hidden md:block">
+                  {presentationState.title}
+                </span>
+              )}
+            </div>
+            {/* Center Controls */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2">
               <TemplateSelector
                 selectedTemplate={currentTemplate}
                 onTemplateChange={changeTemplate}
@@ -860,166 +874,110 @@ const PresentationViewer: React.FC = () => {
                 <Button
                   onClick={() => setShowIterateModal(true)}
                   variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
+                  className="bg-white/5 hover:bg-white/10 backdrop-blur-lg border border-white/5 text-white transition-all duration-300"
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
                   Iterate
                 </Button>
               )}
             </div>
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white/80 text-sm font-medium select-none pointer-events-none bg-white/10 border border-white/20 px-4 py-1 rounded-full shadow-sm flex items-center gap-2">
-              {isStreamingMode && streamingState.isStreaming && (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              )}
-              Slide {currentSlide + 1} of {presentationState.slides.length}
-            </span>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                {intervalMode === "preset" ? (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-24 bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200 justify-between"
-                      >
-                        <span>{slideInterval}s</span>
-                        <ChevronDown className="w-4 h-4 opacity-50" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-32 bg-gray-800/95 backdrop-blur-md border-gray-600">
+            <div className="flex items-center gap-2">
+              {/* Interval Selector */}
+              {intervalMode === "preset" ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-24 bg-transparent border-white/5 text-white/60 hover:text-white hover:bg-white/5 transition-all duration-200 justify-between h-9 px-3"
+                    >
+                      <span>{slideInterval}s</span>
+                      <ChevronDown className="w-4 h-4 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-32 bg-gray-900/95 backdrop-blur-md border border-white/10 text-white shadow-xl">
+                    {[2, 3, 5, 10, 15].map((val) => (
                       <DropdownMenuItem
+                        key={val}
                         onClick={() => {
-                          setSlideInterval(2);
-                          setCustomInterval("2");
+                          setSlideInterval(val);
+                          setCustomInterval(val.toString());
                           setIntervalMode("preset");
                         }}
-                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
+                        className="focus:bg-white/10 focus:text-white cursor-pointer"
                       >
-                        2s
+                        {val}s
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSlideInterval(3);
-                          setCustomInterval("3");
-                          setIntervalMode("preset");
-                        }}
-                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
-                      >
-                        3s
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSlideInterval(5);
-                          setCustomInterval("5");
-                          setIntervalMode("preset");
-                        }}
-                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
-                      >
-                        5s
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSlideInterval(10);
-                          setCustomInterval("10");
-                          setIntervalMode("preset");
-                        }}
-                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
-                      >
-                        10s
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSlideInterval(15);
-                          setCustomInterval("15");
-                          setIntervalMode("preset");
-                        }}
-                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
-                      >
-                        15s
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setIntervalMode("custom")}
-                        className="text-white hover:bg-gray-700/50 focus:bg-gray-700/50 cursor-pointer"
-                      >
-                        Custom
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                ) : (
-                  <input
-                    ref={customInputRef}
-                    type="number"
-                    min={0}
-                    max={10000}
-                    value={customInterval}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (/^\d{0,5}$/.test(val) && Number(val) <= 10000) {
-                        setCustomInterval(val);
-                      }
-                    }}
-                    onBlur={() => {
+                    ))}
+                    <DropdownMenuItem
+                      onClick={() => setIntervalMode("custom")}
+                      className="focus:bg-white/10 focus:text-white cursor-pointer"
+                    >
+                      Custom
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <input
+                  ref={customInputRef}
+                  type="number"
+                  min={0}
+                  max={10000}
+                  value={customInterval}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (/^\d{0,5}$/.test(val) && Number(val) <= 10000) {
+                      setCustomInterval(val);
+                    }
+                  }}
+                  onBlur={() => {
+                    let val = Number(customInterval);
+                    if (Number.isNaN(val) || val < 0) val = 0;
+                    if (val > 10000) val = 10000;
+                    setSlideInterval(val);
+                    setCustomInterval(val.toString());
+                    setIntervalMode("preset");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
                       let val = Number(customInterval);
-                      if (isNaN(val) || val < 0) val = 0;
+                      if (Number.isNaN(val) || val < 0) val = 0;
                       if (val > 10000) val = 10000;
                       setSlideInterval(val);
                       setCustomInterval(val.toString());
                       setIntervalMode("preset");
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        let val = Number(customInterval);
-                        if (isNaN(val) || val < 0) val = 0;
-                        if (val > 10000) val = 10000;
-                        setSlideInterval(val);
-                        setCustomInterval(val.toString());
-                        setIntervalMode("preset");
-                      } else if (e.key === "Escape") {
-                        setIntervalMode("preset");
-                      }
-                    }}
-                    className={`w-24 px-3 py-2 rounded-md border ${
-                      isFullscreen
-                        ? "bg-transparent border-0 shadow-none text-white hover:bg-white/20"
-                        : "border-white/20 bg-white/10 text-white hover:bg-white/20"
-                    } focus:outline-none focus:ring-2 focus:ring-blue-400 hide-number-spin transition-all duration-200`}
-                    placeholder="Custom (s)"
-                    inputMode="numeric"
-                    style={{ MozAppearance: "textfield" }}
-                  />
+                    } else if (e.key === "Escape") {
+                      setIntervalMode("preset");
+                    }
+                  }}
+                  className="w-24 px-3 py-2 rounded-md bg-transparent border border-white/5 text-white/60 hover:text-white hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-white/20 hide-number-spin transition-all duration-200 h-9"
+                  placeholder="Custom (s)"
+                  inputMode="numeric"
+                  style={{ MozAppearance: "textfield" }}
+                />
+              )}
+
+              {/* Play/Pause */}
+              <Button
+                onClick={togglePlayback}
+                variant="outline"
+                className="bg-transparent border-white/5 text-white/60 hover:text-white hover:bg-white/5 transition-all duration-200 h-9 px-3"
+                disabled={presentationState.slides.length === 1}
+              >
+                {isPlaying ? (
+                  <Pause className="w-4 h-4" />
+                ) : (
+                  <Play className="w-4 h-4" />
                 )}
-                <Button
-                  onClick={togglePlayback}
-                  variant={isFullscreen ? "ghost" : "outline"}
-                  className={
-                    isFullscreen
-                      ? "text-white hover:bg-white/20"
-                      : "bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
-                  }
-                  disabled={presentationState.slides.length === 1}
-                >
-                  {isPlaying ? (
-                    <>
-                      <Pause className="w-4 h-4 mr-2" />
-                      Pause
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 mr-2" />
-                      Play
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={toggleFullscreen}
-                  variant="outline"
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 transition-all duration-200"
-                >
-                  <Maximize className="w-4 h-4 mr-2" />
-                  Fullscreen
-                </Button>
-                <DownloadPPTXButton title={presentationState.title} />
-              </div>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsFullscreen(true)}
+                className="text-white/60 hover:text-white hover:bg-white/5 h-9 w-9"
+              >
+                <Maximize className="h-5 w-5" />
+              </Button>
             </div>
           </div>
         )}
@@ -1031,7 +989,7 @@ const PresentationViewer: React.FC = () => {
           isStreaming={streamingState.isStreaming}
         />
         {/* Slide Counter */}
-        {showControls && !isFullscreen && <></>}
+
         {/* Slides Area (horizontal carousel, fills available space) */}
         {!isFullscreen && (
           <div
@@ -1048,8 +1006,10 @@ const PresentationViewer: React.FC = () => {
                 const isActive = visibleSlide === idx;
 
                 return (
+                  // biome-ignore lint/a11y/useKeyWithClickEvents: handled globally
+                  // biome-ignore lint/a11y/useFocusableInteractive: handled globally
                   <div
-                    key={idx}
+                    key={slide.id || idx}
                     id={`slide-${idx}`}
                     role="option"
                     aria-selected={isActive}
@@ -1096,6 +1056,11 @@ const PresentationViewer: React.FC = () => {
             className="relative flex items-center mt-3 pt-8 flex-shrink-0"
             style={{ minHeight: 36, fontSize: "0.95rem" }}
           >
+            {/* Left-aligned download button */}
+            <div className="absolute left-0 top-1/2 -translate-y-1/2">
+              <DownloadPPTXButton title={presentationState.title} />
+            </div>
+
             {/* Centered navigation buttons */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-2">
               <Button
@@ -1105,7 +1070,7 @@ const PresentationViewer: React.FC = () => {
                   skipToFirstSlide();
                 }}
                 disabled={currentSlide === 0}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                className="bg-transparent border-white/5 text-white/60 hover:text-white hover:bg-white/5"
               >
                 <SkipBack className="w-4 h-4" />
               </Button>
@@ -1116,7 +1081,7 @@ const PresentationViewer: React.FC = () => {
                   prevSlide();
                 }}
                 disabled={currentSlide === 0}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                className="bg-transparent border-white/5 text-white/60 hover:text-white hover:bg-white/5"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Previous
@@ -1128,7 +1093,7 @@ const PresentationViewer: React.FC = () => {
                   nextSlide();
                 }}
                 disabled={currentSlide === presentationState.slides.length - 1}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                className="bg-transparent border-white/5 text-white/60 hover:text-white hover:bg-white/5"
               >
                 Next
                 <ChevronRight className="w-4 h-4 ml-2" />
@@ -1140,7 +1105,7 @@ const PresentationViewer: React.FC = () => {
                   skipToLastSlide();
                 }}
                 disabled={currentSlide === presentationState.slides.length - 1}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                className="bg-transparent border-white/5 text-white/60 hover:text-white hover:bg-white/5"
               >
                 <SkipForward className="w-4 h-4" />
               </Button>
@@ -1151,7 +1116,7 @@ const PresentationViewer: React.FC = () => {
                 variant="destructive"
                 onClick={deleteCurrentSlide}
                 disabled={presentationState.slides.length === 1}
-                className="bg-red-600/80 border-red-600/40 text-white hover:bg-red-700/90"
+                className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 shadow-none transition-all duration-200"
                 title="Delete current slide"
               >
                 <Trash className="w-4 h-4 mr-2" />
@@ -1167,7 +1132,7 @@ const PresentationViewer: React.FC = () => {
             style={{ minHeight: 40 }}
           >
             <div className="slide-thumbnails-container flex gap-3 overflow-x-auto py-6 px-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-              {presentationState.slides.map((_, index) => {
+              {presentationState.slides.map((slide, index) => {
                 const isFirstThumbnail = index === 0;
                 const isLastThumbnail =
                   index === presentationState.slides.length - 1 &&
@@ -1177,7 +1142,8 @@ const PresentationViewer: React.FC = () => {
 
                 return (
                   <button
-                    key={index}
+                    key={slide.id || index}
+                    type="button"
                     data-slide-index={index}
                     onClick={() => {
                       setCurrentSlide(index);
@@ -1242,6 +1208,7 @@ const PresentationViewer: React.FC = () => {
         )}
         {/* Fullscreen Controls */}
         {isFullscreen && (
+          // biome-ignore lint/a11y/noStaticElementInteractions: UI hover effect
           <div
             className={`
               fixed bottom-4 left-1/2 transform -translate-x-1/2 
@@ -1305,7 +1272,7 @@ const PresentationViewer: React.FC = () => {
                   }}
                   onBlur={() => {
                     let val = Number(customInterval);
-                    if (isNaN(val) || val < 0) val = 0;
+                    if (Number.isNaN(val) || val < 0) val = 0;
                     if (val > 10000) val = 10000;
                     setSlideInterval(val);
                     setCustomInterval(val.toString());
@@ -1314,7 +1281,7 @@ const PresentationViewer: React.FC = () => {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       let val = Number(customInterval);
-                      if (isNaN(val) || val < 0) val = 0;
+                      if (Number.isNaN(val) || val < 0) val = 0;
                       if (val > 10000) val = 10000;
                       setSlideInterval(val);
                       setCustomInterval(val.toString());
