@@ -192,7 +192,7 @@ export default function PresentationsGridPage() {
       <Header />
       <div className="p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-24">
             <h1 className="text-4xl font-bold text-white flex items-center gap-3">
               Generated Presentations
             </h1>
@@ -219,7 +219,7 @@ export default function PresentationsGridPage() {
                 : gridSize === 3
                   ? "md:grid-cols-2 lg:grid-cols-3"
                   : "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-            } gap-6`}
+            } gap-12`}
           >
             {presentations.length === 0 ? (
               <div className="col-span-full flex flex-col items-center justify-center py-96 text-center">
