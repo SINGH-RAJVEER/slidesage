@@ -1,15 +1,14 @@
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import {
   CreatePresentationButton,
   GridSizeControl,
   PresentationCard,
-} from "@/components/presentations/PresentationsGridPage";
+} from "@/components/Presentations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 import { ROUTES } from "@/router/paths";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -40,19 +40,11 @@ export default function PresentationsGridPage() {
   >(null);
   const [gridSize, setGridSize] = useState<2 | 3 | 4>(() => {
     const saved = localStorage.getItem("gridSize");
-    return saved ? (parseInt(saved) as 2 | 3 | 4) : 3;
+    return saved ? (parseInt(saved, 10) as 2 | 3 | 4) : 3;
   });
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchPresentations();
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("gridSize", gridSize.toString());
-  }, [gridSize]);
-
-  const fetchPresentations = async () => {
+  const fetchPresentations = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_URL}/api/presentations`, {
@@ -81,7 +73,15 @@ export default function PresentationsGridPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void fetchPresentations();
+  }, [fetchPresentations]);
+
+  useEffect(() => {
+    localStorage.setItem("gridSize", gridSize.toString());
+  }, [gridSize]);
 
   const handlePresentationClick = async (presentationId: number) => {
     try {

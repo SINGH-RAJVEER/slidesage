@@ -1,9 +1,9 @@
 import { Loader2, Maximize, Sparkles } from "lucide-react";
 import type React from "react";
 import { Button } from "@/components/ui/button";
-import DownloadPPTXButton from "../Viewer/DownloadPPTXButton";
-import TemplateSelector from "../Viewer/TemplateSelector";
+import DownloadPPTXButton from "./DownloadPPTXButton";
 import { SlideIntervalSelector } from "./SlideIntervalSelector";
+import TemplateSelector from "./TemplateSelector";
 
 interface HeaderControlsProps {
 	currentSlide: number;

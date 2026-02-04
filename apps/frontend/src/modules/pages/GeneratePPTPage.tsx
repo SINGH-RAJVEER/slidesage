@@ -1,11 +1,8 @@
 import { useDebouncedCallback } from "@tanstack/react-pacer/debouncer";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { GenerateForm, GenerateOptionsBar } from "@/components/Generate";
 import Header from "@/components/Header";
-import {
-	GenerateForm,
-	GenerateOptionsBar,
-} from "@/components/presentations/GeneratePPTPage";
 import { useStreaming } from "@/modules/presentations";
 import { ROUTES } from "@/router/paths";
 
