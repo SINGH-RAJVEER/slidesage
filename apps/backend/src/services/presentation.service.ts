@@ -12,7 +12,6 @@ import type {
   Slide,
 } from "../types";
 import { AIService } from "./ai.service";
-import { AutumnBillingService } from "./autumn-billing.service";
 import { TokenCalculator } from "./token-calculator";
 
 export interface GeneratePresentationParams {
@@ -67,8 +66,6 @@ export class PresentationService {
     params: GeneratePresentationParams,
   ): AsyncGenerator<PresentationStreamEvent, void, unknown> {
     const {
-      userId,
-      operationId,
       topic,
       slideCount,
       detailLevel = "balanced",
@@ -78,117 +75,16 @@ export class PresentationService {
     } = params;
 
     try {
-      // Verify user exists and has enough tokens
-      const baseEstimatedTokens = this.calculateEstimatedTokens(
+      // Stream presentation generation
+      for await (const event of this.aiService.generatePresentationStream(
+        topic,
         slideCount,
         detailLevel,
         tonality,
-      );
-
-      const canSummarizeResearch = Boolean(process.env.GROQ_API_KEY);
-      const researchOverheadTokens =
-        TokenCalculator.estimateSearchSlideTokenOverhead({
-          query: topic,
-          maxResults: research?.maxResults,
-          includeSummarization: Boolean(
-            research?.enabled && !researchPayload && canSummarizeResearch,
-          ),
-          summarizationMaxOutputTokens: 500,
-        });
-
-      const estimatedTokens =
-        Math.round((baseEstimatedTokens + researchOverheadTokens) * 10) / 10;
-
-      const tokenCheck = await AutumnBillingService.hasSufficientSlideTokens(
-        userId,
-        estimatedTokens,
-      );
-
-      if (!tokenCheck.allowed && !tokenCheck.unlimited) {
-        yield {
-          event: "error",
-          data: {
-            error: "Insufficient tokens",
-            details: {
-              required: estimatedTokens,
-              available: tokenCheck.balance,
-              shortfall: Math.max(
-                0,
-                Math.round((estimatedTokens - tokenCheck.balance) * 10) / 10,
-              ),
-            },
-          },
-        };
-        return;
-      }
-
-      // Deduct tokens upfront via Autumn (idempotent per operation)
-      await AutumnBillingService.deductSlideTokens(
-        userId,
-        estimatedTokens,
-        `gen:${operationId}:deduct:${estimatedTokens}`,
-      );
-      console.log(
-        `Deducted ${estimatedTokens} tokens from user ${userId} (Autumn)`,
-      );
-
-      let actualTokensUsed = 0;
-      let generationSuccessful = false;
-
-      try {
-        // Stream presentation generation
-        for await (const event of this.aiService.generatePresentationStream(
-          topic,
-          slideCount,
-          detailLevel,
-          tonality,
-          research,
-          researchPayload,
-        )) {
-          yield event;
-
-          if (event.event === "complete") {
-            actualTokensUsed = event.data.tokens_used || 0;
-            generationSuccessful = true;
-          } else if (event.event === "error") {
-            // Generation failed, will refund tokens
-            break;
-          }
-        }
-
-        // Handle token refund if generation failed or used fewer tokens than estimated
-        if (
-          !generationSuccessful ||
-          actualTokensUsed < estimatedTokens * 1000
-        ) {
-          const refundAmount = TokenCalculator.calculateRefund(
-            estimatedTokens,
-            actualTokensUsed,
-          );
-          await AutumnBillingService.refundSlideTokens(
-            userId,
-            refundAmount,
-            `gen:${operationId}:refund:${refundAmount}`,
-          );
-          if (refundAmount > 0) {
-            console.log(
-              `Refunded ${refundAmount} tokens to user ${userId} (Autumn)`,
-            );
-          }
-        }
-      } catch (error) {
-        // Refund tokens on any error
-        const refundAmount = TokenCalculator.calculateRefund(
-          estimatedTokens,
-          actualTokensUsed,
-        );
-        await AutumnBillingService.refundSlideTokens(
-          userId,
-          refundAmount,
-          `gen:${operationId}:refund_error:${refundAmount}`,
-        );
-        console.error("Error during generation, tokens refunded:", error);
-        throw error;
+        research,
+        researchPayload,
+      )) {
+        yield event;
       }
     } catch (error) {
       console.error("Error in presentation generation:", error);
@@ -208,7 +104,6 @@ export class PresentationService {
     const {
       userId,
       presentationId,
-      operationId,
       feedback,
       detailLevel = "balanced",
       tonality = "professional",
@@ -242,64 +137,6 @@ export class PresentationService {
         (existingPresentation.slidesData as unknown as { slides?: Slide[] })
           ?.slides || [];
 
-      // Calculate tokens for iteration (typically less than full generation)
-      const baseEstimatedTokens = this.calculateEstimatedTokens(
-        currentSlides.length,
-        detailLevel,
-        tonality,
-      );
-
-      const canSummarizeResearch = Boolean(process.env.GROQ_API_KEY);
-      const researchOverheadTokens =
-        TokenCalculator.estimateSearchSlideTokenOverhead({
-          query: feedback,
-          maxResults: research?.maxResults,
-          includeSummarization: Boolean(
-            research?.enabled && canSummarizeResearch,
-          ),
-          summarizationMaxOutputTokens: 500,
-        });
-
-      // 30% discount for iterations
-      const estimatedTokens =
-        Math.round((baseEstimatedTokens + researchOverheadTokens) * 0.7 * 10) /
-        10;
-
-      const tokenCheck = await AutumnBillingService.hasSufficientSlideTokens(
-        userId,
-        estimatedTokens,
-      );
-
-      if (!tokenCheck.allowed && !tokenCheck.unlimited) {
-        yield {
-          event: "error",
-          data: {
-            error: "Insufficient tokens for iteration",
-            details: {
-              required: estimatedTokens,
-              available: tokenCheck.balance,
-              shortfall: Math.max(
-                0,
-                Math.round((estimatedTokens - tokenCheck.balance) * 10) / 10,
-              ),
-            },
-          },
-        };
-        return;
-      }
-
-      await AutumnBillingService.deductSlideTokens(
-        userId,
-        estimatedTokens,
-        `iter:${operationId}:deduct:${estimatedTokens}`,
-      );
-      console.log(
-        `Deducted ${estimatedTokens} tokens from user ${userId} for iteration (Autumn)`,
-      );
-
-      let actualTokensUsed = 0;
-      let iterationSuccessful = false;
-
       try {
         // Stream presentation iteration
         for await (const event of this.aiService.iteratePresentationStream(
@@ -310,47 +147,11 @@ export class PresentationService {
           research,
         )) {
           yield event;
-
-          if (event.event === "complete") {
-            actualTokensUsed = event.data.tokens_used || 0;
-            iterationSuccessful = true;
-          } else if (event.event === "error") {
-            // Iteration failed, will refund tokens
-            break;
-          }
-        }
-
-        // Handle token refund if iteration failed or used fewer tokens than estimated
-        if (!iterationSuccessful || actualTokensUsed < estimatedTokens * 1000) {
-          const refundAmount = TokenCalculator.calculateRefund(
-            estimatedTokens,
-            actualTokensUsed,
-          );
-          await AutumnBillingService.refundSlideTokens(
-            userId,
-            refundAmount,
-            `iter:${operationId}:refund:${refundAmount}`,
-          );
-          if (refundAmount > 0) {
-            console.log(
-              `Refunded ${refundAmount} iteration tokens to user ${userId} (Autumn)`,
-            );
-          }
         }
 
         // Persistence is handled by the HTTP route layer.
       } catch (error) {
-        // Refund tokens on any error
-        const refundAmount = TokenCalculator.calculateRefund(
-          estimatedTokens,
-          actualTokensUsed,
-        );
-        await AutumnBillingService.refundSlideTokens(
-          userId,
-          refundAmount,
-          `iter:${operationId}:refund_error:${refundAmount}`,
-        );
-        console.error("Error during iteration, tokens refunded:", error);
+        console.error("Error during iteration:", error);
         throw error;
       }
     } catch (error) {

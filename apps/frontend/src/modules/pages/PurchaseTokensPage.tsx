@@ -51,7 +51,7 @@ export default function PurchaseTokensPage() {
   useEffect(() => {
     let cancelled = false;
     const pollAfterSuccess = async () => {
-      // Autumn/Stripe can take a moment to finalize + sync balances.
+      // Billing can take a moment to finalize + sync balances.
       // Poll a few times after returning so the user sees updated points.
       if (status !== "success") return;
 

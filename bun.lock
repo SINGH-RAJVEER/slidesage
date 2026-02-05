@@ -6,8 +6,8 @@
       "name": "slide-sage-monorepo",
       "devDependencies": {
         "prettier": "latest",
-        "turbo": "latest",
-      },
+        "turbo": "latest"
+      }
     },
     "apps/backend": {
       "name": "slide-sage-backend",
@@ -19,13 +19,13 @@
         "drizzle-orm": "^0.36.4",
         "hono": "^4.6.14",
         "postgres": "^3.4.5",
-        "svix": "^1.84.1",
+        "svix": "^1.84.1"
       },
       "devDependencies": {
         "@biomejs/biome": "^1.9.4",
         "@types/bun": "latest",
-        "drizzle-kit": "^0.28.1",
-      },
+        "drizzle-kit": "^0.28.1"
+      }
     },
     "apps/frontend": {
       "name": "slide-sage-frontend",
@@ -66,7 +66,7 @@
         "react-router-dom": "^7.6.2",
         "tailwind-merge": "^3.0.1",
         "vite": "^6.3.5",
-        "zod": "^3.25.64",
+        "zod": "^3.25.64"
       },
       "devDependencies": {
         "@biomejs/biome": "^2.3.13",
@@ -87,9 +87,9 @@
         "lightningcss": "^1.30.2",
         "tailwindcss": "^4.0.0",
         "vite-tsconfig-paths": "^5.1.4",
-        "vitest": "^1.0.4",
-      },
-    },
+        "vitest": "^1.0.4"
+      }
+    }
   },
   "packages": {
     "@adobe/css-tools": ["@adobe/css-tools@4.4.4", "", {}, "sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg=="],

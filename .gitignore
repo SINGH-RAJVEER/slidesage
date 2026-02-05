@@ -2,3 +2,4 @@ client_secret_for google login in slidesage.json
 node_modules
 .turbo
 .env
+AGENTS.md

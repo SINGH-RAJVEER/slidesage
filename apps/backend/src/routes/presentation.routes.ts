@@ -8,8 +8,6 @@ import {
 import { PresentationRepository } from "../repositories/presentation.repository";
 import { PresentationService } from "../services/presentation.service";
 import { SearchService } from "../services/search.service";
-import { AutumnBillingService } from "../services/autumn-billing.service";
-import { TokenCalculator } from "../services/token-calculator";
 import type {
   PresentationJSON,
   ResearchOptions,
@@ -102,42 +100,6 @@ presentations.post(
 
       if (!topic || !slide_count) {
         return c.json({ error: { message: "Missing required fields" } }, 400);
-      }
-
-      // Pre-check token sufficiency so the frontend can handle 402 before SSE starts.
-      const baseEstimatedTokens = presentationService.calculateEstimatedTokens(
-        Number(slide_count),
-        detail_level || "balanced",
-        tonality || "professional",
-      );
-
-      const canSummarizeResearch = Boolean(process.env.GROQ_API_KEY);
-      const researchOverheadTokens =
-        TokenCalculator.estimateSearchSlideTokenOverhead({
-          query: String(topic),
-          maxResults: research?.maxResults,
-          includeSummarization: Boolean(
-            research?.enabled && !researchPayload && canSummarizeResearch,
-          ),
-          summarizationMaxOutputTokens: 500,
-        });
-
-      const estimatedTokens =
-        Math.round((baseEstimatedTokens + researchOverheadTokens) * 10) / 10;
-      const tokenCheck = await AutumnBillingService.hasSufficientSlideTokens(
-        userId,
-        estimatedTokens,
-      );
-
-      if (!tokenCheck.allowed && !tokenCheck.unlimited) {
-        return c.json(
-          {
-            error: "Insufficient tokens",
-            slide_tokens_remaining: tokenCheck.balance,
-            slide_tokens_required: estimatedTokens,
-          },
-          402,
-        );
       }
 
       // Create initial presentation record
@@ -265,16 +227,10 @@ presentations.post(
             );
 
             await stream.write("event: saved\n");
-
-            const balance = await AutumnBillingService.getSlideTokenBalance(
-              userId,
-            ).catch(() => null);
             await stream.write(
               `data: ${JSON.stringify({
                 presentation_id: presentationId,
                 success: true,
-                slide_tokens_remaining: balance?.slideTokens,
-                is_unlimited: balance?.isUnlimited,
               })}\n\n`,
             );
           } else {
@@ -458,16 +414,10 @@ presentations.post(
             });
 
             await stream.write("event: saved\n");
-
-            const balance = await AutumnBillingService.getSlideTokenBalance(
-              userId,
-            ).catch(() => null);
             await stream.write(
               `data: ${JSON.stringify({
                 presentation_id: presentationId,
                 success: true,
-                slide_tokens_remaining: balance?.slideTokens,
-                is_unlimited: balance?.isUnlimited,
               })}\n\n`,
             );
           } else {
