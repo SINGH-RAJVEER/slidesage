@@ -57,6 +57,10 @@ export default function GeneratePPTPage() {
     setTopics(topics.filter((topic) => topic !== topicToRemove));
   };
 
+  const handleEditTopic = (index: number, value: string) => {
+    setTopics((prev) => prev.map((topic, i) => (i === index ? value : topic)));
+  };
+
   const handleGenerateInternal = async () => {
     if (topics.length === 0) return;
 
@@ -159,6 +163,7 @@ export default function GeneratePPTPage() {
             onPromptChange={setPrompt}
             onKeyDown={handleKeyDown}
             onRemoveTopic={handleRemoveTopic}
+            onEditTopic={handleEditTopic}
             onGenerate={handleGenerate}
           />
         </div>
