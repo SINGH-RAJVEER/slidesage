@@ -9,6 +9,7 @@ import type {
 import { JSONRecoveryError, recoverJson } from '../utils/json-recovery';
 import { StreamProcessor } from '../utils/stream-processor';
 import { buildGenerationPrompt, buildIterationPrompt } from './ai-prompts';
+import { RAGService } from './rag.service';
 import { SearchService } from './search.service';
 
 // Using dynamic import for litellm compatibility
@@ -17,8 +18,6 @@ const completion: unknown = null;
 async function initLiteLLM() {
   if (!completion) {
     try {
-      // LiteLLM is available via Python subprocess or API
-      // For now, we'll use a simple fetch-based approach to an OpenAI-compatible endpoint
       console.log('AI Service initialized');
     } catch (error) {
       console.warn('LiteLLM SDK not available:', error);
@@ -28,6 +27,7 @@ async function initLiteLLM() {
 
 export class AIService {
   private searchService = new SearchService();
+  private ragService = new RAGService();
 
   constructor() {
     initLiteLLM();
@@ -51,7 +51,7 @@ The user requested that you vet factual claims with recent information. Use the 
 Rules:
 - Prefer these sources over general knowledge for dates, stats, versions, pricing, or "latest" info.
 - Do NOT invent citations or facts. If sources don't support a claim, either omit it or mark it as uncertain in slide notes.
-  - You may add a "notes" field on slides to include brief citations like: "Sources: https://example.com, ...".
+- You may add a "notes" field on slides to include brief citations like: "Sources: https://example.com, ...".
 - Output must still be a single valid JSON object (no markdown).
 
 User topic: ${trimmedQuery || '(not provided)'}
@@ -480,7 +480,8 @@ ${JSON.stringify(cappedSources, null, 2)}`;
    * Generate presentation iteration based on user feedback
    */
   async *iteratePresentationStream(
-    currentSlides: Slide[],
+    userId: string,
+    presentationId: string,
     feedback: string,
     detailLevel = 'balanced',
     tonality = 'professional',
@@ -489,7 +490,15 @@ ${JSON.stringify(cappedSources, null, 2)}`;
     console.log(`Starting presentation iteration with feedback: ${feedback.substring(0, 100)}...`);
 
     try {
-      const systemPrompt = buildIterationPrompt(currentSlides, feedback, detailLevel, tonality);
+      // Retrieve RAG context for this iteration
+      const ragContext = await this.ragService.buildRagContextString(
+        userId,
+        presentationId,
+        feedback
+      );
+
+      const systemPrompt = buildIterationPrompt(feedback, detailLevel, tonality);
+      const enhancedSystemPrompt = ragContext ? `${ragContext}\n${systemPrompt}` : systemPrompt;
 
       const effectiveResearch: ResearchOptions | undefined =
         research && typeof research === 'object' ? research : undefined;
@@ -556,7 +565,7 @@ ${JSON.stringify(cappedSources, null, 2)}`;
         : null;
 
       const messages = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: enhancedSystemPrompt },
         ...(researchMessage
           ? [{ role: 'system', content: researchMessage } as LiteLLMMessage]
           : []),
@@ -599,7 +608,7 @@ ${JSON.stringify(cappedSources, null, 2)}`;
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
-            if (data === '[DONE]') continue;
+            if (data === '[DONE]') enhancedSontinue;
 
             try {
               const parsed = JSON.parse(data);

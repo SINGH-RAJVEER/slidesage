@@ -12,6 +12,7 @@ import type {
 import type { Presentation } from '@slide-sage/db';
 import { PresentationRepository, TokenCalculator } from '@slide-sage/db';
 import { AIService } from './ai.service';
+import { RAGService } from './rag.service';
 
 export interface GeneratePresentationParams {
   userId: string;
@@ -37,6 +38,7 @@ export interface IteratePresentationParams {
 export class PresentationService {
   private aiService: AIService;
   private presentationRepo = new PresentationRepository();
+  private ragService = new RAGService();
 
   constructor() {
     this.aiService = new AIService();
@@ -130,14 +132,14 @@ export class PresentationService {
         return;
       }
 
-      // slidesData is stored as JSON; cast for safe access.
-      const currentSlides =
-        (existingPresentation.slidesData as unknown as { slides?: Slide[] })?.slides || [];
+      // Note: currentSlides are stored in the vector database and retrieved via RAG
+      // No need to pass them directly to the AI service
 
       try {
         // Stream presentation iteration
         for await (const event of this.aiService.iteratePresentationStream(
-          currentSlides,
+          userId,
+          presentationId,
           feedback,
           detailLevel,
           tonality,
@@ -215,6 +217,40 @@ export class PresentationService {
   async getPresentationIterations(presentationId: string, userId: string): Promise<Presentation[]> {
     await this.getPresentation(presentationId, userId);
     return await this.presentationRepo.findIterations(presentationId);
+  }
+
+  /**
+   * Store presentation iteration with RAG embedding
+   */
+  async storeIterationWithEmbedding(
+    presentationId: string,
+    userId: string,
+    feedback: string,
+    slides: Slide[]
+  ): Promise<void> {
+    try {
+      await this.ragService.storePresentationEmbedding(presentationId, userId, feedback, slides);
+      console.log(`Stored presentation embedding for iteration: ${feedback.substring(0, 50)}...`);
+    } catch (error) {
+      console.warn('Failed to store presentation embedding:', error);
+      // Non-critical, continue without RAG
+    }
+  }
+
+  /**
+   * Get RAG context for presentation iteration
+   */
+  async getRagContextForIteration(
+    userId: string,
+    presentationId: string,
+    query: string
+  ): Promise<string> {
+    try {
+      return await this.ragService.buildRagContextString(userId, presentationId, query);
+    } catch (error) {
+      console.warn('Failed to retrieve RAG context:', error);
+      return '';
+    }
   }
 
   /**

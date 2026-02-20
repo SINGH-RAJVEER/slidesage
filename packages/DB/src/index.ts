@@ -1,39 +1,37 @@
 // Database exports
-export * from './db';
-export * from './db/schema';
-
-// Repository exports
-export { UserRepository } from './repositories/user.repository';
-export { PresentationRepository } from './repositories/presentation.repository';
-
-// Service exports
-export {
-  TokenCalculator,
-  type TokenCalculationParams,
-  type TokenEstimate,
-} from './services/token-calculator';
 
 // Type exports
 export type {
   ChartConfig,
-  Slide,
-  PresentationJSON,
+  LiteLLMMessage,
   PresentationData,
+  PresentationJSON,
+  PresentationStreamEvent,
   ResearchFreshness,
   ResearchOptions,
-  Source,
   ResearchPayload,
-  PresentationStreamEvent,
-  StreamEvent,
-  StreamStartEvent,
+  Slide,
+  Source,
+  StreamChunk,
+  StreamCompleteEvent,
   StreamCreatedEvent,
-  StreamThemeEvent,
+  StreamErrorEvent,
+  StreamEvent,
   StreamMidwayspaceEvent,
   StreamResearchEvent,
-  StreamSlideEvent,
-  StreamCompleteEvent,
   StreamSavedEvent,
-  StreamErrorEvent,
-  LiteLLMMessage,
-  StreamChunk,
+  StreamSlideEvent,
+  StreamStartEvent,
+  StreamThemeEvent,
 } from '@slide-sage/contracts';
+export * from './db';
+export * from './db/schema';
+export { PresentationRepository } from './repositories/presentation.repository';
+// Repository exports
+export { UserRepository } from './repositories/user.repository';
+// Service exports
+export {
+  type TokenCalculationParams,
+  TokenCalculator,
+  type TokenEstimate,
+} from './services/token-calculator';

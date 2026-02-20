@@ -171,7 +171,7 @@ export class StreamProcessor {
           try {
             const slideObj = JSON.parse(slideJson);
             extractedSlides.push(slideObj);
-          } catch (e) {
+          } catch (_e) {
             // Invalid JSON, skip
           }
           slideStart = -1;

@@ -1,5 +1,16 @@
 import { relations } from 'drizzle-orm';
-import { boolean, date, jsonb, pgTable, real, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  date,
+  index,
+  jsonb,
+  pgTable,
+  real,
+  text,
+  timestamp,
+  varchar,
+  vector,
+} from 'drizzle-orm/pg-core';
 
 // Users table - using Clerk for authentication
 export const users = pgTable('users', {
@@ -64,8 +75,124 @@ export const presentationsRelations = relations(presentations, ({ one, many }) =
   }),
 }));
 
+// RAG Embeddings Tables
+
+// Search embeddings - stores user search queries and their embeddings
+export const searchEmbeddings = pgTable(
+  'search_embeddings',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    searchQuery: text('search_query').notNull(),
+    embedding: vector('embedding', { dimensions: 1536 }),
+    embeddingModel: varchar('embedding_model', { length: 100 }).notNull(),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index('search_embeddings_user_id_idx').on(table.userId),
+    embeddingIdx: index('search_embeddings_embedding_idx').using('hnsw'),
+  }),
+);
+
+// Presentation iteration embeddings - stores presentation content and iteration prompts
+export const presentationEmbeddings = pgTable(
+  'presentation_embeddings',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    presentationId: text('presentation_id')
+      .notNull()
+      .references(() => presentations.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    iterationPrompt: text('iteration_prompt').notNull(),
+    presentationContent: text('presentation_content'), // Serialized slides summary
+    embedding: vector('embedding', { dimensions: 1536 }),
+    embeddingModel: varchar('embedding_model', { length: 100 }).notNull(),
+    metadata: jsonb('metadata'), // Can store slide count, theme, etc.
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    presentationIdIdx: index('presentation_embeddings_presentation_id_idx').on(
+      table.presentationId,
+    ),
+    userIdIdx: index('presentation_embeddings_user_id_idx').on(table.userId),
+    embeddingIdx: index('presentation_embeddings_embedding_idx').using('hnsw'),
+  }),
+);
+
+// RAG context - stores retrieved contexts for presentations
+export const ragContext = pgTable(
+  'rag_context',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    presentationId: text('presentation_id')
+      .notNull()
+      .references(() => presentations.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sourceType: varchar('source_type', { length: 50 }).notNull(), // 'search' | 'iteration' | 'presentation'
+    sourceId: text('source_id'), // Reference to search_embeddings or presentation_embeddings
+    retrievedContext: text('retrieved_context').notNull(),
+    similarityScore: real('similarity_score'), // Cosine similarity score
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    presentationIdIdx: index('rag_context_presentation_id_idx').on(table.presentationId),
+    userIdIdx: index('rag_context_user_id_idx').on(table.userId),
+    sourceTypeIdx: index('rag_context_source_type_idx').on(table.sourceType),
+  }),
+);
+
+// Relations
+export const searchEmbeddingsRelations = relations(searchEmbeddings, ({ one }) => ({
+  user: one(users, {
+    fields: [searchEmbeddings.userId],
+    references: [users.id],
+  }),
+}));
+
+export const presentationEmbeddingsRelations = relations(presentationEmbeddings, ({ one }) => ({
+  presentation: one(presentations, {
+    fields: [presentationEmbeddings.presentationId],
+    references: [presentations.id],
+  }),
+  user: one(users, {
+    fields: [presentationEmbeddings.userId],
+    references: [users.id],
+  }),
+}));
+
+export const ragContextRelations = relations(ragContext, ({ one }) => ({
+  presentation: one(presentations, {
+    fields: [ragContext.presentationId],
+    references: [presentations.id],
+  }),
+  user: one(users, {
+    fields: [ragContext.userId],
+    references: [users.id],
+  }),
+}));
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Presentation = typeof presentations.$inferSelect;
 export type NewPresentation = typeof presentations.$inferInsert;
+export type SearchEmbedding = typeof searchEmbeddings.$inferSelect;
+export type NewSearchEmbedding = typeof searchEmbeddings.$inferInsert;
+export type PresentationEmbedding = typeof presentationEmbeddings.$inferSelect;
+export type NewPresentationEmbedding = typeof presentationEmbeddings.$inferInsert;
+export type RagContext = typeof ragContext.$inferSelect;
+export type NewRagContext = typeof ragContext.$inferInsert;

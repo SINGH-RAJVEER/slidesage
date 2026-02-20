@@ -208,6 +208,18 @@ presentations.post(
               slidesData: finalData,
             });
 
+            // Store initial topic/prompt with RAG embedding
+            try {
+              await presentationService.storeIterationWithEmbedding(
+                presentationId,
+                userId,
+                topic,
+                allSlides
+              );
+            } catch (error) {
+              console.warn('Failed to store initial topic embedding:', error);
+            }
+
             console.log(`Saved presentation ${presentationId} with ${allSlides.length} slides`);
 
             await stream.write('event: saved\n');
@@ -247,6 +259,7 @@ presentations.post(
   ensureUserInDbMiddleware,
   async (c) => {
     try {
+      const userId = getCurrentUserId(c);
       const body = await c.req.json();
       const topic = body?.topic ?? body?.prompt ?? body?.query;
       const research = parseResearchOptions(body?.research);
@@ -256,6 +269,14 @@ presentations.post(
       }
 
       const sources = await searchService.webSearch(String(topic), research);
+
+      // Store search embedding for RAG context
+      try {
+        await searchService.storeSearchWithEmbedding(userId, String(topic));
+      } catch (error) {
+        console.warn('Failed to store search embedding:', error);
+      }
+
       const summaryResult = sources.length
         ? await searchService.summarizeSourcesDetailed(String(topic), sources)
         : { summary: null, tokensUsed: 0, tokensEstimated: 0 };
@@ -388,6 +409,18 @@ presentations.post(
               title: finalTitle,
               slidesData: finalData,
             });
+
+            // Store iteration embedding for RAG context
+            try {
+              await presentationService.storeIterationWithEmbedding(
+                presentationId,
+                userId,
+                effectiveFeedback,
+                allSlides
+              );
+            } catch (error) {
+              console.warn('Failed to store iteration embedding:', error);
+            }
 
             await stream.write('event: saved\n');
             await stream.write(

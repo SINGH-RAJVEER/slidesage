@@ -63,7 +63,7 @@ app.notFound((c) => {
   return c.json({ error: { message: 'Resource not found' } }, 404);
 });
 
-const port = Number.parseInt(process.env.PORT || '8000');
+const port = Number.parseInt(process.env.PORT || '8000', 10);
 
 console.log(`Starting server on port ${port}...`);
 

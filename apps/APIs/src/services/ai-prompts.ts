@@ -309,13 +309,19 @@ TONALITY REQUIREMENT:
 Example: {tonality_example}
 
 ITERATION INSTRUCTIONS:
-- Analyze the previous presentation content carefully
+- Relevant context from previous iterations and searches will be provided from the vector database above
+- Use the provided context to understand what the user is modifying or building upon
 - Apply the user's specific modifications, enhancements, or changes
-- Maintain consistency with the original theme unless instructed otherwise
-- Keep slides that are still relevant unless instructed to remove them
-- Add, modify, or remove slides based on the user's instructions
+- Maintain consistency with previous themes unless instructed otherwise
+- Add, modify, or remove slides based on the user's instructions and the retrieved context
 - Ensure all slides follow the specified detail level: {detail_level}
 - Match the specified tonality: {tonality}
+
+IMPORTANT NOTE ON CONTEXT:
+- You will receive relevant context from the vector database that includes similar previous iterations and searches
+- This context provides insight into what the user has worked on before
+- Use this context to make informed decisions about iterations, but focus primarily on the user's current feedback
+- Do NOT assume you have the full previous presentation unless explicitly provided in the context
 `;
 
 export function buildGenerationPrompt(detailLevel = 'balanced', tonality = 'professional'): string {
@@ -333,10 +339,7 @@ export function buildGenerationPrompt(detailLevel = 'balanced', tonality = 'prof
     .replace('{tonality}', tonality);
 }
 
-import type { Slide } from '@slide-sage/contracts';
-
 export function buildIterationPrompt(
-  currentSlides: Slide[],
   feedback: string,
   detailLevel = 'balanced',
   tonality = 'professional'
@@ -359,8 +362,6 @@ export function buildIterationPrompt(
 USER FEEDBACK AND INSTRUCTIONS:
 ${feedback}
 
-CURRENT PRESENTATION STRUCTURE:
-${JSON.stringify(currentSlides, null, 2)}
-
-Apply the user's feedback to modify, enhance, or adjust this presentation while maintaining the required JSON structure and HTML standards.`;
+Apply the user's feedback to create or modify the presentation while maintaining the required JSON structure and HTML standards.
+Use the relevant context provided above from the vector database to understand previous work and make informed decisions.`;
 }
