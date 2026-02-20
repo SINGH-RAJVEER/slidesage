@@ -6,8 +6,8 @@ General API information, standards, and reference for SlideSage application.
 
 ### Environment Variables
 
-- **Frontend**: `VITE_API_URL=http://localhost:8000/api`
-- **Backend**: Base URL configured via Hono routes
+- **Web**: `VITE_API_URL=http://localhost:8000/api`
+- **APIs**: Base URL configured via Hono routes
 
 ### URL Structure
 

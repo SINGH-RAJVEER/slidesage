@@ -3,22 +3,23 @@
   "version": "0.0.0",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "build": "turbo run build",
-    "build:backend": "turbo run build --filter=slide-sage-backend",
-    "build:frontend": "turbo run build --filter=slide-sage-frontend",
+    "build:apis": "turbo run build --filter=slide-sage-apis",
+    "build:web": "turbo run build --filter=slide-sage-web",
     "dev": "turbo run dev --ui=tui",
     "dev:stream": "turbo run dev --ui=stream",
-    "dev:backend": "turbo run dev --ui=tui --filter=slide-sage-backend",
-    "dev:frontend": "turbo run dev --ui=tui --filter=slide-sage-frontend",
+    "dev:apis": "turbo run dev --ui=tui --filter=slide-sage-apis",
+    "dev:web": "turbo run dev --ui=tui --filter=slide-sage-web",
     "lint": "turbo run lint",
-    "lint:backend": "turbo run lint --filter=slide-sage-backend",
-    "lint:frontend": "turbo run lint --filter=slide-sage-frontend",
+    "lint:apis": "turbo run lint --filter=slide-sage-apis",
+    "lint:web": "turbo run lint --filter=slide-sage-web",
     "format": "turbo run format",
-    "format:backend": "turbo run format --filter=slide-sage-backend",
-    "format:frontend": "turbo run format --filter=slide-sage-frontend"
+    "format:apis": "turbo run format --filter=slide-sage-apis",
+    "format:web": "turbo run format --filter=slide-sage-web"
   },
   "devDependencies": {
     "turbo": "latest",

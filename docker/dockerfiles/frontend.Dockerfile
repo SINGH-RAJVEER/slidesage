@@ -1,4 +1,4 @@
-# Multi-stage build for optimized frontend image
+# Multi-stage build for optimized Web image
 # Use Debian-based Bun image for better native-dependency compatibility.
 FROM oven/bun:1.3.6 AS base
 
@@ -9,8 +9,8 @@ WORKDIR /app
 # Copy all package.json files and lockfile
 COPY package.json ./
 COPY bun.lock ./
-COPY apps/frontend/package.json ./apps/frontend/
-COPY apps/backend/package.json ./apps/backend/
+COPY apps/Web/package.json ./apps/Web/
+COPY apps/APIs/package.json ./apps/APIs/
 
 # Install dependencies with BuildKit cache mount for faster builds
 # Skip lifecycle scripts to avoid failing optional native deps (e.g. node-canvas).
@@ -22,12 +22,12 @@ WORKDIR /app
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
-COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
+COPY --from=deps /app/apps/Web/node_modules ./apps/Web/node_modules
+COPY --from=deps /app/apps/APIs/node_modules ./apps/APIs/node_modules
 
 # Copy source code
-COPY apps/frontend ./apps/frontend
-COPY apps/backend ./apps/backend
+COPY apps/Web ./apps/Web
+COPY apps/APIs ./apps/APIs
 COPY tsconfig.json ./
 
 # Copy environment variables
@@ -36,8 +36,8 @@ ARG VITE_API_URL=http://localhost:8000
 ENV NODE_ENV=${NODE_ENV}
 ENV VITE_API_URL=${VITE_API_URL}
 
-# Build the frontend application
-WORKDIR /app/apps/frontend
+# Build the Web application
+WORKDIR /app/apps/Web
 RUN bun run build
 
 # Production image
@@ -54,8 +54,8 @@ ENV NODE_ENV=production
 ENV PORT=5173
 
 # Copy built static files and serve with bun
-COPY --from=builder /app/apps/frontend/dist ./dist
-COPY --from=builder /app/apps/frontend/package.json ./package.json
+COPY --from=builder /app/apps/Web/dist ./dist
+COPY --from=builder /app/apps/Web/package.json ./package.json
 
 # Expose port
 EXPOSE 5173

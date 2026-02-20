@@ -1,6 +1,6 @@
-# Frontend Routing
+# Web Routing
 
-The frontend app (apps/frontend) is a React SPA using React Router.
+The Web app (apps/Web) is a React SPA using React Router.
 
 ## Route Map
 
@@ -28,6 +28,6 @@ Protected routes are wrapped by `RequireSignedInLayout`, which redirects signed-
 
 ## Where Things Live
 
-- Router definition: apps/frontend/src/router/router.tsx
-- Auth guard: apps/frontend/src/router/RequireSignedInLayout.tsx
-- Routes (route-level components): apps/frontend/src/routes/
+- Router definition: apps/Web/src/router/router.tsx
+- Auth guard: apps/Web/src/router/RequireSignedInLayout.tsx
+- Routes (route-level components): apps/Web/src/routes/

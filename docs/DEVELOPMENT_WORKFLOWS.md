@@ -33,13 +33,13 @@ Common development workflows and best practices for SlideSage monorepo.
 #### Technical Design
 
 ```markdown
-### Backend Changes
+### APIs Changes
 
 - New endpoint: GET /api/dashboard
 - Dashboard service with statistics aggregation
 - Repository methods for data aggregation
 
-### Frontend Changes
+### Web Changes
 
 - New route: /dashboard
 - Dashboard component with statistics cards
@@ -47,12 +47,12 @@ Common development workflows and best practices for SlideSage monorepo.
 - Redux state management for dashboard
 ```
 
-### 2. Backend Implementation
+### 2. APIs Implementation
 
 #### Step 1: Add Types
 
 ```typescript
-// apps/backend/src/types/dashboard.ts
+// apps/APIs/src/types/dashboard.ts
 export interface DashboardStats {
   totalPresentations: number;
   totalSlides: number;
@@ -69,7 +69,7 @@ export interface DashboardStats {
 #### Step 2: Update Database Schema (if needed)
 
 ```sql
--- apps/backend/src/db/schema.ts
+-- apps/APIs/src/db/schema.ts
 -- Add any new tables or columns
 -- Or create views for aggregated data
 ```
@@ -77,7 +77,7 @@ export interface DashboardStats {
 #### Step 3: Add Repository Methods
 
 ```typescript
-// apps/backend/src/repositories/user.repository.ts
+// apps/APIs/src/repositories/user.repository.ts
 export class UserRepository {
   async getDashboardStats(userId: number): Promise<DashboardStats> {
     // Implement aggregated queries
@@ -94,7 +94,7 @@ export class UserRepository {
 #### Step 4: Add Service Logic
 
 ```typescript
-// apps/backend/src/services/dashboard.service.ts
+// apps/APIs/src/services/dashboard.service.ts
 export class DashboardService {
   private userRepo = new UserRepository();
 
@@ -107,7 +107,7 @@ export class DashboardService {
 #### Step 5: Add Route Handler
 
 ```typescript
-// apps/backend/src/routes/dashboard.routes.ts
+// apps/APIs/src/routes/dashboard.routes.ts
 import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.middleware";
 import { DashboardService } from "../services/dashboard.service";
@@ -127,18 +127,18 @@ export default dashboardRoutes;
 #### Step 6: Register Routes
 
 ```typescript
-// apps/backend/src/index.ts
+// apps/APIs/src/index.ts
 import dashboardRoutes from "./routes/dashboard.routes";
 
 app.route("/api/dashboard", dashboardRoutes);
 ```
 
-### 3. Frontend Implementation
+### 3. Web Implementation
 
 #### Step 1: Add Types
 
 ```typescript
-// apps/frontend/src/types/dashboard.ts
+// apps/Web/src/types/dashboard.ts
 export interface DashboardStats {
   totalPresentations: number;
   totalSlides: number;
@@ -155,7 +155,7 @@ export interface DashboardStats {
 #### Step 2: Create API Service
 
 ```typescript
-// apps/frontend/src/services/dashboardService.ts
+// apps/Web/src/services/dashboardService.ts
 import type { DashboardStats } from "../types/dashboard";
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -181,7 +181,7 @@ export const dashboardService = {
 #### Step 3: Create React Hook
 
 ```typescript
-// apps/frontend/src/hooks/useDashboard.ts
+// apps/Web/src/hooks/useDashboard.ts
 import { useState, useEffect } from "react";
 import { dashboardService } from "../services/dashboardService";
 import type { DashboardStats } from "../types/dashboard";
@@ -215,7 +215,7 @@ export function useDashboard() {
 #### Step 4: Create Components
 
 ```tsx
-// apps/frontend/src/features/dashboard/components/Dashboard.tsx
+// apps/Web/src/features/dashboard/components/Dashboard.tsx
 import { useDashboard } from "../../hooks/useDashboard";
 
 export function Dashboard() {
@@ -246,7 +246,7 @@ export function Dashboard() {
 #### Step 5: Add Route
 
 ```tsx
-// apps/frontend/src/App.tsx
+// apps/Web/src/App.tsx
 import { Dashboard } from "./features/dashboard/components/Dashboard";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
@@ -284,8 +284,8 @@ function App() {
 ### 2. Investigation
 
 ```bash
-# Check backend logs
-docker-compose logs backend
+# Check APIs logs
+docker-compose logs APIs
 
 # Reproduce issue manually
 curl -X POST http://localhost:8000/api/generate-presentation-stream \
@@ -297,7 +297,7 @@ curl -X POST http://localhost:8000/api/generate-presentation-stream \
 ### 3. Root Cause Analysis
 
 ```typescript
-// Issue found in apps/backend/src/services/ai.service.ts
+// Issue found in apps/APIs/src/services/ai.service.ts
 // Special characters not properly encoded for LLM API
 const prompt = `Create presentation about: ${topic}`;
 // Problem: emojis break JSON encoding
@@ -314,7 +314,7 @@ const prompt = `Create presentation about: ${encodedTopic}`;
 ### 5. Testing
 
 ```typescript
-// apps/backend/src/services/ai.service.test.ts
+// apps/APIs/src/services/ai.service.test.ts
 test("handles special characters in topic", async () => {
   const result = await aiService.generatePresentation({
     topic: "🚀 Space Exploration",
@@ -388,7 +388,7 @@ Adds user dashboard with presentation statistics
 ### 1. Schema Changes
 
 ```typescript
-// apps/backend/src/db/schema.ts
+// apps/APIs/src/db/schema.ts
 export const users = pgTable("users", {
   // existing fields...
   last_login_at: timestamp("last_login_at").defaultNow(),
@@ -398,7 +398,7 @@ export const users = pgTable("users", {
 ### 2. Migration Generation
 
 ```bash
-cd apps/backend
+cd apps/APIs
 bun run db:generate
 ```
 
@@ -412,14 +412,14 @@ ALTER TABLE users ADD COLUMN last_login_at timestamp DEFAULT now();
 ### 4. Apply Migration
 
 ```bash
-cd apps/backend
+cd apps/APIs
 bun run db:migrate
 ```
 
 ### 5. Update Types
 
 ```typescript
-// apps/backend/src/types/user.ts
+// apps/APIs/src/types/user.ts
 export interface User {
   id: number;
   email: string;
@@ -436,7 +436,7 @@ export interface User {
 ### 1. Unit Testing
 
 ```typescript
-// apps/backend/src/services/auth.service.test.ts
+// apps/APIs/src/services/auth.service.test.ts
 import { describe, test, expect } from "bun:test";
 import { AuthService } from "../auth.service";
 
@@ -462,7 +462,7 @@ describe("AuthService", () => {
 ### 2. Integration Testing
 
 ```typescript
-// apps/backend/src/routes/auth.routes.test.ts
+// apps/APIs/src/routes/auth.routes.test.ts
 import { describe, test, expect } from "bun:test";
 import { app } from "../index";
 
@@ -485,10 +485,10 @@ describe("Auth Routes", () => {
 });
 ```
 
-### 3. Frontend Testing
+### 3. Web Testing
 
 ```tsx
-// apps/frontend/src/features/dashboard/components/Dashboard.test.tsx
+// apps/Web/src/features/dashboard/components/Dashboard.test.tsx
 import { render, screen } from "@testing-library/react";
 import { Dashboard } from "./Dashboard";
 
@@ -533,7 +533,7 @@ bun test src/services/auth.service.test.ts
 
 ```bash
 # Run tests with coverage report
-cd apps/backend && bun test --coverage
+cd apps/APIs && bun test --coverage
 
 # Target minimum coverage
 # - Lines: 80%

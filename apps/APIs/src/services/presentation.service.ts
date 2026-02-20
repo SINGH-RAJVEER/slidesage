@@ -3,16 +3,15 @@
  * Handles presentation generation with token management and streaming
  */
 
-import type { Presentation } from "../db/schema";
-import { PresentationRepository } from "../repositories/presentation.repository";
+import type { Presentation } from "@slide-sage/db";
+import { PresentationRepository, TokenCalculator } from "@slide-sage/db";
 import type {
   PresentationStreamEvent,
   ResearchOptions,
   ResearchPayload,
   Slide,
-} from "../types";
+} from "@slide-sage/db";
 import { AIService } from "./ai.service";
-import { TokenCalculator } from "./token-calculator";
 
 export interface GeneratePresentationParams {
   userId: string;

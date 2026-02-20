@@ -24,8 +24,8 @@ bun dev
 
 **Access Application:**
 
-- **Frontend**: `http://localhost:5173`
-- **Backend API**: `http://localhost:8000`
+- **Web**: `http://localhost:5173`
+- **APIs**: `http://localhost:8000`
 - **Database**: `localhost:5432`
 
 ### Docker Development Commands
@@ -36,7 +36,7 @@ bun dev
 
 # View logs
 ./docker/scripts/dev.sh logs
-./docker/scripts/dev.sh logs backend
+./docker/scripts/dev.sh logs apis
 
 # Stop development environment
 ./docker/scripts/dev.sh stop
@@ -58,7 +58,7 @@ bun dev
 ./docker/scripts/build.sh dev
 
 # Build specific service
-./docker/scripts/build.sh backend v1.0.0
+./docker/scripts/build.sh apis v1.0.0
 ```
 
 ### Manual Docker Compose
@@ -95,12 +95,12 @@ docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-com
 
 ### 🏗️ Architecture & Technology
 
-| Document                                                    | Description                                 |
-| ----------------------------------------------------------- | ------------------------------------------- |
-| [**MONOREPO_STRUCTURE.md**](docs/MONOREPO_STRUCTURE.md)     | Monorepo layout and workspace configuration |
-| [**TECH_STACK.md**](docs/TECH_STACK.md)                     | Detailed technology stack overview          |
-| [**BACKEND_ARCHITECTURE.md**](docs/BACKEND_ARCHITECTURE.md) | Backend layers and component design         |
-| [**REQUEST_FLOWS.md**](docs/REQUEST_FLOWS.md)               | Request flow diagrams and sequences         |
+| Document                                                  | Description                                 |
+| --------------------------------------------------------- | ------------------------------------------- |
+| [**MONOREPO_STRUCTURE.md**](docs/MONOREPO_STRUCTURE.md)   | Monorepo layout and workspace configuration |
+| [**TECH_STACK.md**](docs/TECH_STACK.md)                   | Detailed technology stack overview          |
+| [**APIs_ARCHITECTURE.md**](docs/APIs_ARCHITECTURE.md)     | APIs layers and component design            |
+| [**REQUEST_FLOWS.md**](docs/REQUEST_FLOWS.md)             | Request flow diagrams and sequences         |
 
 ### 🔌 API Documentation
 
@@ -116,7 +116,7 @@ docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-com
 | ------------------------------------------------------------- | --------------------------------------------- |
 | [**DEVELOPMENT_WORKFLOWS.md**](docs/DEVELOPMENT_WORKFLOWS.md) | Feature development, testing, and code review |
 | [**DEPLOYMENT_WORKFLOWS.md**](docs/DEPLOYMENT_WORKFLOWS.md)   | Docker deployment and CI/CD pipelines         |
-| [**FRONTEND_ROUTING.md**](docs/FRONTEND_ROUTING.md)           | Frontend route map and auth guard             |
+| [**WEB_ROUTING.md**](docs/WEB_ROUTING.md)                     | Web route map and auth guard                  |
 
 ---
 
@@ -136,19 +136,19 @@ bun test             # Run all tests
 ### App-Specific Commands
 
 ```bash
-# Backend only
-turbo run dev --filter=backend
-cd apps/backend && bun run db:studio
+# APIs only
+turbo run dev --filter=apis
+cd apps/APIs && bun run db:studio
 
-# Frontend only
-turbo run dev --filter=frontend
-turbo run build --filter=frontend
+# Web only
+turbo run dev --filter=web
+turbo run build --filter=web
 ```
 
 ### Database Operations
 
 ```bash
-cd apps/backend
+cd apps/APIs
 bun run db:push      # Push schema changes
 bun run db:migrate    # Run migrations
 bun run db:studio     # Open Drizzle Studio
@@ -161,8 +161,8 @@ bun run db:studio     # Open Drizzle Studio
 ```
 slide-sage/
 ├── apps/                     # Applications
-│   ├── backend/             # Hono API server (TypeScript + Drizzle)
-│   ├── frontend/            # React SPA (Vite + Tailwind + Shadcn UI)
+│   ├── APIs/                # Hono API server (TypeScript + Drizzle)
+│   ├── Web/                 # React SPA (Vite + Tailwind + Shadcn UI)
 │   └── database/            # PostgreSQL service container
 ├── docker/                  # 🐳 Docker configuration
 │   ├── compose/            # Docker Compose files
@@ -170,8 +170,8 @@ slide-sage/
 │   │   ├── docker-compose.dev.yml  # Development overrides
 │   │   └── docker-compose.prod.yml # Production overrides
 │   ├── dockerfiles/        # Optimized Dockerfiles
-│   │   ├── backend.Dockerfile      # Backend service
-│   │   ├── frontend.Dockerfile     # Frontend service
+│   │   ├── backend.Dockerfile      # APIs service
+│   │   ├── frontend.Dockerfile     # Web service
 │   │   └── database.Dockerfile    # Database service
 │   ├── nginx/             # Production reverse proxy
 │   ├── scripts/           # Helper scripts
@@ -184,7 +184,7 @@ slide-sage/
 │   ├── PRESENTATIONS_API.md # Presentation endpoints
 │   ├── MONOREPO_STRUCTURE.md # Workspace structure
 │   ├── TECH_STACK.md        # Technology stack details
-│   ├── BACKEND_ARCHITECTURE.md # Backend layers
+│   ├── APIs_ARCHITECTURE.md # APIs layers
 │   ├── REQUEST_FLOWS.md     # Request flow diagrams
 │   ├── DEVELOPMENT_SETUP.md  # Environment setup guide
 │   ├── DEVELOPMENT_WORKFLOWS.md # Development processes
@@ -201,8 +201,8 @@ slide-sage/
 
 - **Package Manager**: Bun workspaces for dependency management
 - **Build System**: Turbo for task orchestration and caching
-- **Backend**: TypeScript + Bun + Hono + Drizzle ORM + PostgreSQL
-- **Frontend**: React + Vite + Tailwind CSS + Shadcn UI
+- **APIs**: TypeScript + Bun + Hono + Drizzle ORM + PostgreSQL
+- **Web**: React + Vite + Tailwind CSS + Shadcn UI
 - **Infrastructure**: Docker with multi-stage builds and optimized images
 - **Database**: PostgreSQL 16 Alpine with health checks
 - **Production**: Nginx reverse proxy with SSL support
@@ -222,7 +222,7 @@ slide-sage/
 ### 2. API Development
 
 1. **Design**: Reference [API_OVERVIEW.md](docs/API_OVERVIEW.md)
-2. **Backend**: Follow [BACKEND_ARCHITECTURE.md](docs/BACKEND_ARCHITECTURE.md)
+2. **APIs**: Follow [APIs_ARCHITECTURE.md](docs/APIs_ARCHITECTURE.md)
 3. **Documentation**: Update appropriate API docs:
    - [AUTH_API.md](docs/AUTH_API.md) for authentication
    - [PRESENTATIONS_API.md](docs/PRESENTATIONS_API.md) for presentations
@@ -247,13 +247,13 @@ All services use a single `.env` file in the project root:
 # Copy example configuration
 cp .env.example .env
 
-# Backend Configuration
+# APIs Configuration
 DATABASE_URL=postgresql://slidesage:slidesage@localhost:5432/slidesage
 JWT_SECRET_KEY=change-this-secret-key-in-production
 GROQ_API_KEY=your-groq-api-key
 LITELLM_MODEL=groq/moonshotai/kimi-k2-instruct-0905
 
-# Frontend Configuration
+# Web Configuration
 VITE_API_URL=http://localhost:8000
 VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_CLIENT_ID=your-google-oauth-client-id
@@ -274,7 +274,7 @@ CORS_ORIGINS=*
 ### Common Issues
 
 - **Database Connection**: Ensure PostgreSQL is running and `DATABASE_URL` is correct
-- **Frontend API**: Verify `VITE_API_URL` matches backend port
+- **Web API**: Verify `VITE_API_URL` matches APIs port
 - **Authentication**: Check that `JWT_SECRET_KEY` is set and consistent
 - **Token Issues**: Ensure AI API keys are valid and have sufficient credits
 - **Docker Build Failures**:
@@ -286,7 +286,7 @@ CORS_ORIGINS=*
 
 1. **Check Documentation**: Start with relevant docs in `/docs` folder
 2. **Review Logs**: Check `docker-compose logs` for service issues
-3. **Test API**: Use `/api/health` endpoint to verify backend
+3. **Test API**: Use `/api/health` endpoint to verify APIs
 4. **Validate Setup**: Ensure all environment variables are configured
 
 ---
@@ -296,7 +296,7 @@ CORS_ORIGINS=*
 - **🔄 Shared Dependencies**: Common packages managed centrally
 - **⚡ Parallel Development**: Multiple apps developed simultaneously
 - **🔧 Unified Tooling**: Single configuration for linting, formatting
-- **📦 Atomic Commits**: Changes across frontend and backend in one PR
+- **📦 Atomic Commits**: Changes across Web and APIs in one PR
 - **🚀 Simplified CI/CD**: Build and test everything together
 - **💡 Code Sharing**: Easy sharing of types and utilities
 

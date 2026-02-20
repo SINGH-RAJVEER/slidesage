@@ -215,4 +215,4 @@ sequenceDiagram
 - **Memory Optimization**: Lightweight runtime (Bun vs Node.js)
 - **Request Batching**: Multiple operations combined when possible
 
-For backend architecture details, see [BACKEND_ARCHITECTURE.md](BACKEND_ARCHITECTURE.md).
+For APIs architecture details, see [APIs_ARCHITECTURE.md](APIs_ARCHITECTURE.md).

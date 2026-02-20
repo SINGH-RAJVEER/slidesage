@@ -7,8 +7,7 @@
  */
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { users } from "../db/schema";
+import { db, users } from "@slide-sage/db";
 
 // Secret key required for admin operations
 // Generate a secure secret:

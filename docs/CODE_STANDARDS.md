@@ -24,7 +24,7 @@ Clean code guidelines and standards for SlideSage development.
 
 ---
 
-## Frontend Standards
+## Web Standards
 
 ### Component Structure
 
@@ -77,7 +77,7 @@ function UserList() {
 
 ---
 
-## Backend Standards
+## APIs Standards
 
 ### Route Structure
 
@@ -210,14 +210,14 @@ docs(readme): update installation instructions
 
 ## Performance Guidelines
 
-### Frontend
+### Web
 
 - Use `React.memo` for expensive components
 - Implement proper loading states
 - Optimize bundle size with code splitting
 - Use `useCallback` and `useMemo` appropriately
 
-### Backend
+### APIs
 
 - Use database indexes for frequently queried fields
 - Implement connection pooling (built into Bun)

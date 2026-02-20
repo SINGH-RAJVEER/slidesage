@@ -1,6 +1,6 @@
-# Backend Architecture
+# APIs Architecture
 
-Detailed backend architecture and layer design for SlideSage.
+Detailed APIs architecture and layer design for SlideSage.
 
 ## Layer Architecture
 

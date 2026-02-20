@@ -23,10 +23,10 @@ Detailed overview of technologies used in SlideSage monorepo.
 ### Containerization: Docker
 
 - **Purpose**: Development environment and deployment
-- **Services**: Frontend, Backend, Database
+- **Services**: Web, APIs, Database
 - **Configuration**: `docker-compose.yml` for development
 
-## Backend Stack
+## APIs Stack
 
 ### Runtime: Bun
 
@@ -67,7 +67,7 @@ Detailed overview of technologies used in SlideSage monorepo.
   - Full-text search
   - Connection pooling
 
-## Frontend Stack
+## Web Stack
 
 ### Framework: React
 

@@ -19,7 +19,7 @@ Complete guide to deploying SlideSage applications to various environments.
 - **Purpose**: Local development and testing
 - **Database**: Local PostgreSQL via Docker
 - **Configuration**: `.env` files committed to git (example only)
-- **URL**: `http://localhost:3000` (frontend), `http://localhost:8000` (backend)
+- **URL**: `http://localhost:3000` (Web), `http://localhost:8000` (APIs)
 
 ### Staging Environment
 
@@ -59,10 +59,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  backend:
+  APIs:
     build:
       context: .
-      dockerfile: apps/backend/Dockerfile
+      dockerfile: apps/APIs/Dockerfile
     environment:
       DATABASE_URL: postgresql://slide_user:slide_password@database:5432/slide_sage
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
@@ -72,16 +72,16 @@ services:
     depends_on:
       - database
 
-  frontend:
+  Web:
     build:
       context: .
-      dockerfile: apps/frontend/Dockerfile
+      dockerfile: apps/Web/Dockerfile
     environment:
       VITE_API_URL: http://localhost:8000/api
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      - APIs
 
 volumes:
   postgres_data:
@@ -104,10 +104,10 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
-  backend:
+  APIs:
     build:
       context: .
-      dockerfile: apps/backend/Dockerfile.prod
+      dockerfile: apps/APIs/Dockerfile.prod
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
@@ -119,10 +119,10 @@ services:
       - database
     restart: unless-stopped
 
-  frontend:
+  Web:
     build:
       context: .
-      dockerfile: apps/frontend/Dockerfile.prod
+      dockerfile: apps/Web/Dockerfile.prod
     ports:
       - "80:80"
     restart: unless-stopped
@@ -131,23 +131,23 @@ volumes:
   postgres_data:
 ```
 
-### 3. Backend Dockerfile
+### 3. APIs Dockerfile
 
 ```dockerfile
-# apps/backend/Dockerfile
+# apps/APIs/Dockerfile
 FROM oven/bun:1.0-alpine AS base
 WORKDIR /app
 
 # Install dependencies
 FROM base AS deps
 COPY package.json bun.lockb ./
-COPY apps/backend/package.json ./apps/backend/
+COPY apps/APIs/package.json ./apps/APIs/
 RUN bun install --frozen-lockfile
 
 # Build application
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/backend/node_modules ./apps/backend/node_modules
+COPY --from=deps /app/apps/APIs/node_modules ./apps/APIs/node_modules
 COPY . .
 RUN bun run build
 
@@ -157,18 +157,18 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 bun
 RUN adduser --system --uid 1001 bun
 
-COPY --from=builder /app/apps/backend/src ./src
-COPY --from=builder /app/apps/backend/package.json ./
+COPY --from=builder /app/apps/APIs/src ./src
+COPY --from=builder /app/apps/APIs/package.json ./
 
 USER bun
 EXPOSE 8000
 CMD ["bun", "src/index.ts"]
 ```
 
-### 4. Frontend Dockerfile
+### 4. Web Dockerfile
 
 ```dockerfile
-# apps/frontend/Dockerfile.prod
+# apps/Web/Dockerfile.prod
 FROM node:18-alpine AS builder
 WORKDIR /app
 
@@ -196,7 +196,7 @@ docker-compose up --build
 docker-compose -f docker-compose.prod.yml up --build -d
 
 # Scale services
-docker-compose -f docker-compose.prod.yml up --scale backend=3
+docker-compose -f docker-compose.prod.yml up --scale APIs=3
 
 # View logs
 docker-compose -f docker-compose.prod.yml logs -f
@@ -213,7 +213,7 @@ docker-compose -f docker-compose.prod.yml logs -f
 ```yaml
 # aws-ecs-task-definition.json
 {
-  "family": "slide-sage-backend",
+  "family": "slide-sage-APIs",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
@@ -223,8 +223,8 @@ docker-compose -f docker-compose.prod.yml logs -f
   "containerDefinitions":
     [
       {
-        "name": "backend",
-        "image": "your-account.dkr.ecr.region.amazonaws.com/slide-sage-backend:latest",
+        "name": "APIs",
+        "image": "your-account.dkr.ecr.region.amazonaws.com/slide-sage-APIs:latest",
         "portMappings": [{ "containerPort": 8000, "protocol": "tcp" }],
         "environment":
           [
@@ -242,7 +242,7 @@ docker-compose -f docker-compose.prod.yml logs -f
             "logDriver": "awslogs",
             "options":
               {
-                "awslogs-group": "/ecs/slide-sage-backend",
+                "awslogs-group": "/ecs/slide-sage-APIs",
                 "awslogs-region": "us-west-2",
                 "awslogs-stream-prefix": "ecs",
               },
@@ -274,15 +274,15 @@ aws rds create-db-instance \
 {
   "DistributionConfig":
     {
-      "CallerReference": "slide-sage-frontend",
+      "CallerReference": "slide-sage-Web",
       "Origins":
         {
           "Quantity": 1,
           "Items":
             [
               {
-                "Id": "S3-slide-sage-frontend",
-                "DomainName": "slide-sage-frontend.s3.amazonaws.com",
+                "Id": "S3-slide-sage-Web",
+                "DomainName": "slide-sage-Web.s3.amazonaws.com",
                 "S3OriginConfig":
                   {
                     "OriginAccessIdentity": "origin-access-identity/cloudfront/E1234567890ABCDEF",
@@ -292,7 +292,7 @@ aws rds create-db-instance \
         },
       "DefaultCacheBehavior":
         {
-          "TargetOriginId": "S3-slide-sage-frontend",
+          "TargetOriginId": "S3-slide-sage-Web",
           "ViewerProtocolPolicy": "redirect-to-https",
           "MinTTL": 0,
         },
@@ -302,7 +302,7 @@ aws rds create-db-instance \
 }
 ```
 
-### 2. Vercel Deployment (Frontend)
+### 2. Vercel Deployment (Web)
 
 #### vercel.json
 
@@ -346,7 +346,7 @@ vercel
 vercel env add VITE_API_URL production
 ```
 
-### 3. Railway Deployment (Backend)
+### 3. Railway Deployment (APIs)
 
 #### railway.toml
 
@@ -361,8 +361,8 @@ restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 
 [[services]]
-name = "slide-sage-backend"
-sourceDir = "apps/backend"
+name = "slide-sage-APIs"
+sourceDir = "apps/APIs"
 
 [services.variables]
 PORT = "8000"
@@ -403,17 +403,17 @@ jobs:
       - uses: actions/checkout@v3
       - name: Build Docker images
         run: |
-          docker build -f apps/backend/Dockerfile.prod -t slide-sage-backend .
-          docker build -f apps/frontend/Dockerfile.prod -t slide-sage-frontend .
+          docker build -f apps/APIs/Dockerfile.prod -t slide-sage-APIs .
+          docker build -f apps/Web/Dockerfile.prod -t slide-sage-Web .
 
       - name: Push to registry
         run: |
-          docker tag slide-sage-backend ${{ secrets.REGISTRY_URL }}/slide-sage-backend:${{ github.sha }}
-          docker push ${{ secrets.REGISTRY_URL }}/slide-sage-backend:${{ github.sha }}
+          docker tag slide-sage-APIs ${{ secrets.REGISTRY_URL }}/slide-sage-APIs:${{ github.sha }}
+          docker push ${{ secrets.REGISTRY_URL }}/slide-sage-APIs:${{ github.sha }}
 
       - name: Deploy to ECS
         run: |
-          aws ecs update-service --cluster slide-sage --service backend-service --force-new-deployment
+          aws ecs update-service --cluster slide-sage --service APIs-service --force-new-deployment
 ```
 
 ### 2. Deployment Script
@@ -434,18 +434,18 @@ bun build
 
 # Build Docker images
 echo "Building Docker images..."
-docker build -f apps/backend/Dockerfile.prod -t slide-sage-backend:latest .
-docker build -f apps/frontend/Dockerfile.prod -t slide-sage-frontend:latest .
+docker build -f apps/APIs/Dockerfile.prod -t slide-sage-APIs:latest .
+docker build -f apps/Web/Dockerfile.prod -t slide-sage-Web:latest .
 
 # Tag with version
 VERSION=$(git rev-parse --short HEAD)
-docker tag slide-sage-backend:latest slide-sage-backend:$VERSION
-docker tag slide-sage-frontend:latest slide-sage-frontend:$VERSION
+docker tag slide-sage-APIs:latest slide-sage-APIs:$VERSION
+docker tag slide-sage-Web:latest slide-sage-Web:$VERSION
 
 # Push to registry
 echo "Pushing to registry..."
-docker push slide-sage-backend:$VERSION
-docker push slide-sage-frontend:$VERSION
+docker push slide-sage-APIs:$VERSION
+docker push slide-sage-Web:$VERSION
 
 # Update services
 echo "Updating services..."
@@ -461,10 +461,10 @@ echo "Deployment completed successfully!"
 
 ### 1. Health Checks
 
-#### Backend Health Check
+#### APIs Health Check
 
 ```typescript
-// apps/backend/src/routes/health.ts
+// apps/APIs/src/routes/health.ts
 export const healthRoutes = new Hono();
 
 healthRoutes.get("/health", async (c) => {
@@ -501,10 +501,10 @@ async function checkDatabase() {
 
 ### 2. Logging Configuration
 
-#### Backend Logging
+#### APIs Logging
 
 ```typescript
-// apps/backend/src/lib/logger.ts
+// apps/APIs/src/lib/logger.ts
 import { createWriteStream } from "fs";
 import { Hono } from "hono";
 
@@ -542,7 +542,7 @@ export const logger = (app: Hono) => {
 #### Prometheus Metrics
 
 ```typescript
-// apps/backend/src/lib/metrics.ts
+// apps/APIs/src/lib/metrics.ts
 import { register, Counter, Histogram, Gauge } from "prom-client";
 
 export const httpRequestsTotal = new Counter({

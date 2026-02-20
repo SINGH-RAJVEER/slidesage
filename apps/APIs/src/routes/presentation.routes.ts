@@ -5,7 +5,7 @@ import {
   ensureUserInDbMiddleware,
   getCurrentUserId,
 } from "../middleware/auth.middleware";
-import { PresentationRepository } from "../repositories/presentation.repository";
+import { PresentationRepository } from "@slide-sage/db";
 import { PresentationService } from "../services/presentation.service";
 import { SearchService } from "../services/search.service";
 import type {
@@ -14,7 +14,7 @@ import type {
   ResearchPayload,
   Slide,
   Source,
-} from "../types";
+} from "@slide-sage/db";
 
 function parseResearchOptions(input: unknown): ResearchOptions | undefined {
   if (!input || typeof input !== "object") return undefined;
