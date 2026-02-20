@@ -1,4 +1,4 @@
-import type { ResearchOptions, Source } from '../types';
+import type { ResearchOptions, Source } from '@slide-sage/contracts';
 import { TokenCalculator } from './token-calculator';
 
 export interface SearchSummaryResult {

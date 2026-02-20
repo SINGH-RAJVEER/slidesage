@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@hono/clerk-auth": "^2.0.0",
+    "@slide-sage/contracts": "workspace:*",
     "@slide-sage/db": "workspace:*",
     "drizzle-orm": "^0.36.4",
     "dotenv": "^16.4.5",

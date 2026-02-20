@@ -261,7 +261,7 @@ export class TokenCalculator {
   static validateSufficientTokens(
     userTokens: number,
     estimatedTokens: number,
-    isUnlimited = false
+    isUnlimited = false,
   ): { sufficient: boolean; shortfall?: number } {
     if (isUnlimited) {
       return { sufficient: true };

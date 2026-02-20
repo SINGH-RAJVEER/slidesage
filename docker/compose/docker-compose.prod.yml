@@ -39,7 +39,7 @@ services:
     image: slide-sage/apis:latest
     container_name: slide-sage-apis
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "${APIS_PORT:-8000}:8000"
     restart: always
     env_file:
       - ../../.env
@@ -84,7 +84,7 @@ services:
     image: slide-sage/web:latest
     container_name: slide-sage-web
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "${WEB_PORT:-5173}:5173"
     env_file:
       - ../../.env
     environment:

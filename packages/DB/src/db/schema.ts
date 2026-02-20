@@ -33,7 +33,7 @@ export const presentations = pgTable('presentations', {
   slidesData: jsonb('slides_data').notNull(),
   parentPresentationId: text('parent_presentation_id').references(
     // biome-ignore lint/suspicious/noExplicitAny: Drizzle circular reference
-    (): any => presentations.id
+    (): any => presentations.id,
   ),
 
   // Timestamps

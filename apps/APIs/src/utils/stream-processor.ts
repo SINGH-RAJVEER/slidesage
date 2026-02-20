@@ -16,7 +16,7 @@ export interface StreamChunk {
 
 export interface ExtractedSlide {
   index: number;
-  slide: Record<string, any>;
+  slide: Record<string, unknown>;
 }
 
 export class StreamProcessor {
@@ -30,7 +30,7 @@ export class StreamProcessor {
   /**
    * Extract content from a streaming chunk.
    */
-  processChunk(chunk: any): string {
+  processChunk(chunk: StreamChunk): string {
     this.chunkCount++;
     let chunkContent = '';
 
@@ -123,12 +123,12 @@ export class StreamProcessor {
     const slidesPattern = /"slides"\s*:\s*\[/;
     const slidesMatch = cleanContent.match(slidesPattern);
 
-    if (!slidesMatch) {
+    if (!slidesMatch || slidesMatch.index === undefined) {
       return [];
     }
 
     // Find all complete slide objects
-    const slidesStart = slidesMatch.index! + slidesMatch[0].length;
+    const slidesStart = slidesMatch.index + slidesMatch[0].length;
     const remaining = cleanContent.slice(slidesStart);
 
     // Parse complete slide objects
@@ -137,7 +137,7 @@ export class StreamProcessor {
     let inString = false;
     let escapeNext = false;
 
-    const extractedSlides: Record<string, any>[] = [];
+    const extractedSlides: Record<string, unknown>[] = [];
 
     for (let i = 0; i < remaining.length; i++) {
       const char = remaining[i];
@@ -196,7 +196,7 @@ export class StreamProcessor {
   /**
    * Extract title from a slide.
    */
-  extractTitleFromSlide(slide: Record<string, any>): string | null {
+  extractTitleFromSlide(slide: Record<string, unknown>): string | null {
     if (this.titleExtracted) {
       return this.titleExtracted;
     }

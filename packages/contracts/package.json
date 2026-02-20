@@ -1,5 +1,5 @@
 {
-  "name": "@slide-sage/db",
+  "name": "@slide-sage/contracts",
   "version": "1.0.0",
   "type": "module",
   "main": "./src/index.ts",
@@ -11,12 +11,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write ."
   },
-  "dependencies": {
-    "@slide-sage/contracts": "workspace:*",
-    "drizzle-orm": "^0.36.4",
-    "postgres": "^3.4.5"
-  },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4"
+    "@biomejs/biome": "^2.3.13"
   }
 }

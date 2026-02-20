@@ -41,7 +41,7 @@ export class UserRepository {
   static async findOrCreateByClerkId(
     clerkId: string,
     email?: string,
-    name?: string
+    name?: string,
   ): Promise<User> {
     let user = await UserRepository.findById(clerkId);
 
@@ -120,7 +120,7 @@ export class UserRepository {
    */
   static async hasSufficientTokens(
     userId: string,
-    estimatedTokens: number
+    estimatedTokens: number,
   ): Promise<{ sufficient: boolean; user: User; shortfall?: number }> {
     const user = await UserRepository.findById(userId);
 
@@ -131,7 +131,7 @@ export class UserRepository {
     const validation = TokenCalculator.validateSufficientTokens(
       user.slideTokens,
       estimatedTokens,
-      user.isUnlimited
+      user.isUnlimited,
     );
 
     return {
@@ -223,7 +223,7 @@ export class UserRepository {
   static async refundTokens(
     userId: string,
     estimatedTokens: number,
-    actualTokensUsed = 0
+    actualTokensUsed = 0,
   ): Promise<User> {
     const user = await UserRepository.findById(userId);
 

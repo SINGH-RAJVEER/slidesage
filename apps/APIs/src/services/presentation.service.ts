@@ -3,15 +3,15 @@
  * Handles presentation generation with token management and streaming
  */
 
-import type { Presentation } from "@slide-sage/db";
-import { PresentationRepository, TokenCalculator } from "@slide-sage/db";
 import type {
   PresentationStreamEvent,
   ResearchOptions,
   ResearchPayload,
   Slide,
-} from "@slide-sage/db";
-import { AIService } from "./ai.service";
+} from '@slide-sage/contracts';
+import type { Presentation } from '@slide-sage/db';
+import { PresentationRepository, TokenCalculator } from '@slide-sage/db';
+import { AIService } from './ai.service';
 
 export interface GeneratePresentationParams {
   userId: string;
@@ -47,8 +47,8 @@ export class PresentationService {
    */
   calculateEstimatedTokens(
     slideCount: number,
-    detailLevel = "balanced",
-    tonality = "professional",
+    detailLevel = 'balanced',
+    tonality = 'professional'
   ): number {
     const estimate = TokenCalculator.calculateEstimatedTokens({
       slideCount,
@@ -62,13 +62,13 @@ export class PresentationService {
    * Generate presentation with token management and streaming
    */
   async *generatePresentationStream(
-    params: GeneratePresentationParams,
+    params: GeneratePresentationParams
   ): AsyncGenerator<PresentationStreamEvent, void, unknown> {
     const {
       topic,
       slideCount,
-      detailLevel = "balanced",
-      tonality = "professional",
+      detailLevel = 'balanced',
+      tonality = 'professional',
       research,
       researchPayload,
     } = params;
@@ -81,14 +81,14 @@ export class PresentationService {
         detailLevel,
         tonality,
         research,
-        researchPayload,
+        researchPayload
       )) {
         yield event;
       }
     } catch (error) {
-      console.error("Error in presentation generation:", error);
+      console.error('Error in presentation generation:', error);
       yield {
-        event: "error",
+        event: 'error',
         data: { error: `Generation failed: ${error}` },
       };
     }
@@ -98,26 +98,25 @@ export class PresentationService {
    * Iterate on existing presentation with feedback
    */
   async *iteratePresentationStream(
-    params: IteratePresentationParams,
+    params: IteratePresentationParams
   ): AsyncGenerator<PresentationStreamEvent, void, unknown> {
     const {
       userId,
       presentationId,
       feedback,
-      detailLevel = "balanced",
-      tonality = "professional",
+      detailLevel = 'balanced',
+      tonality = 'professional',
       research,
     } = params;
 
     try {
       // Get the existing presentation
-      const existingPresentation =
-        await this.presentationRepo.findById(presentationId);
+      const existingPresentation = await this.presentationRepo.findById(presentationId);
 
       if (!existingPresentation) {
         yield {
-          event: "error",
-          data: { error: "Presentation not found" },
+          event: 'error',
+          data: { error: 'Presentation not found' },
         };
         return;
       }
@@ -125,16 +124,15 @@ export class PresentationService {
       // Verify user owns the presentation
       if (existingPresentation.userId !== userId) {
         yield {
-          event: "error",
-          data: { error: "Unauthorized access to presentation" },
+          event: 'error',
+          data: { error: 'Unauthorized access to presentation' },
         };
         return;
       }
 
       // slidesData is stored as JSON; cast for safe access.
       const currentSlides =
-        (existingPresentation.slidesData as unknown as { slides?: Slide[] })
-          ?.slides || [];
+        (existingPresentation.slidesData as unknown as { slides?: Slide[] })?.slides || [];
 
       try {
         // Stream presentation iteration
@@ -143,20 +141,20 @@ export class PresentationService {
           feedback,
           detailLevel,
           tonality,
-          research,
+          research
         )) {
           yield event;
         }
 
         // Persistence is handled by the HTTP route layer.
       } catch (error) {
-        console.error("Error during iteration:", error);
+        console.error('Error during iteration:', error);
         throw error;
       }
     } catch (error) {
-      console.error("Error in presentation iteration:", error);
+      console.error('Error in presentation iteration:', error);
       yield {
-        event: "error",
+        event: 'error',
         data: { error: `Iteration failed: ${error}` },
       };
     }
@@ -168,7 +166,7 @@ export class PresentationService {
   async getUserPresentations(
     userId: string,
     limit = 20,
-    offset = 0,
+    offset = 0
   ): Promise<{
     presentations: Presentation[];
     total: number;
@@ -180,18 +178,15 @@ export class PresentationService {
   /**
    * Get presentation by ID with ownership check
    */
-  async getPresentation(
-    presentationId: string,
-    userId: string,
-  ): Promise<Presentation> {
+  async getPresentation(presentationId: string, userId: string): Promise<Presentation> {
     const presentation = await this.presentationRepo.findById(presentationId);
 
     if (!presentation) {
-      throw new Error("Presentation not found");
+      throw new Error('Presentation not found');
     }
 
     if (presentation.userId !== userId) {
-      throw new Error("Unauthorized access to presentation");
+      throw new Error('Unauthorized access to presentation');
     }
 
     return presentation;
@@ -200,18 +195,15 @@ export class PresentationService {
   /**
    * Delete presentation with ownership check
    */
-  async deletePresentation(
-    presentationId: string,
-    userId: string,
-  ): Promise<void> {
+  async deletePresentation(presentationId: string, userId: string): Promise<void> {
     const presentation = await this.presentationRepo.findById(presentationId);
 
     if (!presentation) {
-      throw new Error("Presentation not found");
+      throw new Error('Presentation not found');
     }
 
     if (presentation.userId !== userId) {
-      throw new Error("Unauthorized access to presentation");
+      throw new Error('Unauthorized access to presentation');
     }
 
     await this.presentationRepo.delete(presentationId);
@@ -220,10 +212,7 @@ export class PresentationService {
   /**
    * Get presentation iterations/versions
    */
-  async getPresentationIterations(
-    presentationId: string,
-    userId: string,
-  ): Promise<Presentation[]> {
+  async getPresentationIterations(presentationId: string, userId: string): Promise<Presentation[]> {
     await this.getPresentation(presentationId, userId);
     return await this.presentationRepo.findIterations(presentationId);
   }
@@ -235,15 +224,11 @@ export class PresentationService {
     return {
       tiers: TokenCalculator.getTokenPricingTiers(),
       dailyBonus: TokenCalculator.getDailyLoginBonus(),
-      detailLevels: [
-        "brief",
-        "concise",
-        "balanced",
-        "detailed",
-        "comprehensive",
-      ].map((level) => TokenCalculator.getDetailLevelInfo(level)),
-      tonalities: ["casual", "professional", "enthusiastic", "persuasive"].map(
-        (tonality) => TokenCalculator.getTonalityInfo(tonality),
+      detailLevels: ['brief', 'concise', 'balanced', 'detailed', 'comprehensive'].map((level) =>
+        TokenCalculator.getDetailLevelInfo(level)
+      ),
+      tonalities: ['casual', 'professional', 'enthusiastic', 'persuasive'].map((tonality) =>
+        TokenCalculator.getTonalityInfo(tonality)
       ),
     };
   }

@@ -41,7 +41,7 @@ interface ChartData {
 			fill?: boolean;
 		}>;
 	};
-	options?: any;
+	options?: Record<string, unknown>;
 	title?: string;
 	description?: string;
 }

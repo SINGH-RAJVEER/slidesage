@@ -1,14 +1,14 @@
+import type { PresentationJSON } from '@slide-sage/contracts';
 import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { type Presentation, presentations } from '../db/schema';
-import type { PresentationJSON } from '../types';
 
 export class PresentationRepository {
   async create(
     userId: string,
     title: string,
     prompt: string,
-    slidesData: PresentationJSON
+    slidesData: PresentationJSON,
   ): Promise<Presentation> {
     const [presentation] = await db
       .insert(presentations)
@@ -35,7 +35,7 @@ export class PresentationRepository {
   async findByUserId(
     userId: string,
     limit = 20,
-    offset = 0
+    offset = 0,
   ): Promise<{
     presentations: Presentation[];
     total: number;
@@ -71,7 +71,7 @@ export class PresentationRepository {
 
   async update(
     presentationId: string,
-    updates: Partial<Presentation>
+    updates: Partial<Presentation>,
   ): Promise<Presentation | undefined> {
     const [presentation] = await db
       .update(presentations)

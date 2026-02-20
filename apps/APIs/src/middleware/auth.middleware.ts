@@ -1,6 +1,6 @@
 import { clerkMiddleware, getAuth } from '@hono/clerk-auth';
-import type { Context } from 'hono';
 import { UserRepository } from '@slide-sage/db';
+import type { Context } from 'hono';
 
 export const authMiddleware = clerkMiddleware();
 

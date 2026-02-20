@@ -7,18 +7,33 @@ export { UserRepository } from './repositories/user.repository';
 export { PresentationRepository } from './repositories/presentation.repository';
 
 // Service exports
-export { TokenCalculator, type TokenCalculationParams, type TokenEstimate } from './services/token-calculator';
+export {
+  TokenCalculator,
+  type TokenCalculationParams,
+  type TokenEstimate,
+} from './services/token-calculator';
 
 // Type exports
 export type {
   ChartConfig,
   Slide,
   PresentationJSON,
+  PresentationData,
   ResearchFreshness,
   ResearchOptions,
   Source,
   ResearchPayload,
   PresentationStreamEvent,
+  StreamEvent,
+  StreamStartEvent,
+  StreamCreatedEvent,
+  StreamThemeEvent,
+  StreamMidwayspaceEvent,
+  StreamResearchEvent,
+  StreamSlideEvent,
+  StreamCompleteEvent,
+  StreamSavedEvent,
+  StreamErrorEvent,
   LiteLLMMessage,
   StreamChunk,
-} from './types';
+} from '@slide-sage/contracts';

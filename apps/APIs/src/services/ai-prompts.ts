@@ -333,7 +333,7 @@ export function buildGenerationPrompt(detailLevel = 'balanced', tonality = 'prof
     .replace('{tonality}', tonality);
 }
 
-import type { Slide } from '../types';
+import type { Slide } from '@slide-sage/contracts';
 
 export function buildIterationPrompt(
   currentSlides: Slide[],

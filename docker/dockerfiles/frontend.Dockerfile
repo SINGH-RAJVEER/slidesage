@@ -11,6 +11,7 @@ COPY package.json ./
 COPY bun.lock ./
 COPY apps/Web/package.json ./apps/Web/
 COPY apps/APIs/package.json ./apps/APIs/
+COPY packages/DB/package.json ./packages/DB/
 
 # Install dependencies with BuildKit cache mount for faster builds
 # Skip lifecycle scripts to avoid failing optional native deps (e.g. node-canvas).
@@ -28,6 +29,7 @@ COPY --from=deps /app/apps/APIs/node_modules ./apps/APIs/node_modules
 # Copy source code
 COPY apps/Web ./apps/Web
 COPY apps/APIs ./apps/APIs
+COPY packages/DB ./packages/DB
 COPY tsconfig.json ./
 
 # Copy environment variables
