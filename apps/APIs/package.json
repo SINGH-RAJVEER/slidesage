@@ -16,11 +16,11 @@
     "format": "biome format --write ."
   },
   "dependencies": {
-    "@hono/clerk-auth": "^2.0.0",
     "@langchain/core": "^0.1.48",
     "@langchain/groq": "^0.0.12",
     "@slide-sage/contracts": "workspace:*",
     "@slide-sage/db": "workspace:*",
+    "better-auth": "^1.4.18",
     "drizzle-orm": "^0.36.4",
     "dotenv": "^16.4.5",
     "hono": "^4.6.14",

@@ -1,6 +1,3 @@
-import { Link } from "react-router-dom";
-import { ROUTES } from "@/router/paths";
-
 export default function NotFoundPage() {
 	return (
 		<div className="min-h-screen bg-transparent flex items-center justify-center px-6">
@@ -10,21 +7,6 @@ export default function NotFoundPage() {
 				<p className="text-white/60 mt-4">
 					The page you’re looking for doesn’t exist or was moved.
 				</p>
-
-				<div className="mt-8 flex items-center justify-center gap-3">
-					<Link
-						to={ROUTES.home}
-						className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white transition"
-					>
-						Go Home
-					</Link>
-					<Link
-						to={ROUTES.presentations}
-						className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white transition"
-					>
-						Presentations
-					</Link>
-				</div>
 			</div>
 		</div>
 	);

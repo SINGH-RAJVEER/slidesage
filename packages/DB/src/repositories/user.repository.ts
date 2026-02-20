@@ -3,10 +3,10 @@
  * Handles user data operations
  */
 
-import { eq } from 'drizzle-orm';
-import { db } from '../db';
-import { type NewUser, type User, users } from '../db/schema';
-import { TokenCalculator } from '../services/token-calculator';
+import { eq } from "drizzle-orm";
+import { db } from "../db";
+import { type NewUser, type User, users } from "../db/schema";
+import { TokenCalculator } from "../services/token-calculator";
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Repository uses static methods by design.
 export class UserRepository {
@@ -14,7 +14,11 @@ export class UserRepository {
    * Find user by ID
    */
   static async findById(id: string): Promise<User | null> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
     return result[0] || null;
   }
 
@@ -22,7 +26,11 @@ export class UserRepository {
    * Find user by email
    */
   static async findByEmail(email: string): Promise<User | null> {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
     return result[0] || null;
   }
 
@@ -35,28 +43,25 @@ export class UserRepository {
   }
 
   /**
-   * Find or create user by Clerk ID
-   * Used for syncing Clerk authenticated users to our database
+   * Ensure user exists with default tokens
+   * Used during OAuth callback/signup
    */
-  static async findOrCreateByClerkId(
-    clerkId: string,
-    email?: string,
-    name?: string,
-  ): Promise<User> {
-    let user = await UserRepository.findById(clerkId);
+  static async ensureTokensInitialized(userId: string): Promise<User> {
+    const user = await UserRepository.findById(userId);
 
     if (!user) {
-      console.log(`Creating user for Clerk ID: ${clerkId}`);
-      user = await UserRepository.create({
-        id: clerkId,
-        email: email || `user-${clerkId}@clerk.local`,
-        name: name || 'User',
-        slideTokens: 100, // Initial token allocation
-        isUnlimited: false,
-      });
+      throw new Error(`User ${userId} not found`);
     }
 
-    return user;
+    // If user has default token amount, they're already initialized
+    if (user.slideTokens > 0) {
+      return user;
+    }
+
+    // Initialize tokens if missing
+    return await UserRepository.update(userId, {
+      slideTokens: 50.0, // Default token allocation
+    });
   }
 
   /**
@@ -70,7 +75,7 @@ export class UserRepository {
       .returning();
 
     if (!result[0]) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     return result[0];
@@ -83,7 +88,7 @@ export class UserRepository {
     const user = await UserRepository.findById(userId);
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     // Skip deduction for unlimited users
@@ -92,7 +97,7 @@ export class UserRepository {
     }
 
     if (user.slideTokens < tokens) {
-      throw new Error('Insufficient tokens');
+      throw new Error("Insufficient tokens");
     }
 
     return await UserRepository.update(userId, {
@@ -107,7 +112,7 @@ export class UserRepository {
     const user = await UserRepository.findById(userId);
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     return await UserRepository.update(userId, {
@@ -125,7 +130,7 @@ export class UserRepository {
     const user = await UserRepository.findById(userId);
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     const validation = TokenCalculator.validateSufficientTokens(
@@ -144,18 +149,23 @@ export class UserRepository {
   /**
    * Award daily login bonus if eligible
    */
-  static async awardDailyLoginBonus(userId: string): Promise<{ awarded: boolean; user: User }> {
+  static async awardDailyLoginBonus(
+    userId: string,
+  ): Promise<{ awarded: boolean; user: User }> {
     const user = await UserRepository.findById(userId);
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Start of day
 
     // Check if user has already received bonus today
-    if (user.lastLoginDate && user.lastLoginDate.getTime() === today.getTime()) {
+    if (
+      user.lastLoginDate &&
+      user.lastLoginDate.getTime() === today.getTime()
+    ) {
       return { awarded: false, user };
     }
 
@@ -182,7 +192,10 @@ export class UserRepository {
   /**
    * Revoke unlimited tokens from a user (admin function)
    */
-  static async revokeUnlimitedTokens(userId: string, newTokenAmount = 50.0): Promise<User> {
+  static async revokeUnlimitedTokens(
+    userId: string,
+    newTokenAmount = 50.0,
+  ): Promise<User> {
     return await UserRepository.update(userId, {
       isUnlimited: false,
       slideTokens: newTokenAmount,
@@ -207,12 +220,12 @@ export class UserRepository {
     const user = await UserRepository.findById(userId);
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     return {
       user,
-      displayBalance: user.isUnlimited ? '∞' : user.slideTokens.toFixed(1),
+      displayBalance: user.isUnlimited ? "∞" : user.slideTokens.toFixed(1),
       isUnlimited: user.isUnlimited,
     };
   }
@@ -228,7 +241,7 @@ export class UserRepository {
     const user = await UserRepository.findById(userId);
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     // Skip refund for unlimited users
@@ -236,7 +249,10 @@ export class UserRepository {
       return user;
     }
 
-    const refundAmount = TokenCalculator.calculateRefund(estimatedTokens, actualTokensUsed);
+    const refundAmount = TokenCalculator.calculateRefund(
+      estimatedTokens,
+      actualTokensUsed,
+    );
 
     if (refundAmount > 0) {
       return await UserRepository.addTokens(userId, refundAmount);
@@ -257,7 +273,7 @@ export class UserRepository {
     const user = await UserRepository.findById(userId);
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     // TODO: Implement presentation counting and token usage tracking

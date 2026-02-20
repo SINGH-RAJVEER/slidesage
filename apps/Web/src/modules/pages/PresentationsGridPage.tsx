@@ -32,10 +32,7 @@ interface Presentation {
 }
 
 interface SearchFilters {
-  title: string;
-  prompt: string;
-  dateFrom: string;
-  dateTo: string;
+  query: string;
 }
 
 export default function PresentationsGridPage() {
@@ -183,46 +180,69 @@ export default function PresentationsGridPage() {
     }
   };
 
+  const parseDateRange = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    const fullDateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (fullDateMatch) {
+      const [year, month, day] = fullDateMatch.slice(1).map(Number);
+      const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+      return { start, end };
+    }
+
+    const monthMatch = trimmed.match(/^(\d{4})-(\d{2})$/);
+    if (monthMatch) {
+      const [year, month] = monthMatch.slice(1).map(Number);
+      const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
+      const end = new Date(year, month, 0, 23, 59, 59, 999);
+      return { start, end };
+    }
+
+    const yearMatch = trimmed.match(/^(\d{4})$/);
+    if (yearMatch) {
+      const year = Number(yearMatch[1]);
+      const start = new Date(year, 0, 1, 0, 0, 0, 0);
+      const end = new Date(year, 11, 31, 23, 59, 59, 999);
+      return { start, end };
+    }
+
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      const start = new Date(parsed);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(parsed);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+
+    return null;
+  };
+
   const handleSearch = (filters: SearchFilters) => {
-    let filtered = [...presentations];
-
-    // Filter by title
-    if (filters.title) {
-      const titleLower = filters.title.toLowerCase();
-      filtered = filtered.filter((p) =>
-        p.title.toLowerCase().includes(titleLower),
-      );
+    const query = filters.query.trim();
+    if (!query) {
+      setFilteredPresentations(presentations);
+      return;
     }
 
-    // Filter by prompt
-    if (filters.prompt) {
-      const promptLower = filters.prompt.toLowerCase();
-      filtered = filtered.filter((p) =>
-        p.prompt.toLowerCase().includes(promptLower),
-      );
-    }
-
-    // Filter by date from
-    if (filters.dateFrom) {
-      const dateFrom = new Date(filters.dateFrom);
-      dateFrom.setHours(0, 0, 0, 0);
-      filtered = filtered.filter((p) => {
+    const dateRange = parseDateRange(query);
+    if (dateRange) {
+      const filtered = presentations.filter((p) => {
         const createdDate = new Date(p.created_at);
-        createdDate.setHours(0, 0, 0, 0);
-        return createdDate >= dateFrom;
+        return createdDate >= dateRange.start && createdDate <= dateRange.end;
       });
+      setFilteredPresentations(filtered);
+      return;
     }
 
-    // Filter by date to
-    if (filters.dateTo) {
-      const dateTo = new Date(filters.dateTo);
-      dateTo.setHours(23, 59, 59, 999);
-      filtered = filtered.filter((p) => {
-        const createdDate = new Date(p.created_at);
-        return createdDate <= dateTo;
-      });
-    }
-
+    const queryLower = query.toLowerCase();
+    const filtered = presentations.filter(
+      (p) =>
+        p.title.toLowerCase().includes(queryLower) ||
+        p.prompt.toLowerCase().includes(queryLower),
+    );
     setFilteredPresentations(filtered);
   };
 

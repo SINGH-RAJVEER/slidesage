@@ -1,23 +1,31 @@
-import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 function buildRedirectUrl(location: ReturnType<typeof useLocation>) {
-	const current = `${location.pathname}${location.search}${location.hash}`;
-	const redirectUrl = encodeURIComponent(current);
-	return `/sign-in?redirect_url=${redirectUrl}`;
+  const current = `${location.pathname}${location.search}${location.hash}`;
+  const redirectUrl = encodeURIComponent(current);
+  return `/sign-in?redirect_url=${redirectUrl}`;
 }
 
 export default function RequireSignedInLayout() {
-	const location = useLocation();
+  const location = useLocation();
+  const { isSignedIn, loading } = useAuth();
 
-	return (
-		<>
-			<SignedIn>
-				<Outlet />
-			</SignedIn>
-			<SignedOut>
-				<Navigate to={buildRedirectUrl(location)} replace />
-			</SignedOut>
-		</>
-	);
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-transparent flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {isSignedIn ? (
+        <Outlet />
+      ) : (
+        <Navigate to={buildRedirectUrl(location)} replace />
+      )}
+    </>
+  );
 }

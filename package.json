@@ -26,5 +26,8 @@
     "prettier": "latest"
   },
   "trustedDependencies": [],
-  "packageManager": "bun@1.0.25"
+  "packageManager": "bun@1.0.25",
+  "dependencies": {
+    "better-auth": "^1.4.18"
+  }
 }
