@@ -5,12 +5,12 @@
 
 import type { Slide } from '@slide-sage/contracts';
 import {
-  db,
   type PresentationEmbedding,
-  presentationEmbeddings,
   type RagContext,
-  ragContext,
   type SearchEmbedding,
+  db,
+  presentationEmbeddings,
+  ragContext,
   searchEmbeddings,
 } from '@slide-sage/db';
 import { and, cosineDistance, desc, eq, sql } from 'drizzle-orm';
