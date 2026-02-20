@@ -11,6 +11,7 @@ COPY package.json ./
 COPY bun.lock ./
 COPY apps/APIs/package.json ./apps/APIs/
 COPY packages/DB/package.json ./packages/DB/
+COPY packages/contracts/package.json ./packages/contracts/
 
 # Install dependencies with BuildKit cache mount for faster builds
 # Omit optional deps to keep Docker builds reliable.
@@ -27,6 +28,7 @@ COPY --from=deps /app/apps/APIs/node_modules ./apps/APIs/node_modules
 # Copy source code
 COPY apps/APIs ./apps/APIs
 COPY packages/DB ./packages/DB
+COPY packages/contracts ./packages/contracts
 COPY tsconfig.json ./
 
 # Production image (no build needed - Bun runs TypeScript directly)
@@ -47,6 +49,7 @@ ENV PORT=8000
 COPY --from=deps /app/apps/APIs/node_modules ./apps/APIs/node_modules
 COPY --from=builder /app/apps/APIs ./apps/APIs
 COPY --from=builder /app/packages/DB ./packages/DB
+COPY --from=builder /app/packages/contracts ./packages/contracts
 COPY --from=builder /app/apps/APIs/package.json ./apps/APIs/
 
 # Expose port

@@ -116,11 +116,6 @@ presentations.post(
           let theme = 'default';
           let title = 'Untitled Presentation';
           let sources: Source[] | undefined;
-          // tokensUsed variable was defined but unused in the original code, removing or using if needed.
-          // It's assigned later: tokensUsed = eventData.tokens_used || 0;
-          // But not used in the save part. I'll keep it if I need to pass it, but createPresentation doesn't seem to take tokensUsed in schema?
-          // Checking schema: presentation table has slidesData (jsonb). We can put tokens_used inside slidesData.
-
           let tokensUsed = 0;
 
           // Stream presentation generation

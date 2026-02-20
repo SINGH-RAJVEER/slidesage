@@ -9,11 +9,6 @@ model_list:
       model: groq/llama-3.3-70b-versatile
       api_key: os.environ/GROQ_API_KEY
 
-  - model_name: gemini-3.0
-    litellm_params:
-      model: gemini/gemini-2.0-flash-exp
-      api_key: os.environ/GEMINI_API_KEY
-
 general_settings:
   master_key: null # Dev: no auth
   database_url: null # Dev: no database

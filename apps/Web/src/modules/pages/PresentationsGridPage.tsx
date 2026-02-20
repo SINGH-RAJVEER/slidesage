@@ -3,19 +3,20 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import {
-	CreatePresentationButton,
-	GridSizeControl,
-	PresentationCard,
+  CreatePresentationButton,
+  GridSizeControl,
+  PresentationCard,
+  PresentationSearchBar,
 } from "@/components/Presentations";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { ROUTES } from "@/router/paths";
@@ -23,269 +24,332 @@ import { ROUTES } from "@/router/paths";
 const API_URL = import.meta.env.VITE_API_URL;
 
 interface Presentation {
-	id: number;
-	title: string;
-	prompt: string;
-	created_at: string;
-	updated_at: string;
+  id: number;
+  title: string;
+  prompt: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SearchFilters {
+  title: string;
+  prompt: string;
+  dateFrom: string;
+  dateTo: string;
 }
 
 export default function PresentationsGridPage() {
-	const [presentations, setPresentations] = useState<Presentation[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState("");
-	const [deletingId, setDeletingId] = useState<number | null>(null);
-	const [presentationToDelete, setPresentationToDelete] = useState<
-		number | null
-	>(null);
-	const [gridSize, setGridSize] = useState<2 | 3 | 4>(() => {
-		const saved = localStorage.getItem("gridSize");
-		return saved ? (parseInt(saved, 10) as 2 | 3 | 4) : 3;
-	});
-	const navigate = useNavigate();
+  const [presentations, setPresentations] = useState<Presentation[]>([]);
+  const [filteredPresentations, setFilteredPresentations] = useState<
+    Presentation[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [presentationToDelete, setPresentationToDelete] = useState<
+    number | null
+  >(null);
+  const [gridSize, setGridSize] = useState<2 | 3 | 4>(() => {
+    const saved = localStorage.getItem("gridSize");
+    return saved ? (parseInt(saved, 10) as 2 | 3 | 4) : 3;
+  });
+  const navigate = useNavigate();
 
-	const fetchPresentations = useCallback(async () => {
-		try {
-			setLoading(true);
-			const response = await fetch(`${API_URL}/api/presentations`, {
-				credentials: "include",
-			});
+  const fetchPresentations = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_URL}/api/presentations`, {
+        credentials: "include",
+      });
 
-			if (response.status === 401) {
-				setError("Authentication failed. Please log in again.");
-				return;
-			}
+      if (response.status === 401) {
+        setError("Authentication failed. Please log in again.");
+        return;
+      }
 
-			const result = await response.json();
+      const result = await response.json();
 
-			// New API format: {presentations: [...]} or {error: {message: "..."}}
-			if (result.error) {
-				setError(
-					typeof result.error === "object"
-						? result.error.message
-						: result.error,
-				);
-			} else {
-				setPresentations(result.presentations || []);
-			}
-		} catch (err) {
-			setError(`Error: ${err instanceof Error ? err.message : err}`);
-		} finally {
-			setLoading(false);
-		}
-	}, []);
+      // New API format: {presentations: [...]} or {error: {message: "..."}}
+      if (result.error) {
+        setError(
+          typeof result.error === "object"
+            ? result.error.message
+            : result.error,
+        );
+      } else {
+        const presentationsList = result.presentations || [];
+        setPresentations(presentationsList);
+        setFilteredPresentations(presentationsList);
+      }
+    } catch (err) {
+      setError(`Error: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-	useEffect(() => {
-		void fetchPresentations();
-	}, [fetchPresentations]);
+  useEffect(() => {
+    void fetchPresentations();
+  }, [fetchPresentations]);
 
-	useEffect(() => {
-		localStorage.setItem("gridSize", gridSize.toString());
-	}, [gridSize]);
+  useEffect(() => {
+    localStorage.setItem("gridSize", gridSize.toString());
+  }, [gridSize]);
 
-	const handlePresentationClick = async (presentationId: number) => {
-		try {
-			const response = await fetch(
-				`${API_URL}/api/presentations/${presentationId}`,
-				{ credentials: "include" },
-			);
+  const handlePresentationClick = async (presentationId: number) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/presentations/${presentationId}`,
+        { credentials: "include" },
+      );
 
-			if (response.status === 401) {
-				setError("Session expired. Please log in again.");
-				return;
-			}
+      if (response.status === 401) {
+        setError("Session expired. Please log in again.");
+        return;
+      }
 
-			const result = await response.json();
+      const result = await response.json();
 
-			// New API format: {presentation: {...}} or {error: {message: "..."}}
-			if (result.error) {
-				setError(
-					typeof result.error === "object"
-						? result.error.message
-						: result.error,
-				);
-			} else if (result.presentation) {
-				navigate(ROUTES.presentationById(result.presentation.id), {
-					state: {
-						presentation:
-							result.presentation.slides_data || result.presentation.slides,
-						presentationId: result.presentation.id,
-					},
-				});
-			} else {
-				setError("Failed to load presentation");
-			}
-		} catch (err) {
-			setError(`Error: ${err instanceof Error ? err.message : err}`);
-		}
-	};
+      // New API format: {presentation: {...}} or {error: {message: "..."}}
+      if (result.error) {
+        setError(
+          typeof result.error === "object"
+            ? result.error.message
+            : result.error,
+        );
+      } else if (result.presentation) {
+        navigate(ROUTES.presentationById(result.presentation.id), {
+          state: {
+            presentation:
+              result.presentation.slides_data || result.presentation.slides,
+            presentationId: result.presentation.id,
+          },
+        });
+      } else {
+        setError("Failed to load presentation");
+      }
+    } catch (err) {
+      setError(`Error: ${err instanceof Error ? err.message : err}`);
+    }
+  };
 
-	const handleDeletePresentation = (
-		e: React.MouseEvent,
-		presentationId: number,
-	) => {
-		e.stopPropagation();
-		setPresentationToDelete(presentationId);
-	};
+  const handleDeletePresentation = (
+    e: React.MouseEvent,
+    presentationId: number,
+  ) => {
+    e.stopPropagation();
+    setPresentationToDelete(presentationId);
+  };
 
-	const executeDelete = async () => {
-		if (!presentationToDelete) return;
-		const presentationId = presentationToDelete;
+  const executeDelete = async () => {
+    if (!presentationToDelete) return;
+    const presentationId = presentationToDelete;
 
-		try {
-			setDeletingId(presentationId);
-			const response = await fetch(
-				`${API_URL}/api/presentations/${presentationId}`,
-				{
-					method: "DELETE",
-					credentials: "include",
-				},
-			);
+    try {
+      setDeletingId(presentationId);
+      const response = await fetch(
+        `${API_URL}/api/presentations/${presentationId}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        },
+      );
 
-			if (response.status === 401) {
-				setError("Session expired. Please log in again.");
-				return;
-			}
+      if (response.status === 401) {
+        setError("Session expired. Please log in again.");
+        return;
+      }
 
-			const result = await response.json();
+      const result = await response.json();
 
-			// New API format: {message: "..."} or {error: {message: "..."}}
-			if (result.error) {
-				setError(
-					typeof result.error === "object"
-						? result.error.message
-						: result.error,
-				);
-			} else {
-				setPresentations(presentations.filter((p) => p.id !== presentationId));
-			}
-		} catch (err) {
-			setError(`Error: ${err instanceof Error ? err.message : err}`);
-		} finally {
-			setDeletingId(null);
-			setPresentationToDelete(null);
-		}
-	};
+      // New API format: {message: "..."} or {error: {message: "..."}}
+      if (result.error) {
+        setError(
+          typeof result.error === "object"
+            ? result.error.message
+            : result.error,
+        );
+      } else {
+        setPresentations(presentations.filter((p) => p.id !== presentationId));
+        setFilteredPresentations(
+          filteredPresentations.filter((p) => p.id !== presentationId),
+        );
+      }
+    } catch (err) {
+      setError(`Error: ${err instanceof Error ? err.message : err}`);
+    } finally {
+      setDeletingId(null);
+      setPresentationToDelete(null);
+    }
+  };
 
-	const formatDate = (dateString: string) => {
-		const date = new Date(dateString);
-		return date.toLocaleDateString("en-US", {
-			year: "numeric",
-			month: "short",
-			day: "numeric",
-		});
-	};
+  const handleSearch = (filters: SearchFilters) => {
+    let filtered = [...presentations];
 
-	if (loading) {
-		return (
-			<div className="min-h-screen bg-transparent">
-				<Header />
-				<div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-64px)]">
-					<Spinner className="h-12 w-12" />
-				</div>
-			</div>
-		);
-	}
+    // Filter by title
+    if (filters.title) {
+      const titleLower = filters.title.toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.title.toLowerCase().includes(titleLower),
+      );
+    }
 
-	return (
-		<div className="min-h-screen bg-transparent">
-			<Header />
-			<div className="p-4 md:p-8">
-				<div className="max-w-7xl mx-auto">
-					<div className="flex items-center justify-between mb-24">
-						<h1 className="text-4xl font-bold text-white flex items-center gap-3">
-							Generated Presentations
-						</h1>
-						<GridSizeControl
-							gridSize={gridSize}
-							onGridSizeChange={setGridSize}
-						/>
-					</div>
+    // Filter by prompt
+    if (filters.prompt) {
+      const promptLower = filters.prompt.toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.prompt.toLowerCase().includes(promptLower),
+      );
+    }
 
-					{error && (
-						<Alert
-							variant="destructive"
-							className="mb-6 bg-red-500/20 border-red-500/50 text-white"
-						>
-							<AlertTitle>Error</AlertTitle>
-							<AlertDescription>{error}</AlertDescription>
-						</Alert>
-					)}
+    // Filter by date from
+    if (filters.dateFrom) {
+      const dateFrom = new Date(filters.dateFrom);
+      dateFrom.setHours(0, 0, 0, 0);
+      filtered = filtered.filter((p) => {
+        const createdDate = new Date(p.created_at);
+        createdDate.setHours(0, 0, 0, 0);
+        return createdDate >= dateFrom;
+      });
+    }
 
-					<div
-						className={`grid grid-cols-1 ${
-							gridSize === 2
-								? "md:grid-cols-2"
-								: gridSize === 3
-									? "md:grid-cols-2 lg:grid-cols-3"
-									: "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-						} gap-12`}
-					>
-						{presentations.length === 0 ? (
-							<div className="col-span-full flex flex-col items-center justify-center py-96 text-center">
-								<h2 className="text-3xl text-white mb-2">
-									No Presentations Generated Yet
-								</h2>
-							</div>
-						) : (
-							presentations.map((presentation) => (
-								<PresentationCard
-									key={presentation.id}
-									presentation={presentation}
-									isDeleting={deletingId === presentation.id}
-									onCardClick={handlePresentationClick}
-									onDelete={handleDeletePresentation}
-									formatDate={formatDate}
-								/>
-							))
-						)}
-					</div>
-				</div>
-			</div>
+    // Filter by date to
+    if (filters.dateTo) {
+      const dateTo = new Date(filters.dateTo);
+      dateTo.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((p) => {
+        const createdDate = new Date(p.created_at);
+        return createdDate <= dateTo;
+      });
+    }
 
-			{/* Floating Add Button */}
-			<CreatePresentationButton
-				onCreateClick={() => navigate(ROUTES.generate)}
-			/>
+    setFilteredPresentations(filtered);
+  };
 
-			<Dialog
-				open={!!presentationToDelete}
-				onOpenChange={(open) => !open && setPresentationToDelete(null)}
-			>
-				<DialogContent className="bg-white/10 backdrop-blur-md border-white/20 text-white shadow-2xl">
-					<DialogHeader>
-						<DialogTitle>Delete Presentation</DialogTitle>
-						<DialogDescription className="text-white/70">
-							Are you sure you want to delete this presentation? This action
-							cannot be undone.
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button
-							variant="ghost"
-							onClick={() => setPresentationToDelete(null)}
-							className="text-white hover:bg-white/10 hover:text-white"
-						>
-							Cancel
-						</Button>
-						<Button
-							variant="destructive"
-							onClick={executeDelete}
-							disabled={deletingId !== null}
-							className="bg-red-500 hover:bg-red-600 text-white"
-						>
-							{deletingId !== null ? (
-								<>
-									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-									Deleting...
-								</>
-							) : (
-								"Delete"
-							)}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-		</div>
-	);
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-transparent">
+        <Header />
+        <div className="p-4 md:p-8 flex items-center justify-center min-h-[calc(100vh-64px)]">
+          <Spinner className="h-12 w-12" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-transparent">
+      <Header />
+      <div className="p-4 md:p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
+              Generated Presentations
+            </h1>
+            <GridSizeControl
+              gridSize={gridSize}
+              onGridSizeChange={setGridSize}
+            />
+          </div>
+
+          {/* Search Bar */}
+          <PresentationSearchBar onSearch={handleSearch} />
+
+          {error && (
+            <Alert
+              variant="destructive"
+              className="mb-6 bg-red-500/20 border-red-500/50 text-white"
+            >
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          <div
+            className={`grid grid-cols-1 ${
+              gridSize === 2
+                ? "md:grid-cols-2"
+                : gridSize === 3
+                  ? "md:grid-cols-2 lg:grid-cols-3"
+                  : "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            } gap-12`}
+          >
+            {filteredPresentations.length === 0 ? (
+              <div className="col-span-full flex flex-col items-center justify-center py-96 text-center">
+                <h2 className="text-3xl text-white mb-2">
+                  {presentations.length === 0
+                    ? "No Presentations Generated Yet"
+                    : "No presentations match your search"}
+                </h2>
+              </div>
+            ) : (
+              filteredPresentations.map((presentation) => (
+                <PresentationCard
+                  key={presentation.id}
+                  presentation={presentation}
+                  isDeleting={deletingId === presentation.id}
+                  onCardClick={handlePresentationClick}
+                  onDelete={handleDeletePresentation}
+                  formatDate={formatDate}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Add Button */}
+      <CreatePresentationButton
+        onCreateClick={() => navigate(ROUTES.generate)}
+      />
+
+      <Dialog
+        open={!!presentationToDelete}
+        onOpenChange={(open) => !open && setPresentationToDelete(null)}
+      >
+        <DialogContent className="bg-white/10 backdrop-blur-md border-white/20 text-white shadow-2xl">
+          <DialogHeader>
+            <DialogTitle>Delete Presentation</DialogTitle>
+            <DialogDescription className="text-white/70">
+              Are you sure you want to delete this presentation? This action
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setPresentationToDelete(null)}
+              className="text-white hover:bg-white/10 hover:text-white"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={executeDelete}
+              disabled={deletingId !== null}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              {deletingId !== null ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
