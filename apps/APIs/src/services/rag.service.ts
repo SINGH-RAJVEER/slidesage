@@ -3,7 +3,7 @@
  * Handles embedding generation, storage, and retrieval for augmented generation
  */
 
-import type { Slide } from '@slide-sage/contracts';
+import type { Slide } from "@slide-sage/contracts";
 import {
   type PresentationEmbedding,
   type RagContext,
@@ -12,8 +12,8 @@ import {
   presentationEmbeddings,
   ragContext,
   searchEmbeddings,
-} from '@slide-sage/db';
-import { and, cosineDistance, desc, eq, sql } from 'drizzle-orm';
+} from "@slide-sage/db";
+import { and, cosineDistance, desc, eq, sql } from "drizzle-orm";
 
 export interface EmbeddingResult {
   embedding: number[];
@@ -34,10 +34,13 @@ export class RAGService {
   private embeddingModel: string;
 
   constructor() {
-    this.embeddingModel = process.env.EMBEDDING_MODEL || 'gemini/text-embedding-004';
+    this.embeddingModel =
+      process.env.EMBEDDING_MODEL || "gemini/text-embedding-004";
 
     if (!this.embeddingModel) {
-      console.warn('EMBEDDING_MODEL not set. Using default: gemini/text-embedding-004');
+      console.warn(
+        "EMBEDDING_MODEL not set. Using default: gemini/text-embedding-004",
+      );
     }
   }
 
@@ -47,27 +50,30 @@ export class RAGService {
   async generateEmbedding(text: string): Promise<EmbeddingResult> {
     try {
       if (!text || text.trim().length === 0) {
-        throw new Error('Text cannot be empty');
+        throw new Error("Text cannot be empty");
       }
 
       // Prepare the request body for LiteLLM (OpenAI-compatible)
       const requestBody = {
         model: this.embeddingModel,
         input: text,
-        encoding_format: 'float',
-        dimensions: 768, // Request 768 dimensions for Gemini embeddings
+        encoding_format: "float",
+        dimensions: 768,
       };
 
       // Determine the proxy URL for LiteLLM
-      const litellmProxyBase = process.env.LITELLM_PROXY_BASE || 'http://localhost:4000';
+      const litellmProxyBase =
+        process.env.LITELLM_PROXY_BASE || "http://localhost:4000";
       const embeddingsUrl = this.resolveLiteLLMUrl(litellmProxyBase);
 
-      console.log(`Generating embedding using model: ${this.embeddingModel} at ${embeddingsUrl}`);
+      console.log(
+        `Generating embedding using model: ${this.embeddingModel} at ${embeddingsUrl}`,
+      );
 
       const response = await fetch(embeddingsUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...(process.env.LITELLM_API_KEY && {
             Authorization: `Bearer ${process.env.LITELLM_API_KEY}`,
           }),
@@ -77,20 +83,20 @@ export class RAGService {
 
       if (!response.ok) {
         const error = await response.text();
-        console.error('LiteLLM embedding API error:', error);
+        console.error("LiteLLM embedding API error:", error);
         throw new Error(`Failed to generate embedding: ${response.statusText}`);
       }
 
       const data = await response.json();
 
       if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-        throw new Error('Invalid embedding response format');
+        throw new Error("Invalid embedding response format");
       }
 
       const embedding = data.data[0].embedding;
 
       if (!Array.isArray(embedding)) {
-        throw new Error('Embedding is not an array');
+        throw new Error("Embedding is not an array");
       }
 
       return {
@@ -98,7 +104,7 @@ export class RAGService {
         model: this.embeddingModel,
       };
     } catch (error) {
-      console.error('Error generating embedding:', error);
+      console.error("Error generating embedding:", error);
       throw error;
     }
   }
@@ -107,12 +113,12 @@ export class RAGService {
    * Resolve LiteLLM endpoint URL
    */
   private resolveLiteLLMUrl(base: string): string {
-    const trimmed = base.replace(/\/+$/g, '');
+    const trimmed = base.replace(/\/+$/g, "");
 
-    if (trimmed.endsWith('/v1/embeddings')) {
+    if (trimmed.endsWith("/v1/embeddings")) {
       return trimmed;
     }
-    if (trimmed.endsWith('/v1')) {
+    if (trimmed.endsWith("/v1")) {
       return `${trimmed}/embeddings`;
     }
     return `${trimmed}/v1/embeddings`;
@@ -121,7 +127,10 @@ export class RAGService {
   /**
    * Store search query embedding
    */
-  async storeSearchEmbedding(userId: string, searchQuery: string): Promise<SearchEmbedding | null> {
+  async storeSearchEmbedding(
+    userId: string,
+    searchQuery: string,
+  ): Promise<SearchEmbedding | null> {
     try {
       const { embedding } = await this.generateEmbedding(searchQuery);
 
@@ -141,7 +150,7 @@ export class RAGService {
 
       return result[0] || null;
     } catch (error) {
-      console.error('Error storing search embedding:', error);
+      console.error("Error storing search embedding:", error);
       return null;
     }
   }
@@ -153,7 +162,7 @@ export class RAGService {
     presentationId: string,
     userId: string,
     iterationPrompt: string,
-    slides: Slide[]
+    slides: Slide[],
   ): Promise<PresentationEmbedding | null> {
     try {
       // Serialize presentation content for context
@@ -181,7 +190,7 @@ export class RAGService {
 
       return result[0] || null;
     } catch (error) {
-      console.error('Error storing presentation embedding:', error);
+      console.error("Error storing presentation embedding:", error);
       return null;
     }
   }
@@ -194,7 +203,7 @@ export class RAGService {
     presentationId: string,
     query: string,
     topK = 5,
-    similarityThreshold = 0.7
+    similarityThreshold = 0.7,
   ): Promise<SimilarContext[]> {
     try {
       const { embedding } = await this.generateEmbedding(query);
@@ -202,11 +211,11 @@ export class RAGService {
       // Calculate similarity distance (cosine distance is 1 - cosine similarity)
       const searchEmbed = sql<number>`1 - (${cosineDistance(
         searchEmbeddings.embedding,
-        embedding
+        embedding,
       )})`;
       const presentEmbed = sql<number>`1 - (${cosineDistance(
         presentationEmbeddings.embedding,
-        embedding
+        embedding,
       )})`;
 
       // Retrieve similar search embeddings
@@ -221,8 +230,8 @@ export class RAGService {
         .where(
           and(
             eq(searchEmbeddings.userId, userId),
-            sql`1 - (${cosineDistance(searchEmbeddings.embedding, embedding)}) > ${similarityThreshold}`
-          )
+            sql`1 - (${cosineDistance(searchEmbeddings.embedding, embedding)}) > ${similarityThreshold}`,
+          ),
         )
         .orderBy(desc(searchEmbed))
         .limit(Math.ceil(topK / 2));
@@ -240,19 +249,22 @@ export class RAGService {
           and(
             eq(presentationEmbeddings.userId, userId),
             eq(presentationEmbeddings.presentationId, presentationId),
-            sql`1 - (${cosineDistance(presentationEmbeddings.embedding, embedding)}) > ${similarityThreshold}`
-          )
+            sql`1 - (${cosineDistance(presentationEmbeddings.embedding, embedding)}) > ${similarityThreshold}`,
+          ),
         )
         .orderBy(desc(presentEmbed))
         .limit(Math.ceil(topK / 2));
 
       // Combine and sort by similarity
-      const allContexts: SimilarContext[] = [...similarSearches, ...similarPresentations];
+      const allContexts: SimilarContext[] = [
+        ...similarSearches,
+        ...similarPresentations,
+      ];
       allContexts.sort((a, b) => b.similarity - a.similarity);
 
       return allContexts.slice(0, topK);
     } catch (error) {
-      console.error('Error retrieving similar contexts:', error);
+      console.error("Error retrieving similar contexts:", error);
       return [];
     }
   }
@@ -263,10 +275,10 @@ export class RAGService {
   async storeRagContext(
     presentationId: string,
     userId: string,
-    sourceType: 'search' | 'iteration' | 'presentation',
+    sourceType: "search" | "iteration" | "presentation",
     retrievedContext: string,
     sourceId?: string,
-    similarityScore?: number
+    similarityScore?: number,
   ): Promise<RagContext | null> {
     try {
       const result = await db
@@ -286,7 +298,7 @@ export class RAGService {
 
       return result[0] || null;
     } catch (error) {
-      console.error('Error storing RAG context:', error);
+      console.error("Error storing RAG context:", error);
       return null;
     }
   }
@@ -294,7 +306,10 @@ export class RAGService {
   /**
    * Get all RAG contexts for a presentation
    */
-  async getPresentationRagContexts(presentationId: string, limit = 10): Promise<RagContext[]> {
+  async getPresentationRagContexts(
+    presentationId: string,
+    limit = 10,
+  ): Promise<RagContext[]> {
     try {
       return await db
         .select()
@@ -303,7 +318,7 @@ export class RAGService {
         .orderBy(desc(ragContext.createdAt))
         .limit(limit);
     } catch (error) {
-      console.error('Error retrieving RAG contexts:', error);
+      console.error("Error retrieving RAG contexts:", error);
       return [];
     }
   }
@@ -314,7 +329,7 @@ export class RAGService {
   async buildRagContextString(
     userId: string,
     presentationId: string,
-    query: string
+    query: string,
   ): Promise<string> {
     try {
       const similarContexts = await this.retrieveSimilarContexts(
@@ -322,23 +337,26 @@ export class RAGService {
         presentationId,
         query,
         5,
-        0.6
+        0.6,
       );
 
       if (similarContexts.length === 0) {
-        return '';
+        return "";
       }
 
       const contextLines = similarContexts.map((ctx, index) => {
-        const sourceLabel = ctx.sourceType === 'search' ? 'Previous Search' : 'Previous Iteration';
+        const sourceLabel =
+          ctx.sourceType === "search"
+            ? "Previous Search"
+            : "Previous Iteration";
         const similarity = (ctx.similarity * 100).toFixed(1);
         return `${index + 1}. ${sourceLabel} (${similarity}% similarity):\n${ctx.context}`;
       });
 
-      return `## RELEVANT PREVIOUS CONTEXTS:\n\n${contextLines.join('\n\n')}\n\n`;
+      return `## RELEVANT PREVIOUS CONTEXTS:\n\n${contextLines.join("\n\n")}\n\n`;
     } catch (error) {
-      console.error('Error building RAG context string:', error);
-      return '';
+      console.error("Error building RAG context string:", error);
+      return "";
     }
   }
 
@@ -355,9 +373,9 @@ export class RAGService {
         if (slide.notes) lines.push(`Notes: ${slide.notes}`);
         if (slide.type) lines.push(`Type: ${slide.type}`);
 
-        return lines.join('\n');
+        return lines.join("\n");
       })
-      .join('\n\n');
+      .join("\n\n");
   }
 
   /**
@@ -374,8 +392,8 @@ export class RAGService {
         .where(
           and(
             eq(searchEmbeddings.userId, userId),
-            sql`${searchEmbeddings.createdAt} < ${cutoffDate}`
-          )
+            sql`${searchEmbeddings.createdAt} < ${cutoffDate}`,
+          ),
         );
 
       // Delete old presentation embeddings
@@ -384,13 +402,13 @@ export class RAGService {
         .where(
           and(
             eq(presentationEmbeddings.userId, userId),
-            sql`${presentationEmbeddings.createdAt} < ${cutoffDate}`
-          )
+            sql`${presentationEmbeddings.createdAt} < ${cutoffDate}`,
+          ),
         );
 
       return result.rowCount || 0;
     } catch (error) {
-      console.error('Error cleaning up embeddings:', error);
+      console.error("Error cleaning up embeddings:", error);
       return 0;
     }
   }
