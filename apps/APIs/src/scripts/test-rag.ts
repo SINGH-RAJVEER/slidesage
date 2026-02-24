@@ -19,7 +19,7 @@ const TEST_CONFIG = {
   userId: `test-user-${Date.now()}`,
   presentationId: `test-pres-${Date.now()}`,
   litellmProxyBase: process.env.LITELLM_PROXY_BASE || 'http://localhost:4000',
-  embeddingModel: process.env.EMBEDDING_MODEL || 'text-embedding-3-small',
+  embeddingModel: process.env.EMBEDDING_MODEL || 'gemini/text-embedding-004',
 };
 
 // ANSI color codes for better output
@@ -122,9 +122,9 @@ async function testEmbeddingGeneration(): Promise<boolean> {
       info(`Model used: ${result.model}`);
       info(`Sample values: [${sampleValues.join(', ')}...]`);
 
-      // Verify dimension
-      if (dimension !== 1536) {
-        warning(`Expected dimension 1536 but got ${dimension}`);
+      // Verify dimension (Gemini text-embedding-004 uses 768 dimensions)
+      if (dimension !== 768) {
+        warning(`Expected dimension 768 but got ${dimension}`);
         warning('This may cause database insertion issues!');
       }
 

@@ -34,10 +34,10 @@ export class RAGService {
   private embeddingModel: string;
 
   constructor() {
-    this.embeddingModel = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+    this.embeddingModel = process.env.EMBEDDING_MODEL || 'gemini/text-embedding-004';
 
     if (!this.embeddingModel) {
-      console.warn('EMBEDDING_MODEL not set. Using default: text-embedding-3-small');
+      console.warn('EMBEDDING_MODEL not set. Using default: gemini/text-embedding-004');
     }
   }
 
@@ -55,6 +55,7 @@ export class RAGService {
         model: this.embeddingModel,
         input: text,
         encoding_format: 'float',
+        dimensions: 768, // Request 768 dimensions for Gemini embeddings
       };
 
       // Determine the proxy URL for LiteLLM

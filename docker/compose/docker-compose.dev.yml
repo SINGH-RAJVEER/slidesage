@@ -73,6 +73,7 @@ services:
       - ../../tsconfig.json:/app/tsconfig.json:ro
       - ../../apps/APIs:/app/apps/APIs
       - ../../packages/DB:/app/packages/DB
+      - ../../packages/contracts:/app/packages/contracts
       - root_node_modules:/app/node_modules
       - apis_node_modules:/app/apps/APIs/node_modules
       - bun_cache:/root/.bun
@@ -121,6 +122,7 @@ services:
       - ../../tsconfig.json:/app/tsconfig.json:ro
       - ../../apps/Web:/app/apps/Web
       - ../../packages/DB:/app/packages/DB
+      - ../../packages/contracts:/app/packages/contracts
       - root_node_modules:/app/node_modules
       - web_node_modules:/app/apps/Web/node_modules
       - bun_cache:/root/.bun

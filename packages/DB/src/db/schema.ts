@@ -160,7 +160,7 @@ export const searchEmbeddings = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     searchQuery: text('search_query').notNull(),
-    embedding: vector('embedding', { dimensions: 1536 }),
+    embedding: vector('embedding', { dimensions: 768 }),
     embeddingModel: varchar('embedding_model', { length: 100 }).notNull(),
     metadata: jsonb('metadata'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -189,7 +189,7 @@ export const presentationEmbeddings = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     iterationPrompt: text('iteration_prompt').notNull(),
     presentationContent: text('presentation_content'), // Serialized slides summary
-    embedding: vector('embedding', { dimensions: 1536 }),
+    embedding: vector('embedding', { dimensions: 768 }),
     embeddingModel: varchar('embedding_model', { length: 100 }).notNull(),
     metadata: jsonb('metadata'), // Can store slide count, theme, etc.
     createdAt: timestamp('created_at').notNull().defaultNow(),

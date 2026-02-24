@@ -19,7 +19,7 @@ The RAG system enhances the presentation generation and iteration process by:
 
 Core service for embedding management with the following responsibilities:
 
-- **Embedding Generation**: Uses Groq API to generate embeddings for text
+- **Embedding Generation**: Uses Gemini API via LiteLLM to generate embeddings for text
 - **Storage**: Persists embeddings to pgvector-enabled PostgreSQL
 - **Retrieval**: Performs similarity searches using cosine distance
 - **Context Building**: Converts retrieved embeddings into LLM-ready context strings
@@ -27,7 +27,7 @@ Core service for embedding management with the following responsibilities:
 **Key Methods:**
 
 ```typescript
-// Generate embeddings using Groq
+// Generate embeddings using Gemini via LiteLLM
 async generateEmbedding(text: string): Promise<EmbeddingResult>
 
 // Store search queries as embeddings
@@ -167,11 +167,14 @@ Three new tables are created to support RAG:
 
 ```bash
 # Embedding Model Configuration (via LiteLLM)
-EMBEDDING_MODEL=nomic-embed-text-v1.5
+EMBEDDING_MODEL=gemini/text-embedding-004
 
 # LiteLLM Configuration (required for embeddings)
 LITELLM_PROXY_BASE=http://localhost:4000
 LITELLM_API_KEY=optional_api_key
+
+# Gemini API Key (required for embeddings)
+GEMINI_API_KEY=your-gemini-api-key
 
 # Database URL (existing configuration)
 DATABASE_URL=postgresql://user:password@localhost:5432/slidesage
@@ -181,13 +184,13 @@ DATABASE_URL=postgresql://user:password@localhost:5432/slidesage
 
 The system uses LiteLLM to access embedding models. Supported models include:
 
-| Model                    | Dimensions | Provider | Recommendation                           |
-| ------------------------ | ---------- | -------- | ---------------------------------------- |
-| `nomic-embed-text-v1.5`  | 1536       | Groq     | Recommended (best quality-to-cost ratio) |
-| `text-embedding-3-small` | 1536       | OpenAI   | Alternative                              |
-| `text-embedding-3-large` | 3072       | OpenAI   | For higher precision                     |
+| Model                       | Dimensions | Provider | Recommendation                           |
+| --------------------------- | ---------- | -------- | ---------------------------------------- |
+| `gemini/text-embedding-004` | 768        | Google   | Recommended (default, high quality)      |
+| `nomic-embed-text-v1.5`     | 1536       | Groq     | Alternative (requires schema migration)  |
+| `text-embedding-3-small`    | 1536       | OpenAI   | Alternative (requires schema migration)  |
 
-**Note:** The available models depend on how your LiteLLM instance is configured. Update `EMBEDDING_MODEL` to use different models.
+**Note:** The default model is Gemini's text-embedding-004 with 768 dimensions. If you want to use models with different dimensions, you'll need to run the appropriate database migration to update the vector dimensions.
 
 ### Tunable Parameters
 
@@ -223,20 +226,20 @@ ON search_embeddings USING hnsw (embedding vector_cosine_ops);
 
 ### Storage Optimization
 
-**Vector dimensions**: 1536 (nomic-embed-text-v1.5)
+**Vector dimensions**: 768 (gemini/text-embedding-004)
 
-- 8 bytes per dimension (float64)
-- ~12 KB per embedding + metadata
-- 1M embeddings ≈ 12 GB
+- 4 bytes per dimension (float32)
+- ~3 KB per embedding + metadata
+- 1M embeddings ≈ 3 GB
 
 ### Scaling Recommendations
 
 | Users | Estimated Embeddings | Storage | Recommended Actions                     |
 | ----- | -------------------- | ------- | --------------------------------------- |
-| 100   | 20K                  | 250 MB  | No special action                       |
-| 1K    | 200K                 | 2.5 GB  | Set up cleanup job (30 days)            |
-| 10K   | 2M                   | 25 GB   | Archive old embeddings, partition table |
-| 100K  | 20M                  | 250 GB  | Implement sharding by user_id           |
+| 100   | 20K                  | 60 MB   | No special action                       |
+| 1K    | 200K                 | 600 MB  | Set up cleanup job (30 days)            |
+| 10K   | 2M                   | 6 GB    | Archive old embeddings, partition table |
+| 100K  | 20M                  | 60 GB   | Implement sharding by user_id           |
 
 ## Usage Examples
 
