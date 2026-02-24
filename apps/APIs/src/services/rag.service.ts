@@ -34,10 +34,10 @@ export class RAGService {
   private embeddingModel: string;
 
   constructor() {
-    this.embeddingModel = process.env.EMBEDDING_MODEL || 'nomic-embed-text-v1.5';
+    this.embeddingModel = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
 
     if (!this.embeddingModel) {
-      console.warn('EMBEDDING_MODEL not set. Using default: nomic-embed-text-v1.5');
+      console.warn('EMBEDDING_MODEL not set. Using default: text-embedding-3-small');
     }
   }
 

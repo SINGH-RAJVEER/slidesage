@@ -1,11 +1,11 @@
-import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/integrations/drizzle";
-import { db } from "@slide-sage/db";
-import { accounts, sessions, users, verifications } from "@slide-sage/db";
+import { db } from '@slide-sage/db';
+import { accounts, sessions, users, verifications } from '@slide-sage/db';
+import { betterAuth } from 'better-auth';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 
 const authClient = betterAuth({
   database: drizzleAdapter(db, {
-    provider: "pg",
+    provider: 'pg',
     schema: {
       user: users,
       account: accounts,
@@ -13,26 +13,29 @@ const authClient = betterAuth({
       verification: verifications,
     },
   }),
-  secret: process.env.AUTH_SECRET || "your-secret-key-change-in-production",
-  baseURL: process.env.AUTH_URL || "http://localhost:8000",
-  basePath: "/api/auth",
+  emailAndPassword: {
+    enabled: true,
+  },
+  secret: process.env.AUTH_SECRET || 'your-secret-key-change-in-production',
+  baseURL: process.env.AUTH_URL || 'http://localhost:8000',
+  basePath: '/api/auth',
   socialProviders: {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      redirectURL: `${process.env.AUTH_URL || "http://localhost:8000"}/api/auth/callback/google`,
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      redirectURL: `${process.env.AUTH_URL || 'http://localhost:8000'}/api/auth/callback/google`,
     },
     github: {
-      clientId: process.env.GITHUB_CLIENT_ID || "",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
-      redirectURL: `${process.env.AUTH_URL || "http://localhost:8000"}/api/auth/callback/github`,
+      clientId: process.env.GITHUB_CLIENT_ID || '',
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+      redirectURL: `${process.env.AUTH_URL || 'http://localhost:8000'}/api/auth/callback/github`,
     },
   },
   emailVerification: {
     sendVerificationEmail: async (user, url) => {
       // TODO: Implement email sending logic (sendgrid, resend, etc.)
-      console.log("Verification email would be sent to:", user.email);
-      console.log("Verification URL:", url);
+      console.log('Verification email would be sent to:', user.email);
+      console.log('Verification URL:', url);
     },
   },
   callbacks: {

@@ -1,10 +1,8 @@
-import { Hono } from "hono";
-import { toWebHandler } from "better-auth/hono";
-import authClient from "../services/auth";
+import { Hono } from 'hono';
+import authClient from '../services/auth';
 
 const authRoutes = new Hono();
 
-// Mount better-auth routes (handles /api/auth/signin, /api/auth/callback, etc.)
-authRoutes.all("/*", toWebHandler(authClient));
+authRoutes.all('/*', (c) => authClient.handler(c.req.raw));
 
 export default authRoutes;

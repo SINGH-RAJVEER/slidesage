@@ -1,14 +1,6 @@
-#!/usr/bin/env ts-node
-/**
- * RAG Service Testing and Examples
- *
- * This file demonstrates how to use the RAG service for embedding generation,
- * storage, and retrieval in the Slide Sage application.
- */
-
 import type { Slide } from '@slide-sage/contracts';
-import { PresentationService } from './src/services/presentation.service';
-import { RAGService } from './src/services/rag.service';
+import { PresentationService } from '../../src/services/presentation.service';
+import { RAGService } from '../../src/services/rag.service';
 
 /**
  * Example 1: Store and retrieve search embeddings
@@ -19,7 +11,6 @@ async function exampleSearchEmbeddings() {
   const ragService = new RAGService();
   const userId = 'user-123';
 
-  // Store multiple search queries
   const searches = [
     'How to implement machine learning in Node.js',
     'Best practices for scalable database design',
@@ -230,30 +221,21 @@ async function exampleCleanup() {
  * Run all examples
  */
 async function _runExamples() {
-  console.log('╔════════════════════════════════════════════════════╗');
-  console.log('║     RAG Service Examples and Testing Guide          ║');
-  console.log('╚════════════════════════════════════════════════════╝');
-
   try {
-    // Uncomment the examples you want to run:
+    await exampleSearchEmbeddings();
+    await examplePresentationEmbeddings();
+    await exampleRagContextBuilding();
+    await examplePresentationServiceIntegration();
+    await exampleCleanup();
 
-    // await exampleSearchEmbeddings();
-    // await examplePresentationEmbeddings();
-    // await exampleRagContextBuilding();
-    // await examplePresentationServiceIntegration();
-    // await exampleCleanup();
-
-    console.log('\n╔════════════════════════════════════════════════════╗');
-    console.log('║              Examples Complete                      ║');
-    console.log('╚════════════════════════════════════════════════════╝\n');
+    console.log('Examples Complete');
   } catch (error) {
-    console.error('Fatal error:', error);
+    console.error(error);
     process.exit(1);
   }
 }
 
-// Uncomment to run examples
-// runExamples().catch(console.error);
+_runExamples().catch(console.error);
 
 export {
   exampleSearchEmbeddings,

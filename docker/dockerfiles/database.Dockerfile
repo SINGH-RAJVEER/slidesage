@@ -1,1 +1,1 @@
-FROM postgres:16-alpine
+FROM pgvector/pgvector:pg16

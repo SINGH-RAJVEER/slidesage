@@ -9,12 +9,22 @@ model_list:
       model: groq/llama-3.3-70b-versatile
       api_key: os.environ/GROQ_API_KEY
 
+  - model_name: text-embedding-3-small
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_key: os.environ/OPENAI_API_KEY
+
 general_settings:
-  master_key: null # Dev: no auth
-  database_url: null # Dev: no database
+  master_key: null
+  database_url: null
 
 # Logging
 litellm_settings:
   drop_params: true
   success_callback: []
   failure_callback: []
+  mcp_semantic_tool_filter:
+    enabled: true
+    embedding_model: "text-embedding-3-small"
+    top_k: 5
+    similarity_threshold: 0.3

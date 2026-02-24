@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations } from 'drizzle-orm';
 import {
   boolean,
   date,
@@ -10,102 +10,102 @@ import {
   timestamp,
   varchar,
   vector,
-} from "drizzle-orm/pg-core";
+} from 'drizzle-orm/pg-core';
 
 // Users table - using better-auth for authentication
-export const users = pgTable("users", {
-  id: text("id").primaryKey(), // better-auth user ID
-  name: varchar("name", { length: 100 }),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  emailVerified: boolean("email_verified").notNull().default(false),
-  image: text("image"),
+export const users = pgTable('users', {
+  id: text('id').primaryKey(), // better-auth user ID
+  name: varchar('name', { length: 100 }),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  image: text('image'),
 
   // Custom fields for our application
-  slideTokens: real("slide_tokens").notNull().default(50.0),
-  isUnlimited: boolean("is_unlimited").notNull().default(false),
-  lastLoginDate: date("last_login_date", { mode: "date" }),
+  slideTokens: real('slide_tokens').notNull().default(50.0),
+  isUnlimited: boolean('is_unlimited').notNull().default(false),
+  lastLoginDate: date('last_login_date', { mode: 'date' }),
 
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at")
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at')
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
 // Accounts table - stores OAuth/external provider links
-export const accounts = pgTable("accounts", {
-  id: text("id")
+export const accounts = pgTable('accounts', {
+  id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  userId: text("user_id")
+  userId: text('user_id')
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  accountId: text("account_id").notNull(),
-  providerId: varchar("provider_id", { length: 100 }).notNull(),
-  accessToken: text("access_token"),
-  refreshToken: text("refresh_token"),
-  idToken: text("id_token"),
-  accessTokenExpiresAt: timestamp("access_token_expires_at"),
-  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
-  scope: text("scope"),
-  password: text("password"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at")
+    .references(() => users.id, { onDelete: 'cascade' }),
+  accountId: text('account_id').notNull(),
+  providerId: varchar('provider_id', { length: 100 }).notNull(),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at'),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at')
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
 // Sessions table - stores user sessions
-export const sessions = pgTable("sessions", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
+export const sessions = pgTable('sessions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  userAgent: text("user_agent"),
-  ipAddress: text("ip_address"),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at")
+    .references(() => users.id, { onDelete: 'cascade' }),
+  userAgent: text('user_agent'),
+  ipAddress: text('ip_address'),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at')
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
 // Verification tokens - for email verification, password resets, etc.
-export const verifications = pgTable("verifications", {
-  id: text("id")
+export const verifications = pgTable('verifications', {
+  id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  identifier: varchar("identifier", { length: 255 }).notNull(),
-  value: text("value").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at")
+  identifier: varchar('identifier', { length: 255 }).notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at')
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
 
 // Presentations table
-export const presentations = pgTable("presentations", {
-  id: text("id")
+export const presentations = pgTable('presentations', {
+  id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  userId: text("user_id")
+  userId: text('user_id')
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  title: varchar("title", { length: 255 }).notNull(),
-  prompt: text("prompt").notNull(),
-  slidesData: jsonb("slides_data").notNull(),
-  parentPresentationId: text("parent_presentation_id").references(
+    .references(() => users.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  prompt: text('prompt').notNull(),
+  slidesData: jsonb('slides_data').notNull(),
+  parentPresentationId: text('parent_presentation_id').references(
     // biome-ignore lint/suspicious/noExplicitAny: Drizzle circular reference
     (): any => presentations.id,
   ),
 
   // Timestamps
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at")
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at')
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
@@ -132,130 +132,125 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
   }),
 }));
 
-export const presentationsRelations = relations(
-  presentations,
-  ({ one, many }) => ({
-    user: one(users, {
-      fields: [presentations.userId],
-      references: [users.id],
-    }),
-    parentPresentation: one(presentations, {
-      fields: [presentations.parentPresentationId],
-      references: [presentations.id],
-      relationName: "iterations",
-    }),
-    iterations: many(presentations, {
-      relationName: "iterations",
-    }),
+export const presentationsRelations = relations(presentations, ({ one, many }) => ({
+  user: one(users, {
+    fields: [presentations.userId],
+    references: [users.id],
   }),
-);
+  parentPresentation: one(presentations, {
+    fields: [presentations.parentPresentationId],
+    references: [presentations.id],
+    relationName: 'iterations',
+  }),
+  iterations: many(presentations, {
+    relationName: 'iterations',
+  }),
+}));
 
 // RAG Embeddings Tables
 
 // Search embeddings - stores user search queries and their embeddings
 export const searchEmbeddings = pgTable(
-  "search_embeddings",
+  'search_embeddings',
   {
-    id: text("id")
+    id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    userId: text("user_id")
+    userId: text('user_id')
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    searchQuery: text("search_query").notNull(),
-    embedding: vector("embedding", { dimensions: 1536 }),
-    embeddingModel: varchar("embedding_model", { length: 100 }).notNull(),
-    metadata: jsonb("metadata"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+      .references(() => users.id, { onDelete: 'cascade' }),
+    searchQuery: text('search_query').notNull(),
+    embedding: vector('embedding', { dimensions: 1536 }),
+    embeddingModel: varchar('embedding_model', { length: 100 }).notNull(),
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => ({
-    userIdIdx: index("search_embeddings_user_id_idx").on(table.userId),
-    embeddingIdx: index("search_embeddings_embedding_idx").using("hnsw"),
+    userIdIdx: index('search_embeddings_user_id_idx').on(table.userId),
+    embeddingIdx: index('search_embeddings_embedding_idx').using(
+      'hnsw',
+      table.embedding.op('vector_cosine_ops'),
+    ),
   }),
 );
 
 // Presentation iteration embeddings - stores presentation content and iteration prompts
 export const presentationEmbeddings = pgTable(
-  "presentation_embeddings",
+  'presentation_embeddings',
   {
-    id: text("id")
+    id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    presentationId: text("presentation_id")
+    presentationId: text('presentation_id')
       .notNull()
-      .references(() => presentations.id, { onDelete: "cascade" }),
-    userId: text("user_id")
+      .references(() => presentations.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    iterationPrompt: text("iteration_prompt").notNull(),
-    presentationContent: text("presentation_content"), // Serialized slides summary
-    embedding: vector("embedding", { dimensions: 1536 }),
-    embeddingModel: varchar("embedding_model", { length: 100 }).notNull(),
-    metadata: jsonb("metadata"), // Can store slide count, theme, etc.
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+      .references(() => users.id, { onDelete: 'cascade' }),
+    iterationPrompt: text('iteration_prompt').notNull(),
+    presentationContent: text('presentation_content'), // Serialized slides summary
+    embedding: vector('embedding', { dimensions: 1536 }),
+    embeddingModel: varchar('embedding_model', { length: 100 }).notNull(),
+    metadata: jsonb('metadata'), // Can store slide count, theme, etc.
+    createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => ({
-    presentationIdIdx: index("presentation_embeddings_presentation_id_idx").on(
+    presentationIdIdx: index('presentation_embeddings_presentation_id_idx').on(
       table.presentationId,
     ),
-    userIdIdx: index("presentation_embeddings_user_id_idx").on(table.userId),
-    embeddingIdx: index("presentation_embeddings_embedding_idx").using("hnsw"),
+    userIdIdx: index('presentation_embeddings_user_id_idx').on(table.userId),
+    embeddingIdx: index('presentation_embeddings_embedding_idx').using(
+      'hnsw',
+      table.embedding.op('vector_cosine_ops'),
+    ),
   }),
 );
 
 // RAG context - stores retrieved contexts for presentations
 export const ragContext = pgTable(
-  "rag_context",
+  'rag_context',
   {
-    id: text("id")
+    id: text('id')
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    presentationId: text("presentation_id")
+    presentationId: text('presentation_id')
       .notNull()
-      .references(() => presentations.id, { onDelete: "cascade" }),
-    userId: text("user_id")
+      .references(() => presentations.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    sourceType: varchar("source_type", { length: 50 }).notNull(), // 'search' | 'iteration' | 'presentation'
-    sourceId: text("source_id"), // Reference to search_embeddings or presentation_embeddings
-    retrievedContext: text("retrieved_context").notNull(),
-    similarityScore: real("similarity_score"), // Cosine similarity score
-    metadata: jsonb("metadata"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sourceType: varchar('source_type', { length: 50 }).notNull(), // 'search' | 'iteration' | 'presentation'
+    sourceId: text('source_id'), // Reference to search_embeddings or presentation_embeddings
+    retrievedContext: text('retrieved_context').notNull(),
+    similarityScore: real('similarity_score'), // Cosine similarity score
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
   },
   (table) => ({
-    presentationIdIdx: index("rag_context_presentation_id_idx").on(
-      table.presentationId,
-    ),
-    userIdIdx: index("rag_context_user_id_idx").on(table.userId),
-    sourceTypeIdx: index("rag_context_source_type_idx").on(table.sourceType),
+    presentationIdIdx: index('rag_context_presentation_id_idx').on(table.presentationId),
+    userIdIdx: index('rag_context_user_id_idx').on(table.userId),
+    sourceTypeIdx: index('rag_context_source_type_idx').on(table.sourceType),
   }),
 );
 
 // Relations
-export const searchEmbeddingsRelations = relations(
-  searchEmbeddings,
-  ({ one }) => ({
-    user: one(users, {
-      fields: [searchEmbeddings.userId],
-      references: [users.id],
-    }),
+export const searchEmbeddingsRelations = relations(searchEmbeddings, ({ one }) => ({
+  user: one(users, {
+    fields: [searchEmbeddings.userId],
+    references: [users.id],
   }),
-);
+}));
 
-export const presentationEmbeddingsRelations = relations(
-  presentationEmbeddings,
-  ({ one }) => ({
-    presentation: one(presentations, {
-      fields: [presentationEmbeddings.presentationId],
-      references: [presentations.id],
-    }),
-    user: one(users, {
-      fields: [presentationEmbeddings.userId],
-      references: [users.id],
-    }),
+export const presentationEmbeddingsRelations = relations(presentationEmbeddings, ({ one }) => ({
+  presentation: one(presentations, {
+    fields: [presentationEmbeddings.presentationId],
+    references: [presentations.id],
   }),
-);
+  user: one(users, {
+    fields: [presentationEmbeddings.userId],
+    references: [users.id],
+  }),
+}));
 
 export const ragContextRelations = relations(ragContext, ({ one }) => ({
   presentation: one(presentations, {
@@ -282,7 +277,6 @@ export type NewPresentation = typeof presentations.$inferInsert;
 export type SearchEmbedding = typeof searchEmbeddings.$inferSelect;
 export type NewSearchEmbedding = typeof searchEmbeddings.$inferInsert;
 export type PresentationEmbedding = typeof presentationEmbeddings.$inferSelect;
-export type NewPresentationEmbedding =
-  typeof presentationEmbeddings.$inferInsert;
+export type NewPresentationEmbedding = typeof presentationEmbeddings.$inferInsert;
 export type RagContext = typeof ragContext.$inferSelect;
 export type NewRagContext = typeof ragContext.$inferInsert;
