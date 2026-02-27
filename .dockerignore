@@ -60,7 +60,7 @@ Thumbs.db
 
 # Docker (exclude docker files from docker context, except needed files)
 docker/compose/
-docker/nginx/
+nginx/
 Dockerfile*
 docker-compose*.yml
 .dockerignore.dev

@@ -98,10 +98,10 @@ docker compose -f docker/compose/docker-compose.prod.yml up
 
 ### 🚀 Getting Started
 
-| Document                                              | Description                           |
-| ----------------------------------------------------- | ------------------------------------- |
-| [**DEVELOPMENT_SETUP.md**](docs/DEVELOPMENT_SETUP.md) | Complete environment setup guide      |
-| [**CODE_STANDARDS.md**](docs/CODE_STANDARDS.md)       | Coding conventions and best practices |
+| Document                                              | Description                            |
+| ----------------------------------------------------- | -------------------------------------- |
+| [**DEVELOPMENT_SETUP.md**](docs/DEVELOPMENT_SETUP.md) | Complete environment setup guide       |
+| [**CODE_STANDARDS.md**](docs/CODE_STANDARDS.md)       | Coding conventions and best practices  |
 | [**AGENTS.md**](AGENTS.md)                            | AI agent behavior and shell guidelines |
 
 ### 🏗️ Architecture & Technology
@@ -211,7 +211,7 @@ slide-sage/
 │   │   ├── frontend.Dockerfile  # Web service
 │   │   ├── database.Dockerfile  # Database service
 │   │   └── litellm.Dockerfile   # LiteLLM proxy service
-│   └── nginx/           # Production reverse proxy config
+├── nginx/               # Production reverse proxy config
 ├── docs/                 # 📚 Documentation
 │   ├── API_OVERVIEW.md             # API standards and overview
 │   ├── AUTH_API.md                 # Authentication endpoints
@@ -325,6 +325,7 @@ CORS_ORIGINS=*
 ```
 
 **Key Configuration Notes:**
+
 - `LITELLM_BASE_URL`: Points to LiteLLM proxy service for unified LLM access
 - `EMBEDDING_MODEL`: Gemini text-embedding-004 (768 dimensions) for RAG
 - See [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) for embedding model migration details
@@ -340,7 +341,7 @@ CORS_ORIGINS=*
 - **pgvector Extension**: If RAG features fail, ensure PostgreSQL has pgvector installed
 - **Web API**: Verify `VITE_API_URL` matches APIs port (default: 8000)
 - **Authentication**: Check that `JWT_SECRET_KEY` and `BETTER_AUTH_SECRET` are set
-- **LiteLLM Issues**: 
+- **LiteLLM Issues**:
   - Verify LiteLLM service is running on port 4000
   - Check API keys in environment variables (GROQ_API_KEY, GEMINI_API_KEY)
   - Review [litellm_config.yaml](litellm_config.yaml) for model configuration
