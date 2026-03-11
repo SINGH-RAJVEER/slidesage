@@ -215,9 +215,3 @@ input.hide-number-spin[type="number"] {
 		transparent 100%
 	);
 }
-
-/* Clerk Development Mode Badge */
-.cl-developmentBadge {
-	@apply !bg-white/10 !text-white/80 !border !border-white/20 !backdrop-blur-md !shadow-lg font-medium;
-	text-transform: none;
-}

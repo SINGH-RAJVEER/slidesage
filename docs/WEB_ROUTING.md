@@ -6,8 +6,8 @@ The Web app (apps/Web) is a React SPA using React Router.
 
 Public:
 
-- `/sign-in/*` – Clerk sign-in flow
-- `/sign-up/*` – Clerk sign-up flow
+- `/sign-in/*` – sign-in flow
+- `/sign-up/*` – sign-up flow
 
 Protected (requires auth):
 

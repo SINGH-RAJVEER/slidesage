@@ -1,7 +1,7 @@
 import { Loader2, Maximize, Sparkles } from "lucide-react";
 import type React from "react";
 import { Button } from "@/components/ui/button";
-import DownloadPPTXButton from "./DownloadPPTXButton";
+import DownloadPPTXButton from "./DownloadPDFButton";
 import { SlideIntervalSelector } from "./SlideIntervalSelector";
 import TemplateSelector from "./TemplateSelector";
 

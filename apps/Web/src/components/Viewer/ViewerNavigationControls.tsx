@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { Button } from "@/components/ui/button";
-import DownloadPPTXButton from "@/components/Viewer/DownloadPPTXButton";
+import DownloadPPTXButton from "@/components/Viewer/DownloadPDFButton";
 
 interface ViewerNavigationControlsProps {
 	title: string;

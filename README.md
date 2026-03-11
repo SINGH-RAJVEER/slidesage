@@ -211,7 +211,7 @@ slide-sage/
 │   │   ├── frontend.Dockerfile  # Web service
 │   │   ├── database.Dockerfile  # Database service
 │   │   └── litellm.Dockerfile   # LiteLLM proxy service
-├── nginx/               # Production reverse proxy config
+│   └── nginx/            # Production reverse proxy config
 ├── docs/                 # 📚 Documentation
 │   ├── API_OVERVIEW.md             # API standards and overview
 │   ├── AUTH_API.md                 # Authentication endpoints

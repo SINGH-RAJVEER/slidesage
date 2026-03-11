@@ -1,7 +1,5 @@
 # Better Auth Setup Guide
 
-This guide covers the migration from Clerk to Better Auth with Google and GitHub OAuth.
-
 ## Environment Variables
 
 Add these to your `.env` file at the project root:
