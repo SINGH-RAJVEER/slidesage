@@ -1,66 +1,98 @@
-# Multi-stage build for optimized APIs image
-# Use Debian-based Bun image for better native-dependency compatibility.
-FROM oven/bun:1.3.6 AS base
+# syntax=docker/dockerfile:1.7
 
-# Install dependencies only when needed
-FROM base AS deps
+FROM oven/bun:1.3.6 AS base
 WORKDIR /app
 
-# Copy all package.json files and lockfile
+ENV BUN_INSTALL_CACHE_DIR=/root/.bun/install/cache
+
+FROM base AS workspace-manifests
+
 COPY package.json ./
 COPY bun.lock ./
-COPY apps/APIs/package.json ./apps/APIs/
-COPY packages/DB/package.json ./packages/DB/
-COPY packages/contracts/package.json ./packages/contracts/
+COPY tsconfig.json ./
+COPY turbo.json ./
 
-# Install dependencies with BuildKit cache mount for faster builds
-# Omit optional deps to keep Docker builds reliable.
-RUN --mount=type=cache,target=/root/.bun/install/cache bun install --no-save --omit=optional
+COPY apps/APIs/package.json ./apps/APIs/package.json
+COPY apps/Web/package.json ./apps/Web/package.json
+COPY packages/DB/package.json ./packages/DB/package.json
+COPY packages/contracts/package.json ./packages/contracts/package.json
 
-# Build the application
-FROM base AS builder
-WORKDIR /app
+FROM workspace-manifests AS install-dev
 
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/APIs/node_modules ./apps/APIs/node_modules
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+	bun install --frozen-lockfile --ignore-scripts
 
-# Copy source code
+FROM workspace-manifests AS install-prod
+
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+	bun install --frozen-lockfile --production --ignore-scripts
+
+FROM base AS source
+
+COPY package.json ./
+COPY bun.lock ./
+COPY tsconfig.json ./
+COPY turbo.json ./
+
 COPY apps/APIs ./apps/APIs
 COPY packages/DB ./packages/DB
 COPY packages/contracts ./packages/contracts
-COPY tsconfig.json ./
 
-# Production image (no build needed - Bun runs TypeScript directly)
-FROM oven/bun:1.3.6 AS runner
-WORKDIR /app
+FROM base AS development
 
-# Tools used by Docker/Compose healthchecks
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends wget \
-    && rm -rf /var/lib/apt/lists/*
+ARG NODE_ENV=development
 
-# Set production environment
-ARG NODE_ENV=production
-ENV NODE_ENV=production
+ENV NODE_ENV=${NODE_ENV}
 ENV PORT=8000
 
-# Copy application code and dependencies
-COPY --from=deps /app/apps/APIs/node_modules ./apps/APIs/node_modules
-COPY --from=builder /app/apps/APIs ./apps/APIs
-COPY --from=builder /app/packages/DB ./packages/DB
-COPY --from=builder /app/packages/contracts ./packages/contracts
-COPY --from=builder /app/apps/APIs/package.json ./apps/APIs/
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends wget bash \
+	&& rm -rf /var/lib/apt/lists/*
 
-# Expose port
+COPY --from=install-dev /app/node_modules ./node_modules
+COPY --from=install-dev /app/apps/APIs/node_modules ./apps/APIs/node_modules
+COPY --from=install-dev /app/packages/DB/node_modules ./packages/DB/node_modules
+COPY --from=install-dev /app/packages/contracts/node_modules ./packages/contracts/node_modules
+
+COPY --from=source /app/apps/APIs ./apps/APIs
+COPY --from=source /app/packages/DB ./packages/DB
+COPY --from=source /app/packages/contracts ./packages/contracts
+COPY docker/scripts/ensure-bun-workspace-install.sh /usr/local/bin/ensure-bun-workspace-install
+
+RUN chmod +x /usr/local/bin/ensure-bun-workspace-install
+
 EXPOSE 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
+	CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
 
-# Set working directory to APIs
+CMD ["bash", "-lc", "ensure-bun-workspace-install && cd /app/apps/APIs && bun run db:push && bun run dev"]
+
+FROM base AS production
+
+ARG NODE_ENV=production
+
+ENV NODE_ENV=${NODE_ENV}
+ENV PORT=8000
+
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends wget \
+	&& rm -rf /var/lib/apt/lists/*
+
+COPY --from=install-prod /app/node_modules ./node_modules
+COPY --from=install-prod /app/apps/APIs/node_modules ./apps/APIs/node_modules
+COPY --from=install-prod /app/packages/DB/node_modules ./packages/DB/node_modules
+COPY --from=install-prod /app/packages/contracts/node_modules ./packages/contracts/node_modules
+
+COPY --from=source /app/apps/APIs ./apps/APIs
+COPY --from=source /app/packages/DB ./packages/DB
+COPY --from=source /app/packages/contracts ./packages/contracts
+
 WORKDIR /app/apps/APIs
 
-# Run migrations and start server
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+	CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
+
 CMD ["sh", "-c", "set -e; bun run db:push; bun run start"]

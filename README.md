@@ -81,22 +81,22 @@ docker compose -f docker/compose/docker-compose.prod.yml up
 
 ---
 
-## 📋 Key Features
+## Key Features
 
-- **🤖 AI Generation**: Comprehensive slide decks from simple prompts using LLMs via LiteLLM
-- **🧠 RAG Integration**: Retrieval Augmented Generation with pgvector for context-aware iterations
-- **📊 Smart Charts**: Automatic data visualizations (Bar, Line, Pie, etc.)
+- **AI Generation**: Comprehensive slide decks from simple prompts using LLMs via LiteLLM
+- **RAG Integration**: Retrieval Augmented Generation with pgvector for context-aware iterations
+- **Smart Charts**: Automatic data visualizations (Bar, Line, Pie, etc.)
 - **⚡ Real-time Streaming**: Watch presentations build via Server-Sent Events
-- **🎨 Professional Templates**: Multiple themes (Modern Dark, Corporate Blue, Minimalist)
-- **🔐 Secure Authentication**: Email/password or Google OAuth via Better Auth
-- **🔍 Semantic Search**: Gemini-powered embeddings for intelligent content retrieval
-- **📄 Export Support**: Download presentations as editable PPTX files
+- **Professional Templates**: Multiple themes (Modern Dark, Corporate Blue, Minimalist)
+- **Secure Authentication**: Email/password or Google OAuth via Better Auth
+- **Semantic Search**: Gemini-powered embeddings for intelligent content retrieval
+- **Export Support**: Download presentations as editable PPTX files
 
 ---
 
-## 📚 Documentation
+## Documentation
 
-### 🚀 Getting Started
+### Getting Started
 
 | Document                                              | Description                            |
 | ----------------------------------------------------- | -------------------------------------- |
@@ -104,7 +104,7 @@ docker compose -f docker/compose/docker-compose.prod.yml up
 | [**CODE_STANDARDS.md**](docs/CODE_STANDARDS.md)       | Coding conventions and best practices  |
 | [**AGENTS.md**](AGENTS.md)                            | AI agent behavior and shell guidelines |
 
-### 🏗️ Architecture & Technology
+### Architecture & Technology
 
 | Document                                                | Description                                 |
 | ------------------------------------------------------- | ------------------------------------------- |
@@ -114,7 +114,7 @@ docker compose -f docker/compose/docker-compose.prod.yml up
 | [**REQUEST_FLOWS.md**](docs/REQUEST_FLOWS.md)           | Request flow diagrams and sequences         |
 | [**RAG_IMPLEMENTATION.md**](docs/RAG_IMPLEMENTATION.md) | Retrieval Augmented Generation details      |
 
-### 🔌 API Documentation
+### API Documentation
 
 | Document                                              | Description                                       |
 | ----------------------------------------------------- | ------------------------------------------------- |
@@ -123,7 +123,7 @@ docker compose -f docker/compose/docker-compose.prod.yml up
 | [**PRESENTATIONS_API.md**](docs/PRESENTATIONS_API.md) | Presentation CRUD and AI generation endpoints     |
 | [**BETTER_AUTH_SETUP.md**](docs/BETTER_AUTH_SETUP.md) | Better Auth configuration and integration         |
 
-### 💻 Development Workflows
+### Development Workflows
 
 | Document                                                      | Description                                   |
 | ------------------------------------------------------------- | --------------------------------------------- |
@@ -195,14 +195,14 @@ slide-sage/
 │           ├── routes/    # Route components
 │           ├── contexts/  # React contexts
 │           └── hooks/     # Custom hooks
-├── packages/               # 📦 Shared packages
+├── packages/               # Shared packages
 │   ├── contracts/         # Shared TypeScript contracts/types
 │   └── DB/               # Database schemas and repositories
 │       ├── db/           # Database connection and setup
 │       ├── repositories/ # Data access layer
 │       ├── services/     # Database-related services
 │       └── types/        # Database types
-├── docker/                # 🐳 Docker configuration
+├── docker/                # Docker configuration
 │   ├── compose/          # Docker Compose files
 │   │   ├── docker-compose.dev.yml  # Development configuration
 │   │   └── docker-compose.prod.yml # Production configuration
@@ -212,7 +212,7 @@ slide-sage/
 │   │   ├── database.Dockerfile  # Database service
 │   │   └── litellm.Dockerfile   # LiteLLM proxy service
 │   └── nginx/            # Production reverse proxy config
-├── docs/                 # 📚 Documentation
+├── docs/                 # Documentation
 │   ├── API_OVERVIEW.md             # API standards and overview
 │   ├── AUTH_API.md                 # Authentication endpoints
 │   ├── PRESENTATIONS_API.md        # Presentation endpoints
