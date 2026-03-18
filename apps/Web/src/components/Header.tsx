@@ -15,6 +15,23 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const getUserInitials = () => {
+    const trimmedName = user?.name?.trim();
+
+    if (trimmedName) {
+      const nameParts = trimmedName.split(/\s+/);
+      const firstInitial = nameParts[0]?.charAt(0) ?? "";
+      const lastInitial =
+        nameParts.length > 1
+          ? (nameParts[nameParts.length - 1]?.charAt(0) ?? "")
+          : "";
+
+      return `${firstInitial}${lastInitial}`.toUpperCase() || "U";
+    }
+
+    return user?.email?.charAt(0)?.toUpperCase() || "U";
+  };
+
   const isAuthPage =
     location.pathname === ROUTES.signIn ||
     location.pathname === ROUTES.signUp ||
@@ -98,9 +115,17 @@ export default function Header() {
               <DropdownMenu>
                 <DropdownMenuTrigger className="focus:outline-none rounded-full ring-offset-black focus:ring-2 focus:ring-white/20 transition-all">
                   <div className="h-10 w-10 overflow-hidden rounded-full border border-white/20 bg-white/10 transition-colors hover:border-white/40 flex items-center justify-center shadow-sm">
-                    <span className="text-base font-semibold text-white/90 uppercase flex-shrink-0">
-                      {user.email?.charAt(0) || "U"}
-                    </span>
+                    {user.image ? (
+                      <img
+                        src={user.image}
+                        alt="Profile"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-base font-semibold text-white/90 uppercase flex-shrink-0">
+                        {getUserInitials()}
+                      </span>
+                    )}
                   </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
