@@ -1,34 +1,24 @@
 import { db } from "@slide-sage/db";
-import { sessions, users } from "@slide-sage/db";
+import { users } from "@slide-sage/db";
 import { eq } from "drizzle-orm";
 import type { Context } from "hono";
-import { getCookie } from "hono/cookie";
+import authClient from "../services/auth";
 
-/**
- * Extract session from cookies and verify it
- */
+// Extract session from cookies and verify it
 async function getSessionFromCookie(
   c: Context,
 ): Promise<{ userId: string; sessionId: string } | null> {
-  const sessionCookie = getCookie(c, "better-auth.session_token");
+  const sessionData = await authClient.api.getSession({
+    headers: c.req.raw.headers,
+  });
 
-  if (!sessionCookie) {
+  if (!sessionData?.session || !sessionData?.user) {
     return null;
   }
 
-  const [session] = await db
-    .select()
-    .from(sessions)
-    .where(eq(sessions.token, sessionCookie))
-    .limit(1);
-
-  if (!session || new Date(session.expiresAt) < new Date()) {
-    return null; // Session expired
-  }
-
   return {
-    userId: session.userId,
-    sessionId: session.id,
+    userId: sessionData.user.id,
+    sessionId: sessionData.session.id,
   };
 }
 
@@ -39,7 +29,7 @@ async function getSessionFromCookie(
 export async function authMiddleware(
   c: Context,
   next: () => Promise<void>,
-): Promise<void> {
+): Promise<Response | undefined> {
   const auth = await getSessionFromCookie(c);
 
   if (!auth) {
@@ -82,7 +72,7 @@ export function getCurrentSessionId(c: Context): string {
 export async function ensureUserInDbMiddleware(
   c: Context,
   next: () => Promise<void>,
-): Promise<void> {
+): Promise<Response | undefined> {
   const userId = getCurrentUserId(c);
 
   const user = await db

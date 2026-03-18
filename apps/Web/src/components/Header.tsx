@@ -2,6 +2,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/router/paths";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function Header() {
   const { user, signOut } = useAuth();
@@ -31,8 +38,9 @@ export default function Header() {
 
   return (
     <header className="border-b border-white/10 bg-black/10">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 md:px-6">
-        <div className="flex items-center gap-4">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3 md:px-6">
+        {/* Left Side: Logo */}
+        <div className="flex items-center w-1/3">
           <Link to={ROUTES.home} aria-label="Go to home">
             <img
               src="/icon.png"
@@ -40,8 +48,11 @@ export default function Header() {
               className="h-10 w-auto object-contain"
             />
           </Link>
+        </div>
 
-          {!isAuthPage && (
+        {/* Center: Tabs */}
+        {!isAuthPage ? (
+          <div className="flex-1 flex justify-center w-1/3">
             <nav className="flex items-center gap-1">
               <Link
                 to={ROUTES.generate}
@@ -66,40 +77,57 @@ export default function Header() {
                 Presentations
               </Link>
             </nav>
+          </div>
+        ) : (
+          <div className="flex-1 w-1/3"></div>
+        )}
+
+        {/* Right Side: Profile / Points */}
+        <div className="flex items-center justify-end w-1/3 gap-3">
+          {user && (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate(ROUTES.purchase)}
+                className="rounded-full border border-white/10 px-4 py-1.5 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20"
+                title="Click to purchase more points"
+              >
+                {user.slideTokens === Infinity
+                  ? "∞ points"
+                  : `${user.slideTokens?.toFixed(1) ?? "0.0"} points`}
+              </button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger className="focus:outline-none rounded-full ring-offset-black focus:ring-2 focus:ring-white/20 transition-all">
+                  <div className="h-9 w-9 overflow-hidden rounded-full border border-white/20 bg-white/10 transition-colors hover:border-white/40 flex items-center justify-center shadow-sm">
+                    <span className="text-sm font-semibold text-white/90 uppercase flex-shrink-0">
+                      {user.email?.charAt(0) || "U"}
+                    </span>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-zinc-950/95 backdrop-blur-md border border-white/10 text-white shadow-xl rounded-xl p-1.5">
+                  <div className="px-2 py-2">
+                    <p className="text-xs font-medium text-white/60 uppercase tracking-wider mb-1">Signed in as</p>
+                    <p className="font-normal text-white/90 text-sm truncate">{user.email}</p>
+                  </div>
+                  <DropdownMenuSeparator className="bg-white/10 my-1" />
+                  <DropdownMenuItem asChild className="p-0 rounded-lg overflow-hidden cursor-pointer">
+                    <Link to={ROUTES.profile} className="block w-full px-2 py-2 text-sm text-white/90 hover:bg-white/10 transition-colors outline-none focus:bg-white/10">
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10 my-1" />
+                  <DropdownMenuItem 
+                    onClick={() => signOut()}
+                    className="cursor-pointer px-2 py-2 text-sm rounded-lg text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors focus:bg-red-500/10 outline-none"
+                  >
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           )}
         </div>
-
-        {user && (
-          <div className="flex items-center gap-2 md:gap-3">
-            <button
-              type="button"
-              onClick={() => navigate(ROUTES.purchase)}
-              className="rounded-md border border-white/10 px-3 py-2 text-sm text-white/90 transition-colors hover:bg-white/5"
-              title="Click to purchase more points"
-            >
-              {user.slideTokens === Infinity
-                ? "∞ points"
-                : `${user.slideTokens?.toFixed(1) ?? "0.0"} points`}
-            </button>
-
-            <span className="hidden text-sm text-white/70 lg:block">
-              {user.email}
-            </span>
-            <Link
-              to={ROUTES.profile}
-              className="rounded-md px-3 py-2 text-sm text-white/90 transition-colors hover:bg-white/10"
-            >
-              Profile
-            </Link>
-            <button
-              type="button"
-              onClick={() => signOut()}
-              className="rounded-md px-3 py-2 text-sm text-white/90 transition-colors hover:bg-white/10"
-            >
-              Sign Out
-            </button>
-          </div>
-        )}
       </div>
     </header>
   );

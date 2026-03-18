@@ -1,5 +1,5 @@
 import type React from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 interface User {
   id: string;
@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshSession = async () => {
+  const refreshSession = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/get-session", {
         credentials: "include",
@@ -55,7 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       console.error("Failed to fetch session:", error);
       setUser(null);
     }
-  };
+  }, []);
 
   // Fetch current user session on mount
   useEffect(() => {
@@ -68,7 +68,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     };
 
     fetchSession();
-  }, []);
+  }, [refreshSession]);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      void refreshSession();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [refreshSession]);
 
   const signOut = async () => {
     try {

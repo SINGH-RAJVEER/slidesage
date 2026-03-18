@@ -11,6 +11,8 @@ Authentication endpoints for SlideSage. The APIs use better-auth with cookie-bas
 
 - Successful sign-in sets the HTTP-only `better-auth.session_token` cookie.
 - Clients must send cookies with requests.
+- Protected API routes validate the current user through Better Auth session resolution (same source used by `GET /api/auth/get-session`).
+- Web app session state is refreshed on initial load and when the browser window regains focus.
 
 ```bash
 # fetch example
