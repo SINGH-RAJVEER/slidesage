@@ -1,7 +1,7 @@
-import { db } from "@slide-sage/db";
-import { users } from "@slide-sage/db";
-import { eq } from "drizzle-orm";
-import { createHash } from "node:crypto";
+import { db } from '@slide-sage/db';
+import { users } from '@slide-sage/db';
+import { eq } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 
 /**
  * Hash password using SHA-256
@@ -9,9 +9,9 @@ import { createHash } from "node:crypto";
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -19,14 +19,10 @@ async function hashPassword(password: string): Promise<string> {
  */
 export async function getUserProfile(userId: string) {
   try {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
     if (!user) {
-      return { success: false, error: "User not found" };
+      return { success: false, error: 'User not found' };
     }
 
     return {
@@ -43,10 +39,10 @@ export async function getUserProfile(userId: string) {
       },
     };
   } catch (error) {
-    console.error("Get profile error:", error);
+    console.error('Get profile error:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to get profile",
+      error: error instanceof Error ? error.message : 'Failed to get profile',
     };
   }
 }
@@ -61,7 +57,7 @@ export async function updateUserProfile(
     email?: string;
     currentPassword?: string;
     newPassword?: string;
-  },
+  }
 ): Promise<{
   success: boolean;
   error?: string;
@@ -73,7 +69,7 @@ export async function updateUserProfile(
     });
 
     if (!user) {
-      return { success: false, error: "User not found" };
+      return { success: false, error: 'User not found' };
     }
 
     // Prepare updates
@@ -90,7 +86,7 @@ export async function updateUserProfile(
       });
 
       if (existingUser && existingUser.id !== userId) {
-        return { success: false, error: "Email already in use" };
+        return { success: false, error: 'Email already in use' };
       }
 
       updates.email = data.email.toLowerCase();
@@ -100,7 +96,7 @@ export async function updateUserProfile(
       if (!data.currentPassword) {
         return {
           success: false,
-          error: "Current password required to change password",
+          error: 'Current password required to change password',
         };
       }
 
@@ -112,18 +108,14 @@ export async function updateUserProfile(
     }
 
     if (Object.keys(updates).length === 0) {
-      return { success: false, error: "No updates provided" };
+      return { success: false, error: 'No updates provided' };
     }
 
     // Update user
-    const result = await db
-      .update(users)
-      .set(updates)
-      .where(eq(users.id, userId))
-      .returning();
+    const result = await db.update(users).set(updates).where(eq(users.id, userId)).returning();
 
     if (!result || result.length === 0) {
-      return { success: false, error: "Failed to update profile" };
+      return { success: false, error: 'Failed to update profile' };
     }
 
     const updatedUser = result[0];
@@ -139,11 +131,10 @@ export async function updateUserProfile(
       },
     };
   } catch (error) {
-    console.error("Update profile error:", error);
+    console.error('Update profile error:', error);
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : "Failed to update profile",
+      error: error instanceof Error ? error.message : 'Failed to update profile',
     };
   }
 }
@@ -153,7 +144,7 @@ export async function updateUserProfile(
  */
 export async function updateUserAvatar(
   userId: string,
-  imageUrl: string,
+  imageUrl: string
 ): Promise<{
   success: boolean;
   error?: string;
@@ -161,7 +152,7 @@ export async function updateUserAvatar(
 }> {
   try {
     if (!imageUrl || !imageUrl.trim()) {
-      return { success: false, error: "Image URL is required" };
+      return { success: false, error: 'Image URL is required' };
     }
 
     const result = await db
@@ -171,7 +162,7 @@ export async function updateUserAvatar(
       .returning();
 
     if (!result || result.length === 0) {
-      return { success: false, error: "Failed to update avatar" };
+      return { success: false, error: 'Failed to update avatar' };
     }
 
     const updatedUser = result[0];
@@ -184,10 +175,10 @@ export async function updateUserAvatar(
       },
     };
   } catch (error) {
-    console.error("Update avatar error:", error);
+    console.error('Update avatar error:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to update avatar",
+      error: error instanceof Error ? error.message : 'Failed to update avatar',
     };
   }
 }

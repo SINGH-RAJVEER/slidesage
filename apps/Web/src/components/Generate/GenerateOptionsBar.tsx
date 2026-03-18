@@ -35,9 +35,9 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
   onCustomSlideCountChange,
 }) => {
   return (
-    <div className="absolute top-0 right-0 left-0 -mt-14 flex items-center justify-center px-4">
-      <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg border border-white/10 bg-black/20 px-4 py-3">
-        <div className="flex items-center gap-2">
+    <div className="mb-2 w-full flex items-center justify-center">
+      <div className="w-fit flex flex-nowrap items-center justify-center gap-3 rounded-lg border border-white/10 bg-black/20 px-4 py-3 whitespace-nowrap overflow-x-auto custom-scrollbar">
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             type="button"
             variant="ghost"

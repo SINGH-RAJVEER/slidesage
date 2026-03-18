@@ -1,35 +1,28 @@
-import { Hono, type Context } from "hono";
-import { db } from "@slide-sage/db";
-import { accounts, users } from "@slide-sage/db";
-import { hashPassword as hashBetterAuthPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
-import authClient from "../services/auth";
+import { Hono, type Context } from 'hono';
+import { db } from '@slide-sage/db';
+import { accounts, users } from '@slide-sage/db';
+import { hashPassword as hashBetterAuthPassword } from 'better-auth/crypto';
+import { and, eq } from 'drizzle-orm';
+import authClient from '../services/auth';
 import {
   resendVerificationCode,
   signUpWithEmail,
   verifyEmailCode,
-} from "../services/email-auth.service";
+} from '../services/email-auth.service';
 
 const authRoutes = new Hono();
 
-async function attachSessionCookie(
-  c: Context,
-  email: string,
-  password: string,
-): Promise<void> {
-  const signInUrl = `${process.env.AUTH_URL || "http://localhost:8000"}/api/auth/sign-in/email`;
+async function attachSessionCookie(c: Context, email: string, password: string): Promise<void> {
+  const signInUrl = `${process.env.AUTH_URL || 'http://localhost:8000'}/api/auth/sign-in/email`;
   const signInResponse = await fetch(signInUrl, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "content-type": "application/json",
-      origin:
-        c.req.header("origin") ||
-        process.env.AUTH_URL ||
-        "http://localhost:8000",
-      "user-agent": c.req.header("user-agent") || "slide-sage-server",
-      "x-forwarded-for": c.req.header("x-forwarded-for") || "127.0.0.1",
-      "x-forwarded-proto": c.req.header("x-forwarded-proto") || "http",
-      "x-forwarded-host": c.req.header("x-forwarded-host") || "localhost",
+      'content-type': 'application/json',
+      origin: c.req.header('origin') || process.env.AUTH_URL || 'http://localhost:8000',
+      'user-agent': c.req.header('user-agent') || 'slide-sage-server',
+      'x-forwarded-for': c.req.header('x-forwarded-for') || '127.0.0.1',
+      'x-forwarded-proto': c.req.header('x-forwarded-proto') || 'http',
+      'x-forwarded-host': c.req.header('x-forwarded-host') || 'localhost',
     },
     body: JSON.stringify({
       email,
@@ -38,23 +31,23 @@ async function attachSessionCookie(
     }),
   });
 
-  const setCookie = signInResponse.headers.get("set-cookie");
+  const setCookie = signInResponse.headers.get('set-cookie');
 
   if (setCookie) {
-    c.header("set-cookie", setCookie, { append: true });
+    c.header('set-cookie', setCookie, { append: true });
   }
 }
 
 async function hashLegacyPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 // Custom endpoints for email verification flow
-authRoutes.post("/signup/email", async (c) => {
+authRoutes.post('/signup/email', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { email, password, name } = body;
 
@@ -62,10 +55,10 @@ authRoutes.post("/signup/email", async (c) => {
     return c.json(
       {
         error: {
-          message: "Email, password, and name are required",
+          message: 'Email, password, and name are required',
         },
       },
-      400,
+      400
     );
   }
 
@@ -76,10 +69,10 @@ authRoutes.post("/signup/email", async (c) => {
     return c.json(
       {
         error: {
-          message: result.error || "Sign up failed",
+          message: result.error || 'Sign up failed',
         },
       },
-      400,
+      400
     );
   }
 
@@ -88,15 +81,15 @@ authRoutes.post("/signup/email", async (c) => {
   return c.json(
     {
       success: true,
-      message: "Account created. Verification code sent to email.",
+      message: 'Account created. Verification code sent to email.',
       userId: result.userId,
     },
-    201,
+    201
   );
 });
 
 // Verify email code endpoint
-authRoutes.post("/verify-code", async (c) => {
+authRoutes.post('/verify-code', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { email, code, password } = body;
 
@@ -104,10 +97,10 @@ authRoutes.post("/verify-code", async (c) => {
     return c.json(
       {
         error: {
-          message: "Email and code are required",
+          message: 'Email and code are required',
         },
       },
-      400,
+      400
     );
   }
 
@@ -118,26 +111,26 @@ authRoutes.post("/verify-code", async (c) => {
     return c.json(
       {
         error: {
-          message: result.error || "Verification failed",
+          message: result.error || 'Verification failed',
         },
       },
-      400,
+      400
     );
   }
 
-  if (typeof password === "string" && password.length > 0) {
+  if (typeof password === 'string' && password.length > 0) {
     await attachSessionCookie(c, normalizedEmail, password);
   }
 
   return c.json({
     success: true,
-    message: "Email verified successfully",
+    message: 'Email verified successfully',
     user: result.user,
   });
 });
 
 // Resend verification code endpoint
-authRoutes.post("/resend-code", async (c) => {
+authRoutes.post('/resend-code', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { email } = body;
 
@@ -145,10 +138,10 @@ authRoutes.post("/resend-code", async (c) => {
     return c.json(
       {
         error: {
-          message: "Email is required",
+          message: 'Email is required',
         },
       },
-      400,
+      400
     );
   }
 
@@ -158,25 +151,25 @@ authRoutes.post("/resend-code", async (c) => {
     return c.json(
       {
         error: {
-          message: result.error || "Failed to resend code",
+          message: result.error || 'Failed to resend code',
         },
       },
-      400,
+      400
     );
   }
 
   return c.json({
     success: true,
-    message: "Verification code sent",
+    message: 'Verification code sent',
   });
 });
 
 // Compatibility shim for legacy accounts created before provider/password format fix.
-authRoutes.post("/sign-in/email", async (c) => {
+authRoutes.post('/sign-in/email', async (c) => {
   const parsedRequest = c.req.raw.clone();
   const body = await parsedRequest.json().catch(() => ({}));
-  const email = typeof body.email === "string" ? body.email : "";
-  const password = typeof body.password === "string" ? body.password : "";
+  const email = typeof body.email === 'string' ? body.email : '';
+  const password = typeof body.password === 'string' ? body.password : '';
 
   if (!email || !password) {
     return authClient.handler(c.req.raw);
@@ -188,18 +181,12 @@ authRoutes.post("/sign-in/email", async (c) => {
 
   if (user) {
     const credentialAccount = await db.query.accounts.findFirst({
-      where: and(
-        eq(accounts.userId, user.id),
-        eq(accounts.providerId, "credential"),
-      ),
+      where: and(eq(accounts.userId, user.id), eq(accounts.providerId, 'credential')),
     });
 
     if (!credentialAccount) {
       const legacyAccount = await db.query.accounts.findFirst({
-        where: and(
-          eq(accounts.userId, user.id),
-          eq(accounts.providerId, "email"),
-        ),
+        where: and(eq(accounts.userId, user.id), eq(accounts.providerId, 'email')),
       });
 
       if (legacyAccount?.password) {
@@ -209,7 +196,7 @@ authRoutes.post("/sign-in/email", async (c) => {
           await db
             .update(accounts)
             .set({
-              providerId: "credential",
+              providerId: 'credential',
               accountId: user.id,
               password: compatibleHash,
             })
@@ -223,6 +210,6 @@ authRoutes.post("/sign-in/email", async (c) => {
 });
 
 // All other auth routes handled by better-auth
-authRoutes.all("/*", (c) => authClient.handler(c.req.raw));
+authRoutes.all('/*', (c) => authClient.handler(c.req.raw));
 
 export default authRoutes;

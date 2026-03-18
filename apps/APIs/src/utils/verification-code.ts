@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
 // Generate a random 6-digit verification code
 export function generateVerificationCode(): string {
@@ -7,7 +7,7 @@ export function generateVerificationCode(): string {
 
 // Hash a verification code using SHA-256
 export function hashVerificationCode(code: string): string {
-  return createHash("sha256").update(code).digest("hex");
+  return createHash('sha256').update(code).digest('hex');
 }
 
 // Verify that a code matches its hash

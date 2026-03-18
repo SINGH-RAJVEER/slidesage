@@ -328,11 +328,6 @@ export default function PresentationsGridPage() {
         </div>
       </div>
 
-      {/* Floating Add Button */}
-      <CreatePresentationButton
-        onCreateClick={() => navigate(ROUTES.generate)}
-      />
-
       <Dialog
         open={!!presentationToDelete}
         onOpenChange={(open) => !open && setPresentationToDelete(null)}

@@ -1,24 +1,17 @@
-import { Hono } from "hono";
-import {
-  authMiddleware,
-  getCurrentUserId,
-} from "../middleware/auth.middleware";
-import {
-  getUserProfile,
-  updateUserProfile,
-  updateUserAvatar,
-} from "../services/profile.service";
+import { Hono } from 'hono';
+import { authMiddleware, getCurrentUserId } from '../middleware/auth.middleware';
+import { getUserProfile, updateUserProfile, updateUserAvatar } from '../services/profile.service';
 
 const profileRoutes = new Hono();
 
 // All profile routes require authentication
-profileRoutes.use("*", authMiddleware);
+profileRoutes.use('*', authMiddleware);
 
 /**
  * GET /api/profile
  * Get current user's profile
  */
-profileRoutes.get("/", async (c) => {
+profileRoutes.get('/', async (c) => {
   try {
     const userId = getCurrentUserId(c);
     const result = await getUserProfile(userId);
@@ -29,8 +22,8 @@ profileRoutes.get("/", async (c) => {
 
     return c.json({ user: result.user });
   } catch (error) {
-    console.error("Profile route error:", error);
-    return c.json({ error: { message: "Internal server error" } }, 500);
+    console.error('Profile route error:', error);
+    return c.json({ error: { message: 'Internal server error' } }, 500);
   }
 });
 
@@ -38,7 +31,7 @@ profileRoutes.get("/", async (c) => {
  * PUT /api/profile
  * Update user profile (name, email, password)
  */
-profileRoutes.put("/", async (c) => {
+profileRoutes.put('/', async (c) => {
   try {
     const userId = getCurrentUserId(c);
     const body = await c.req.json().catch(() => ({}));
@@ -46,7 +39,7 @@ profileRoutes.put("/", async (c) => {
     const { name, email, currentPassword, newPassword } = body;
 
     if (!name && !email && !newPassword) {
-      return c.json({ error: { message: "Nothing to update" } }, 400);
+      return c.json({ error: { message: 'Nothing to update' } }, 400);
     }
 
     const result = await updateUserProfile(userId, {
@@ -62,8 +55,8 @@ profileRoutes.put("/", async (c) => {
 
     return c.json({ user: result.user });
   } catch (error) {
-    console.error("Update profile error:", error);
-    return c.json({ error: { message: "Internal server error" } }, 500);
+    console.error('Update profile error:', error);
+    return c.json({ error: { message: 'Internal server error' } }, 500);
   }
 });
 
@@ -71,7 +64,7 @@ profileRoutes.put("/", async (c) => {
  * POST /api/profile/avatar
  * Update user's profile avatar/image
  */
-profileRoutes.post("/avatar", async (c) => {
+profileRoutes.post('/avatar', async (c) => {
   try {
     const userId = getCurrentUserId(c);
     const body = await c.req.json().catch(() => ({}));
@@ -79,7 +72,7 @@ profileRoutes.post("/avatar", async (c) => {
     const { imageUrl } = body;
 
     if (!imageUrl) {
-      return c.json({ error: { message: "Image URL is required" } }, 400);
+      return c.json({ error: { message: 'Image URL is required' } }, 400);
     }
 
     const result = await updateUserAvatar(userId, imageUrl);
@@ -90,8 +83,8 @@ profileRoutes.post("/avatar", async (c) => {
 
     return c.json({ user: result.user });
   } catch (error) {
-    console.error("Update avatar error:", error);
-    return c.json({ error: { message: "Internal server error" } }, 500);
+    console.error('Update avatar error:', error);
+    return c.json({ error: { message: 'Internal server error' } }, 500);
   }
 });
 

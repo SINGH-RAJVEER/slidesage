@@ -24,29 +24,59 @@ export default function GeneratePPTPage() {
     resetStreaming();
   }, [resetStreaming]);
 
-  // Navigate to viewer when first slide arrives
   useEffect(() => {
     if (streamingState.slides.length >= 1 && loading) {
       setLoading(false);
       navigate(ROUTES.presentation, {
-        state: {
-          isStreaming: true,
-        },
+        state: { isStreaming: true },
       });
     }
   }, [streamingState.slides.length, loading, navigate]);
 
-  // Handle streaming errors
   useEffect(() => {
     if (streamingState.error) {
       setError(streamingState.error);
       setLoading(false);
     }
   }, [streamingState.error]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key.toLowerCase() === "f" &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        document.activeElement?.tagName !== "INPUT" &&
+        document.activeElement?.tagName !== "TEXTAREA"
+      ) {
+        e.preventDefault();
+        const input = document.getElementById("prompt");
+        if (input) {
+          input.focus();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && prompt.trim()) {
+    if (e.key === "Enter") {
       e.preventDefault();
-      if (!topics.includes(prompt.trim())) {
+      
+      if (e.shiftKey) {
+        if (prompt.trim() && !topics.includes(prompt.trim())) {
+          setTopics([...topics, prompt.trim()]);
+        }
+        if (topics.length > 0 || prompt.trim()) {
+          setTimeout(() => handleGenerate(), 0);
+        }
+        return;
+      }
+      
+      if (prompt.trim() && !topics.includes(prompt.trim())) {
         setTopics([...topics, prompt.trim()]);
       }
       setPrompt("");
@@ -55,6 +85,12 @@ export default function GeneratePPTPage() {
 
   const handleRemoveTopic = (topicToRemove: string) => {
     setTopics(topics.filter((topic) => topic !== topicToRemove));
+  };
+
+  const handleAddTopic = (topicToAdd: string) => {
+    if (!topics.includes(topicToAdd)) {
+      setTopics([...topics, topicToAdd]);
+    }
   };
 
   const handleEditTopic = (index: number, value: string) => {
@@ -67,7 +103,6 @@ export default function GeneratePPTPage() {
     setLoading(true);
     setError("");
 
-    // Get the slide count (either from preset or custom)
     const count =
       slideCountMode === "preset"
         ? parseInt(slideCount, 10)
@@ -103,7 +138,6 @@ export default function GeneratePPTPage() {
     leading: true,
   });
 
-  // Calculate estimated token usage based on selections
   const calculateEstimatedTokens = () => {
     const count =
       slideCountMode === "preset"
@@ -131,43 +165,49 @@ export default function GeneratePPTPage() {
       tonalityMultiplier = 1.1;
     }
 
-    const estimatedTokens = count * baseTokenPerSlide * tonalityMultiplier;
-    return estimatedTokens;
+    return count * baseTokenPerSlide * tonalityMultiplier;
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-transparent flex flex-col">
+    <div className="flex flex-col min-h-screen w-full overflow-x-hidden bg-transparent">
       <Header />
-      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8">
-        <div className="w-full max-w-4xl relative">
-          <GenerateOptionsBar
-            detailLevel={detailLevel}
-            tonality={tonality}
-            useWebResearch={useWebResearch}
-            slideCountMode={slideCountMode}
-            slideCount={slideCount}
-            customSlideCount={customSlideCount}
-            onDetailLevelChange={setDetailLevel}
-            onTonalityChange={setTonality}
-            onUseWebResearchChange={setUseWebResearch}
-            onSlideCountModeChange={setSlideCountMode}
-            onSlideCountChange={setSlideCount}
-            onCustomSlideCountChange={setCustomSlideCount}
-          />
-          <GenerateForm
-            prompt={prompt}
-            topics={topics}
-            loading={loading}
-            error={error}
-            estimatedTokens={calculateEstimatedTokens()}
-            onPromptChange={setPrompt}
-            onKeyDown={handleKeyDown}
-            onRemoveTopic={handleRemoveTopic}
-            onEditTopic={handleEditTopic}
-            onGenerate={handleGenerate}
-          />
-        </div>
+      
+      <div className="w-full flex items-center justify-center px-4 pt-6 md:pt-8">
+        <GenerateOptionsBar
+          detailLevel={detailLevel}
+          tonality={tonality}
+          useWebResearch={useWebResearch}
+          slideCountMode={slideCountMode}
+          slideCount={slideCount}
+          customSlideCount={customSlideCount}
+          onDetailLevelChange={setDetailLevel}
+          onTonalityChange={setTonality}
+          onUseWebResearchChange={setUseWebResearch}
+          onSlideCountModeChange={setSlideCountMode}
+          onSlideCountChange={setSlideCount}
+          onCustomSlideCountChange={setCustomSlideCount}
+        />
       </div>
+
+      <main className="flex-1 w-full flex items-center justify-center px-4 md:px-8 pb-12 overflow-y-auto">
+        <div className="w-full max-w-5xl max-h-full">
+          <div className="mx-auto w-full max-w-4xl flex flex-col items-center justify-center">
+            <GenerateForm
+              prompt={prompt}
+              topics={topics}
+              loading={loading}
+              error={error}
+              estimatedTokens={calculateEstimatedTokens()}
+              onPromptChange={setPrompt}
+              onKeyDown={handleKeyDown}
+              onRemoveTopic={handleRemoveTopic}
+              onEditTopic={handleEditTopic}
+              onAddTopic={handleAddTopic}
+              onGenerate={handleGenerate}
+            />
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

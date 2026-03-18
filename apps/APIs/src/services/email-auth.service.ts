@@ -1,21 +1,21 @@
-import { db } from "@slide-sage/db";
-import { accounts, users, verifications } from "@slide-sage/db";
-import { hashPassword as hashBetterAuthPassword } from "better-auth/crypto";
-import { eq } from "drizzle-orm";
+import { db } from '@slide-sage/db';
+import { accounts, users, verifications } from '@slide-sage/db';
+import { hashPassword as hashBetterAuthPassword } from 'better-auth/crypto';
+import { eq } from 'drizzle-orm';
 import {
   generateVerificationCode,
   getCodeExpirationTime,
   hashVerificationCode,
   isCodeExpired,
   verifyCode,
-} from "../utils/verification-code";
-import { sendVerificationEmail } from "./email.service";
+} from '../utils/verification-code';
+import { sendVerificationEmail } from './email.service';
 
 // Sign up a new user to create an unverified user account and send verification code
 export async function signUpWithEmail(
   email: string,
   password: string,
-  name: string,
+  name: string
 ): Promise<{
   success: boolean;
   error?: string;
@@ -27,7 +27,7 @@ export async function signUpWithEmail(
     });
 
     if (existingUser) {
-      return { success: false, error: "Email already registered" };
+      return { success: false, error: 'Email already registered' };
     }
 
     const userId = crypto.randomUUID();
@@ -45,7 +45,7 @@ export async function signUpWithEmail(
       id: accountId,
       userId,
       accountId: userId,
-      providerId: "credential",
+      providerId: 'credential',
       password: hashedPassword,
     });
 
@@ -64,17 +64,17 @@ export async function signUpWithEmail(
     // Send verification email
     const emailResult = await sendVerificationEmail(email, code, name);
     if (!emailResult.success)
-      console.error("Failed to send verification email:", emailResult.error);
+      console.error('Failed to send verification email:', emailResult.error);
 
     return {
       success: true,
       userId,
     };
   } catch (error) {
-    console.error("Sign up error:", error);
+    console.error('Sign up error:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Sign up failed",
+      error: error instanceof Error ? error.message : 'Sign up failed',
     };
   }
 }
@@ -82,7 +82,7 @@ export async function signUpWithEmail(
 // Verify email
 export async function verifyEmailCode(
   email: string,
-  code: string,
+  code: string
 ): Promise<{
   success: boolean;
   error?: string;
@@ -94,20 +94,18 @@ export async function verifyEmailCode(
     });
 
     if (!verification) {
-      return { success: false, error: "No verification code found" };
+      return { success: false, error: 'No verification code found' };
     }
 
     // Check if expired
     if (isCodeExpired(verification.expiresAt)) {
-      await db
-        .delete(verifications)
-        .where(eq(verifications.id, verification.id));
-      return { success: false, error: "Verification code expired" };
+      await db.delete(verifications).where(eq(verifications.id, verification.id));
+      return { success: false, error: 'Verification code expired' };
     }
 
     // Verify code
     if (!verifyCode(code, verification.value)) {
-      return { success: false, error: "Invalid verification code" };
+      return { success: false, error: 'Invalid verification code' };
     }
 
     // Mark user as verified
@@ -118,7 +116,7 @@ export async function verifyEmailCode(
       .returning();
 
     if (!result || result.length === 0) {
-      return { success: false, error: "User not found" };
+      return { success: false, error: 'User not found' };
     }
 
     // Delete verification code
@@ -129,10 +127,10 @@ export async function verifyEmailCode(
       user: result[0],
     };
   } catch (error) {
-    console.error("Email verification error:", error);
+    console.error('Email verification error:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Verification failed",
+      error: error instanceof Error ? error.message : 'Verification failed',
     };
   }
 }
@@ -148,7 +146,7 @@ export async function resendVerificationCode(email: string): Promise<{
     });
 
     if (!user) {
-      return { success: false, error: "User not found" };
+      return { success: false, error: 'User not found' };
     }
 
     // Delete existing code if any
@@ -167,24 +165,20 @@ export async function resendVerificationCode(email: string): Promise<{
     });
 
     // Send email
-    const emailResult = await sendVerificationEmail(
-      email,
-      code,
-      user.name || "",
-    );
+    const emailResult = await sendVerificationEmail(email, code, user.name || '');
     if (!emailResult.success) {
       return {
         success: false,
-        error: emailResult.error || "Failed to send verification email",
+        error: emailResult.error || 'Failed to send verification email',
       };
     }
 
     return { success: true };
   } catch (error) {
-    console.error("Resend code error:", error);
+    console.error('Resend code error:', error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to resend code",
+      error: error instanceof Error ? error.message : 'Failed to resend code',
     };
   }
 }

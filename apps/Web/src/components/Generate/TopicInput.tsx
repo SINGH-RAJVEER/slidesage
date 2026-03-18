@@ -22,10 +22,10 @@ export const TopicInput: React.FC<TopicInputProps> = ({
   disabled,
 }) => {
   return (
-    <div className="space-y-8">
-      {topics.length > 0 && (
-        <div className="flex flex-wrap gap-2 justify-center">
-          {topics.map((topic, index) => (
+    <div className="relative w-full flex flex-col items-center justify-center">
+      <div className="absolute bottom-[calc(100%+2rem)] left-0 right-0 max-h-[30vh] overflow-y-auto custom-scrollbar flex flex-wrap gap-2 justify-center">
+        {topics.length > 0 && (
+          topics.map((topic, index) => (
             <div
               key={`${index}-${topic}`}
               className="group flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-white/90 transition-colors hover:bg-white/10"
@@ -48,10 +48,11 @@ export const TopicInput: React.FC<TopicInputProps> = ({
                 aria-label={`Topic ${index + 1}`}
               />
             </div>
-          ))}
-        </div>
-      )}
-      <div className="relative mx-auto max-w-xl">
+          ))
+        )}
+      </div>
+
+      <div className="w-full relative mx-auto max-w-xl">
         <Input
           id="prompt"
           placeholder={
@@ -68,9 +69,17 @@ export const TopicInput: React.FC<TopicInputProps> = ({
         />
       </div>
 
-      <p className="text-center text-sm text-white/45">
-        Press <span className="text-white/50">Enter</span> to add a topic
-      </p>
+      {topics.length === 0 && !prompt.trim() && (
+        <p className="absolute top-[calc(100%+2rem)] text-center text-sm text-white/45 w-full">
+          Press <span className="text-white/50">Enter</span> to add a topic
+        </p>
+      )}
+
+      {(topics.length > 0 || prompt.trim()) && (
+        <p className="absolute top-[calc(100%+2rem)] text-center text-sm text-white/45 w-full">
+          Press <span className="text-white/50">Shift + Enter</span> to generate
+        </p>
+      )}
     </div>
   );
 };
