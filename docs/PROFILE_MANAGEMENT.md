@@ -22,16 +22,16 @@ Retrieve current user's profile information.
 
 ```json
 {
-    "user": {
-        "id": "user-id",
-        "name": "John Doe",
-        "email": "john@example.com",
-        "image": "https://example.com/avatar.jpg",
-        "emailVerified": true,
-        "slideTokens": 50.0,
-        "isUnlimited": false,
-        "createdAt": "2026-02-26T00:00:00Z"
-    }
+  "user": {
+    "id": "user-id",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "image": "https://example.com/avatar.jpg",
+    "emailVerified": true,
+    "slideTokens": 50.0,
+    "isUnlimited": false,
+    "createdAt": "2026-02-26T00:00:00Z"
+  }
 }
 ```
 
@@ -43,10 +43,10 @@ Update user profile (name, email, or password).
 
 ```json
 {
-    "name": "Jane Doe",
-    "email": "jane@example.com",
-    "currentPassword": "OldPassword123",
-    "newPassword": "NewPassword123"
+  "name": "Jane Doe",
+  "email": "jane@example.com",
+  "currentPassword": "OldPassword123",
+  "newPassword": "NewPassword123"
 }
 ```
 
@@ -60,13 +60,13 @@ Update user profile (name, email, or password).
 
 ```json
 {
-    "user": {
-        "id": "user-id",
-        "name": "Jane Doe",
-        "email": "jane@example.com",
-        "image": "https://example.com/avatar.jpg",
-        "emailVerified": true
-    }
+  "user": {
+    "id": "user-id",
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "image": "https://example.com/avatar.jpg",
+    "emailVerified": true
+  }
 }
 ```
 
@@ -78,7 +78,7 @@ Update user's profile picture.
 
 ```json
 {
-    "imageUrl": "https://example.com/new-avatar.jpg"
+  "imageUrl": "https://example.com/new-avatar.jpg"
 }
 ```
 
@@ -86,10 +86,10 @@ Update user's profile picture.
 
 ```json
 {
-    "user": {
-        "id": "user-id",
-        "image": "https://example.com/new-avatar.jpg"
-    }
+  "user": {
+    "id": "user-id",
+    "image": "https://example.com/new-avatar.jpg"
+  }
 }
 ```
 
@@ -100,6 +100,7 @@ Update user's profile picture.
 - **Route:** `/profile`
 - **Access:** Authenticated users only
 - **Navigation:** Profile button in header (next to Sign Out)
+- **Avatar fallback:** Header avatar shows initials from first and last name when `image` is not set
 
 ## Authentication Notes
 

@@ -4,68 +4,99 @@ import { describe, expect, it, mock } from "bun:test";
 import { render } from "@testing-library/react";
 import { BrowserRouter, MemoryRouter } from "react-router-dom";
 
+const mockAuthState = {
+  user: null,
+  loading: false,
+  isSignedIn: false,
+  signOut: () => Promise.resolve(),
+};
+
 mock.module("@/contexts/AuthContext", () => {
-	return {
-		useAuth: () => ({
-			user: null,
-			loading: false,
-			isSignedIn: false,
-			signOut: () => Promise.resolve(),
-		}),
-		AuthProvider: ({ children }: { children: React.ReactNode }) => children,
-	};
+  return {
+    useAuth: () => mockAuthState,
+    AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  };
 });
 
 describe("Header", () => {
-	it("renders header component", async () => {
-		// Import after mocking AuthContext.
-		const { default: Header } = await import("../../components/Header");
+  it("renders header component", async () => {
+    mockAuthState.user = null;
 
-		const { container } = render(
-			<BrowserRouter>
-				<Header />
-			</BrowserRouter>,
-		);
+    // Import after mocking AuthContext.
+    const { default: Header } = await import("../../components/Header");
 
-		// Header should be present
-		const header = container.querySelector("header");
-		expect(header).toBeInTheDocument();
-	});
+    const { container } = render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>,
+    );
 
-	it("hides navigation tabs on auth pages", async () => {
-		// Import after mocking AuthContext.
-		const { default: Header } = await import("../../components/Header");
+    // Header should be present
+    const header = container.querySelector("header");
+    expect(header).toBeInTheDocument();
+  });
 
-		const { queryByText } = render(
-			<MemoryRouter initialEntries={["/sign-in"]}>
-				<Header />
-			</MemoryRouter>,
-		);
+  it("hides navigation tabs on auth pages", async () => {
+    mockAuthState.user = null;
 
-		expect(queryByText("Generate")).toBeNull();
-		expect(queryByText("Presentations")).toBeNull();
-	});
+    // Import after mocking AuthContext.
+    const { default: Header } = await import("../../components/Header");
 
-	it("hides navigation tabs on nested auth pages", async () => {
-		// Import after mocking AuthContext.
-		const { default: Header } = await import("../../components/Header");
+    const { queryByText } = render(
+      <MemoryRouter initialEntries={["/sign-in"]}>
+        <Header />
+      </MemoryRouter>,
+    );
 
-		const { queryByText, rerender } = render(
-			<MemoryRouter initialEntries={["/sign-in/sso-callback"]}>
-				<Header />
-			</MemoryRouter>,
-		);
+    expect(queryByText("Generate")).toBeNull();
+    expect(queryByText("Presentations")).toBeNull();
+  });
 
-		expect(queryByText("Generate")).toBeNull();
-		expect(queryByText("Presentations")).toBeNull();
+  it("hides navigation tabs on nested auth pages", async () => {
+    mockAuthState.user = null;
 
-		rerender(
-			<MemoryRouter initialEntries={["/sign-up/verify-email"]}>
-				<Header />
-			</MemoryRouter>,
-		);
+    // Import after mocking AuthContext.
+    const { default: Header } = await import("../../components/Header");
 
-		expect(queryByText("Generate")).toBeNull();
-		expect(queryByText("Presentations")).toBeNull();
-	});
+    const { queryByText, rerender } = render(
+      <MemoryRouter initialEntries={["/sign-in/sso-callback"]}>
+        <Header />
+      </MemoryRouter>,
+    );
+
+    expect(queryByText("Generate")).toBeNull();
+    expect(queryByText("Presentations")).toBeNull();
+
+    rerender(
+      <MemoryRouter initialEntries={["/sign-up/verify-email"]}>
+        <Header />
+      </MemoryRouter>,
+    );
+
+    expect(queryByText("Generate")).toBeNull();
+    expect(queryByText("Presentations")).toBeNull();
+  });
+
+  it("shows first and last name initials when image is missing", async () => {
+    mockAuthState.user = {
+      id: "user_1",
+      name: "Rajveer Singh",
+      email: "rajveer@example.com",
+      image: null,
+      emailVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      slideTokens: 10,
+    };
+
+    const { default: Header } = await import("../../components/Header");
+
+    const { getByText } = render(
+      <BrowserRouter>
+        <Header />
+      </BrowserRouter>,
+    );
+
+    expect(getByText("RS")).toBeInTheDocument();
+  });
 });
