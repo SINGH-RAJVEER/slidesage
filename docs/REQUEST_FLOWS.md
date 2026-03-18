@@ -1,34 +1,50 @@
 # Request Flows
 
-Detailed request flow diagrams for SlideSage application endpoints.
+Request flow diagrams for key SlideSage endpoints.
 
-## User Registration Flow
+## Email Sign-up and Verification Flow
 
 ```mermaid
 sequenceDiagram
     participant Client as Client
     participant Hono as Hono Router
-    participant Auth as Auth Service
-    participant UserRepo as User Repository
+    participant EmailAuth as EmailAuthService
     participant DB as PostgreSQL
+    participant Email as Email Provider
 
-    Client->>Hono: POST /api/auth/register
+    Client->>Hono: POST /api/auth/signup/email
     Note over Client,Hono: { email, name, password }
 
-    Hono->>Auth: validateEmail()
-    Auth->>Auth: checkDuplicate()
+    Hono->>EmailAuth: signUpWithEmail()
+    EmailAuth->>DB: INSERT users, accounts, verifications
+    EmailAuth->>Email: Send verification code
+    Hono->>Client: 201 Created + { userId }
 
-    UserRepo->>Auth: findByEmail()
-    DB->>UserRepo: SELECT * FROM users WHERE email = ?
-    UserRepo->>Auth: null (email available)
+    Client->>Hono: POST /api/auth/verify-code
+    Note over Client,Hono: { email, code }
 
-    Auth->>UserRepo: hashPassword()
-    UserRepo->>DB: INSERT INTO users (email, name, password_hash, ...)
-    DB->>UserRepo: User record created
-    UserRepo->>Auth: User object
+    Hono->>EmailAuth: verifyEmailCode()
+    EmailAuth->>DB: UPDATE users.emailVerified
+    EmailAuth->>DB: DELETE verifications
+    Hono->>Client: 200 OK + { success: true }
+```
 
-    Auth->>Hono: generateJWT()
-    Hono->>Client: 201 Created + JWT tokens
+## Email Sign-in Flow
+
+```mermaid
+sequenceDiagram
+    participant Client as Client
+    participant Hono as Hono Router
+    participant Auth as better-auth
+    participant DB as PostgreSQL
+
+    Client->>Hono: POST /api/auth/sign-in/email
+    Note over Client,Hono: { email, password }
+
+    Hono->>Auth: verify credentials
+    Auth->>DB: Read accounts, create session
+    Auth->>Hono: Set-Cookie (session)
+    Hono->>Client: 200 OK
 ```
 
 ## Presentation Generation Flow (SSE)
@@ -37,42 +53,30 @@ sequenceDiagram
 sequenceDiagram
     participant Client as Client
     participant Hono as Hono + Auth
-    participant PresService as Presentation Service
-    participant AI as AI Service
+    participant PresService as PresentationService
+    participant AI as AIService
     participant Stream as Stream Processor
-    participant PresRepo as Presentation Repository
+    participant PresRepo as PresentationRepository
     participant DB as PostgreSQL
 
     Client->>Hono: POST /api/generate-presentation-stream
-    Note over Client,Hono: + Authorization: Bearer <token>
+    Note over Client,Hono: Cookie: better-auth.session_token
     Note over Client,Hono: { topic, slide_count, detail_level, tonality }
 
-    Hono->>Hono: Verify JWT token
-    Hono->>PresService: generatePresentation()
+    Hono->>Hono: Validate session cookie
+    Hono->>PresService: generatePresentationStream()
 
-    PresService->>PresService: checkUserTokens()
-    PresService->>PresService: deductTokens()
-
-    PresService->>AI: buildPrompt()
-    AI->>AI: callLLMAPI(streaming=true)
+    PresService->>AI: call LLM (streaming)
 
     loop Stream Processing
         AI->>Stream: parseChunk()
-        Stream->>Stream: extractTheme()
         Stream->>Client: SSE: event:theme
-
-        Stream->>Stream: extractSlide()
         Stream->>Client: SSE: event:slide
     end
 
-    AI->>Stream: generationComplete()
     Stream->>Client: SSE: event:complete
-
-    PresService->>PresRepo: savePresentation()
-    PresRepo->>DB: INSERT INTO presentations (...)
-    DB->>PresRepo: Presentation saved
-
-    PresService->>Client: SSE: event:saved
+    PresRepo->>DB: INSERT presentations
+    Hono->>Client: SSE: event:saved
 ```
 
 ## Get Presentations Flow
@@ -81,58 +85,35 @@ sequenceDiagram
 sequenceDiagram
     participant Client as Client
     participant Hono as Hono + Auth
-    participant PresService as Presentation Service
-    participant PresRepo as Presentation Repository
+    participant PresService as PresentationService
+    participant PresRepo as PresentationRepository
     participant DB as PostgreSQL
 
     Client->>Hono: GET /api/presentations
-    Note over Client,Hono: + Authorization: Bearer <token>
+    Note over Client,Hono: Cookie: better-auth.session_token
 
-    Hono->>Hono: Verify JWT
+    Hono->>Hono: Validate session cookie
     Hono->>PresService: getUserPresentations(userId)
-
     PresService->>PresRepo: findByUserId(userId)
-    PresRepo->>DB: SELECT * FROM presentations WHERE user_id = ? ORDER BY created_at DESC
-    DB->>PresRepo: Array of presentations
-    PresRepo->>PresService: Presentations data
-    PresService->>Hono: Transform to JSON
+    PresRepo->>DB: SELECT presentations by user_id
     Hono->>Client: 200 OK + { presentations: [...] }
 ```
 
-## Google OAuth Flow
+## OAuth Flow (Google or GitHub)
 
 ```mermaid
 sequenceDiagram
     participant Client as Client
-    participant Google as Google OAuth
+    participant Provider as OAuth Provider
     participant Hono as Hono Router
-    participant Auth as Auth Service
-    participant UserRepo as User Repository
+    participant Auth as better-auth
     participant DB as PostgreSQL
 
-    Client->>Google: Google Sign-In
-    Google->>Client: OAuth token
-
-    Client->>Hono: POST /api/auth/google
-    Note over Client,Hono: { credential: "google_oauth_token" }
-
-    Hono->>Auth: verifyGoogleToken()
-    Auth->>Google: Verify token
-    Google->>Auth: User profile data
-
-    Auth->>UserRepo: findByEmail()
-    DB->>UserRepo: SELECT * FROM users WHERE email = ?
-
-    alt User exists
-        UserRepo->>Auth: Existing user
-    else New user
-        UserRepo->>DB: INSERT INTO users (email, name, profile_picture_url, ...)
-        DB->>UserRepo: New user created
-        UserRepo->>Auth: New user
-    end
-
-    Auth->>Hono: generateJWT()
-    Hono->>Client: 200 OK + JWT tokens + user data
+    Client->>Hono: GET /api/auth/callback/google?callbackURL=...
+    Hono->>Provider: OAuth redirect
+    Provider->>Auth: OAuth callback
+    Auth->>DB: Upsert account + session
+    Auth->>Client: Set-Cookie + redirect to callbackURL
 ```
 
 ## Database Schema Relationships
@@ -140,79 +121,48 @@ sequenceDiagram
 ```mermaid
 erDiagram
     users {
-        integer id PK
+        string id PK
         string email UK
         string name
-        string password_hash
+        boolean email_verified
         float slide_tokens
-        string profile_picture_url
+        boolean is_unlimited
         timestamp created_at
         timestamp updated_at
     }
 
+    accounts {
+        string id PK
+        string user_id FK
+        string provider_id
+        string account_id
+    }
+
+    sessions {
+        string id PK
+        string user_id FK
+        timestamp expires_at
+    }
+
+    verifications {
+        string id PK
+        string identifier
+        timestamp expires_at
+    }
+
     presentations {
-        integer id PK
-        integer user_id FK
+        string id PK
+        string user_id FK
         string title
-        integer slide_count
+        string prompt
         jsonb slides_data
-        string theme
-        integer tokens_used
         timestamp created_at
         timestamp updated_at
     }
 
     users ||--o{ presentations : "has many"
+    users ||--o{ accounts : "has many"
+    users ||--o{ sessions : "has many"
 ```
-
-## Error Handling Flow
-
-```mermaid
-sequenceDiagram
-    participant Client as Client
-    participant Hono as Hono Router
-    participant Middleware as Error Middleware
-    participant Service as Service Layer
-    participant Repo as Repository
-
-    Client->>Hono: Request
-
-    Hono->>Service: processRequest()
-
-    alt Business Logic Error
-        Service->>Service: validateData()
-        Service->>Middleware: BusinessError("Invalid input")
-        Middleware->>Middleware: mapToHTTPStatus(400)
-        Middleware->>Client: 400 Bad Request
-    else Database Error
-        Service->>Repo: databaseOperation()
-        Repo->>Service: DatabaseError("Connection failed")
-        Service->>Middleware: mapToHTTPStatus(500)
-        Middleware->>Client: 500 Internal Server Error
-    else Success
-        Service->>Hono: SuccessResponse
-        Hono->>Client: 200 OK + data
-    end
-```
-
-## Performance Considerations
-
-### Caching Strategy
-
-- **Turbo Cache**: Build artifacts cached by file dependencies
-- **Database Queries**: Frequently accessed data cached in memory
-- **API Responses**: Static responses cached with appropriate TTL
-
-### Parallel Processing
-
-- **Build Tasks**: Multiple apps built simultaneously when possible
-- **API Requests**: Non-blocking I/O operations
-- **Slide Generation**: Stream processing for real-time updates
-
-### Resource Management
-
-- **Connection Pooling**: Database connections reused efficiently
-- **Memory Optimization**: Lightweight runtime (Bun vs Node.js)
-- **Request Batching**: Multiple operations combined when possible
 
 For APIs architecture details, see [APIs_ARCHITECTURE.md](APIs_ARCHITECTURE.md).

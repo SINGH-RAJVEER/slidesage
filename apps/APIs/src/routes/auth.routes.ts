@@ -1,4 +1,8 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import { db } from "@slide-sage/db";
+import { accounts, users } from "@slide-sage/db";
+import { hashPassword as hashBetterAuthPassword } from "better-auth/crypto";
+import { and, eq } from "drizzle-orm";
 import authClient from "../services/auth";
 import {
   resendVerificationCode,
@@ -7,6 +11,47 @@ import {
 } from "../services/email-auth.service";
 
 const authRoutes = new Hono();
+
+async function attachSessionCookie(
+  c: Context,
+  email: string,
+  password: string,
+): Promise<void> {
+  const signInUrl = `${process.env.AUTH_URL || "http://localhost:8000"}/api/auth/sign-in/email`;
+  const signInResponse = await fetch(signInUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      origin:
+        c.req.header("origin") ||
+        process.env.AUTH_URL ||
+        "http://localhost:8000",
+      "user-agent": c.req.header("user-agent") || "slide-sage-server",
+      "x-forwarded-for": c.req.header("x-forwarded-for") || "127.0.0.1",
+      "x-forwarded-proto": c.req.header("x-forwarded-proto") || "http",
+      "x-forwarded-host": c.req.header("x-forwarded-host") || "localhost",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      rememberMe: true,
+    }),
+  });
+
+  const setCookie = signInResponse.headers.get("set-cookie");
+
+  if (setCookie) {
+    c.header("set-cookie", setCookie, { append: true });
+  }
+}
+
+async function hashLegacyPassword(password: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 // Custom endpoints for email verification flow
 authRoutes.post("/signup/email", async (c) => {
@@ -24,7 +69,8 @@ authRoutes.post("/signup/email", async (c) => {
     );
   }
 
-  const result = await signUpWithEmail(email, password, name);
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const result = await signUpWithEmail(normalizedEmail, password, name);
 
   if (!result.success) {
     return c.json(
@@ -36,6 +82,8 @@ authRoutes.post("/signup/email", async (c) => {
       400,
     );
   }
+
+  await attachSessionCookie(c, normalizedEmail, password);
 
   return c.json(
     {
@@ -50,7 +98,7 @@ authRoutes.post("/signup/email", async (c) => {
 // Verify email code endpoint
 authRoutes.post("/verify-code", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const { email, code } = body;
+  const { email, code, password } = body;
 
   if (!email || !code) {
     return c.json(
@@ -63,7 +111,8 @@ authRoutes.post("/verify-code", async (c) => {
     );
   }
 
-  const result = await verifyEmailCode(email, code);
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const result = await verifyEmailCode(normalizedEmail, code);
 
   if (!result.success) {
     return c.json(
@@ -74,6 +123,10 @@ authRoutes.post("/verify-code", async (c) => {
       },
       400,
     );
+  }
+
+  if (typeof password === "string" && password.length > 0) {
+    await attachSessionCookie(c, normalizedEmail, password);
   }
 
   return c.json({
@@ -116,6 +169,57 @@ authRoutes.post("/resend-code", async (c) => {
     success: true,
     message: "Verification code sent",
   });
+});
+
+// Compatibility shim for legacy accounts created before provider/password format fix.
+authRoutes.post("/sign-in/email", async (c) => {
+  const parsedRequest = c.req.raw.clone();
+  const body = await parsedRequest.json().catch(() => ({}));
+  const email = typeof body.email === "string" ? body.email : "";
+  const password = typeof body.password === "string" ? body.password : "";
+
+  if (!email || !password) {
+    return authClient.handler(c.req.raw);
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.email, email.toLowerCase()),
+  });
+
+  if (user) {
+    const credentialAccount = await db.query.accounts.findFirst({
+      where: and(
+        eq(accounts.userId, user.id),
+        eq(accounts.providerId, "credential"),
+      ),
+    });
+
+    if (!credentialAccount) {
+      const legacyAccount = await db.query.accounts.findFirst({
+        where: and(
+          eq(accounts.userId, user.id),
+          eq(accounts.providerId, "email"),
+        ),
+      });
+
+      if (legacyAccount?.password) {
+        const legacyHash = await hashLegacyPassword(password);
+        if (legacyHash === legacyAccount.password) {
+          const compatibleHash = await hashBetterAuthPassword(password);
+          await db
+            .update(accounts)
+            .set({
+              providerId: "credential",
+              accountId: user.id,
+              password: compatibleHash,
+            })
+            .where(eq(accounts.id, legacyAccount.id));
+        }
+      }
+    }
+  }
+
+  return authClient.handler(c.req.raw);
 });
 
 // All other auth routes handled by better-auth

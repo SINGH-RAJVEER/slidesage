@@ -45,8 +45,8 @@ just dev-up-d
 just dev-logs
 
 # View logs (specific service)
-just dev-logs backend
-just dev-logs frontend
+just dev-logs apis
+just dev-logs web
 just dev-logs database
 
 # Stop development environment
@@ -73,10 +73,10 @@ just prod-down
 
 ```bash
 # Development
-docker compose -f docker/compose/docker-compose.dev.yml up
+docker compose --env-file docker/.env -f docker/dev/docker-compose.dev.yml up
 
 # Production
-docker compose -f docker/compose/docker-compose.prod.yml up
+docker compose --env-file docker/.env -f docker/prod/docker-compose.prod.yml up
 ```
 
 ---
@@ -179,7 +179,7 @@ just frontend-shell   # Frontend container shell
 
 ## 🏗️ Project Structure
 
-```
+```text
 slide-sage/
 ├── apps/                     # Applications
 │   ├── APIs/                # Hono API server (TypeScript + Drizzle)
@@ -203,15 +203,17 @@ slide-sage/
 │       ├── services/     # Database-related services
 │       └── types/        # Database types
 ├── docker/                # Docker configuration
-│   ├── compose/          # Docker Compose files
-│   │   ├── docker-compose.dev.yml  # Development configuration
-│   │   └── docker-compose.prod.yml # Production configuration
-│   ├── dockerfiles/      # Optimized Dockerfiles
-│   │   ├── backend.Dockerfile   # APIs service
-│   │   ├── frontend.Dockerfile  # Web service
-│   │   ├── database.Dockerfile  # Database service
-│   │   └── litellm.Dockerfile   # LiteLLM proxy service
-│   └── nginx/            # Production reverse proxy config
+│   ├── dev/              # Development Dockerfiles + compose
+│   │   ├── backend.Dockerfile
+│   │   ├── frontend.Dockerfile
+│   │   ├── litellm.Dockerfile
+│   │   └── docker-compose.dev.yml
+│   ├── prod/             # Production Dockerfiles + compose + nginx config
+│   │   ├── backend.Dockerfile
+│   │   ├── frontend.Dockerfile
+│   │   ├── docker-compose.prod.yml
+│   │   └── nginx/
+│   └── .env.example
 ├── docs/                 # Documentation
 │   ├── API_OVERVIEW.md             # API standards and overview
 │   ├── AUTH_API.md                 # Authentication endpoints
@@ -273,9 +275,7 @@ slide-sage/
 ### 3. Deployment
 
 1. **Local Development**: Use `just dev-up-d` to start all services
-2. **Production**:
-   - Deploy with `just prod-up`
-   - Or manually: `docker compose -f docker/compose/docker-compose.prod.yml up -d`
+2. **Production**: Deploy with `just prod-up`, or manually run `docker compose --env-file docker/.env -f docker/prod/docker-compose.prod.yml up -d`
 3. **Docker Management**: See [DEPLOYMENT_WORKFLOWS.md](docs/DEPLOYMENT_WORKFLOWS.md)
 4. **CI/CD**: Use automated pipelines and monitoring
 
@@ -285,11 +285,11 @@ slide-sage/
 
 ### Environment Variables
 
-All services use a single `.env` file in the project root:
+Docker workflows use `docker/.env`:
 
 ```bash
 # Copy example configuration
-cp .env.example .env
+cp docker/.env.example docker/.env
 
 # Database Configuration
 DATABASE_URL=postgresql://slidesage:slidesage@localhost:5432/slidesage

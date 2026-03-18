@@ -4,7 +4,7 @@ services:
   litellm:
     build:
       context: ../..
-      dockerfile: docker/dockerfiles/litellm.Dockerfile
+      dockerfile: docker/dev/litellm.Dockerfile
     image: slide-sage/litellm:dev
     container_name: slide-sage-litellm-dev
     ports:
@@ -26,10 +26,7 @@ services:
       start_period: 10s
 
   database:
-    build:
-      context: ../..
-      dockerfile: docker/dockerfiles/database.Dockerfile
-    image: slide-sage/database:dev
+    image: pgvector/pgvector:pg16
     container_name: slide-sage-postgres-dev
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-slidesage}
@@ -39,7 +36,6 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./initdb/init-dev-db.sql:/docker-entrypoint-initdb.d/init-dev-db.sql:ro
     restart: "no"
     healthcheck:
       test:
@@ -56,7 +52,7 @@ services:
   apis:
     build:
       context: ../..
-      dockerfile: docker/dockerfiles/backend.Dockerfile
+      dockerfile: docker/dev/backend.Dockerfile
       target: development
       args:
         NODE_ENV: development
@@ -66,7 +62,7 @@ services:
       - "${APIS_PORT:-8000}:8000"
     restart: "no"
     env_file:
-      - ../../.env
+      - ../.env
     environment:
       NODE_ENV: development
       LOG_LEVEL: debug
@@ -84,11 +80,6 @@ services:
       - ../../apps/APIs:/app/apps/APIs
       - ../../packages/DB:/app/packages/DB
       - ../../packages/contracts:/app/packages/contracts
-      - ../../docker/scripts/ensure-bun-workspace-install.sh:/usr/local/bin/ensure-bun-workspace-install:ro
-      - root_node_modules:/app/node_modules
-      - apis_node_modules:/app/apps/APIs/node_modules
-      - db_node_modules:/app/packages/DB/node_modules
-      - contracts_node_modules:/app/packages/contracts/node_modules
       - bun_install_cache:/root/.bun/install/cache
       - docker_cache:/app/.docker-cache
     depends_on:
@@ -100,11 +91,9 @@ services:
       test:
         [
           "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:8000/health",
+          "bun",
+          "-e",
+          "fetch('http://localhost:8000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
         ]
       interval: 30s
       timeout: 10s
@@ -116,21 +105,23 @@ services:
   web:
     build:
       context: ../..
-      dockerfile: docker/dockerfiles/frontend.Dockerfile
+      dockerfile: docker/dev/frontend.Dockerfile
       target: development
       args:
         NODE_ENV: development
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+        VITE_API_URL: ""
+        VITE_PROXY_TARGET: http://apis:8000
     image: slide-sage/web:dev
     container_name: slide-sage-web-dev
     ports:
       - "${WEB_PORT:-5173}:5173"
     restart: "no"
     env_file:
-      - ../../.env
+      - ../.env
     environment:
       NODE_ENV: development
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      VITE_API_URL: ""
+      VITE_PROXY_TARGET: http://apis:8000
       ROOT_DIR: /app
       BUN_CACHE_DIR: /root/.bun/install/cache
       STAMP_DIR: /app/.docker-cache/web
@@ -141,10 +132,6 @@ services:
       - ../../turbo.json:/app/turbo.json:ro
       - ../../apps/Web:/app/apps/Web
       - ../../packages/contracts:/app/packages/contracts
-      - ../../docker/scripts/ensure-bun-workspace-install.sh:/usr/local/bin/ensure-bun-workspace-install:ro
-      - root_node_modules:/app/node_modules
-      - web_node_modules:/app/apps/Web/node_modules
-      - contracts_node_modules:/app/packages/contracts/node_modules
       - bun_install_cache:/root/.bun/install/cache
       - docker_cache:/app/.docker-cache
     depends_on:
@@ -154,11 +141,9 @@ services:
       test:
         [
           "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:5173",
+          "bun",
+          "-e",
+          "fetch('http://localhost:5173').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
         ]
       interval: 30s
       timeout: 10s
@@ -173,10 +158,5 @@ networks:
 
 volumes:
   postgres_data:
-  root_node_modules:
-  apis_node_modules:
-  web_node_modules:
-  db_node_modules:
-  contracts_node_modules:
   bun_install_cache:
   docker_cache:

@@ -1,277 +1,25 @@
 # Authentication API
 
-All authentication endpoints for user management and JWT token handling.
+Authentication endpoints for SlideSage. The APIs use better-auth with cookie-based sessions and a custom email verification flow.
 
 ## Base URL
 
 - **Development**: `http://localhost:8000/api/auth`
-- **Production**: Configure via `VITE_API_URL` environment variable
+- **Production**: `AUTH_URL` + `/api/auth`
 
 ## Authentication Method
 
-All endpoints require appropriate HTTP headers:
+- Successful sign-in sets the HTTP-only `better-auth.session_token` cookie.
+- Clients must send cookies with requests.
 
 ```bash
-Content-Type: application/json
-Authorization: Bearer <token> (for protected endpoints)
+# fetch example
+fetch("/api/auth/get-session", {
+    credentials: "include",
+});
 ```
 
-## Token Lifecycle
-
-- **Access Token**: 15 minutes expiry
-- **Refresh Token**: 30 days expiry
-
----
-
-## POST /api/auth/register
-
-Register a new user account.
-
-### Request Body
-
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePass1",
-  "name": "John Doe"
-}
-```
-
-### Validation Rules
-
-- **Email**: Valid email format, unique
-- **Password**: Minimum 8 characters, at least 1 uppercase letter and 1 number
-- **Name**: Required, non-empty string
-
-### Success Response (201 Created)
-
-```json
-{
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "name": "John Doe",
-    "profile_picture_url": null,
-    "slide_tokens": 10.0,
-    "created_at": "2026-01-04T12:00:00Z",
-    "updated_at": "2026-01-04T12:00:00Z"
-  },
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ..."
-}
-```
-
-### Error Responses
-
-- `400`: Validation failed
-- `409`: Email already registered
-
----
-
-## POST /api/auth/login
-
-Login with email and password.
-
-### Request Body
-
-```json
-{
-  "email": "user@example.com",
-  "password": "SecurePass1"
-}
-```
-
-### Success Response (200 OK)
-
-```json
-{
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "name": "John Doe",
-    "profile_picture_url": null,
-    "slide_tokens": 10.0,
-    "created_at": "2026-01-04T12:00:00Z",
-    "updated_at": "2026-01-04T12:00:00Z"
-  },
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ..."
-}
-```
-
-### Error Responses
-
-- `400`: Validation failed
-- `401`: Invalid email or password
-
----
-
-## POST /api/auth/google
-
-Authenticate via Google OAuth.
-
-### Request Body
-
-```json
-{
-  "credential": "google_oauth_token_here"
-}
-```
-
-### Success Response (200 OK)
-
-```json
-{
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "name": "John Doe",
-    "profile_picture_url": "https://...",
-    "slide_tokens": 10.0,
-    "created_at": "2026-01-04T12:00:00Z",
-    "updated_at": "2026-01-04T12:00:00Z"
-  },
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ..."
-}
-```
-
-### Error Responses
-
-- `400`: Validation failed
-- `401`: Invalid Google token
-
----
-
-## POST /api/auth/refresh
-
-Refresh access token using refresh token.
-
-### Headers
-
-```bash
-Authorization: Bearer <refresh_token>
-```
-
-### Success Response (200 OK)
-
-```json
-{
-  "access_token": "eyJ..."
-}
-```
-
-### Error Responses
-
-- `401`: Invalid or expired refresh token
-- `404`: User not found
-
----
-
-## GET /api/auth/me
-
-Get current authenticated user.
-
-### Headers
-
-```bash
-Authorization: Bearer <access_token>
-```
-
-### Success Response (200 OK)
-
-```json
-{
-  "user": {
-    "id": 1,
-    "email": "user@example.com",
-    "name": "John Doe",
-    "profile_picture_url": null,
-    "slide_tokens": 10.0,
-    "created_at": "2026-01-04T12:00:00Z",
-    "updated_at": "2026-01-04T12:00:00Z"
-  }
-}
-```
-
-### Error Responses
-
-- `401`: Invalid or expired token
-- `404`: User not found
-
----
-
-## PUT /api/auth/profile
-
-Update user profile.
-
-### Headers
-
-```bash
-Authorization: Bearer <access_token>
-```
-
-### Request Body
-
-```json
-{
-  "name": "Jane Doe",
-  "email": "newemail@example.com",
-  "current_password": "OldPass1",
-  "new_password": "NewPass1"
-}
-```
-
-**Note:** All fields are optional. Password change requires `current_password`.
-
-### Success Response (200 OK)
-
-```json
-{
-  "user": {
-    "id": 1,
-    "email": "newemail@example.com",
-    "name": "Jane Doe",
-    "profile_picture_url": null,
-    "slide_tokens": 10.0,
-    "created_at": "2026-01-04T12:00:00Z",
-    "updated_at": "2026-01-04T12:30:00Z"
-  }
-}
-```
-
-### Error Responses
-
-- `400`: Validation failed or incorrect current password
-- `401`: Invalid or expired token
-- `404`: User not found
-- `409`: Email already in use
-
----
-
-## POST /api/auth/logout
-
-Logout user (client should discard tokens).
-
-### Headers
-
-```bash
-Authorization: Bearer <access_token>
-```
-
-### Success Response (200 OK)
-
-```json
-{
-  "message": "Logged out successfully"
-}
-```
-
----
-
-## Error Response Format
-
-All errors follow consistent format:
+## Standard Error Format
 
 ```json
 {
@@ -282,15 +30,177 @@ All errors follow consistent format:
 }
 ```
 
-## Standard HTTP Status Codes
+---
 
-- `200`: Success
-- `201`: Created
-- `400`: Bad Request (validation, malformed input)
-- `401`: Unauthorized (invalid/expired token, invalid credentials)
-- `404`: Not Found
-- `409`: Conflict (duplicate email, etc.)
-- `422`: Unprocessable Entity (invalid token format)
-- `500`: Internal Server Error
+## POST /api/auth/signup/email
 
-For presentation API endpoints, see [PRESENTATIONS_API.md](PRESENTATIONS_API.md).
+Create a new user and send a verification code.
+
+### Request Body
+
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePass1",
+  "name": "Jane Doe"
+}
+```
+
+### Success Response (201 Created)
+
+```json
+{
+  "success": true,
+  "message": "Account created. Verification code sent to email.",
+  "userId": "user-id"
+}
+```
+
+### Session Behavior
+
+- The endpoint now attempts an immediate sign-in and sets `better-auth.session_token` on success.
+- This allows the verification page to continue with an authenticated session.
+
+### Error Responses
+
+- `400`: Validation failed or email already registered
+
+---
+
+## POST /api/auth/verify-code
+
+Verify a user email with the code sent by email.
+
+### Request Body
+
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Email verified successfully",
+  "user": {
+    "id": "user-id",
+    "email": "user@example.com",
+    "emailVerified": true
+  }
+}
+```
+
+### Session Behavior
+
+- If `password` is provided in the request body, the endpoint signs the user in and refreshes `better-auth.session_token`.
+- If an active session already exists from signup, verification completes without requiring manual sign-in.
+
+### Error Responses
+
+- `400`: Invalid or expired code
+
+---
+
+## POST /api/auth/resend-code
+
+Resend a verification code to the user.
+
+### Request Body
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Verification code sent"
+}
+```
+
+---
+
+## POST /api/auth/sign-in/email
+
+Sign in using email and password (handled by better-auth). On success, the session cookie is set.
+
+### Request Body
+
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePass1",
+  "rememberMe": true
+}
+```
+
+### Success Response (200 OK)
+
+- Sets `better-auth.session_token` cookie.
+- Returns a JSON body with session data and user info.
+
+### Error Responses
+
+- `400`: Validation failed
+- `401`: Invalid credentials
+
+---
+
+## GET /api/auth/get-session
+
+Return the current session and user data if signed in.
+
+### Success Response (200 OK)
+
+```json
+{
+  "user": {
+    "id": "user-id",
+    "email": "user@example.com",
+    "name": "Jane Doe",
+    "emailVerified": true
+  }
+}
+```
+
+### Error Responses
+
+- `401`: Not signed in
+
+---
+
+## POST /api/auth/sign-out
+
+Clear the current session cookie.
+
+### Success Response (200 OK)
+
+```json
+{
+  "success": true
+}
+```
+
+---
+
+## GET /api/auth/callback/google
+
+## GET /api/auth/callback/github
+
+OAuth callback endpoints for social sign-in. These are invoked via browser redirect and set the session cookie on success.
+
+### Query Parameters
+
+- `callbackURL`: Where to redirect after sign-in.
+
+---
+
+For profile endpoints, see [PROFILE_MANAGEMENT.md](PROFILE_MANAGEMENT.md).

@@ -5,14 +5,16 @@ Endpoints for managing presentations and AI generation.
 ## Base URL
 
 - **Development**: `http://localhost:8000/api`
-- **Production**: Configure via `VITE_API_URL` environment variable
+- **Production**: `VITE_API_URL` + `/api`
 
 ## Authentication
 
-All presentation endpoints require JWT authentication:
+All presentation endpoints require a valid session cookie. Clients must send cookies:
 
 ```bash
-Authorization: Bearer <access_token>
+fetch(`${API_URL}/api/presentations`, {
+    credentials: "include",
+});
 ```
 
 ---
@@ -24,7 +26,6 @@ Generate a new presentation with Server-Sent Events (SSE) streaming.
 ### Headers
 
 ```bash
-Authorization: Bearer <access_token>
 Content-Type: application/json
 ```
 
@@ -32,15 +33,26 @@ Content-Type: application/json
 
 ```json
 {
-  "topic": "Introduction to Machine Learning",
-  "slide_count": 8,
-  "detail_level": "balanced",
-  "tonality": "professional",
-  "research": {
-    "enabled": true,
-    "freshness": "week",
-    "maxResults": 5
-  }
+    "topic": "Introduction to Machine Learning",
+    "slide_count": 8,
+    "detail_level": "balanced",
+    "tonality": "professional",
+    "research": {
+        "enabled": true,
+        "freshness": "week",
+        "maxResults": 5
+    },
+    "research_payload": {
+        "summary": "Optional research summary",
+        "sources": [
+            {
+                "url": "https://example.com",
+                "title": "Example",
+                "snippet": "Summary excerpt",
+                "retrieved_at": "2026-01-04T12:00:00Z"
+            }
+        ]
+    }
 }
 ```
 
@@ -48,12 +60,13 @@ Content-Type: application/json
 
 - `topic` (required): String, 1-500 characters
 - `slide_count` (required): Integer, 1-50
-- `detail_level` (optional): One of `brief`, `concise`, `balanced`, `detailed`, `comprehensive`. Default: `balanced`
-- `tonality` (optional): One of `professional`, `casual`, `enthusiastic`, `persuasive`. Default: `professional`
-- `research` (optional): Web research settings. When enabled, the APIs performs a search prepass and injects sources into the prompt.
-  - `enabled` (boolean): Enable/disable web research.
-  - `freshness` (optional): One of `day`, `week`, `month`, `year`.
-  - `maxResults` (optional): Number of results to fetch (1–10). Default: 5.
+- `detail_level` (optional): One of `brief`, `concise`, `balanced`, `detailed`, `comprehensive` (default: `balanced`)
+- `tonality` (optional): One of `professional`, `casual`, `enthusiastic`, `persuasive` (default: `professional`)
+- `research` (optional): Web research settings
+    - `enabled` (boolean): Enable/disable web research
+    - `freshness` (optional): `day`, `week`, `month`, `year`
+    - `maxResults` (optional): 1-10
+- `research_payload` (optional): Pre-fetched research summary and sources (usually from `/api/research-presentation`)
 
 ### Response (200 OK - SSE Stream)
 
@@ -65,7 +78,7 @@ Content-Type: `text/event-stream`
 
 ```
 event: created
-data: {"presentation_id": 123}
+data: {"presentation_id": "presentation-id"}
 ```
 
 2. **theme** - Theme selected
@@ -93,7 +106,7 @@ data: {"slides": [...], "theme": "modern", "title": "...", "tokens_used": 5000}
 
 ```
 event: saved
-data: {"presentation_id": 123, "success": true}
+data: {"presentation_id": "presentation-id", "success": true}
 ```
 
 6. **error** - Error occurred
@@ -103,43 +116,110 @@ event: error
 data: {"error": "Error message"}
 ```
 
-### Client-side SSE Implementation
+### Client-side SSE Implementation (POST + fetch)
 
 ```javascript
-const eventSource = new EventSource("/api/generate-presentation-stream", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    topic: "Introduction to AI",
-    slide_count: 5,
-  }),
+const response = await fetch("/api/generate-presentation-stream", {
+    method: "POST",
+    credentials: "include",
+    headers: {
+        "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+        topic: "Introduction to AI",
+        slide_count: 5,
+    }),
 });
 
-eventSource.addEventListener("created", (event) => {
-  const data = JSON.parse(event.data);
-  console.log("Presentation created:", data.presentation_id);
-});
+if (!response.ok || !response.body) {
+    throw new Error("Failed to start stream");
+}
 
-eventSource.addEventListener("slide", (event) => {
-  const data = JSON.parse(event.data);
-  console.log("New slide:", data.slide);
-});
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
 
-eventSource.addEventListener("complete", (event) => {
-  const data = JSON.parse(event.data);
-  console.log("Generation complete:", data);
-});
+while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // Parse SSE frames from buffer here.
+}
 ```
 
 ### Error Responses
 
 - `400`: Validation failed
-- `401`: Invalid or expired token
-- `402`: Insufficient tokens
-- `404`: User not found
+- `401`: Not signed in
+- `500`: Internal error
+
+---
+
+## POST /api/research-presentation
+
+Run a research prepass before generation. Returns a summary and sources that can be passed to `research_payload`.
+
+### Request Body
+
+```json
+{
+    "topic": "Introduction to Machine Learning",
+    "research": {
+        "enabled": true,
+        "freshness": "week",
+        "maxResults": 5
+    }
+}
+```
+
+### Success Response (200 OK)
+
+```json
+{
+    "summary": "Research summary text",
+    "sources": [
+        {
+            "url": "https://example.com",
+            "title": "Example",
+            "snippet": "Summary excerpt",
+            "retrieved_at": "2026-01-04T12:00:00Z"
+        }
+    ],
+    "tokens_used": 1200,
+    "tokens_estimated": 1400
+}
+```
+
+### Error Responses
+
+- `400`: Missing required fields
+- `401`: Not signed in
+
+---
+
+## POST /api/iterate-presentation-stream
+
+Iterate on an existing presentation with streaming.
+
+### Request Body
+
+```json
+{
+    "parent_presentation_id": "presentation-id",
+    "feedback": "Make this more concise",
+    "slide_count": 6,
+    "detail_level": "concise",
+    "tonality": "professional",
+    "research": {
+        "enabled": false
+    }
+}
+```
+
+### Response
+
+SSE stream with the same event types as `/api/generate-presentation-stream`.
 
 ---
 
@@ -147,46 +227,25 @@ eventSource.addEventListener("complete", (event) => {
 
 Get all presentations for the authenticated user.
 
-### Headers
-
-```bash
-Authorization: Bearer <access_token>
-```
-
 ### Success Response (200 OK)
 
 ```json
 {
-  "presentations": [
-    {
-      "id": 1,
-      "title": "Introduction to ML",
-      "slide_count": 8,
-      "created_at": "2026-01-04T12:00:00Z",
-      "updated_at": "2026-01-04T12:00:00Z"
-    },
-    {
-      "id": 2,
-      "title": "React Hooks Guide",
-      "slide_count": 6,
-      "created_at": "2026-01-04T12:00:00Z",
-      "updated_at": "2026-01-04T12:00:00Z"
-    }
-  ]
+    "presentations": [
+        {
+            "id": "presentation-id",
+            "title": "Introduction to ML",
+            "slide_count": 8,
+            "created_at": "2026-01-04T12:00:00Z",
+            "updated_at": "2026-01-04T12:00:00Z"
+        }
+    ]
 }
 ```
 
-### Response Fields
-
-- `id`: Presentation identifier
-- `title`: Presentation title
-- `slide_count`: Number of slides
-- `created_at`: Creation timestamp (ISO 8601)
-- `updated_at`: Last update timestamp (ISO 8601)
-
 ### Error Responses
 
-- `401`: Invalid or expired token
+- `401`: Not signed in
 
 ---
 
@@ -194,69 +253,42 @@ Authorization: Bearer <access_token>
 
 Get a specific presentation with full slide data.
 
-### Headers
-
-```bash
-Authorization: Bearer <access_token>
-```
-
 ### Success Response (200 OK)
 
 ```json
 {
-  "presentation": {
-    "id": 1,
-    "user_id": 1,
-    "title": "Introduction to ML",
-    "slide_count": 8,
-    "slides": {
-      "slides": [
-        {
-          "id": 1,
-          "title": "What is Machine Learning?",
-          "content": [
-            {
-              "type": "text",
-              "text": "Machine learning is..."
-            },
-            {
-              "type": "bullet",
-              "items": ["Supervised learning", "Unsupervised learning"]
-            }
-          ],
-          "layout": "title-content"
-        }
-      ],
-      "theme": "modern",
-      "title": "Introduction to ML",
-      "totalSlides": 8
-    },
-    "created_at": "2026-01-04T12:00:00Z",
-    "updated_at": "2026-01-04T12:00:00Z"
-  }
+    "presentation": {
+        "id": "presentation-id",
+        "title": "Introduction to ML",
+        "prompt": "Original prompt",
+        "slides_data": {
+            "slides": [
+                {
+                    "id": "slide-id",
+                    "title": "What is Machine Learning?",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Machine learning is..."
+                        }
+                    ],
+                    "layout": "title-content"
+                }
+            ],
+            "theme": "modern",
+            "title": "Introduction to ML",
+            "totalSlides": 8
+        },
+        "created_at": "2026-01-04T12:00:00Z",
+        "updated_at": "2026-01-04T12:00:00Z"
+    }
 }
 ```
 
-### Slide Structure
-
-Each slide contains:
-
-- `id`: Unique slide identifier
-- `title`: Slide title
-- `content`: Array of content blocks
-- `layout`: Layout template name
-
-### Content Block Types
-
-- `text`: Plain text content
-- `bullet`: Bulleted list items
-- `chart`: Data visualization configuration
-- `image`: Image with caption
-
 ### Error Responses
 
-- `401`: Invalid or expired token
-- `403`: Unauthorized access (not owner)
+- `401`: Not signed in
+- `403`: Unauthorized access
 - `404`: Presentation not found
 
 ---
@@ -265,68 +297,20 @@ Each slide contains:
 
 Delete a specific presentation.
 
-### Headers
-
-```bash
-Authorization: Bearer <access_token>
-```
-
 ### Success Response (200 OK)
 
 ```json
 {
-  "message": "Presentation deleted successfully"
+    "message": "Presentation deleted successfully"
 }
 ```
 
 ### Error Responses
 
-- `401`: Invalid or expired token
-- `403`: Unauthorized access (not owner)
+- `401`: Not signed in
+- `403`: Unauthorized access
 - `404`: Presentation not found
 
 ---
-
-## Token System
-
-### Token Costs
-
-- **1 slide token** ≈ **2500 AI tokens**
-- **New users** receive **10 slide tokens**
-- **Token deduction** occurs when generation starts
-
-### Token Management
-
-```json
-{
-  "slide_tokens": 8.5,
-  "tokens_used_this_generation": 1.5
-}
-```
-
-### Token Responses
-
-- `402`: Insufficient tokens error
-- Token balance included in user profile responses
-- Token deduction logged in presentation metadata
-
----
-
-## Export Functionality
-
-While not a separate API endpoint, presentations can be exported:
-
-### Export Formats
-
-- **PPTX**: PowerPoint presentation (most compatible)
-- **PDF**: PDF document (print-friendly)
-- **Images**: Individual slide images
-
-### Export Process
-
-1. Retrieve presentation data via `GET /api/presentations/:id`
-2. Process slides with appropriate formatting
-3. Generate export file using client-side libraries
-4. Download file via browser
 
 For authentication endpoints, see [AUTH_API.md](AUTH_API.md).

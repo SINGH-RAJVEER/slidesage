@@ -29,7 +29,7 @@ Clean code guidelines and standards for SlideSage development.
 ### Component Structure
 
 ```tsx
-// ✅ Good: Small, focused component
+// Good: Small, focused component
 export function UserProfile({ user }: { user: User }) {
   return (
     <div className="user-profile">
@@ -39,7 +39,7 @@ export function UserProfile({ user }: { user: User }) {
   );
 }
 
-// ❌ Bad: Large component with multiple concerns
+// Bad: Large component with multiple concerns
 export function UserManagement() {
   // 300+ lines of mixed concerns
 }
@@ -48,7 +48,7 @@ export function UserManagement() {
 ### State Management
 
 ```tsx
-// ✅ Good: Use custom hooks
+// Good: Use custom hooks
 function useUserData() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,7 +57,7 @@ function useUserData() {
   return { users, loading };
 }
 
-// ❌ Bad: Direct fetch in component
+// Bad: Direct fetch in component
 function UserList() {
   useEffect(() => {
     fetch("/api/users").then((res) => res.json());
@@ -68,10 +68,10 @@ function UserList() {
 ### Styling
 
 ```tsx
-// ✅ Good: Tailwind utility classes
+// Good: Tailwind utility classes
 <div className="flex items-center justify-between p-4 bg-white rounded-lg shadow">
 
-// ❌ Bad: Inline styles
+// Bad: Inline styles
 <div style={{ display: 'flex', alignItems: 'center' }}>
 ```
 
@@ -82,14 +82,14 @@ function UserList() {
 ### Route Structure
 
 ```typescript
-// ✅ Good: Thin controller
+// Good: Thin controller
 app.post("/users", authMiddleware, async (c) => {
   const data = (await c.req.json()) as CreateUserRequest;
   const user = await userService.createUser(data);
   return c.json({ user }, 201);
 });
 
-// ❌ Bad: Business logic in route
+// Bad: Business logic in route
 app.post("/users", async (c) => {
   const data = await c.req.json();
   // Validation, hashing, database calls all here
@@ -99,7 +99,7 @@ app.post("/users", async (c) => {
 ### Service Layer
 
 ```typescript
-// ✅ Good: Clean service with single responsibility
+// Good: Clean service with single responsibility
 export class UserService {
   async createUser(data: CreateUserRequest): Promise<User> {
     // Validate and create user
@@ -107,7 +107,7 @@ export class UserService {
   }
 }
 
-// ❌ Bad: Mixed concerns
+// Bad: Mixed concerns
 export class UserService {
   async createUserAndSendEmail(data) {
     // User creation + email sending + logging + analytics
@@ -118,7 +118,7 @@ export class UserService {
 ### Database Access
 
 ```typescript
-// ✅ Good: Repository pattern with Drizzle
+// Good: Repository pattern with Drizzle
 async findById(id: number): Promise<User | null> {
   const result = await db
     .select()
@@ -128,7 +128,7 @@ async findById(id: number): Promise<User | null> {
   return result[0] || null;
 }
 
-// ❌ Bad: Raw SQL strings
+// Bad: Raw SQL strings
 async findById(id: number) {
   return await db.query(`SELECT * FROM users WHERE id = ${id}`);
 }
@@ -141,7 +141,7 @@ async findById(id: number) {
 ### Consistent Error Format
 
 ```typescript
-// ✅ Good: Structured error response
+// Good: Structured error response
 return c.json(
   {
     error: {
@@ -152,7 +152,7 @@ return c.json(
   404,
 );
 
-// ❌ Bad: Inconsistent errors
+// Bad: Inconsistent errors
 return c.json({ error: "Not found" }, 404);
 return c.json("Something went wrong", 500);
 ```
@@ -160,7 +160,7 @@ return c.json("Something went wrong", 500);
 ### Error Logging
 
 ```typescript
-// ✅ Good: Proper error handling
+// Good: Proper error handling
 try {
   await operation();
 } catch (error) {
@@ -231,7 +231,7 @@ docs(readme): update installation instructions
 ### Input Validation
 
 ```typescript
-// ✅ Good: Validate all inputs
+// Good: Validate all inputs
 const schema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -243,7 +243,7 @@ const validated = schema.parse(input);
 ### Authentication
 
 ```typescript
-// ✅ Good: Proper middleware usage
+// Good: Proper middleware usage
 app.use("/api/*", authMiddleware);
 app.use("/admin/*", adminMiddleware);
 ```
@@ -255,7 +255,7 @@ app.use("/admin/*", adminMiddleware);
 ### Test Structure
 
 ```typescript
-// ✅ Good: Descriptive test names
+// Good: Descriptive test names
 describe("UserService", () => {
   test("should create user with valid data", async () => {
     const userData = { email: "test@example.com", name: "Test" };
@@ -336,4 +336,4 @@ bun run db:studio
 
 **Remember**: Consistency is key. When in doubt, follow existing patterns in the codebase and prioritize readability and maintainability.
 
-For detailed workflows, see [DEVELOPMENT_WORKFLOWS.md](DEVELOPMENT_WORKFLOWS.md).
+For setup details, see [DEVELOPMENT_SETUP.md](DEVELOPMENT_SETUP.md).

@@ -95,7 +95,7 @@ scripts
 
 # Exclude all Docker assets by default, then re-include only build-time files
 docker/**
-!docker/dockerfiles/**
+!docker/dev/**
 
 # Keep runtime config needed by Dockerfiles
 !litellm_config.yaml

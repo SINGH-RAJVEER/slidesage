@@ -23,12 +23,12 @@ curl -fsSL https://bun.sh/install | bash
 
 # Install Docker (Linux)
 sudo apt update
-sudo apt install docker.io docker-compose
+sudo apt install docker.io
 
 # Verify installations
 bun --version
 docker --version
-docker-compose --version
+docker compose version
 ```
 
 ## Initial Setup
@@ -54,46 +54,66 @@ bun install
 
 ### 3. Configure Environment Variables
 
-#### APIs Configuration
+#### Shared Configuration (Docker + Local)
+
+The APIs service loads `docker/.env` first, then `.env` at the repo root.
 
 ```bash
-# Copy example environment file
-cp apps/APIs/.env.example apps/APIs/.env
+# Copy the example environment file
+cp docker/.env.example docker/.env
 
 # Edit with your configuration
-nano apps/APIs/.env
+nano docker/.env
 ```
 
-**Required APIs Variables:**
+**Key Variables:**
 
 ```bash
+# APIs base configuration
 PORT=8000
-DATABASE_URL=postgresql://user:password@localhost:5432/slide_sage
-JWT_SECRET_KEY=your-super-secret-jwt-key-here
-GEMINI_API_KEY=your-gemini-api-key
-GROQ_API_KEY=your-groq-api-key
-LITELLM_MODEL=gemini-pro
-LITELLM_PROXY_BASE=http://localhost:4000
+DATABASE_URL=postgresql://slidesage:slidesage@localhost:5432/slidesage
 CORS_ORIGINS=http://localhost:5173
+
+# better-auth
+AUTH_SECRET=your-secret-key-change-in-production
+AUTH_URL=http://localhost:8000
+
+# OAuth providers
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+
+# Email delivery
+RESEND_API_KEY=your-resend-api-key
+RESEND_FROM_EMAIL=onboarding@yourdomain.com
+
+# AI providers
+GROQ_API_KEY=your-groq-api-key
+GEMINI_API_KEY=your-gemini-api-key
+OPENAI_API_KEY=
+
+# LiteLLM configuration
+LITELLM_MODEL=groq/llama-3.3-70b-versatile
+LITELLM_SEARCH_MODEL=llama-3.1-8b-instant
+LITELLM_PROXY_BASE=http://localhost:4000
 ```
 
-If you're using Docker development (recommended), the APIs is configured to talk to the LiteLLM container automatically via `http://litellm:4000`.
+#### Web Configuration (Local Only)
 
-#### Web Configuration
+If you are running the Web app outside Docker, create `apps/Web/.env`:
 
 ```bash
-# Copy example environment file
-cp apps/Web/.env.example apps/Web/.env
-
-# Edit with your configuration
-nano apps/Web/.env
+VITE_API_URL=http://localhost:8000
 ```
 
-**Required Web Variables:**
+If you are running the Web app in Docker, keep `VITE_API_URL` empty and set
+`VITE_PROXY_TARGET` in `docker/.env` so browser requests stay same-origin while
+the Vite dev server proxies to the internal APIs container:
 
 ```bash
-VITE_API_URL=http://localhost:8000/api
-VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id
+VITE_API_URL=
+VITE_PROXY_TARGET=http://apis:8000
 ```
 
 ### 4. Start Development Services
@@ -102,19 +122,19 @@ VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id
 
 ```bash
 # Start all services with Docker
-docker-compose up --build
+docker compose -f docker/dev/docker-compose.dev.yml up --build
 
 # Services started:
-# - slide-sage-Web (port 5173)
-# - slide-sage-APIs (port 8000)
-# - slide-sage-database (port 5432)
+# - slide-sage-web (port 5173)
+# - slide-sage-apis (port 8000)
+# - slide-sage-postgres (port 5432)
 ```
 
 #### Option B: Local Development
 
 ```bash
 # Start PostgreSQL (if running locally)
-docker-compose up database -d
+docker compose -f docker/dev/docker-compose.dev.yml up database -d
 
 # Start development servers
 bun dev
@@ -130,7 +150,7 @@ turbo run dev --filter=Web
 
 ```bash
 # Test APIs health
-curl http://localhost:8000/api/health
+curl http://localhost:8000/health
 
 # Check Web (open in browser)
 open http://localhost:5173
@@ -199,24 +219,45 @@ lsof -i :5173  # Web
 # Kill process
 kill -9 <PID>
 
-# Or change ports in .env files
-echo "PORT=8001" >> apps/APIs/.env
+# Or change ports in docker/.env
+echo "PORT=8001" >> docker/.env
 ```
 
 #### Database Connection Failed
 
 ```bash
 # Check if database is running
-docker-compose ps
+docker compose -f docker/dev/docker-compose.dev.yml ps
 
 # Restart database
-docker-compose restart database
+docker compose -f docker/dev/docker-compose.dev.yml restart database
 
 # Check database logs
-docker-compose logs database
+docker compose -f docker/dev/docker-compose.dev.yml logs database
 
 # Test connection manually
 psql postgresql://user:password@localhost:5432/slide_sage
+```
+
+If logs show `FATAL: role "slidesage" does not exist`, your Postgres volume was likely initialized from older credentials.
+
+```bash
+# Recreate dev services and reset Postgres volume
+just dev-reset
+just ddu-d
+```
+
+Or create the expected role/database without wiping data:
+
+```bash
+docker exec slide-sage-postgres-dev psql -U postgres -d postgres -c "CREATE ROLE slidesage LOGIN PASSWORD 'slidesage';"
+docker exec slide-sage-postgres-dev psql -U postgres -d postgres -c "CREATE DATABASE slidesage OWNER slidesage;"
+```
+
+If migrations fail with `permission denied to create extension "vector"`, run:
+
+```bash
+docker exec slide-sage-postgres-dev psql -U postgres -d slidesage -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
 #### Dependency Installation Failed
@@ -243,6 +284,10 @@ bun dev
 bun run build
 ```
 
+#### Docker Web Proxy ECONNREFUSED
+
+If Vite logs `http proxy error: /api/... ECONNREFUSED` in Docker, verify Web is using the Docker network target (`http://apis:8000`) rather than `http://localhost:8000`. The dev compose file is preconfigured for this.
+
 ## Development Tools
 
 ### Useful Commands
@@ -260,8 +305,8 @@ bun format          # Format all code
 bun build           # Build all apps
 
 # Individual app commands
-turbo run dev --filter=APIs
-turbo run test --filter=Web
+bun run dev:apis
+bun run dev:web
 ```
 
 ### Database Management
@@ -274,8 +319,8 @@ bun run db:studio
 # Reset database (development only)
 bun run db:migrate  # Run migrations
 # Or manually reset via:
-# docker-compose down database
-# docker-compose up database
+# docker compose -f docker/dev/docker-compose.dev.yml down database
+# docker compose -f docker/dev/docker-compose.dev.yml up database
 ```
 
 ## Next Steps
@@ -287,4 +332,4 @@ After setup is complete:
 3. **Explore Codebase**: Read the architecture documentation
 4. **Set Up Testing**: Configure test environment
 
-For development workflows, see [DEVELOPMENT_WORKFLOWS.md](DEVELOPMENT_WORKFLOWS.md).
+For request flow diagrams, see [REQUEST_FLOWS.md](REQUEST_FLOWS.md).

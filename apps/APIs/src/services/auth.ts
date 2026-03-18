@@ -15,10 +15,13 @@ const authClient = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    autoSignInAfterSignUp: false, // Don't auto sign-in, require email verification
+    autoSignIn: true,
   },
   secret: process.env.AUTH_SECRET || "your-secret-key-change-in-production",
   baseURL: process.env.AUTH_URL || "http://localhost:8000",
+  trustedOrigins: process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(",")
+    : ["http://localhost:5173"],
   basePath: "/api/auth",
   socialProviders: {
     google: {

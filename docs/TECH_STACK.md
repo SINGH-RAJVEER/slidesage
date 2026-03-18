@@ -24,7 +24,9 @@ Detailed overview of technologies used in SlideSage monorepo.
 
 - **Purpose**: Development environment and deployment
 - **Services**: Web, APIs, Database
-- **Configuration**: `docker-compose.yml` for development
+- **Configuration**:
+  - `docker/dev/docker-compose.dev.yml` for development
+  - `docker/prod/docker-compose.prod.yml` for production
 
 ## APIs Stack
 
@@ -137,30 +139,21 @@ Detailed overview of technologies used in SlideSage monorepo.
 
 ## Authentication & Security
 
-### JWT: Jose
+### Authentication: better-auth
 
-- **Purpose**: JWT token handling
+- **Purpose**: Session-based authentication for APIs and Web
 - **Features**:
-  - Token signing and verification
-  - Multiple algorithms support
-  - TypeScript types
-  - Secure implementation
+  - Cookie-based sessions (`better-auth.session_token`)
+  - Email/password sign-in
+  - OAuth providers (Google, GitHub)
+  - Drizzle adapter for PostgreSQL
 
-### Password Hashing: bcryptjs
+### Email Delivery: Resend
 
-- **Purpose**: Secure password hashing
+- **Purpose**: Verification and transactional email delivery
 - **Features**:
-  - Salted hashing
-  - Configurable rounds
-  - Cross-platform support
-
-### OAuth: Google Auth Library
-
-- **Purpose**: Google OAuth integration
-- **Features**:
-  - Token verification
-  - User profile retrieval
-  - Secure implementation
+  - API-driven email sending
+  - Used for verification code delivery
 
 ## AI Integration
 

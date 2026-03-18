@@ -2,74 +2,54 @@ import { config as loadEnv } from "dotenv";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-
 import authRoutes from "./routes/auth.routes";
 import billingRoutes from "./routes/billing.routes";
 import presentationRoutes from "./routes/presentation.routes";
 import profileRoutes from "./routes/profile.routes";
 
-loadEnv({ path: new URL("../../../.env", import.meta.url) });
+loadEnv({ path: new URL("../../../docker/.env", import.meta.url) });
+loadEnv({ path: new URL("../../../.env", import.meta.url), override: false });
 
 const app = new Hono();
 
-// Middleware
+const corsOrigins = process.env.CORS_ORIGINS?.split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
+const corsOriginConfig = corsOrigins && corsOrigins.length > 0 ? corsOrigins : "*";
+
 app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: (origin) => {
-      const corsOrigins = process.env.CORS_ORIGINS;
-
-      const normalizeOrigin = (value: string) =>
-        value.trim().replace(/\/+$/, "");
-
-      if (!corsOrigins) return origin || "*";
-
-      const configured = corsOrigins
-        .split(",")
-        .map((v) => v.trim())
-        .filter(Boolean);
-
-      if (configured.includes("*")) return origin || "*";
-
-      if (!origin) return "*";
-
-      const normalizedOrigin = normalizeOrigin(origin);
-      const allowList = new Set(configured.map(normalizeOrigin));
-
-      return allowList.has(normalizedOrigin) ? origin : undefined;
-    },
+    origin: corsOriginConfig,
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   }),
 );
 
-// Health check
 app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Routes
 app.route("/api/auth", authRoutes);
 app.route("/api/profile", profileRoutes);
 app.route("/api", presentationRoutes);
 app.route("/api/billing", billingRoutes);
 
-// Error handler
 app.onError((err, c) => {
   console.error("Error:", err);
   return c.json({ error: { message: "Internal server error" } }, 500);
 });
 
-// 404 handler
 app.notFound((c) => {
   return c.json({ error: { message: "Resource not found" } }, 404);
 });
 
 const port = Number.parseInt(process.env.PORT || "8000", 10);
 
-console.log(`Starting server on port ${port}...`);
+console.log(`Server started on port ${port}...`);
 
 export default {
   port,

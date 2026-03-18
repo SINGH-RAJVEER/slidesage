@@ -1,5 +1,5 @@
-import { type FormEvent, useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { type SubmitEvent, useEffect, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -12,31 +12,34 @@ function sanitizeRedirectPath(value: string | null) {
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
-  const redirectTo = sanitizeRedirectPath(searchParams.get("redirect_url"));
   const email = searchParams.get("email");
+  const redirectTo = sanitizeRedirectPath(searchParams.get("redirect_url"));
+  const location = useLocation();
+  const password =
+    typeof (location.state as { password?: unknown } | null)?.password ===
+    "string"
+      ? (location.state as { password?: string }).password
+      : undefined;
   const navigate = useNavigate();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, user } = useAuth();
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [resending, setResending] = useState(false);
 
-  // Redirect to dashboard if already signed in
   useEffect(() => {
-    if (isSignedIn) {
-      navigate("/");
+    if (isSignedIn && user?.emailVerified) {
+      navigate(redirectTo);
     }
-  }, [isSignedIn, navigate]);
+  }, [isSignedIn, navigate, redirectTo, user?.emailVerified]);
 
   // Redirect if no email is provided
   useEffect(() => {
-    if (!email) {
-      navigate("/sign-up");
-    }
+    if (!email) navigate("/sign-up");
   }, [email, navigate]);
 
-  const handleVerify = async (event: FormEvent<HTMLFormElement>) => {
+  const handleVerify = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
@@ -57,6 +60,7 @@ export default function VerifyEmailPage() {
         body: JSON.stringify({
           email,
           code,
+          password,
         }),
       });
 
@@ -68,7 +72,7 @@ export default function VerifyEmailPage() {
       setSuccess(true);
       // Redirect after a short delay to show success message
       setTimeout(() => {
-        navigate("/sign-in", { replace: true });
+        navigate(redirectTo, { replace: true });
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Verification failed");
@@ -109,11 +113,13 @@ export default function VerifyEmailPage() {
   return (
     <div className="min-h-screen bg-transparent flex flex-col">
       <Header />
-      <div className="flex-1 flex items-center justify-center px-4 md:px-8">
+      <div className="flex-1 flex items-center justify-center px-4 py-8 md:px-8">
         <div className="max-w-md w-full">
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8 shadow-2xl">
-            <h1 className="text-3xl font-bold text-white mb-2">Verify Email</h1>
-            <p className="text-white/60 mb-6">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-6">
+            <h1 className="mb-1 text-2xl font-semibold text-white">
+              Verify email
+            </h1>
+            <p className="mb-6 text-white/65">
               We sent a 6-digit code to{" "}
               <span className="text-white font-semibold">{email}</span>
             </p>
@@ -144,7 +150,6 @@ export default function VerifyEmailPage() {
                     placeholder="000000"
                     className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 text-center text-2xl tracking-widest font-mono"
                     required
-                    autoFocus
                   />
                   <p className="text-xs text-white/50 text-center mt-2">
                     Code expires in 15 minutes
@@ -159,7 +164,7 @@ export default function VerifyEmailPage() {
 
                 <button
                   type="submit"
-                  className="w-full bg-white text-black font-semibold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-60"
+                  className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition duration-200 disabled:opacity-60"
                   disabled={submitting || code.length !== 6}
                 >
                   {submitting ? "Verifying..." : "Verify Email"}
@@ -176,7 +181,7 @@ export default function VerifyEmailPage() {
               </form>
             )}
 
-            <p className="text-center text-white/50 text-sm mt-8">
+            <p className="mt-6 text-center text-sm text-white/55">
               Wrong email?{" "}
               <a
                 href="/sign-up"

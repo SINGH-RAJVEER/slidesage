@@ -6,41 +6,28 @@ General API information, standards, and reference for SlideSage application.
 
 ### Environment Variables
 
-- **Web**: `VITE_API_URL=http://localhost:8000/api`
+- **Web**: `VITE_API_URL=http://localhost:8000`
 - **APIs**: Base URL configured via Hono routes
 
 ### URL Structure
 
 ```
-Development: http://localhost:8000/api
-Production:  https://your-domain.com/api
+Development: http://localhost:8000
+Production:  https://your-domain.com
 ```
+
+API routes are mounted under `/api` (for example `/api/presentations`), while the health check is `/health`.
 
 ## Authentication Standards
 
-### JWT Token Format
+### Session Cookie
 
-```bash
-Authorization: Bearer <access_token>
-```
-
-### Token Types
-
-- **Access Token**: 15 minutes expiry, used for API calls
-- **Refresh Token**: 30 days expiry, used to obtain new access tokens
-
-### Token Management
+APIs use better-auth with HTTP-only cookies. Clients must send cookies when calling protected endpoints.
 
 ```javascript
-// Store tokens securely
-localStorage.setItem('access_token', accessToken);
-localStorage.setItem('refresh_token', refreshToken);
-
-// Include in API requests
-headers: {
-  'Authorization': `Bearer ${accessToken}`,
-  'Content-Type': 'application/json'
-}
+fetch(`${API_URL}/api/presentations`, {
+    credentials: "include",
+});
 ```
 
 ## Request/Response Standards
@@ -83,27 +70,25 @@ All timestamps use ISO 8601 format (UTC):
 
 ### HTTP Status Codes
 
-| Status | Meaning               | Use Cases                                      |
-| ------ | --------------------- | ---------------------------------------------- |
-| `200`  | OK                    | Successful request                             |
-| `201`  | Created               | Resource created successfully                  |
-| `400`  | Bad Request           | Validation failed, malformed input             |
-| `401`  | Unauthorized          | Invalid/expired token, authentication required |
-| `402`  | Payment Required      | Insufficient tokens                            |
-| `403`  | Forbidden             | Access denied to resource                      |
-| `404`  | Not Found             | Resource doesn't exist                         |
-| `409`  | Conflict              | Duplicate data (email already exists)          |
-| `422`  | Unprocessable Entity  | Invalid data format                            |
-| `500`  | Internal Server Error | Server-side error                              |
+| Status | Meaning               | Use Cases                                       |
+| ------ | --------------------- | ----------------------------------------------- |
+| `200`  | OK                    | Successful request                              |
+| `201`  | Created               | Resource created successfully                   |
+| `400`  | Bad Request           | Validation failed, malformed input              |
+| `401`  | Unauthorized          | Missing or expired session cookie               |
+| `402`  | Payment Required      | Token or billing enforcement (future use)       |
+| `403`  | Forbidden             | Access denied to resource                       |
+| `404`  | Not Found             | Resource doesn't exist                          |
+| `409`  | Conflict              | Duplicate data (email already exists)           |
+| `422`  | Unprocessable Entity  | Invalid data format or session validation error |
+| `500`  | Internal Server Error | Server-side error                               |
 
 ### Client-Side Error Handling
 
 ```javascript
 try {
   const response = await fetch("/api/presentations", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -134,11 +119,11 @@ Currently not implemented but planned for production:
 ```typescript
 // Hono CORS middleware
 app.use(
-  "/api/*",
-  cors({
-    origin: ["http://localhost:5173"],
-    credentials: true,
-  }),
+    "*",
+    cors({
+        origin: ["http://localhost:5173"],
+        credentials: true,
+    }),
 );
 ```
 
@@ -166,7 +151,7 @@ Future versions may include version in URL:
 ### Endpoint
 
 ```
-GET /api/health
+GET /health
 ```
 
 ### Response
@@ -183,11 +168,19 @@ GET /api/health
 
 ```javascript
 // Check API health before making requests
-const healthResponse = await fetch("/api/health");
+const healthResponse = await fetch("/health");
 if (healthResponse.ok) {
   // API is healthy, proceed with requests
 }
 ```
+
+## Billing Endpoints (Placeholder)
+
+The billing routes exist but are not implemented yet. All return `501 Not Implemented`.
+
+- `GET /api/billing/balance`
+- `POST /api/billing/checkout`
+- `POST /api/billing/webhook`
 
 ## Pagination
 

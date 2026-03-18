@@ -6,17 +6,17 @@ The Web app (apps/Web) is a React SPA using React Router.
 
 Public:
 
-- `/sign-in/*` – sign-in flow
-- `/sign-up/*` – sign-up flow
+- `/sign-in/*` - sign-in flow
+- `/sign-up/*` - sign-up flow
 
 Protected (requires auth):
 
-- `/` – Home
-- `/generate` – Generate a presentation
-- `/presentations` – Presentations grid
-- `/presentation` – Viewer (driven by navigation state)
-- `/presentation-error` – Viewer error page
-- `/purchase` – Purchase points
+- `/` - Home
+- `/generate` - Generate a presentation
+- `/presentations` - Presentations grid
+- `/presentation` - Viewer (driven by navigation state)
+- `/presentation-error` - Viewer error page
+- `/purchase` - Purchase points
 
 ## Auth Guard
 

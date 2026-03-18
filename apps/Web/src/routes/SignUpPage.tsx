@@ -73,6 +73,9 @@ export default function SignUpPage() {
       navigate(
         `/sign-up/verify-email?email=${encodeURIComponent(email)}&redirect_url=${encodeURIComponent(redirectTo)}`,
         {
+          state: {
+            password,
+          },
           replace: true,
         },
       );
@@ -86,11 +89,15 @@ export default function SignUpPage() {
   return (
     <div className="min-h-screen bg-transparent flex flex-col">
       <Header />
-      <div className="flex-1 flex items-center justify-center px-4 md:px-8">
+      <div className="flex-1 flex items-center justify-center px-4 py-8 md:px-8">
         <div className="max-w-md w-full">
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8 shadow-2xl">
-            <h1 className="text-3xl font-bold text-white mb-2">Get Started</h1>
-            <p className="text-white/60 mb-8">Create your Slide Sage account</p>
+          <div className="rounded-xl border border-white/10 bg-black/20 p-6">
+            <h1 className="mb-1 text-2xl font-semibold text-white">
+              Create account
+            </h1>
+            <p className="mb-6 text-white/65">
+              Start generating presentations.
+            </p>
 
             <form className="space-y-4" onSubmit={handleEmailSignUp}>
               <div className="space-y-2">
@@ -179,7 +186,7 @@ export default function SignUpPage() {
 
               <button
                 type="submit"
-                className="w-full bg-white text-black font-semibold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-60"
+                className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition duration-200 disabled:opacity-60"
                 disabled={submitting}
               >
                 {submitting ? "Creating account..." : "Sign up with email"}
@@ -194,11 +201,11 @@ export default function SignUpPage() {
               <div className="h-px flex-1 bg-white/10" />
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <button
                 type="button"
                 onClick={handleGoogleSignUp}
-                className="w-full bg-white hover:bg-white/90 text-black font-semibold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2"
+                className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition duration-200 hover:bg-white/90 flex items-center justify-center gap-2"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <title>Google</title>
@@ -225,7 +232,7 @@ export default function SignUpPage() {
               <button
                 type="button"
                 onClick={handleGithubSignUp}
-                className="w-full bg-[#1F2937] hover:bg-[#111827] text-white font-semibold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2 border border-white/10"
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 font-semibold text-white transition duration-200 hover:bg-white/10 flex items-center justify-center gap-2"
               >
                 <svg
                   className="w-5 h-5"
@@ -243,7 +250,7 @@ export default function SignUpPage() {
               </button>
             </div>
 
-            <p className="text-center text-white/50 text-sm mt-8">
+            <p className="mt-6 text-center text-sm text-white/55">
               Already have an account?{" "}
               <a
                 href="/sign-in"

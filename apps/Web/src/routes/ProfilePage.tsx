@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ChangeEvent } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +16,7 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { isSignedIn, user: authUser } = useAuth();
+  const { isSignedIn } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,11 +47,7 @@ export default function ProfilePage() {
   }, [isSignedIn, navigate]);
 
   // Fetch profile on mount
-  useEffect(() => {
-    fetchProfile();
-  }, []);
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/profile", {
@@ -72,7 +68,11 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void fetchProfile();
+  }, [fetchProfile]);
 
   const handleUpdateName = async (event: FormEvent) => {
     event.preventDefault();
@@ -242,8 +242,8 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-transparent flex flex-col">
       <Header />
-      <div className="flex-1 flex items-center justify-center px-4 md:px-8 py-8">
-        <div className="max-w-2xl w-full space-y-6">
+      <div className="flex-1 px-4 py-6 md:px-8 md:py-8">
+        <div className="mx-auto w-full max-w-2xl space-y-4">
           {/* Success Alert */}
           {success ? (
             <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-100">
@@ -259,16 +259,18 @@ export default function ProfilePage() {
           ) : null}
 
           {/* Profile Header */}
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8 shadow-2xl">
-            <h1 className="text-3xl font-bold text-white mb-2">My Profile</h1>
-            <p className="text-white/60">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-6">
+            <h1 className="mb-1 text-2xl font-semibold text-white">
+              My profile
+            </h1>
+            <p className="text-white/65">
               Manage your account settings and preferences
             </p>
           </div>
 
           {/* Avatar Section */}
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8 shadow-2xl space-y-4">
-            <h2 className="text-xl font-semibold text-white">
+          <div className="space-y-4 rounded-xl border border-white/10 bg-black/20 p-6">
+            <h2 className="text-lg font-semibold text-white">
               Profile Picture
             </h2>
 
@@ -293,10 +295,14 @@ export default function ProfilePage() {
 
             <form className="space-y-4" onSubmit={handleUpdateAvatar}>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-white/80">
+                <label
+                  htmlFor="avatar-url"
+                  className="text-sm font-medium text-white/80"
+                >
                   Image URL
                 </label>
                 <input
+                  id="avatar-url"
                   type="url"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
@@ -319,11 +325,12 @@ export default function ProfilePage() {
           </div>
 
           {/* Name Section */}
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8 shadow-2xl">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white">Full Name</h2>
+              <h2 className="text-lg font-semibold text-white">Full name</h2>
               {!editingName ? (
                 <button
+                  type="button"
                   onClick={() => setEditingName(true)}
                   className="text-sm text-white/60 hover:text-white transition"
                 >
@@ -371,10 +378,10 @@ export default function ProfilePage() {
           </div>
 
           {/* Email Section */}
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8 shadow-2xl">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-xl font-semibold text-white">Email</h2>
+                <h2 className="text-lg font-semibold text-white">Email</h2>
                 {profile.emailVerified ? (
                   <p className="text-xs text-green-400/80 mt-1">✓ Verified</p>
                 ) : (
@@ -385,6 +392,7 @@ export default function ProfilePage() {
               </div>
               {!editingEmail ? (
                 <button
+                  type="button"
                   onClick={() => setEditingEmail(true)}
                   className="text-sm text-white/60 hover:text-white transition"
                 >
@@ -432,11 +440,12 @@ export default function ProfilePage() {
           </div>
 
           {/* Password Section */}
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8 shadow-2xl">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-white">Password</h2>
+              <h2 className="text-lg font-semibold text-white">Password</h2>
               {!editingPassword ? (
                 <button
+                  type="button"
                   onClick={() => setEditingPassword(true)}
                   className="text-sm text-white/60 hover:text-white transition"
                 >
@@ -448,10 +457,14 @@ export default function ProfilePage() {
             {editingPassword ? (
               <form className="space-y-4" onSubmit={handleUpdatePassword}>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-white/80">
+                  <label
+                    htmlFor="current-password"
+                    className="text-sm font-medium text-white/80"
+                  >
                     Current Password
                   </label>
                   <input
+                    id="current-password"
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
@@ -462,10 +475,14 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-white/80">
+                  <label
+                    htmlFor="new-password"
+                    className="text-sm font-medium text-white/80"
+                  >
                     New Password
                   </label>
                   <input
+                    id="new-password"
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -477,10 +494,14 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-white/80">
+                  <label
+                    htmlFor="confirm-new-password"
+                    className="text-sm font-medium text-white/80"
+                  >
                     Confirm Password
                   </label>
                   <input
+                    id="confirm-new-password"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -519,8 +540,8 @@ export default function ProfilePage() {
           </div>
 
           {/* Account Info */}
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-8 shadow-2xl">
-            <h2 className="text-xl font-semibold text-white mb-4">
+          <div className="rounded-xl border border-white/10 bg-black/20 p-6">
+            <h2 className="mb-4 text-lg font-semibold text-white">
               Account Information
             </h2>
 

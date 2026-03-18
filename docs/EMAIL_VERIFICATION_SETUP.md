@@ -35,7 +35,7 @@ The system uses a 6-digit verification code sent via Resend email service to ver
 
 ## Environment Variables
 
-Add to your `.env` file:
+Add to your `docker/.env` file (or root `.env` for local runs):
 
 ```env
 # Resend Configuration
@@ -51,7 +51,7 @@ RESEND_FROM_EMAIL=noreply@yourdomain.com
 2. Sign up for a free account
 3. Navigate to API Keys section
 4. Create a new API key
-5. Copy the key to your `.env` file as `RESEND_API_KEY`
+5. Copy the key to your `docker/.env` file as `RESEND_API_KEY`
 
 ### 2. Configure Email Domain (Production)
 
@@ -134,7 +134,7 @@ The verification code is handled automatically:
 
 ### Emails not being sent
 
-- Check that RESEND_API_KEY is set in .env
+- Check that RESEND_API_KEY is set in docker/.env
 - Verify the key is valid on Resend dashboard
 - Check Resend dashboard Emails tab for failed sends
 

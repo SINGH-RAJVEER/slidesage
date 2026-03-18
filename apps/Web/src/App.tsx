@@ -1,5 +1,3 @@
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Suspense } from "react";
 import { RouterProvider } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner";
@@ -9,9 +7,6 @@ import { router } from "@/router/router";
 export default function App() {
 	return (
 		<StreamingProvider>
-			<SpeedInsights />
-			<Analytics />
-
 			<Suspense
 				fallback={
 					<div className="min-h-screen bg-transparent flex items-center justify-center px-6">

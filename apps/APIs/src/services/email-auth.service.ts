@@ -1,5 +1,6 @@
 import { db } from "@slide-sage/db";
 import { accounts, users, verifications } from "@slide-sage/db";
+import { hashPassword as hashBetterAuthPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 import {
   generateVerificationCode,
@@ -10,21 +11,7 @@ import {
 } from "../utils/verification-code";
 import { sendVerificationEmail } from "./email.service";
 
-/**
- * Hash password using Bun's built-in crypto
- */
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/**
- * Sign up a new user with email and password
- * Creates an unverified user account and sends verification code
- */
+// Sign up a new user to create an unverified user account and send verification code
 export async function signUpWithEmail(
   email: string,
   password: string,
@@ -35,7 +22,6 @@ export async function signUpWithEmail(
   userId?: string;
 }> {
   try {
-    // Check if user already exists
     const existingUser = await db.query.users.findFirst({
       where: eq(users.email, email),
     });
@@ -44,11 +30,9 @@ export async function signUpWithEmail(
       return { success: false, error: "Email already registered" };
     }
 
-    // Generate user ID and hash password
     const userId = crypto.randomUUID();
-    const hashedPassword = await hashPassword(password);
+    const hashedPassword = await hashBetterAuthPassword(password);
 
-    // Create unverified user in database
     await db.insert(users).values({
       id: userId,
       email,
@@ -56,13 +40,12 @@ export async function signUpWithEmail(
       emailVerified: false,
     });
 
-    // Store password in accounts table for email/password authentication
     const accountId = crypto.randomUUID();
     await db.insert(accounts).values({
       id: accountId,
       userId,
-      accountId: email,
-      providerId: "email",
+      accountId: userId,
+      providerId: "credential",
       password: hashedPassword,
     });
 
@@ -80,10 +63,8 @@ export async function signUpWithEmail(
 
     // Send verification email
     const emailResult = await sendVerificationEmail(email, code, name);
-    if (!emailResult.success) {
-      // Don't fail signup if email fails, user can still verify later
+    if (!emailResult.success)
       console.error("Failed to send verification email:", emailResult.error);
-    }
 
     return {
       success: true,
@@ -98,9 +79,7 @@ export async function signUpWithEmail(
   }
 }
 
-/**
- * Verify email using the code sent to user
- */
+// Verify email
 export async function verifyEmailCode(
   email: string,
   code: string,
@@ -110,7 +89,6 @@ export async function verifyEmailCode(
   user?: typeof users.$inferSelect;
 }> {
   try {
-    // Find verification record
     const verification = await db.query.verifications.findFirst({
       where: eq(verifications.identifier, email),
     });
@@ -159,9 +137,7 @@ export async function verifyEmailCode(
   }
 }
 
-/**
- * Resend verification code to user
- */
+// Resend verification code
 export async function resendVerificationCode(email: string): Promise<{
   success: boolean;
   error?: string;

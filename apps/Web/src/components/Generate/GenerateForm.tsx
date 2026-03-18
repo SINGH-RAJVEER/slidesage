@@ -4,79 +4,79 @@ import { Button } from "@/components/ui/button";
 import { TopicInput } from "./TopicInput";
 
 interface GenerateFormProps {
-	prompt: string;
-	topics: string[];
-	loading: boolean;
-	error: string;
-	estimatedTokens: number;
-	onPromptChange: (value: string) => void;
-	onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-	onRemoveTopic: (topic: string) => void;
-	onEditTopic: (index: number, value: string) => void;
-	onGenerate: () => void;
+  prompt: string;
+  topics: string[];
+  loading: boolean;
+  error: string;
+  estimatedTokens: number;
+  onPromptChange: (value: string) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onRemoveTopic: (topic: string) => void;
+  onEditTopic: (index: number, value: string) => void;
+  onGenerate: () => void;
 }
 
 export const GenerateForm: React.FC<GenerateFormProps> = ({
-	prompt,
-	topics,
-	loading,
-	error,
-	estimatedTokens,
-	onPromptChange,
-	onKeyDown,
-	onRemoveTopic,
-	onEditTopic,
-	onGenerate,
+  prompt,
+  topics,
+  loading,
+  error,
+  estimatedTokens,
+  onPromptChange,
+  onKeyDown,
+  onRemoveTopic,
+  onEditTopic,
+  onGenerate,
 }) => {
-	return (
-		<div className="w-full max-w-2xl mx-auto py-16">
-			<div className="space-y-2 mb-16 text-center">
-				{topics.length > 0 && (
-					<p className="text-xl font-light text-white/60">
-						Est. {estimatedTokens.toFixed(1)} points
-					</p>
-				)}
-			</div>
+  return (
+    <div className="mx-auto w-full max-w-2xl py-10">
+      <div className="mb-8 text-center">
+        {topics.length > 0 && (
+          <p className="text-sm font-medium text-white/70">
+            Est. {estimatedTokens.toFixed(1)} points
+          </p>
+        )}
+      </div>
 
-			<div className="space-y-16">
-				<TopicInput
-					prompt={prompt}
-					topics={topics}
-					onPromptChange={onPromptChange}
-					onKeyDown={onKeyDown}
-					onRemoveTopic={onRemoveTopic}
-					onEditTopic={onEditTopic}
-					disabled={loading}
-				/>
+      <div className="space-y-10">
+        <TopicInput
+          prompt={prompt}
+          topics={topics}
+          onPromptChange={onPromptChange}
+          onKeyDown={onKeyDown}
+          onRemoveTopic={onRemoveTopic}
+          onEditTopic={onEditTopic}
+          disabled={loading}
+        />
 
-				<div className="flex justify-center">
-					<Button
-						onClick={onGenerate}
-						disabled={loading || topics.length === 0}
-						className="relative group overflow-hidden px-10 py-8 bg-white/10 hover:bg-white/15 backdrop-blur-md rounded-full border border-white/20 text-white transition-all duration-300 hover:border-white/40 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]"
-					>
-						<span className="relative flex items-center gap-4 text-xl font-light tracking-wide">
-							{loading ? (
-								<>
-									<Loader2 className="h-6 w-6 animate-spin" />
-									Creating...
-								</>
-							) : (
-								<>
-									<Sparkles className="h-6 w-6 opacity-70 group-hover:opacity-100 transition-opacity" />
-									Start Generating
-								</>
-							)}
-						</span>
-					</Button>
-				</div>
+        <div className="flex justify-center">
+          <Button
+            onClick={onGenerate}
+            disabled={loading || topics.length === 0}
+            className="group h-11 rounded-md border border-white/20 bg-white/10 px-6 text-white transition-colors hover:bg-white/15"
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold">
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 opacity-80" />
+                  Start Generating
+                </>
+              )}
+            </span>
+          </Button>
+        </div>
 
-				{error && (
-					<div className="bg-red-500/10 border border-red-500/20 text-red-200 px-6 py-4 rounded-xl backdrop-blur-sm text-center font-light">
-						{error}
-					</div>
-				)}
-			</div>
-		</div>
-	);
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-200 px-6 py-4 rounded-xl backdrop-blur-sm text-center font-light">
+            {error}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
