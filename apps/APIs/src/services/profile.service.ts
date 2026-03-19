@@ -1,7 +1,6 @@
 import { db } from '@slide-sage/db';
 import { users } from '@slide-sage/db';
 import { eq } from 'drizzle-orm';
-import { createHash } from 'node:crypto';
 
 /**
  * Hash password using SHA-256
