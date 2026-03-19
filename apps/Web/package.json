@@ -7,7 +7,6 @@
   "module": "src/main.tsx",
   "scripts": {
     "dev": "bunx vite",
-    "start": "bunx vite",
     "build": "bunx vite build",
     "preview": "bunx vite preview",
     "test": "bun test",
