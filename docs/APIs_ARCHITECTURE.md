@@ -4,7 +4,7 @@ Architecture overview for the SlideSage APIs service.
 
 ## Layer Architecture
 
-```
+```text
 +-----------------------------------------------------------+
 | Hono Application                                          |
 |  +-----------------------------------------------------+  |
@@ -21,6 +21,7 @@ Architecture overview for the SlideSage APIs service.
 |  |  - /api/profile                                     |  |
 |  |  - /api (presentations + research)                  |  |
 |  |  - /api/billing (placeholder)                       |  |
+|  |  - Frontend bundle (/assets/* + SPA index fallback) |  |
 |  +-----------------------------------------------------+  |
 +-----------------------------------------------------------+
                             |
@@ -59,15 +60,15 @@ Architecture overview for the SlideSage APIs service.
 const authRoutes = new Hono();
 
 authRoutes.post("/signup/email", async (c) => {
-    // Create user and send verification code
+  // Create user and send verification code
 });
 
 authRoutes.post("/verify-code", async (c) => {
-    // Verify email code
+  // Verify email code
 });
 
 authRoutes.post("/resend-code", async (c) => {
-    // Resend verification code
+  // Resend verification code
 });
 
 // All other auth routes are handled by better-auth
@@ -78,11 +79,15 @@ authRoutes.all("/*", (c) => authClient.handler(c.req.raw));
 
 ```typescript
 // apps/APIs/src/routes/presentation.routes.ts
-presentations.post("/generate-presentation-stream", authMiddleware, async (c) => {
+presentations.post(
+  "/generate-presentation-stream",
+  authMiddleware,
+  async (c) => {
     return stream(c, async (stream) => {
-        // SSE: created, theme, slide, complete, saved
+      // SSE: created, theme, slide, complete, saved
     });
-});
+  },
+);
 ```
 
 ## Middleware Layer
@@ -93,7 +98,7 @@ presentations.post("/generate-presentation-stream", authMiddleware, async (c) =>
 // apps/APIs/src/middleware/auth.middleware.ts
 const sessionCookie = getCookie(c, "better-auth.session_token");
 if (!sessionCookie) {
-    return c.json({ error: { message: "Unauthorized" } }, 401);
+  return c.json({ error: { message: "Unauthorized" } }, 401);
 }
 ```
 
@@ -103,23 +108,24 @@ The database schema lives in `packages/DB/src/db/schema.ts` and aligns with bett
 
 ```typescript
 export const users = pgTable("users", {
-    id: text("id").primaryKey(),
-    email: varchar("email", { length: 255 }).notNull().unique(),
-    emailVerified: boolean("email_verified").notNull().default(false),
-    slideTokens: real("slide_tokens").notNull().default(50.0),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+  id: text("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  slideTokens: real("slide_tokens").notNull().default(50.0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const sessions = pgTable("sessions", {
-    id: text("id").primaryKey(),
-    userId: text("user_id").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
 });
 ```
 
 ## Configuration
 
-The APIs service loads environment variables from `docker/.env` first, then `.env` at the repo root.
+For Docker runs, environment variables come from `docker/.env` through compose.
+For manual runs, the APIs service loads `.env` at the repo root.
 
 Key variables:
 
@@ -130,5 +136,18 @@ Key variables:
 - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
 - `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`
 - `LITELLM_MODEL`, `LITELLM_PROXY_BASE`, `LITELLM_SEARCH_MODEL`
+
+## Frontend Bundle Serving
+
+When `apps/Web/dist/index.html` exists, the APIs process also serves the frontend bundle:
+
+- Static assets are served from `apps/Web/dist` (`/assets/*`, `/favicon.ico`, `/robots.txt`, `/manifest.webmanifest`).
+- Non-API GET routes fall back to the frontend `index.html` for SPA routing.
+- `/api/*` routes continue to use JSON API handlers and are not affected by SPA fallback.
+
+Operational notes:
+
+- Build the web app before running the APIs service in bundled mode (`bun run build:web` at repo root).
+- If the frontend bundle is missing, the APIs service runs in API-only mode.
 
 For request flow diagrams, see [REQUEST_FLOWS.md](REQUEST_FLOWS.md).

@@ -109,8 +109,7 @@ services:
       target: development
       args:
         NODE_ENV: development
-        VITE_API_URL: ""
-        VITE_PROXY_TARGET: http://apis:8000
+        VITE_API_URL: "http://apis:8000"
     image: slide-sage/web:dev
     container_name: slide-sage-web-dev
     ports:
@@ -120,8 +119,7 @@ services:
       - ../.env
     environment:
       NODE_ENV: development
-      VITE_API_URL: ""
-      VITE_PROXY_TARGET: http://apis:8000
+      VITE_API_URL: "http://apis:8000"
       ROOT_DIR: /app
       BUN_CACHE_DIR: /root/.bun/install/cache
       STAMP_DIR: /app/.docker-cache/web

@@ -4,7 +4,6 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig(() => {
 	const proxyTarget =
-		process.env.VITE_PROXY_TARGET ||
 		process.env.VITE_API_URL ||
 		"http://localhost:8000";
 

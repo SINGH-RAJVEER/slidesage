@@ -54,12 +54,13 @@ bun install
 
 ### 3. Configure Environment Variables
 
-#### Shared Configuration (Docker + Local)
+#### Environment File Sources
 
-The APIs service loads `docker/.env` first, then `.env` at the repo root.
+- Docker services read variables from `docker/.env`.
+- Manual dev servers (`bun dev`) read variables from the repo root `.env`.
 
 ```bash
-# Copy the example environment file
+# Copy the Docker environment file
 cp docker/.env.example docker/.env
 
 # Edit with your configuration
@@ -99,21 +100,16 @@ LITELLM_SEARCH_MODEL=llama-3.1-8b-instant
 LITELLM_PROXY_BASE=http://localhost:4000
 ```
 
-#### Web Configuration (Local Only)
+#### Local Root `.env` (Manual Runs)
 
-If you are running the Web app outside Docker, create `apps/Web/.env`:
+If you are running services manually (without Docker), create a root `.env` file:
 
 ```bash
+# Repo root .env (used by manual bun/turbo runs)
+PORT=8000
+DATABASE_URL=postgresql://slidesage:slidesage@localhost:5432/slidesage
+CORS_ORIGINS=http://localhost:5173
 VITE_API_URL=http://localhost:8000
-```
-
-If you are running the Web app in Docker, keep `VITE_API_URL` empty and set
-`VITE_PROXY_TARGET` in `docker/.env` so browser requests stay same-origin while
-the Vite dev server proxies to the internal APIs container:
-
-```bash
-VITE_API_URL=
-VITE_PROXY_TARGET=http://apis:8000
 ```
 
 ### 4. Start Development Services
@@ -122,7 +118,7 @@ VITE_PROXY_TARGET=http://apis:8000
 
 ```bash
 # Start all services with Docker
-docker compose -f docker/dev/docker-compose.dev.yml up --build
+docker compose --env-file docker/.env -f docker/dev/docker-compose.dev.yml up --build
 
 # Services started:
 # - slide-sage-web (port 5173)
@@ -134,7 +130,7 @@ docker compose -f docker/dev/docker-compose.dev.yml up --build
 
 ```bash
 # Start PostgreSQL (if running locally)
-docker compose -f docker/dev/docker-compose.dev.yml up database -d
+docker compose --env-file docker/.env -f docker/dev/docker-compose.dev.yml up database -d
 
 # Start development servers
 bun dev
@@ -227,13 +223,13 @@ echo "PORT=8001" >> docker/.env
 
 ```bash
 # Check if database is running
-docker compose -f docker/dev/docker-compose.dev.yml ps
+docker compose --env-file docker/.env -f docker/dev/docker-compose.dev.yml ps
 
 # Restart database
-docker compose -f docker/dev/docker-compose.dev.yml restart database
+docker compose --env-file docker/.env -f docker/dev/docker-compose.dev.yml restart database
 
 # Check database logs
-docker compose -f docker/dev/docker-compose.dev.yml logs database
+docker compose --env-file docker/.env -f docker/dev/docker-compose.dev.yml logs database
 
 # Test connection manually
 psql postgresql://user:password@localhost:5432/slide_sage
@@ -319,8 +315,8 @@ bun run db:studio
 # Reset database (development only)
 bun run db:migrate  # Run migrations
 # Or manually reset via:
-# docker compose -f docker/dev/docker-compose.dev.yml down database
-# docker compose -f docker/dev/docker-compose.dev.yml up database
+# docker compose --env-file docker/.env -f docker/dev/docker-compose.dev.yml down database
+# docker compose --env-file docker/.env -f docker/dev/docker-compose.dev.yml up database
 ```
 
 ## Next Steps
