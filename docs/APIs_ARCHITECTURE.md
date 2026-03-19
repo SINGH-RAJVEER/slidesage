@@ -21,7 +21,6 @@ Architecture overview for the SlideSage APIs service.
 |  |  - /api/profile                                     |  |
 |  |  - /api (presentations + research)                  |  |
 |  |  - /api/billing (placeholder)                       |  |
-|  |  - Frontend bundle (/assets/* + SPA index fallback) |  |
 |  +-----------------------------------------------------+  |
 +-----------------------------------------------------------+
                             |
@@ -137,17 +136,12 @@ Key variables:
 - `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`
 - `LITELLM_MODEL`, `LITELLM_PROXY_BASE`, `LITELLM_SEARCH_MODEL`
 
-## Frontend Bundle Serving
+## Serving Model
 
-When `apps/Web/dist/index.html` exists, the APIs process also serves the frontend bundle:
+The APIs service is API-only and does not serve frontend static assets.
 
-- Static assets are served from `apps/Web/dist` (`/assets/*`, `/favicon.ico`, `/robots.txt`, `/manifest.webmanifest`).
-- Non-API GET routes fall back to the frontend `index.html` for SPA routing.
-- `/api/*` routes continue to use JSON API handlers and are not affected by SPA fallback.
-
-Operational notes:
-
-- Build the web app before running the APIs service in bundled mode (`bun run build:web` at repo root).
-- If the frontend bundle is missing, the APIs service runs in API-only mode.
+- API routes are mounted under `/api/*`.
+- Unknown non-API routes return the standard JSON 404 response from Hono.
+- Frontend assets and SPA routing should be handled by the dedicated Web deployment/runtime.
 
 For request flow diagrams, see [REQUEST_FLOWS.md](REQUEST_FLOWS.md).
