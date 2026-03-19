@@ -22,13 +22,8 @@
     "format:web": "turbo run format --filter=slide-sage-web"
   },
   "devDependencies": {
-    "turbo": "latest",
-    "prettier": "latest"
+    "turbo": "latest"
   },
   "trustedDependencies": [],
-  "packageManager": "bun@1.0.25",
-  "dependencies": {
-    "better-auth": "^1.4.18",
-    "vercel": "^50.33.1"
-  }
+  "packageManager": "bun@1.3.10"
 }
