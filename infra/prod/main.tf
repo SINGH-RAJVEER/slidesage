@@ -28,7 +28,18 @@ locals {
 		"BYOK_ENCRYPTION_KEY",
 	])
 
-	runtime_secret_names = setunion(local.api_secret_names, local.worker_secret_names)
+	observability_enabled = trimspace(var.otel_exporter_otlp_endpoint) != ""
+	observability_environment = local.observability_enabled ? {
+		OTEL_EXPORTER_OTLP_ENDPOINT = var.otel_exporter_otlp_endpoint
+		OTEL_EXPORTER_OTLP_PROTOCOL = "http/protobuf"
+		OTEL_LOGS_EXPORTER          = var.otel_logs_exporter
+		OTEL_SERVICE_VERSION        = var.otel_service_version
+	} : {}
+	runtime_secret_names = setunion(
+		local.api_secret_names,
+		local.worker_secret_names,
+		local.observability_enabled ? toset(["DATADOG_OTLP_HEADERS"]) : toset([]),
+	)
 }
 
 data "google_project" "current" {
@@ -154,6 +165,27 @@ resource "google_cloud_run_v2_service" "api" {
 			}
 
 			dynamic "env" {
+				for_each = local.observability_environment
+				content {
+					name  = env.key
+					value = env.value
+				}
+			}
+
+			dynamic "env" {
+				for_each = local.observability_enabled ? toset(["DATADOG_OTLP_HEADERS"]) : toset([])
+				content {
+					name = "OTEL_EXPORTER_OTLP_HEADERS"
+					value_source {
+						secret_key_ref {
+							secret  = data.google_secret_manager_secret.runtime[env.value].secret_id
+							version = "latest"
+						}
+					}
+				}
+			}
+
+			dynamic "env" {
 				for_each = local.api_secret_names
 				content {
 					name = env.value
@@ -238,6 +270,27 @@ resource "google_cloud_run_v2_service" "worker" {
 			env {
 				name  = "BYOK_ENCRYPTION_KEY_CURRENT_VERSION"
 				value = "1"
+			}
+
+			dynamic "env" {
+				for_each = local.observability_environment
+				content {
+					name  = env.key
+					value = env.value
+				}
+			}
+
+			dynamic "env" {
+				for_each = local.observability_enabled ? toset(["DATADOG_OTLP_HEADERS"]) : toset([])
+				content {
+					name = "OTEL_EXPORTER_OTLP_HEADERS"
+					value_source {
+						secret_key_ref {
+							secret  = data.google_secret_manager_secret.runtime[env.value].secret_id
+							version = "latest"
+						}
+					}
+				}
 			}
 
 			dynamic "env" {

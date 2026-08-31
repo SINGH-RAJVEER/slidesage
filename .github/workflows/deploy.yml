@@ -16,6 +16,8 @@ env:
   RUN_REGION: asia-south1
   IMAGE_VERSION: ${{ github.sha }}
   API_AUTH_FLAG: ${{ vars.API_AUTH_FLAG || '--allow-unauthenticated' }}
+  DATADOG_OTLP_ENDPOINT: ${{ vars.DATADOG_OTLP_ENDPOINT }}
+  OTEL_LOGS_EXPORTER: ${{ vars.OTEL_LOGS_EXPORTER || 'otlp' }}
 
 jobs:
   build:
@@ -118,9 +120,24 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Grant Datadog telemetry secret access
+        if: env.DATADOG_OTLP_ENDPOINT != ''
+        run: |
+          gcloud secrets add-iam-policy-binding DATADOG_OTLP_HEADERS \
+            --project=$PROJECT_ID \
+            --member="serviceAccount:slidesage-runtime@$PROJECT_ID.iam.gserviceaccount.com" \
+            --role=roles/secretmanager.secretAccessor \
+            --quiet
+
       - name: Deploy API service
         run: |
           IMAGE=$REGISTRY_LOCATION-docker.pkg.dev/$PROJECT_ID/$REGISTRY_REPOSITORY/api:$IMAGE_VERSION
+          SECRETS='DATABASE_URL=DATABASE_URL:latest,AUTH_SECRET=AUTH_SECRET:latest,RATE_LIMIT_HASH_SECRET=RATE_LIMIT_HASH_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest,GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest,EXA_API_KEY=EXA_API_KEY:latest,OPEN_ROUTER_API_KEY=OPEN_ROUTER_API_KEY:latest,RESEND_API_KEY=RESEND_API_KEY:latest,RESEND_FROM_EMAIL=RESEND_FROM_EMAIL:latest'
+          ENV_VARS='^@^NODE_ENV=production@BASE_URL=https://api.slidesage.app@CORS_ORIGINS=https://slidesage.app,https://www.slidesage.app,https://slidesage.pages.dev,https://slide-sage.pages.dev@BETTER_AUTH_TRUSTED_ORIGINS=https://slidesage.app,https://www.slidesage.app,https://slidesage.pages.dev,https://slide-sage.pages.dev@OPEN_ROUTER_MODEL=google/gemma-4-26b-a4b-it:free@OPEN_ROUTER_API_BASE=https://openrouter.ai/api/v1/chat/completions'
+          if [[ -n "$DATADOG_OTLP_ENDPOINT" ]]; then
+            SECRETS="$SECRETS,OTEL_EXPORTER_OTLP_HEADERS=DATADOG_OTLP_HEADERS:latest"
+            ENV_VARS="$ENV_VARS@OTEL_EXPORTER_OTLP_ENDPOINT=$DATADOG_OTLP_ENDPOINT@OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf@OTEL_LOGS_EXPORTER=$OTEL_LOGS_EXPORTER@OTEL_SERVICE_VERSION=$IMAGE_VERSION"
+          fi
           gcloud run deploy api \
             $API_AUTH_FLAG \
             --image=$IMAGE \
@@ -135,12 +152,18 @@ jobs:
             --max-instances=10 \
             --concurrency=80 \
             --timeout=300s \
-            --set-secrets=DATABASE_URL=DATABASE_URL:latest,AUTH_SECRET=AUTH_SECRET:latest,RATE_LIMIT_HASH_SECRET=RATE_LIMIT_HASH_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest,GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest,EXA_API_KEY=EXA_API_KEY:latest,OPEN_ROUTER_API_KEY=OPEN_ROUTER_API_KEY:latest,RESEND_API_KEY=RESEND_API_KEY:latest,RESEND_FROM_EMAIL=RESEND_FROM_EMAIL:latest \
-            --set-env-vars='^@^NODE_ENV=production@BASE_URL=https://api.slidesage.app@CORS_ORIGINS=https://slidesage.app,https://www.slidesage.app,https://slidesage.pages.dev,https://slide-sage.pages.dev@BETTER_AUTH_TRUSTED_ORIGINS=https://slidesage.app,https://www.slidesage.app,https://slidesage.pages.dev,https://slide-sage.pages.dev@OPEN_ROUTER_MODEL=google/gemma-4-26b-a4b-it:free@OPEN_ROUTER_API_BASE=https://openrouter.ai/api/v1/chat/completions'
+            --set-secrets="$SECRETS" \
+            --set-env-vars="$ENV_VARS"
 
       - name: Deploy worker service
         run: |
           IMAGE=$REGISTRY_LOCATION-docker.pkg.dev/$PROJECT_ID/$REGISTRY_REPOSITORY/worker:$IMAGE_VERSION
+          SECRETS='DATABASE_URL=DATABASE_URL:latest,OPEN_ROUTER_API_KEY=OPEN_ROUTER_API_KEY:latest'
+          ENV_VARS='^@^NODE_ENV=production@WORKER_CONCURRENCY=2@BASE_URL=https://api.slidesage.app@OPEN_ROUTER_MODEL=google/gemma-4-26b-a4b-it:free@OPEN_ROUTER_API_BASE=https://openrouter.ai/api/v1/chat/completions'
+          if [[ -n "$DATADOG_OTLP_ENDPOINT" ]]; then
+            SECRETS="$SECRETS,OTEL_EXPORTER_OTLP_HEADERS=DATADOG_OTLP_HEADERS:latest"
+            ENV_VARS="$ENV_VARS@OTEL_EXPORTER_OTLP_ENDPOINT=$DATADOG_OTLP_ENDPOINT@OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf@OTEL_LOGS_EXPORTER=$OTEL_LOGS_EXPORTER@OTEL_SERVICE_VERSION=$IMAGE_VERSION"
+          fi
           gcloud run deploy worker \
             --no-allow-unauthenticated \
             --image=$IMAGE \
@@ -155,8 +178,8 @@ jobs:
             --min-instances=1 \
             --max-instances=1 \
             --concurrency=1 \
-            --set-secrets=DATABASE_URL=DATABASE_URL:latest,OPEN_ROUTER_API_KEY=OPEN_ROUTER_API_KEY:latest \
-            --set-env-vars='^@^NODE_ENV=production@WORKER_CONCURRENCY=2@BASE_URL=https://api.slidesage.app@OPEN_ROUTER_MODEL=google/gemma-4-26b-a4b-it:free@OPEN_ROUTER_API_BASE=https://openrouter.ai/api/v1/chat/completions'
+            --set-secrets="$SECRETS" \
+            --set-env-vars="$ENV_VARS"
 
       - name: Verify Cloud Run exposure
         run: |

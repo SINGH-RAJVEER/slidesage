@@ -58,3 +58,26 @@ variable "open_router_model" {
 	type        = string
 	default     = "z-ai/glm-5.2:free"
 }
+
+variable "otel_exporter_otlp_endpoint" {
+	description = "Common Datadog OTLP intake endpoint. Leave empty to disable telemetry export."
+	type        = string
+	default     = ""
+}
+
+variable "otel_service_version" {
+	description = "Version attached to OpenTelemetry resources, normally the deployed commit SHA."
+	type        = string
+	default     = ""
+}
+
+variable "otel_logs_exporter" {
+	description = "Set to none when the Datadog GCP integration already collects Cloud Run stdout logs."
+	type        = string
+	default     = "otlp"
+
+	validation {
+		condition     = contains(["otlp", "none"], var.otel_logs_exporter)
+		error_message = "otel_logs_exporter must be otlp or none."
+	}
+}
