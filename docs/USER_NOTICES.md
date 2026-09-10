@@ -39,4 +39,6 @@ The notice replaces feedback that follows a user action. Blocking states that ow
 - `PresentationErrorPage`, the dedicated route for a failed generation (its retry failure message uses the notice)
 - The research failure block on `GenerateResearchPage`, which offers **Retry research**
 - The template preview failure on `MarketplaceThemePreviewPage`, which offers **Retry**
-- The "AI settings could not be loaded" state in `AISettings`, which replaces the whole panel
+- The "AI settings could not be loaded" state in `AISettings`, which replaces the whole panel. It is tracked separately from the panel's confirmations, which do go to the notice
+- The "Email verified" block on `VerifyEmailPage`, which replaces the form for the terminal state of the flow
+- The preview rendering status in the viewer, which carries its own retry link
