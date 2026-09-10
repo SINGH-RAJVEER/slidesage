@@ -4,6 +4,7 @@ export * from "./components/button";
 export * from "./components/card";
 export * from "./components/dialog";
 export * from "./components/dropdown-menu";
+export * from "./components/FloatingNotice";
 export * from "./components/Generate";
 export * from "./components/Header";
 export * from "./components/input";

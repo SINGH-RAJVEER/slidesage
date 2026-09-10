@@ -1,5 +1,5 @@
 import type { LandingPage } from "@slidesage/types";
-import { FloatingSettingsNotice } from "@slidesage/ui/components/Settings/FloatingSettingsNotice";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import {
 	Select,
 	SelectContent,
@@ -80,7 +80,7 @@ export function LandingPreference({ value, onSave }: LandingPreferenceProps) {
 					{message}
 				</p>
 			) : null}
-			<FloatingSettingsNotice error={error} onDismiss={() => setError(null)} />
+			<FloatingNotice error={error} onDismiss={() => setError(null)} />
 		</section>
 	);
 }

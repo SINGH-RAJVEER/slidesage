@@ -1,6 +1,6 @@
 import type { AIConfigurationResponse, AIModelSelection, AIProvider } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
-import { FloatingSettingsNotice } from "@slidesage/ui/components/Settings/FloatingSettingsNotice";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import {
 	Select,
 	SelectContent,
@@ -172,7 +172,7 @@ export function AISettings({
 
 	return (
 		<div className="space-y-10">
-			<FloatingSettingsNotice error={notice} onDismiss={() => setNotice(null)} />
+			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
 			<section>
 				<div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
 					External providers
