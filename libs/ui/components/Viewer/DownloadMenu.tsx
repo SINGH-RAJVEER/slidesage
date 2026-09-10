@@ -6,6 +6,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@slidesage/ui/components/dropdown-menu";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { ChevronDown, Download, Presentation } from "lucide-react";
 import type React from "react";
@@ -91,14 +92,7 @@ const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>
-			{error && (
-				<span
-					role="alert"
-					className="absolute top-full mt-1 text-xs text-red-400 whitespace-nowrap"
-				>
-					{error}
-				</span>
-			)}
+			<FloatingNotice error={error} onDismiss={() => setError(null)} />
 		</div>
 	);
 };

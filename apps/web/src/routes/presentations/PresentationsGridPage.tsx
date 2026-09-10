@@ -4,7 +4,6 @@ import type {
 	PresentationSummary,
 	PresentationsResponse,
 } from "@slidesage/types";
-import { Alert, AlertDescription, AlertTitle } from "@slidesage/ui/components/alert";
 import { Button } from "@slidesage/ui/components/button";
 import {
 	Dialog,
@@ -14,6 +13,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@slidesage/ui/components/dialog";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import {
 	GridSizeControl,
 	PresentationCard,
@@ -302,6 +302,7 @@ export default function PresentationsGridPage() {
 	return (
 		<div className="flex h-dvh flex-col overflow-hidden bg-transparent">
 			<Header />
+			<FloatingNotice error={error} onDismiss={() => setError("")} />
 			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
 				<div className="max-w-7xl mx-auto">
 					<div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -310,16 +311,6 @@ export default function PresentationsGridPage() {
 							<GridSizeControl gridSize={gridSize} onGridSizeChange={setGridSize} />
 						</div>
 					</div>
-
-					{error && (
-						<Alert
-							variant="destructive"
-							className="mb-6 bg-red-500/20 border-red-500/50 text-white"
-						>
-							<AlertTitle>Error</AlertTitle>
-							<AlertDescription>{error}</AlertDescription>
-						</Alert>
-					)}
 
 					{loading ? (
 						<div

@@ -1,5 +1,6 @@
 import { Button } from "@slidesage/ui/components/button";
 import { DialogHeader } from "@slidesage/ui/components/dialog";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { Slider, SliderThumb } from "@slidesage/ui/components/slider";
 import { Textarea } from "@slidesage/ui/components/textarea";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
@@ -41,7 +42,11 @@ export default function IterateModal({
 	const [detailLevel, setDetailLevel] = useState("balanced");
 	const [tonality, setTonality] = useState("professional");
 	const [useWebResearch, setUseWebResearch] = useState(false);
+	const [dismissedError, setDismissedError] = useState<string | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+	// The error is owned by the streaming state upstream, so dismissal is tracked
+	// locally against the message that was last acknowledged.
+	const visibleError = open && error && error !== dismissedError ? error : null;
 
 	useEffect(() => {
 		if (!open) return;
@@ -190,11 +195,6 @@ export default function IterateModal({
 				</div>
 			</div>
 			<div className="border-t border-white/10 bg-black/20 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:px-6">
-				{error && (
-					<p role="alert" className="mb-3 text-sm text-red-300">
-						{error}
-					</p>
-				)}
 				<Button
 					onClick={handleSubmit}
 					disabled={!iteratePrompt.trim() || isStreaming}
@@ -236,6 +236,7 @@ export default function IterateModal({
 			>
 				{panelContent}
 			</aside>
+			<FloatingNotice error={visibleError} onDismiss={() => setDismissedError(error ?? null)} />
 		</>
 	);
 }

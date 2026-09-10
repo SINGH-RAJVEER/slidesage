@@ -1,5 +1,6 @@
 import type { ApiErrorResponse, PresentationResponse } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
 import { getPresentationRetryDestination } from "@slidesage/ui/lib/presentation-retry";
@@ -96,6 +97,7 @@ export default function PresentationErrorPage({
 	return (
 		<div className="flex min-h-screen flex-col bg-transparent">
 			<Header />
+			<FloatingNotice error={retryError} onDismiss={() => setRetryError("")} />
 			<main className="flex flex-1 items-center px-6 py-12 md:px-10 md:py-16">
 				<section aria-labelledby="presentation-error-title" className="mx-auto w-full max-w-3xl">
 					<div className="max-w-2xl">
@@ -158,12 +160,6 @@ export default function PresentationErrorPage({
 							</Button>
 						)}
 					</div>
-
-					{retryError && (
-						<p className="mt-4 text-sm text-red-300" role="alert">
-							{retryError}
-						</p>
-					)}
 				</section>
 			</main>
 		</div>
