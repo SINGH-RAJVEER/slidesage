@@ -48,6 +48,12 @@ export interface BinaryPptxTemplate {
 	};
 	/** Object path of the rendered cover thumbnail, relative to the CDN root. */
 	thumbnailPath: string;
+	/**
+	 * Slides in the published package, zero when nothing is published yet. It
+	 * is what lets a reader address a slide preview without asking the API for
+	 * a manifest first.
+	 */
+	slideCount: number;
 }
 
 const WIDESCREEN: BinaryTemplateDimensions = {
@@ -64,7 +70,7 @@ const HALF_SCALE_WIDESCREEN: BinaryTemplateDimensions = {
 
 type CatalogEntry = Omit<
 	BinaryPptxTemplate,
-	"asset" | "sourceFilename" | "version" | "thumbnailPath"
+	"asset" | "sourceFilename" | "version" | "thumbnailPath" | "slideCount"
 >;
 
 /**
@@ -85,6 +91,7 @@ function template(entry: CatalogEntry): BinaryPptxTemplate {
 			? { status: "available", sha256: published.sha256 }
 			: { status: "pending-upload" },
 		thumbnailPath: `pptx-templates/${entry.id}/1/thumbnails/cover.webp`,
+		slideCount: published?.slideCount ?? 0,
 	};
 }
 
