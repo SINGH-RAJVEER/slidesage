@@ -91,3 +91,35 @@ func TestEveryPublishedTemplateHasAManifest(t *testing.T) {
 		}
 	}
 }
+
+// TestClosingIsAlwaysTheFinalSlide holds the invariant the landing page reads
+// the catalog through. Every package in the catalog ends with the same credits
+// slide, and the web client drops a template's last slide to keep that page off
+// the hero ring - it has no manifest of its own to consult. Were a template
+// ever published with its closing archetype somewhere other than the end, that
+// arithmetic would start cutting a content page and leaving the credits in.
+func TestClosingIsAlwaysTheFinalSlide(t *testing.T) {
+	ids, err := IDs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range ids {
+		manifest, err := Lookup(id, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		closings := 0
+		for _, archetype := range manifest.Archetypes {
+			if archetype.Role != templatepublish.RoleClosing {
+				continue
+			}
+			closings++
+			if archetype.SourceSlide != manifest.SlideCount {
+				t.Errorf("%s closes on slide %d of %d", id, archetype.SourceSlide, manifest.SlideCount)
+			}
+		}
+		if closings != 1 {
+			t.Errorf("%s has %d closing slides, want exactly one", id, closings)
+		}
+	}
+}
