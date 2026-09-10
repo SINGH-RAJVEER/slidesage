@@ -75,12 +75,14 @@ export function LandingPreference({ value, onSave }: LandingPreferenceProps) {
 					))}
 				</SelectContent>
 			</Select>
-			{message ? (
-				<p role="status" className="mt-3 text-sm text-white/70">
-					{message}
-				</p>
-			) : null}
-			<FloatingNotice error={error} onDismiss={() => setError(null)} />
+			<FloatingNotice
+				error={error}
+				success={message}
+				onDismiss={() => {
+					setError(null);
+					setMessage(null);
+				}}
+			/>
 		</section>
 	);
 }
