@@ -1,4 +1,5 @@
 import { useAuth } from "@slidesage/ui";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { auth } from "@slidesage/ui/lib/auth-client";
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -95,6 +96,14 @@ export default function ResetPasswordPage() {
 	return (
 		<div className="min-h-screen bg-transparent flex flex-col">
 			<Header />
+			<FloatingNotice
+				error={error}
+				success={success}
+				onDismiss={() => {
+					setError(null);
+					setSuccess(null);
+				}}
+			/>
 			<div className="flex-1 flex items-center justify-center px-4 py-8 md:px-8">
 				<div className="max-w-md w-full">
 					<div className="rounded-xl border border-white/10 bg-black/20 p-6">
@@ -175,18 +184,6 @@ export default function ResetPasswordPage() {
 									required
 								/>
 							</div>
-
-							{success ? (
-								<div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-100">
-									{success}
-								</div>
-							) : null}
-
-							{error ? (
-								<div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-									{error}
-								</div>
-							) : null}
 
 							<button
 								type="submit"

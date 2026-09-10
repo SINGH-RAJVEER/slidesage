@@ -8,8 +8,8 @@ import type {
 } from "@slidesage/types";
 import { useAuth } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { LoadingScreen } from "@slidesage/ui/components/loading-screen";
-import { FloatingSettingsNotice } from "@slidesage/ui/components/Settings/FloatingSettingsNotice";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
 import { FolderOpen } from "lucide-react";
@@ -351,16 +351,16 @@ export default function ProfilePage() {
 	return (
 		<div className="min-h-screen bg-transparent flex flex-col">
 			<Header />
-			<FloatingSettingsNotice error={null} success={success} onDismiss={() => setSuccess(null)} />
+			<FloatingNotice
+				error={error}
+				success={success}
+				onDismiss={() => {
+					setError(null);
+					setSuccess(null);
+				}}
+			/>
 			<div className="flex-1 px-4 py-6 md:px-8 md:py-8">
 				<div className="mx-auto w-full max-w-2xl space-y-4">
-					{/* Error Alert */}
-					{error ? (
-						<div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-							{error}
-						</div>
-					) : null}
-
 					{/* Avatar Section */}
 					<div className="space-y-4 pb-8">
 						<h2 className="text-lg font-semibold text-white">Profile Picture</h2>

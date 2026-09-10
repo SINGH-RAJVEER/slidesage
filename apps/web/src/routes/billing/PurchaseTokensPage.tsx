@@ -15,6 +15,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@slidesage/ui/components/card";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { Input } from "@slidesage/ui/components/input";
 import { API_URL } from "@slidesage/ui/lib/api";
 import { publishPointsBalance } from "@slidesage/ui/lib/points";
@@ -213,6 +214,14 @@ export default function PurchaseTokensPage() {
 	return (
 		<div className="flex h-dvh flex-col overflow-hidden bg-transparent">
 			<Header />
+			<FloatingNotice
+				error={errorMessage}
+				success={successMessage}
+				onDismiss={() => {
+					setErrorMessage(null);
+					setSuccessMessage(null);
+				}}
+			/>
 
 			{/* Main Content */}
 			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
@@ -227,16 +236,6 @@ export default function PurchaseTokensPage() {
 							</span>
 							<span className="text-lg text-white/40 font-light">points</span>
 						</div>
-						{successMessage && (
-							<div className="text-xs text-green-400/80 font-medium tracking-wide">
-								{successMessage}
-							</div>
-						)}
-						{errorMessage && (
-							<div className="text-xs text-red-400/80 font-medium tracking-wide">
-								{errorMessage}
-							</div>
-						)}
 					</div>
 
 					{/* Purchase Options */}
