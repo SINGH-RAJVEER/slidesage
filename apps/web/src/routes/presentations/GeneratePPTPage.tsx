@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
 
 interface GenerateRouteState {
 	retry?: PresentationRetryOptions;
@@ -33,6 +34,7 @@ function templateSelection(
 }
 
 export default function GeneratePPTPage() {
+	useHorizonPageReady();
 	const location = useLocation();
 	const retry = (location.state as GenerateRouteState | null)?.retry;
 	const retryPresentationId = (location.state as GenerateRouteState | null)?.retryPresentationId;

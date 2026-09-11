@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
 
 interface PaginationState {
 	total: number;
@@ -87,6 +88,7 @@ export default function PresentationsGridPage() {
 	const [presentations, setPresentations] = useState<PresentationSummary[]>([]);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [loading, setLoading] = useState(true);
+	useHorizonPageReady(!loading);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [error, setError] = useState("");
 	const [deletingId, setDeletingId] = useState<string | null>(null);

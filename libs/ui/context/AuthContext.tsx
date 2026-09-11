@@ -2,6 +2,7 @@ import type React from "react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { POINTS_UPDATED_EVENT, readPointBalanceStorage } from "../lib/points";
 import { fetchSessionWithRetry, isSessionCheckStale, type SessionUser } from "../lib/session";
+import { rememberSignedIn } from "../lib/session-history";
 
 export type User = SessionUser;
 
@@ -45,6 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 			.then((nextUser) => {
 				if (!signingOut.current && requestId === sessionRequestId.current) {
 					lastSessionCheckAt.current = Date.now();
+					if (nextUser) rememberSignedIn();
 					setUser(nextUser);
 				}
 			})
