@@ -484,6 +484,7 @@ export function SlideRingHero() {
 				plate.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) matrix(${a}, ${b}, ${b}, ${d}, 0, 0) scale(${scale * shrink})`;
 				plate.style.pointerEvents = pull > 0.65 ? "none" : "auto";
 				plate.style.zIndex = String(stackingLayers[i] ?? 0);
+				plate.style.filter = `brightness(${0.78 + depth * 0.22}) blur(${(1 - depth) ** 2 * 0.45}px)`;
 
 				/* depth bottoms out a quarter turn back from the ring's origin,
 				   so counting turns from there counts passes behind the orb */
@@ -657,7 +658,8 @@ export function SlideRingHero() {
 			aria-label="Presentation templates orbiting a black hole"
 			className="relative h-full w-full cursor-grab select-none overflow-hidden active:cursor-grabbing"
 			style={{
-				background: "radial-gradient(120% 90% at 50% -20%, #252a37 0%, #161b27 60%)",
+				background:
+					"radial-gradient(ellipse at 50% 46%, transparent 24%, rgba(4, 7, 14, 0.42) 100%), radial-gradient(100% 85% at 48% 30%, #242c3b 0%, #161b27 65%, #10141e 100%)",
 				touchAction: "pan-y",
 			}}
 		>

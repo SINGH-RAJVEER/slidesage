@@ -22,6 +22,22 @@ function createStars(count: number): Star[] {
 	}));
 }
 
+/* Perspective flights are sampled from absolute time, so both their speed
+   and their curved trails stay consistent across refresh rates. */
+function flightPoint(
+	angle: number,
+	offset: number,
+	progress: number,
+	extent: number,
+	gravity: number,
+) {
+	const depth = 1 - progress * 0.92;
+	const radius = (extent * offset) / depth;
+	const influence = Math.exp(-radius / (extent * 0.85));
+	const bend = gravity * influence * progress * 0.075;
+	return { x: Math.cos(angle + bend) * radius, y: Math.sin(angle + bend) * radius };
+}
+
 function compile(gl: WebGLRenderingContext, type: number, source: string) {
 	const shader = gl.createShader(type);
 	if (!shader) return null;
@@ -123,6 +139,13 @@ export function WordmarkOrb() {
 			webgl.clearColor(0, 0, 0, 0);
 
 			const stars = createStars(180);
+			const flights = Array.from({ length: 115 }, (_, index) => ({
+				angle: seeded(index, 11) * Math.PI * 2,
+				offset: 0.12 + seeded(index, 12) * 0.72,
+				phase: seeded(index, 13),
+				speed: 0.035 + seeded(index, 14) * 0.04,
+				length: 0.006 + seeded(index, 15) * 0.01,
+			}));
 			const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 			const reducedMotion = motionQuery.matches;
 			let width = 1;
@@ -176,6 +199,26 @@ export function WordmarkOrb() {
 					starContext.beginPath();
 					starContext.arc(x, y, radius, 0, Math.PI * 2);
 					starContext.fill();
+				}
+				// Short hairlines approach the viewer and fade before they recycle.
+				// The larger horizon bends nearby paths a little more strongly.
+				const horizonScale =
+					Number(host.parentElement?.style.getPropertyValue("--horizon-scale")) || 1 / 3;
+				const extent = Math.min(width, height) * 0.42;
+				starContext.lineCap = "round";
+				for (const flight of flights) {
+					const progress = fract(flight.phase + elapsed * flight.speed);
+					const fade = Math.min(1, progress / 0.12, (1 - progress) / 0.14);
+					starContext.strokeStyle = `rgba(153, 183, 215, ${fade * (0.045 + progress * 0.2)})`;
+					starContext.lineWidth = 0.35 + progress * 0.45;
+					starContext.beginPath();
+					for (let segment = 0; segment <= 4; segment++) {
+						const sample = Math.max(0, progress - flight.length * (1 - segment / 4));
+						const point = flightPoint(flight.angle, flight.offset, sample, extent, horizonScale);
+						if (segment === 0) starContext.moveTo(width / 2 + point.x, height / 2 + point.y);
+						else starContext.lineTo(width / 2 + point.x, height / 2 + point.y);
+					}
+					starContext.stroke();
 				}
 				starContext.globalCompositeOperation = "source-over";
 			};
