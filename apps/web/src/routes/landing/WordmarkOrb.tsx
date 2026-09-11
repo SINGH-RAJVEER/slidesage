@@ -132,6 +132,7 @@ export function WordmarkOrb() {
 
 			const uniforms = {
 				time: webgl.getUniformLocation(program, "uT"),
+				expansion: webgl.getUniformLocation(program, "uExpansion"),
 				resolution: webgl.getUniformLocation(program, "uR"),
 			};
 			webgl.enable(webgl.BLEND);
@@ -228,6 +229,12 @@ export function WordmarkOrb() {
 				const elapsed = reducedMotion ? STATIC_ELAPSED : (now - startedAt) * 0.001;
 				drawStars(elapsed);
 				webgl.uniform1f(uniforms.time, elapsed);
+				const scale =
+					Number(host.parentElement?.style.getPropertyValue("--horizon-scale")) || 1 / 3;
+				webgl.uniform1f(
+					uniforms.expansion,
+					Math.max(0, Math.min(1, (scale - 1 / 3) / (1.22 - 1 / 3))),
+				);
 				webgl.clear(webgl.COLOR_BUFFER_BIT);
 				webgl.drawArrays(webgl.TRIANGLES, 0, 3);
 				if (!reducedMotion && visible && !document.hidden) frame = requestAnimationFrame(render);

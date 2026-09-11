@@ -7,6 +7,7 @@ export const WORDMARK_ORB_VERTEX_SHADER =
 export const WORDMARK_ORB_FRAGMENT_SHADER = `
 precision highp float;
 uniform float uT;
+uniform float uExpansion;
 uniform vec2 uR;
 
 float hash(vec2 p) {
@@ -62,10 +63,13 @@ void main() {
 	float veil = smoothstep(0.48, 0.76, flow) * 0.035;
 	/* Reflections taper off inside the silhouette, never outlining it. */
 	float inset = 1.0 - smoothstep(0.83, 1.0, length(p));
-	vec3 color = vec3(0.002, 0.003, 0.006);
+	// Hue follows the already-smoothed expansion, so it reverses with size.
+	float blue = smoothstep(0.0, 1.0, uExpansion);
+	vec3 color = mix(vec3(0.002, 0.003, 0.006), vec3(0.004, 0.012, 0.029), blue);
+	color += inset * blue * vec3(0.003, 0.010, 0.024) * z;
 	color += vec3(0.045, 0.080, 0.13) * veil;
-	color += inset * (vec3(0.25, 0.31, 0.39) * upper
-		+ vec3(0.045, 0.13, 0.24) * side
+	color += inset * (mix(vec3(0.25, 0.31, 0.39), vec3(0.20, 0.32, 0.49), blue) * upper
+		+ mix(vec3(0.045, 0.13, 0.24), vec3(0.035, 0.16, 0.34), blue) * side
 		+ vec3(0.22, 0.26, 0.30) * glint);
 	gl_FragColor = vec4(color, alpha);
 }
