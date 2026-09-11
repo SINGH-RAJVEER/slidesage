@@ -1,6 +1,15 @@
-import { BINARY_PPTX_TEMPLATE_CATALOG, type PresentationData } from "@slidesage/types";
+import type { PresentationData } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@slidesage/ui/components/dialog";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import {
 	Select,
 	SelectContent,
@@ -31,17 +40,13 @@ import { useSlideNavigation } from "@slidesage/ui/hooks/useSlideNavigation";
 import { useViewerKeyboardNavigation } from "@slidesage/ui/hooks/useViewerKeyboardNavigation";
 import { API_URL } from "@slidesage/ui/lib/api";
 import { requestGenerationNotificationPermission } from "@slidesage/ui/lib/generation-notifications";
-import { fetchPresentationRevision } from "@slidesage/ui/lib/presentation-revision";
+import {
+	deletePresentationSlide,
+	fetchPresentationRevision,
+} from "@slidesage/ui/lib/presentation-revision";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ROUTES } from "../../app/router/paths";
-import { useVimMode } from "../../context/VimModeContext";
-
-function templateLabelFor(reference?: PresentationData["template"]): string | undefined {
-	return BINARY_PPTX_TEMPLATE_CATALOG.find(
-		(candidate) => candidate.id === reference?.id && candidate.version === reference.version,
-	)?.name;
-}
 
 // Radix rejects an empty option value, so the live pointer needs a sentinel.
 const CURRENT_REVISION = "current";
@@ -51,7 +56,6 @@ export default function PresentationViewerPage() {
 	const navigate = useNavigate();
 	const params = useParams();
 	const { streamingState, getPresentation, generate, cancelGeneration } = useStreaming();
-	const { isVimMode } = useVimMode();
 
 	const locationState = location.state as ViewerLocationState | undefined;
 
@@ -132,7 +136,6 @@ export default function PresentationViewerPage() {
 	});
 
 	useViewerKeyboardNavigation({
-		enabled: isVimMode,
 		currentSlide: navigation.currentSlide,
 		slideCount,
 		onNavigate: (index) => navigation.scrollToSlide(index, "auto"),
@@ -154,11 +157,15 @@ export default function PresentationViewerPage() {
 		navigate,
 	]);
 
-	// Show the deck from its first slide once the finished revision is parsed.
+	// Show the deck from its first slide once the finished revision is parsed,
+	// or from whichever slide took the place of one that was just deleted.
+	const focusSlideRef = useRef(0);
 	useEffect(() => {
 		if (slideCount === 0) return;
+		const target = Math.min(focusSlideRef.current, slideCount - 1);
+		focusSlideRef.current = 0;
 		const id = setTimeout(() => {
-			navigation.scrollToSlide(0, "smooth");
+			navigation.scrollToSlide(target, "smooth");
 		}, 100);
 		return () => clearTimeout(id);
 	}, [navigation.scrollToSlide, slideCount]);
@@ -190,6 +197,27 @@ export default function PresentationViewerPage() {
 			setShowIterateModal(false);
 		}
 		return success;
+	};
+
+	const [slideToDelete, setSlideToDelete] = useState<number>();
+	const [isDeletingSlide, setIsDeletingSlide] = useState(false);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
+
+	// The deck without the slide becomes the next revision, so the viewer only
+	// has to reload the current pointer to show it.
+	const handleDeleteSlide = async () => {
+		if (!presentationId || !previews.revision || slideToDelete === undefined) return;
+		setIsDeletingSlide(true);
+		try {
+			await deletePresentationSlide(presentationId, previews.revision.revision, slideToDelete);
+			focusSlideRef.current = slideToDelete;
+			setSlideToDelete(undefined);
+			previews.reload();
+		} catch (cause) {
+			setDeleteError(cause instanceof Error ? cause.message : "Could not delete the slide.");
+		} finally {
+			setIsDeletingSlide(false);
+		}
 	};
 
 	const handleCancelGeneration = async () => {
@@ -241,6 +269,10 @@ export default function PresentationViewerPage() {
 	const viewerTitle = presentation?.title ?? streamingState.prompt ?? "Untitled presentation";
 	const hasSlides = slideCount > 0;
 	const isWaitingForDeck = shouldShowGenerating || isRevisionLoading;
+	// Only the deck's live revision can be edited: an older one is history, and a
+	// deck that is still generating has nothing committed to edit yet.
+	const canEditDeck =
+		!!presentationId && !!previews.revision && !selectedRevision && !shouldShowGenerating;
 	const canCancelGeneration =
 		shouldShowGenerating &&
 		streamingState.operation === "generation" &&
@@ -273,7 +305,6 @@ export default function PresentationViewerPage() {
 					<ViewerHeaderControls
 						title={viewerTitle}
 						canIterate={!!previews.revision && !!presentationId && !selectedRevision}
-						templateLabel={templateLabelFor(presentation?.template)}
 						onBack={() => navigate(isStreamingMode ? ROUTES.generate : ROUTES.presentations)}
 						onIterate={() => setShowIterateModal((current) => !current)}
 						onPresent={() => void enterFullscreen()}
@@ -361,6 +392,10 @@ export default function PresentationViewerPage() {
 						}}
 						onCancelGeneration={canCancelGeneration ? handleCancelGeneration : undefined}
 						cancelDisabled={isCancelling}
+						onDeleteSlide={
+							canEditDeck ? () => setSlideToDelete(navigation.currentSlide) : undefined
+						}
+						deleteDisabled={isDeletingSlide}
 						onExport={exportPresentation}
 					/>
 				)}
@@ -424,6 +459,35 @@ export default function PresentationViewerPage() {
 					/>
 				)}
 			</div>
+			<FloatingNotice error={deleteError} onDismiss={() => setDeleteError(null)} />
+			<Dialog
+				open={slideToDelete !== undefined}
+				onOpenChange={(open) => {
+					if (!open) setSlideToDelete(undefined);
+				}}
+			>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Delete this slide?</DialogTitle>
+						<DialogDescription>
+							Slide {(slideToDelete ?? 0) + 1} is removed from the deck and a new revision is saved.
+							The revision that still has it stays in the history.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setSlideToDelete(undefined)}>
+							Keep slide
+						</Button>
+						<Button
+							variant="destructive"
+							disabled={isDeletingSlide}
+							onClick={() => void handleDeleteSlide()}
+						>
+							{isDeletingSlide ? "Deleting..." : "Delete slide"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 			{!isFullscreenMode && (
 				<IterateModal
 					open={showIterateModal}
