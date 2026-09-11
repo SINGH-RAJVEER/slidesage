@@ -1,6 +1,6 @@
 {
 	"name": "@slidesage/ui",
-	"version": "0.0.2",
+	"version": "0.2.0",
 	"type": "module",
 	"main": "./index.ts",
 	"exports": {
