@@ -5,14 +5,15 @@ import {
 	DropdownMenuTrigger,
 } from "@slidesage/ui/components/dropdown-menu";
 import MarketplaceCard from "@slidesage/ui/components/Marketplace/MarketplaceCard";
+import { SearchBar } from "@slidesage/ui/components/SearchBar";
 import { MARKETPLACE_ITEMS, type MarketplaceItem } from "@slidesage/ui/lib/catalog";
-import { templateThumbnailUrl } from "@slidesage/ui/lib/template-thumbnails";
 import {
 	getInstalledMarketplaceThemes,
 	installMarketplaceTheme,
 	removeMarketplaceTheme,
 } from "@slidesage/ui/lib/marketplace-themes";
-import { Check, ChevronDown, Palette, Search, SlidersHorizontal } from "lucide-react";
+import { templateThumbnailUrl } from "@slidesage/ui/lib/template-thumbnails";
+import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
@@ -65,30 +66,14 @@ export default function MarketplacePage() {
 			<main className="min-h-0 flex-1 overflow-y-auto pb-[max(5rem,env(safe-area-inset-bottom))]">
 				<section className="px-4 py-8 md:px-8 md:py-12">
 					<div className="mx-auto max-w-7xl">
-						<div className="grid gap-3 border-b border-white/10 pb-6 md:grid-cols-[auto_minmax(16rem,1fr)_auto] md:items-center">
-							<div className="hidden md:flex md:justify-start">
-								<button
-									type="button"
-									disabled
-									title="Theme editor coming soon"
-									className="flex h-10 items-center justify-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-4 text-sm font-medium text-blue-300 transition-colors hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-70"
-								>
-									<Palette className="h-4 w-4" />
-									Contribute a theme
-									<span className="text-[9px] uppercase tracking-wider text-blue-300/55">Soon</span>
-								</button>
-							</div>
-							<label className="flex h-11 min-w-0 items-center gap-3 rounded-full border border-white/10 bg-black/20 px-5 text-white/40 transition-colors focus-within:border-blue-400/50 focus-within:bg-black/30 focus-within:ring-2 focus-within:ring-blue-500/10">
-								<Search className="h-4 w-4 shrink-0" />
-								<span className="sr-only">Search marketplace</span>
-								<input
-									type="search"
-									value={query}
-									onInput={(event) => setQuery(event.currentTarget.value)}
-									placeholder="Search templates"
-									className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/30"
-								/>
-							</label>
+						<div className="grid gap-3 border-b border-white/10 pb-6 md:grid-cols-[minmax(16rem,1fr)_auto] md:items-center">
+							<SearchBar
+								id="marketplace-search"
+								label="Search marketplace"
+								value={query}
+								onChange={setQuery}
+								placeholder="Search templates"
+							/>
 							<div className="flex justify-end">
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild>

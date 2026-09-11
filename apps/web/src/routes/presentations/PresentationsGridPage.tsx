@@ -14,11 +14,8 @@ import {
 	DialogTitle,
 } from "@slidesage/ui/components/dialog";
 import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
-import {
-	GridSizeControl,
-	PresentationCard,
-	PresentationSearchBar,
-} from "@slidesage/ui/components/Presentations";
+import { GridSizeControl, PresentationCard } from "@slidesage/ui/components/Presentations";
+import { SearchBar } from "@slidesage/ui/components/SearchBar";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
 import { PRESENTATIONS_UPDATED_EVENT } from "@slidesage/ui/lib/presentation-events";
@@ -27,10 +24,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
-
-interface SearchFilters {
-	query: string;
-}
 
 interface PaginationState {
 	total: number;
@@ -286,10 +279,6 @@ export default function PresentationsGridPage() {
 		}
 	};
 
-	const handleSearch = (filters: SearchFilters) => {
-		setSearchQuery(filters.query);
-	};
-
 	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);
 		return date.toLocaleDateString("en-US", {
@@ -305,8 +294,14 @@ export default function PresentationsGridPage() {
 			<FloatingNotice error={error} onDismiss={() => setError("")} />
 			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
 				<div className="max-w-7xl mx-auto">
-					<div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-						<PresentationSearchBar onSearch={handleSearch} />
+					<div className="mb-8 flex flex-col gap-3 border-b border-white/10 pb-6 sm:flex-row sm:items-center">
+						<SearchBar
+							id="presentation-search"
+							label="Search presentations"
+							value={searchQuery}
+							onChange={setSearchQuery}
+							placeholder="Search by title, prompt, or date..."
+						/>
 						<div className="hidden sm:block">
 							<GridSizeControl gridSize={gridSize} onGridSizeChange={setGridSize} />
 						</div>

@@ -12,7 +12,9 @@ describe("MarketplacePage", () => {
 	beforeEach(() => localStorage.clear());
 
 	it("lists all 24 binary marketplace templates", async () => {
-		const { default: MarketplacePage } = await import("../../../routes/marketplace/MarketplacePage");
+		const { default: MarketplacePage } = await import(
+			"../../../routes/marketplace/MarketplacePage"
+		);
 		const view = render(
 			<MemoryRouter initialEntries={["/marketplace"]}>
 				<MarketplacePage />
@@ -26,7 +28,9 @@ describe("MarketplacePage", () => {
 	});
 
 	it("opens a binary template ID in its preview route", async () => {
-		const { default: MarketplacePage } = await import("../../../routes/marketplace/MarketplacePage");
+		const { default: MarketplacePage } = await import(
+			"../../../routes/marketplace/MarketplacePage"
+		);
 		const view = render(
 			<MemoryRouter initialEntries={["/marketplace"]}>
 				<Routes>
@@ -69,7 +73,9 @@ describe("MarketplacePage", () => {
 	});
 
 	it("installs and removes a versioned binary reference", async () => {
-		const { default: MarketplacePage } = await import("../../../routes/marketplace/MarketplacePage");
+		const { default: MarketplacePage } = await import(
+			"../../../routes/marketplace/MarketplacePage"
+		);
 		const { MARKETPLACE_ITEMS } = await import("@slidesage/ui/lib/catalog");
 		const item = MARKETPLACE_ITEMS[0];
 		if (!item) throw new Error("Expected marketplace fixture");
@@ -89,14 +95,16 @@ describe("MarketplacePage", () => {
 	});
 
 	it("searches binary catalog metadata", async () => {
-		const { default: MarketplacePage } = await import("../../../routes/marketplace/MarketplacePage");
+		const { default: MarketplacePage } = await import(
+			"../../../routes/marketplace/MarketplacePage"
+		);
 		const view = render(
 			<MemoryRouter initialEntries={["/marketplace"]}>
 				<MarketplacePage />
 			</MemoryRouter>,
 		);
 
-		fireEvent.input(view.getByRole("searchbox", { name: "Search marketplace" }), {
+		fireEvent.input(view.getByRole("textbox", { name: "Search marketplace" }), {
 			target: { value: "16:9" },
 		});
 		expect(view.getByText("Hotel Sales Strategy", { selector: "h2" })).toBeInTheDocument();

@@ -13,6 +13,7 @@ export * from "./components/loading-screen";
 export type { MarketplaceCardItem } from "./components/Marketplace/MarketplaceCard";
 export { default as MarketplaceCard } from "./components/Marketplace/MarketplaceCard";
 export * from "./components/Presentations";
+export * from "./components/SearchBar";
 export * from "./components/Settings/AISettings";
 export * from "./components/select";
 export * from "./components/textarea";
