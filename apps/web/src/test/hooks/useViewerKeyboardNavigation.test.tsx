@@ -60,6 +60,22 @@ describe("useViewerKeyboardNavigation", () => {
 		expect(getViewerKeyboardDestination("Escape", 1, 4)).toBeUndefined();
 	});
 
+	it("navigates on plain J and L keydowns", () => {
+		const onNavigate = mock(() => {});
+		render(<Harness currentSlide={1} onNavigate={onNavigate} onStopPlayback={mock(() => {})} />);
+
+		act(() => {
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "l" }));
+		});
+		expect(onNavigate).toHaveBeenLastCalledWith(2);
+
+		act(() => {
+			window.dispatchEvent(new KeyboardEvent("keyup", { key: "l" }));
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "j" }));
+		});
+		expect(onNavigate).toHaveBeenLastCalledWith(1);
+	});
+
 	it("does not navigate while typing in a form control", () => {
 		const onNavigate = mock(() => {});
 		render(<Harness onNavigate={onNavigate} onStopPlayback={mock(() => {})} />);

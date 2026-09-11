@@ -1,7 +1,6 @@
 import Header from "../../app/Header";
 import { AISettings } from "./AISettings";
 import { LandingPreference } from "./LandingPreference";
-import { VimModePreference } from "./VimModePreference";
 
 export default function SettingsPage() {
 	return (
@@ -12,9 +11,6 @@ export default function SettingsPage() {
 					<LandingPreference />
 					<div className="border-t border-white/10 pt-10">
 						<AISettings />
-					</div>
-					<div className="border-t border-white/10 pt-10">
-						<VimModePreference />
 					</div>
 				</div>
 			</main>
