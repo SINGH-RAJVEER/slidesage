@@ -13,7 +13,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { horizonDestination } from "./horizon-destination";
 import "./horizon-transition.css";
 
-type Origin = { x: number; y: number; radius: number };
+type Origin = { x: number; y: number; radius: number; wordmark?: number };
 type Phase = "cover" | "waiting" | "reveal";
 type Transition = { origin: Origin; phase: Phase; href: string };
 type HorizonContext = {
@@ -48,9 +48,13 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 	const [transition, setTransition] = useState<Transition | null>(null);
 	const [slow, setSlow] = useState(false);
 	const active = useRef(false);
+	const runId = useRef(0);
+	const destinationKey = useRef<string | null>(null);
 	const readyRef = useRef(false);
+	const focusPending = useRef(false);
 	const routeKey = useRef(location.key);
 	const coverRef = useRef<HTMLDivElement>(null);
+	const diskRef = useRef<HTMLDivElement>(null);
 	const contentRef = useRef<HTMLDivElement>(null);
 	const animations = useRef<Animation[]>([]);
 	const alive = useRef(true);
@@ -70,6 +74,8 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 		(origin: Origin) => {
 			if (active.current || loading) return;
 			active.current = true;
+			runId.current += 1;
+			destinationKey.current = null;
 			readyRef.current = false;
 			routeKey.current = location.key;
 			setSlow(false);
@@ -83,6 +89,36 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 		[href, loading, location.key],
 	);
 
+	const cancel = useCallback(() => {
+		runId.current += 1;
+		active.current = false;
+		readyRef.current = false;
+		destinationKey.current = null;
+		animations.current.forEach((animation) => {
+			animation.cancel();
+		});
+		animations.current = [];
+		setSlow(false);
+		setTransition(null);
+	}, []);
+
+	useEffect(() => {
+		const onBack = () => {
+			if (active.current) cancel();
+		};
+		window.addEventListener("popstate", onBack);
+		return () => window.removeEventListener("popstate", onBack);
+	}, [cancel]);
+
+	useEffect(() => {
+		if (!active.current || !transition) return;
+		if (transition.phase === "cover") {
+			if (location.key !== routeKey.current) cancel();
+		} else if (destinationKey.current === null) {
+			if (location.key !== routeKey.current) destinationKey.current = location.key;
+		} else if (location.key !== destinationKey.current) cancel();
+	}, [location.key, transition?.phase, cancel]);
+
 	const ready = useCallback(() => {
 		if (!active.current || location.key === routeKey.current) return;
 		readyRef.current = true;
@@ -92,24 +128,35 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 	}, [location.key]);
 
 	useEffect(() => {
-		if (transition?.phase !== "cover" || !coverRef.current) return;
+		if (transition?.phase !== "cover" || !diskRef.current) return;
 		const { origin } = transition;
+		const run = runId.current;
 		const radius =
 			Math.hypot(
-				Math.max(origin.x, window.innerWidth - origin.x),
-				Math.max(origin.y, window.innerHeight - origin.y),
+				Math.max(window.innerWidth, window.screen.width),
+				Math.max(window.innerHeight, window.screen.height),
 			) + 24;
-		const animation = coverRef.current.animate(
-			[
-				{ clipPath: `circle(${origin.radius}px at ${origin.x}px ${origin.y}px)` },
-				{ clipPath: `circle(${radius}px at ${origin.x}px ${origin.y}px)` },
-			],
-			{ duration: reduced ? 180 : 1100, easing: "cubic-bezier(.55,0,.18,1)", fill: "forwards" },
+
+		const finalScale = `scale(${radius / Math.max(1, origin.radius)})`;
+		const animation = diskRef.current.animate(
+			reduced
+				? [
+						{ transform: finalScale, opacity: 0, backgroundColor: "hsl(222 27% 12%)" },
+						{ transform: finalScale, opacity: 1, backgroundColor: "hsl(222 27% 12%)" },
+					]
+				: [
+						{ transform: "scale(1)", backgroundColor: "#010307" },
+						{
+							transform: finalScale,
+							backgroundColor: "hsl(222 27% 12%)",
+						},
+					],
+			{ duration: reduced ? 180 : 1000, easing: "cubic-bezier(.55,0,.18,1)", fill: "forwards" },
 		);
 		animations.current.push(animation);
 		void animation.finished
 			.then(() => {
-				if (!alive.current) return;
+				if (!alive.current || run !== runId.current) return;
 				setTransition((current) => (current ? { ...current, phase: "waiting" } : null));
 				void navigate(transition.href);
 			})
@@ -117,8 +164,8 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 	}, [transition?.phase, navigate, reduced]);
 
 	useEffect(() => {
-		if (transition?.phase !== "waiting") return;
-		if (readyRef.current)
+		if (!transition || transition.phase === "cover") return;
+		if (transition.phase === "waiting" && readyRef.current)
 			setTransition((current) => (current ? { ...current, phase: "reveal" } : null));
 		const timer = window.setTimeout(() => setSlow(true), 12000);
 		return () => window.clearTimeout(timer);
@@ -127,10 +174,11 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 	useEffect(() => {
 		if (transition?.phase !== "reveal") return;
 		let cancelled = false;
+		const run = runId.current;
 		void (async () => {
 			await document.fonts?.ready;
 			await nextPaint();
-			if (cancelled || !contentRef.current || !coverRef.current) return;
+			if (cancelled || run !== runId.current || !contentRef.current || !coverRef.current) return;
 			const content = contentRef.current;
 			content.style.visibility = "visible";
 			const candidates = [
@@ -144,14 +192,14 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 					[
 						{
 							opacity: 0,
-							transform: reduced ? "none" : "translateY(14px)",
-							filter: reduced ? "none" : "blur(4px)",
+							transform: reduced ? "none" : "translateY(10px)",
+							filter: reduced ? "none" : "blur(2px)",
 						},
 						{ opacity: 1, transform: "none", filter: "none" },
 					],
 					{
-						duration: reduced ? 160 : 600,
-						delay: reduced ? 0 : Math.min(index * 65, 520),
+						duration: reduced ? 160 : 540,
+						delay: reduced ? 0 : 100 + Math.min(index * 60, 420),
 						fill: "both",
 						easing: "cubic-bezier(.2,.7,.2,1)",
 					},
@@ -164,23 +212,29 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 			});
 			animations.current.push(fade);
 			await Promise.allSettled(animations.current.map((animation) => animation.finished));
-			if (cancelled) return;
+			if (cancelled || run !== runId.current) return;
 			animations.current.forEach((animation) => {
 				animation.cancel();
 			});
 			animations.current = [];
 			active.current = false;
+			focusPending.current = true;
 			setTransition(null);
-			const focus = content.querySelector<HTMLElement>("h1, main");
-			if (focus) {
-				focus.setAttribute("tabindex", "-1");
-				focus.focus({ preventScroll: true });
-			}
 		})();
 		return () => {
 			cancelled = true;
 		};
 	}, [transition?.phase, reduced]);
+
+	useEffect(() => {
+		if (transition || !focusPending.current) return;
+		focusPending.current = false;
+		const focus = contentRef.current?.querySelector<HTMLElement>("h1, main, input");
+		if (focus) {
+			focus.setAttribute("tabindex", "-1");
+			focus.focus({ preventScroll: true });
+		}
+	}, [transition]);
 
 	return (
 		<Context.Provider value={{ href, loading, begin, ready }}>
@@ -196,13 +250,31 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 				<div
 					ref={coverRef}
 					className="horizon-route-cover"
+					data-phase={transition.phase}
 					aria-hidden={!slow}
-					style={{
-						clipPath: `circle(${transition.origin.radius}px at ${transition.origin.x}px ${transition.origin.y}px)`,
-					}}
 				>
+					<div
+						ref={diskRef}
+						className="horizon-route-disk"
+						style={{
+							left: transition.origin.x - transition.origin.radius,
+							top: transition.origin.y - transition.origin.radius,
+							width: transition.origin.radius * 2,
+							height: transition.origin.radius * 2,
+						}}
+					>
+						<div className="horizon-route-reflection" />
+						{Boolean(transition.origin.wordmark) && (
+							<img
+								alt=""
+								src="/landing/slidesage-wordmark-current.png"
+								className="horizon-route-mark"
+								style={{ opacity: transition.origin.wordmark }}
+							/>
+						)}
+					</div>
 					<div className="horizon-route-blue" />
-					{slow && transition.phase === "waiting" && (
+					{slow && (
 						<div className="horizon-route-wait" role="status">
 							<p>Your page is taking a little longer to arrive.</p>
 							<button type="button" onClick={() => window.location.assign(transition.href)}>

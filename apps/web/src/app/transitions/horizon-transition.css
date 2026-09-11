@@ -5,21 +5,46 @@
 	position: fixed;
 	inset: 0;
 	z-index: 10000;
+	overflow: hidden;
+	will-change: opacity;
+}
+.horizon-route-disk {
+	position: absolute;
+	border-radius: 50%;
 	background: #010307;
-	will-change: clip-path, opacity;
+	will-change: transform, background-color;
 }
 .horizon-route-blue {
 	position: absolute;
 	inset: 0;
 	background: radial-gradient(circle at top, hsl(220 20% 18%), hsl(222 27% 12%) 60%);
-	animation: horizon-blue-arrival 1.6s cubic-bezier(0.3, 0, 0.2, 1) both;
+	opacity: 0;
+	transition: opacity 450ms ease;
 }
-@keyframes horizon-blue-arrival {
-	from {
-		opacity: 0;
-	}
+.horizon-route-cover:not([data-phase="cover"]) .horizon-route-blue {
+	opacity: 1;
+}
+.horizon-route-reflection {
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	background:
+		radial-gradient(ellipse at 32% 25%, #426485 0%, #152339 9%, transparent 25%),
+		radial-gradient(ellipse at 80% 62%, #0d3762 0%, transparent 22%);
+	animation: horizon-reflection-out 650ms ease-out forwards;
+}
+.horizon-route-mark {
+	position: absolute;
+	width: 167%;
+	max-width: none;
+	left: -33.5%;
+	top: 50%;
+	transform: translateY(-50%);
+	animation: horizon-reflection-out 300ms ease-out forwards;
+}
+@keyframes horizon-reflection-out {
 	to {
-		opacity: 1;
+		opacity: 0;
 	}
 }
 .horizon-route-wait {
@@ -40,6 +65,10 @@
 }
 @media (prefers-reduced-motion: reduce) {
 	.horizon-route-blue {
-		animation-duration: 180ms;
+		transition-duration: 160ms;
+	}
+	.horizon-route-reflection,
+	.horizon-route-mark {
+		animation-duration: 160ms;
 	}
 }

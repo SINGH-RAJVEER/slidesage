@@ -296,7 +296,10 @@ export default function PresentationsGridPage() {
 			<FloatingNotice error={error} onDismiss={() => setError("")} />
 			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
 				<div className="max-w-7xl mx-auto">
-					<div className="mb-8 flex flex-col gap-3 border-b border-white/10 pb-6 sm:flex-row sm:items-center">
+					<div
+						data-horizon-reveal
+						className="mb-8 flex flex-col gap-3 border-b border-white/10 pb-6 sm:flex-row sm:items-center"
+					>
 						<SearchBar
 							id="presentation-search"
 							label="Search presentations"
@@ -320,6 +323,7 @@ export default function PresentationsGridPage() {
 					) : (
 						<>
 							<div
+								data-horizon-reveal
 								className={`grid grid-cols-1 ${
 									gridSize === 2
 										? "md:grid-cols-2"

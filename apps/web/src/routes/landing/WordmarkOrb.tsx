@@ -306,19 +306,33 @@ export function WordmarkOrb() {
 	}, []);
 
 	const enter = (event: React.MouseEvent<HTMLAnchorElement>) => {
-		if (dragDistance.current > DRAG_CLICK_SLOP) {
+		if (event.detail !== 0 && dragDistance.current > DRAG_CLICK_SLOP) {
 			event.preventDefault();
 			return;
 		}
 		if (!transition || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 		event.preventDefault();
+
 		const bounds = event.currentTarget.getBoundingClientRect();
+
 		const scale =
 			Number(hostRef.current?.parentElement?.style.getPropertyValue("--horizon-scale")) || 1 / 3;
+		// Pointer activation follows the visible silhouette, not the square canvas.
+		if (
+			event.detail !== 0 &&
+			Math.hypot(
+				event.clientX - bounds.left - bounds.width / 2,
+				event.clientY - bounds.top - bounds.height / 2,
+			) >
+				bounds.height * 0.3 * scale + 6
+		)
+			return;
 		transition.begin({
 			x: bounds.left + bounds.width / 2,
 			y: bounds.top + bounds.height / 2,
 			radius: bounds.height * 0.3 * scale,
+			wordmark:
+				Number(hostRef.current?.parentElement?.style.getPropertyValue("--horizon-wordmark")) || 0,
 		});
 	};
 
@@ -368,6 +382,14 @@ export function WordmarkOrb() {
 				<Link
 					to={destination}
 					aria-label={destinationLabel}
+					onPointerDown={(event) => {
+						dragStartX.current = event.clientX;
+						dragDistance.current = 0;
+					}}
+					onPointerMove={(event) => {
+						dragDistance.current += Math.abs(event.clientX - dragStartX.current);
+						dragStartX.current = event.clientX;
+					}}
 					onClick={enter}
 					className="pointer-events-auto grid aspect-square h-[min(76%,560px)] place-items-center"
 				>
