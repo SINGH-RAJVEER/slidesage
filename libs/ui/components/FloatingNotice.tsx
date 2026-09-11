@@ -3,20 +3,24 @@ import { useEffect } from "react";
 
 const NOTICE_TTL_MS = 4000;
 
-interface FloatingSettingsNoticeProps {
+interface FloatingNoticeProps {
 	/** Error to display; null hides the indicator. */
-	error: string | null;
+	error?: string | null;
 	/** Success message to display; error takes precedence when both are present. */
 	success?: string | null;
 	onDismiss: () => void;
 }
 
 /**
- * Transient status notice pinned below the header's top-right corner,
- * mirroring the active generation indicator's placement and pill styling.
- * Auto-dismisses shortly after appearing.
+ * The application-wide transient status notice. Every user-facing error or
+ * confirmation that follows an action is surfaced through this pill, pinned
+ * below the header's top-right corner to mirror the active generation
+ * indicator. Auto-dismisses shortly after appearing.
+ *
+ * Blocking states that own the whole page or panel and offer their own
+ * recovery action (a retry button, an error route) stay inline instead.
  */
-export function FloatingSettingsNotice({ error, success, onDismiss }: FloatingSettingsNoticeProps) {
+export function FloatingNotice({ error, success, onDismiss }: FloatingNoticeProps) {
 	const message = error || success;
 	const isError = !!error;
 

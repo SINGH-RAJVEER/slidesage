@@ -1,3 +1,4 @@
+import type { PresentationRevision } from "@slidesage/types";
 import { API_URL } from "./api";
 
 /**
@@ -26,4 +27,29 @@ export async function fetchPresentationRevision(
 		throw new Error(`Could not load presentation revision (${response.status})`);
 	}
 	return response.arrayBuffer();
+}
+
+/**
+ * Deletes one slide from a presentation and returns the revision that replaces
+ * the current one.
+ *
+ * A revision is immutable, so nothing is erased: the deck without the slide is
+ * committed as the next revision, and the revision picker still reaches the one
+ * that had it. The revision the viewer is showing is sent along, so a deck that
+ * moved on elsewhere is rejected rather than silently rewritten.
+ */
+export async function deletePresentationSlide(
+	presentationId: string,
+	revision: number,
+	slideIndex: number,
+): Promise<PresentationRevision> {
+	const response = await fetch(
+		`${API_URL}/presentations/${presentationId}/revisions/${revision}/slides/${slideIndex}`,
+		{ method: "DELETE", credentials: "include" },
+	);
+	if (!response.ok) {
+		const reason = (await response.text()).trim();
+		throw new Error(reason || "Could not delete the slide. Please try again.");
+	}
+	return response.json();
 }

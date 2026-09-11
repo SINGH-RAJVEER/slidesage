@@ -14,7 +14,9 @@ const restorableModules = [
 ] as const;
 
 const realModules = await Promise.all(
-	restorableModules.map(async (specifier) => [specifier, { ...(await import(specifier)) }] as const),
+	restorableModules.map(
+		async (specifier) => [specifier, { ...(await import(specifier)) }] as const,
+	),
 );
 
 afterAll(() => {

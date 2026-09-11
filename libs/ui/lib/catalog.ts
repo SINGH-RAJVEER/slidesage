@@ -15,7 +15,25 @@ export interface MarketplaceItem {
 	dimensions: BinaryPptxTemplate["dimensions"];
 	/** Object path of the cover thumbnail rendered from the package itself. */
 	thumbnailPath: string;
+	/** Digest of the published package, absent until the template is published. */
+	sha256?: string;
+	/** Slides in the published package, zero when nothing is published yet. */
+	slideCount: number;
 	available: boolean;
+}
+
+/**
+ * Slides of a template that are worth showing on their own.
+ *
+ * Every package in the catalog closes with the same credits slide - the
+ * "free for everyone to use, thanks to the following" attribution page - which
+ * is the one slide that says nothing about the design. Dropping the last slide
+ * drops exactly that page; `templatemanifest`'s embedded manifests are the
+ * authority, and its test holds the closing archetype to the final slide so
+ * this arithmetic cannot quietly start cutting a content page instead.
+ */
+export function presentableSlideCount(item: MarketplaceItem): number {
+	return Math.max(0, item.slideCount - 1);
 }
 
 function marketplaceTags(entry: BinaryPptxTemplate): string[] {
@@ -38,6 +56,8 @@ export function marketplaceItem(entry: BinaryPptxTemplate): MarketplaceItem {
 		aspectRatio: entry.dimensions.aspectRatio,
 		dimensions: entry.dimensions,
 		thumbnailPath: entry.thumbnailPath,
+		sha256: entry.asset.sha256,
+		slideCount: entry.slideCount,
 		available: entry.asset.status === "available",
 	};
 }

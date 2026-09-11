@@ -18,17 +18,16 @@ describe("WordmarkOrb", () => {
 		expect(link).toHaveAttribute("href", "/sign-up");
 	});
 
-	it("layers the star field under the warp streaks under the WebGL orb", () => {
+	it("layers the WebGL black hole over the star field", () => {
 		const { container } = renderOrb();
-		expect(container.querySelectorAll("canvas")).toHaveLength(3);
+		expect(container.querySelectorAll("canvas")).toHaveLength(2);
 	});
 
-	it("falls back to the flat SVG wordmark when WebGL is unavailable", () => {
-		/* happy-dom has no WebGL context, so the effect takes the fallback path
-		   and reveals the SVG treatment the hero used before the orb — still
-		   linking to sign-up */
+	it("falls back to a CSS black hole when WebGL is unavailable", () => {
+		/* happy-dom has no WebGL context, so the effect takes the fallback path. */
 		const { container, getByRole } = renderOrb();
-		expect(container.querySelector("svg")).not.toBeNull();
+		expect(container.querySelector("[data-black-hole-fallback]")).not.toBeNull();
+		expect(container.querySelector("svg")).toBeNull();
 		expect(getByRole("link", { name: "SlideSage — sign up" })).toHaveAttribute("href", "/sign-up");
 	});
 });

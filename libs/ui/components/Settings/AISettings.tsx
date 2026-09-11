@@ -1,6 +1,6 @@
 import type { AIConfigurationResponse, AIModelSelection, AIProvider } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
-import { FloatingSettingsNotice } from "@slidesage/ui/components/Settings/FloatingSettingsNotice";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import {
 	Select,
 	SelectContent,
@@ -47,6 +47,7 @@ export function AISettings({
 	const [busy, setBusy] = useState<AIProvider | "selection" | null>(null);
 	const [message, setMessage] = useState<string | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
+	const [loadError, setLoadError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 
 	const refresh = async () => {
@@ -58,11 +59,17 @@ export function AISettings({
 	useEffect(() => {
 		void fetchConfiguration()
 			.then(setConfig)
-			.catch((error) => setMessage(error instanceof Error ? error.message : String(error)))
+			.catch((error) => setLoadError(error instanceof Error ? error.message : String(error)))
 			.finally(() => setIsLoading(false));
 	}, [fetchConfiguration]);
 
-	useEffect(() => () => setNotice(null), []);
+	useEffect(
+		() => () => {
+			setNotice(null);
+			setMessage(null);
+		},
+		[],
+	);
 
 	const reportError = (error: unknown) =>
 		setNotice(error instanceof Error ? error.message : String(error));
@@ -165,14 +172,21 @@ export function AISettings({
 	if (!config) {
 		return (
 			<div role="alert" className="flex min-h-64 items-center justify-center text-sm text-red-200">
-				{message || "AI settings could not be loaded."}
+				{loadError || "AI settings could not be loaded."}
 			</div>
 		);
 	}
 
 	return (
 		<div className="space-y-10">
-			<FloatingSettingsNotice error={notice} onDismiss={() => setNotice(null)} />
+			<FloatingNotice
+				error={notice}
+				success={message}
+				onDismiss={() => {
+					setNotice(null);
+					setMessage(null);
+				}}
+			/>
 			<section>
 				<div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
 					External providers
@@ -198,11 +212,6 @@ export function AISettings({
 					<p className="mt-4 rounded-lg border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100">
 						More than 50 points are required to add keys or change models. Existing connected keys
 						continue to generate normally.
-					</p>
-				) : null}
-				{message ? (
-					<p role="status" className="mt-4 text-sm text-white/70">
-						{message}
 					</p>
 				) : null}
 				<div className="mt-5">

@@ -1,4 +1,5 @@
 import { useAuth } from "@slidesage/ui";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { LoadingScreen } from "@slidesage/ui/components/loading-screen";
 import { auth } from "@slidesage/ui/lib/auth-client";
 import { type FormEvent, useEffect, useState } from "react";
@@ -114,6 +115,7 @@ export default function SignUpPage() {
 		<div className="min-h-screen bg-transparent flex flex-col">
 			{switching ? <LoadingScreen label="Loading sign in" /> : null}
 			<Header />
+			<FloatingNotice error={error} onDismiss={() => setError(null)} />
 			<div className="flex flex-1 flex-col">
 				<div className="px-4 py-6 md:px-8 md:py-8">
 					<div className="mx-auto max-w-7xl">
@@ -188,12 +190,6 @@ export default function SignUpPage() {
 									required
 								/>
 							</div>
-
-							{error ? (
-								<div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-									{error}
-								</div>
-							) : null}
 
 							<button
 								type="submit"

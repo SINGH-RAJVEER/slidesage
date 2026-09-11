@@ -1,6 +1,6 @@
 import type { PresentationData } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
-import { ChevronLeft, ChevronRight, SkipBack, SkipForward, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, SkipBack, SkipForward, Trash2, X } from "lucide-react";
 import type React from "react";
 import DownloadMenu, { type PresentationExporter } from "./DownloadMenu";
 
@@ -16,6 +16,9 @@ interface ViewerNavigationControlsProps {
 	cancelDisabled?: boolean;
 	showDownload?: boolean;
 	onExport?: PresentationExporter;
+	/** Removes the slide on screen. Omitted where a deck cannot be edited. */
+	onDeleteSlide?: () => void;
+	deleteDisabled?: boolean;
 }
 
 export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> = ({
@@ -30,6 +33,8 @@ export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> =
 	cancelDisabled = false,
 	showDownload = true,
 	onExport,
+	onDeleteSlide,
+	deleteDisabled = false,
 }) => {
 	return (
 		<nav
@@ -84,17 +89,30 @@ export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> =
 				</Button>
 			</div>
 
-			{onCancelGeneration ? (
+			{onCancelGeneration || onDeleteSlide ? (
 				<div className="viewer-navigation__delete absolute right-0 top-1/2 flex -translate-y-1/2 gap-2">
-					<Button
-						variant="destructive"
-						onClick={onCancelGeneration}
-						disabled={cancelDisabled}
-						className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 shadow-none transition-all duration-200"
-					>
-						<X className="w-4 h-4 mr-2" />
-						Cancel generation
-					</Button>
+					{onCancelGeneration ? (
+						<Button
+							variant="destructive"
+							onClick={onCancelGeneration}
+							disabled={cancelDisabled}
+							className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 shadow-none transition-all duration-200"
+						>
+							<X className="w-4 h-4 mr-2" />
+							Cancel generation
+						</Button>
+					) : (
+						<Button
+							variant="destructive"
+							onClick={onDeleteSlide}
+							disabled={deleteDisabled || totalSlides <= 1}
+							aria-label="Delete slide"
+							className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 shadow-none transition-all duration-200"
+						>
+							<Trash2 className="w-4 h-4 mr-2" />
+							Delete
+						</Button>
+					)}
 				</div>
 			) : null}
 		</nav>

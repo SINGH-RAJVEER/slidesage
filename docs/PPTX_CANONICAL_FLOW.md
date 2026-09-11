@@ -146,9 +146,15 @@ Preview failure does not corrupt or replace the PPTX revision. The UI offers dow
 
 ## Viewer and editor
 
-The regular viewer displays revision preview images. It retains navigation, thumbnails, fullscreen, playback, generation progress, revision history, download, delete-presentation, and editor launch controls.
+The regular viewer displays revision preview images. It retains navigation, thumbnails, fullscreen, playback, generation progress, revision history, download, delete-presentation, delete-slide, and editor launch controls.
 
-The ONLYOFFICE iframe owns element selection, movement, resizing, content changes, slide deletion, duplication, reordering, chart and table editing, and undo or redo. SlideSage removes its custom element canvas, semantic layout selector, scene renderer, widget renderer, and browser theme substitution.
+### Deleting a slide
+
+`DELETE /presentations/{id}/revisions/{revision}/slides/{index}` removes one slide, where the index is zero-based and follows package slide order, the same order the previews use. The request names the revision the viewer is showing; a deck that has moved on since returns `409` instead of being rewritten from stale bytes.
+
+The API reads the named revision's package, drops the slide's part, its presentation relationship, and the parts only that slide reached, and commits the result as the next revision with source operation `editor_save` and editor provider `slidesage-viewer`. Surviving slide parts keep their file names: deck order lives in the slide list. Nothing is erased, because a revision is immutable: the revision that still holds the slide stays in the history, and the operation ID is derived from the revision and slide index, so a retried request returns the revision the first attempt committed rather than deleting a second slide. A deck cannot lose its last slide; that request returns `409`.
+
+The ONLYOFFICE iframe owns element selection, movement, resizing, content changes, slide duplication, reordering, chart and table editing, and undo or redo. SlideSage removes its custom element canvas, semantic layout selector, scene renderer, widget renderer, and browser theme substitution.
 
 PDF export uses the PDF produced from the canonical revision. It does not rasterize React DOM.
 
