@@ -1780,6 +1780,22 @@
 
 /* Portrait devices use a focused, touch-first viewer instead of the desktop control rails. */
 @media (orientation: portrait) {
+	/* The viewer is exactly one dynamic viewport tall, while the document
+	   defaults to 100vh. Whenever the two disagree - a mobile browser with its
+	   URL bar shown, a keyboard, a safe-area inset - the difference showed as a
+	   lighter strip of page background under the control bar. Pin the document
+	   to the same dynamic viewport and give it the viewer's base colour so any
+	   remainder is indistinguishable. */
+	html:has(.presentation-viewer),
+	body:has(.presentation-viewer) {
+		height: 100dvh;
+		min-height: 100dvh;
+		max-height: 100dvh;
+		overflow: hidden;
+		background-color: hsl(222 27% 10%);
+		background-image: none;
+	}
+
 	.presentation-viewer {
 		min-height: 100dvh !important;
 		height: 100dvh !important;
@@ -1853,7 +1869,7 @@
 		margin: 0;
 	}
 
-	.viewer-header__present {
+	.viewer-header__present-button {
 		display: none;
 	}
 
@@ -1919,14 +1935,24 @@
 	.viewer-navigation__delete {
 		position: static;
 		transform: none;
+		/* Tailwind centres these with the translate property, not transform, so
+		   clearing transform alone left them half a button above the bar. */
+		translate: none;
 	}
 
 	.viewer-navigation__download button,
 	.viewer-navigation__delete button {
-		width: 40px;
-		height: 40px;
+		display: inline-flex;
+		width: 44px;
+		height: 44px;
+		align-items: center;
+		justify-content: center;
+		/* The label collapses to a zero-width anonymous flex item, but the
+		   button's gap would still push the icon off-centre. */
+		gap: 0;
 		padding: 0;
 		font-size: 0;
+		line-height: 0;
 	}
 
 	.viewer-navigation__download button svg,

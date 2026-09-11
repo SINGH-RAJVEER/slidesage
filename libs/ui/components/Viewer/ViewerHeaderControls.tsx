@@ -51,6 +51,18 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 						{templateLabel}
 					</div>
 				)}
+				<Button
+					variant="outline"
+					onClick={onPresent}
+					disabled={presentDisabled}
+					aria-label="Present slideshow"
+					className="viewer-header__present-button border-white/5 bg-white/5 text-white hover:bg-white/10"
+				>
+					<Presentation className="mr-2 size-4" /> Present
+				</Button>
+			</div>
+
+			<div className="viewer-header__actions flex items-center justify-end gap-2">
 				{showIterate && (
 					<Button
 						onClick={onIterate}
@@ -63,18 +75,6 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 						Iterate
 					</Button>
 				)}
-			</div>
-
-			<div className="viewer-header__present flex items-center justify-end gap-2">
-				<Button
-					variant="outline"
-					onClick={onPresent}
-					disabled={presentDisabled}
-					aria-label="Present slideshow"
-					className="viewer-header__present-button border-white/5 bg-white/5 text-white hover:bg-white/10"
-				>
-					<Presentation className="mr-2 size-4" /> Present
-				</Button>
 			</div>
 		</header>
 	);

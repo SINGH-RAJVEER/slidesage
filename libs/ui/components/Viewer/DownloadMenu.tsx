@@ -71,7 +71,7 @@ const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent
-					side="top"
+					side="bottom"
 					align="start"
 					className="w-48 bg-gray-900/80 backdrop-blur-md border border-white/10 text-white shadow-xl"
 				>

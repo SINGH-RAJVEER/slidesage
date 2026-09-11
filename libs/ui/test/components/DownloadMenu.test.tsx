@@ -39,9 +39,7 @@ describe("DownloadMenu", () => {
 	});
 
 	it("downloads the current presentation as PPTX", async () => {
-		const view = render(
-			<DownloadMenu presentation={presentation} onExport={exportPresentation} />,
-		);
+		const view = render(<DownloadMenu presentation={presentation} onExport={exportPresentation} />);
 		openMenu(view.getByRole("button", { name: /Download/ }));
 		fireEvent.click(await view.findByText("PowerPoint"));
 
@@ -69,9 +67,7 @@ describe("DownloadMenu", () => {
 					release = resolve;
 				}),
 		);
-		const view = render(
-			<DownloadMenu presentation={presentation} onExport={exportPresentation} />,
-		);
+		const view = render(<DownloadMenu presentation={presentation} onExport={exportPresentation} />);
 		openMenu(view.getByRole("button", { name: /Download/ }));
 		fireEvent.click(await view.findByText("PowerPoint"));
 		await waitFor(() => expect(exportPptx).toHaveBeenCalledTimes(1));
@@ -86,9 +82,7 @@ describe("DownloadMenu", () => {
 		exportPptx.mockImplementation(async () => {
 			throw new Error("export boom");
 		});
-		const view = render(
-			<DownloadMenu presentation={presentation} onExport={exportPresentation} />,
-		);
+		const view = render(<DownloadMenu presentation={presentation} onExport={exportPresentation} />);
 		openMenu(view.getByRole("button", { name: /Download/ }));
 		fireEvent.click(await view.findByText("PowerPoint"));
 
