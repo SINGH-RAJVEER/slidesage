@@ -6,13 +6,20 @@ on:
   push:
     branches: [dev]
   workflow_dispatch:
+  # Called by deploy.yml so a push to main cannot reach Cloud Run without
+  # these checks passing first.
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: checks-${{ github.ref }}
-  cancel-in-progress: true
+  # In a called run github.workflow is the caller's name, so gating runs get
+  # their own group and never cancel the standalone PR checks.
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  # A superseded PR push is worth cancelling; a deploy waiting on its gate is
+  # not, because cancelling it fails the deploy rather than replacing it.
+  cancel-in-progress: ${{ github.workflow == 'Pull request checks' }}
 
 jobs:
   test-and-build:

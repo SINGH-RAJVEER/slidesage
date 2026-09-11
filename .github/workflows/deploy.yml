@@ -17,7 +17,15 @@ env:
   IMAGE_VERSION: ${{ github.sha }}
 
 jobs:
+  # The same suite that guards a pull request, run again on the merge commit
+  # itself. Nothing is built or published unless it passes.
+  checks:
+    # workflow_dispatch can select a branch; only main may publish or deploy.
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/checks.yml
+
   build:
+    needs: checks
     # workflow_dispatch can select a branch; only main may publish or deploy.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
