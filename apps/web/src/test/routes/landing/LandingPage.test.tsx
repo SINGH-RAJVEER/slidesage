@@ -15,7 +15,7 @@ import {
 	plateStackingLayers,
 } from "../../../routes/landing/SlideRingHero";
 
-const RING_LABEL = "Presentation templates orbiting the SlideSage wordmark";
+const RING_LABEL = "Presentation templates orbiting a black hole";
 
 const authState: { isSignedIn: boolean; loading: boolean; user: { landingPage?: string } | null } =
 	{

@@ -310,6 +310,13 @@ export function SlideRingHero() {
 		let plateBaseWidth = 0;
 		let spin = 0;
 		let angularVelocity = AMBIENT_VELOCITY;
+		let proximityTarget = 0;
+		let proximity = 0;
+		let expanded = false;
+		let cursorX = 0;
+		let cursorY = 0;
+		let deformX = 0;
+		let deformY = 0;
 		let last = performance.now();
 		let frameId = 0;
 		let disposed = false;
@@ -394,6 +401,31 @@ export function SlideRingHero() {
 		};
 
 		const render = (dt = 0) => {
+			proximity += (proximityTarget - proximity) * (reducedMotion ? 1 : 1 - Math.exp(-dt * 3.2));
+			// Latch on first contact, including when the growing surface reaches
+			// a stationary cursor. Completion is not required to retain capture.
+			const visibleRadius =
+				Math.min(height * 0.76, 560) * 0.3 * (1 / 3 + proximity * (1.22 - 1 / 3));
+			if (proximityTarget > 0 && Math.hypot(cursorX, cursorY) <= visibleRadius) {
+				expanded = true;
+				proximityTarget = 1;
+			}
+			const horizonRadius = Math.min(height * 0.76, 560) * 0.3 * 1.22;
+			const deformation = expanded && proximity > 0.985 && !reducedMotion ? 1 : 0;
+			const response = 1 - Math.exp(-dt * 18);
+			deformX +=
+				(Math.max(-1, Math.min(1, cursorX / Math.max(1, horizonRadius))) * deformation - deformX) *
+				response;
+			deformY +=
+				(Math.max(-1, Math.min(1, cursorY / Math.max(1, horizonRadius))) * deformation - deformY) *
+				response;
+			root.style.setProperty("--horizon-deform-x", `${deformX * 3}px`);
+			root.style.setProperty("--horizon-deform-y", `${deformY * 3}px`);
+			root.style.setProperty("--horizon-skew", `${deformX * 0.65}deg`);
+			root.style.setProperty("--horizon-stretch", String(1 + Math.abs(deformY) * 0.008));
+			root.style.setProperty("--horizon-scale", String(1 / 3 + proximity * (1.22 - 1 / 3)));
+			const reveal = Math.max(0, Math.min(1, (proximity - 0.88) / 0.12));
+			root.style.setProperty("--horizon-wordmark", String(reveal * reveal * (3 - 2 * reveal)));
 			const cx = width / 2;
 			const cy = height / 2;
 			const radiusX = Math.min(width * 0.4, 540);
@@ -427,7 +459,30 @@ export function SlideRingHero() {
 				const angle = (i / count) * Math.PI * 2 + spread.phase + spin;
 				const depth = projection.depth;
 				const scale = 0.62 + 0.38 * depth;
-				plate.style.transform = `translate(${projection.x + particle.x}px, ${projection.y + particle.y}px) translate(-50%, -50%) scale(${scale})`;
+				// Each slide falls along its own radial path; no shared rotation of the belt.
+				const seed = (Math.sin(i * 91.173 + 4.7) * 43758.5453) % 1;
+				const delay = 0.1 + Math.abs(seed) * 0.34;
+				const capture = Math.max(0, Math.min(1, (proximity - delay) / (0.88 - delay)));
+				const pull = capture * capture * (3 - 2 * capture);
+				const dx = projection.x + particle.x - cx;
+				const dy = projection.y + particle.y - cy;
+				const distance = Math.max(1, Math.hypot(dx, dy));
+				const bend = reducedMotion ? 0 : Math.sin(pull * Math.PI) * seed * 28;
+				const x = cx + dx * (1 - pull) - (dy / distance) * bend;
+				const y = cy + dy * (1 - pull) + (dx / distance) * bend;
+				const shrink = 1 - pull * 0.97;
+				const stretch = reducedMotion ? 0 : Math.sin(pull * Math.PI);
+				const direction = Math.atan2(dy, dx);
+				// Stretch toward the hole in screen space without spinning the slide.
+				const along = 1 + stretch * 0.85;
+				const across = 1 - stretch * 0.65;
+				const c = Math.cos(direction);
+				const sn = Math.sin(direction);
+				const a = along * c * c + across * sn * sn;
+				const b = (along - across) * c * sn;
+				const d = along * sn * sn + across * c * c;
+				plate.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) matrix(${a}, ${b}, ${b}, ${d}, 0, 0) scale(${scale * shrink})`;
+				plate.style.pointerEvents = pull > 0.65 ? "none" : "auto";
 				plate.style.zIndex = String(stackingLayers[i] ?? 0);
 
 				/* depth bottoms out a quarter turn back from the ring's origin,
@@ -444,7 +499,7 @@ export function SlideRingHero() {
 				   of it, so the refill lands on an invisible plate */
 				const fromCrossing = Math.min(cycle - pass, 1 - (cycle - pass));
 				const dip = turning ? Math.min(1, fromCrossing / SWAP_DIP) : 1;
-				plate.style.opacity = String((0.42 + 0.58 * depth) * dip * dip);
+				plate.style.opacity = String((0.42 + 0.58 * depth) * dip * dip * (1 - pull ** 3));
 			}
 		};
 
@@ -466,8 +521,8 @@ export function SlideRingHero() {
 			if (!dragging && !reducedMotion) {
 				angularVelocity = decelerateRing(angularVelocity, dt);
 				spin += angularVelocity * dt;
-				render(dt);
 			}
+			render(dt);
 			frameId = requestAnimationFrame(frame);
 		};
 
@@ -489,6 +544,22 @@ export function SlideRingHero() {
 		};
 
 		const onPointerMove = (event: PointerEvent) => {
+			if (event.pointerType !== "touch") {
+				const bounds = root.getBoundingClientRect();
+				cursorX = event.clientX - bounds.left - width / 2;
+				cursorY = event.clientY - bounds.top - height / 2;
+				const distance = Math.hypot(cursorX, cursorY);
+				const expandedRadius = Math.min(height * 0.76, 560) * 0.3 * 1.22;
+				const visibleRadius =
+					Math.min(height * 0.76, 560) * 0.3 * (1 / 3 + proximity * (1.22 - 1 / 3));
+				if (distance <= visibleRadius) expanded = true;
+				else if (expanded && distance > expandedRadius + 6) expanded = false;
+				const breakoff = Math.min(width, height) * 0.43;
+				const inner = Math.min(width, height) * 0.08;
+				proximityTarget = expanded
+					? 1
+					: Math.max(0, Math.min(1, (breakoff - distance) / Math.max(1, breakoff - inner)));
+			}
 			if (!dragging) return;
 			const dx = event.clientX - lastX;
 			const now = performance.now();
@@ -508,6 +579,11 @@ export function SlideRingHero() {
 			lastX = event.clientX;
 			lastPointerTime = now;
 			render(reducedMotion ? 1 / 60 : 0);
+		};
+
+		const onPointerLeave = () => {
+			expanded = false;
+			proximityTarget = 0;
 		};
 
 		const onPointerUp = () => {
@@ -536,6 +612,7 @@ export function SlideRingHero() {
 		pump();
 		observer?.observe(root);
 		root.addEventListener("pointerdown", onPointerDown);
+		root.addEventListener("pointerleave", onPointerLeave);
 		window.addEventListener("pointermove", onPointerMove);
 		window.addEventListener("pointerup", onPointerUp);
 		window.addEventListener("pointercancel", onPointerUp);
@@ -547,6 +624,7 @@ export function SlideRingHero() {
 			cancelAnimationFrame(frameId);
 			observer?.disconnect();
 			root.removeEventListener("pointerdown", onPointerDown);
+			root.removeEventListener("pointerleave", onPointerLeave);
 			window.removeEventListener("pointermove", onPointerMove);
 			window.removeEventListener("pointerup", onPointerUp);
 			window.removeEventListener("pointercancel", onPointerUp);
@@ -576,7 +654,7 @@ export function SlideRingHero() {
 		<div
 			ref={rootRef}
 			role="img"
-			aria-label="Presentation templates orbiting the SlideSage wordmark"
+			aria-label="Presentation templates orbiting a black hole"
 			className="relative h-full w-full cursor-grab select-none overflow-hidden active:cursor-grabbing"
 			style={{
 				background: "radial-gradient(120% 90% at 50% -20%, #252a37 0%, #161b27 60%)",
@@ -630,9 +708,9 @@ export function SlideRingHero() {
 					</div>
 				))}
 			</div>
-			{/* The wordmark lives on a rotating smoke sphere (see WordmarkOrb);
-			    the ring's plates pass over it, and it stays clear of the preview
-			    dialog at z-30. */}
+			{/* The black-hole event-horizon visual anchors the ring. Its steady
+			    shadow sits between the rear and front plates and stays below the
+			    preview dialog at z-30. */}
 			<WordmarkOrb />
 
 			{preview && (
