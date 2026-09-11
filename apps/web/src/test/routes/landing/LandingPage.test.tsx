@@ -9,6 +9,7 @@ import {
 	landingPlateCount,
 	randomLandingPool,
 } from "../../../routes/landing/landing-plates";
+import { plateStackingLayers } from "../../../routes/landing/SlideRingHero";
 
 const RING_LABEL = "Presentation templates orbiting the SlideSage wordmark";
 
@@ -156,6 +157,12 @@ describe("LandingPage", () => {
 });
 
 describe("Landing plates", () => {
+	it("keeps every distinct depth on its own stacking layer", () => {
+		const layers = plateStackingLayers([{ depth: 0.511 }, { depth: 0.512 }]);
+
+		expect(layers[1]).toBeGreaterThan(layers[0] ?? 0);
+	});
+
 	it("draws slides of published sixteen-by-nine templates", () => {
 		const pool = randomLandingPool();
 

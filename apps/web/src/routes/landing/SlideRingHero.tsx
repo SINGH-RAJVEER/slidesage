@@ -51,6 +51,18 @@ interface PlateMotion {
 	vy: number;
 }
 
+export function plateStackingLayers(projections: Array<Pick<PlateProjection, "depth">>): number[] {
+	const ordered = projections
+		.map(({ depth }, index) => ({ depth, index }))
+		.sort((a, b) => a.depth - b.depth || a.index - b.index);
+	const layers = new Array<number>(projections.length);
+	for (let layer = 0; layer < ordered.length; layer += 1) {
+		const plate = ordered[layer];
+		if (plate) layers[plate.index] = layer;
+	}
+	return layers;
+}
+
 function applyPlateRepulsion(
 	projections: PlateProjection[],
 	motion: PlateMotion[],
@@ -382,6 +394,7 @@ export function SlideRingHero() {
 			}
 
 			applyPlateRepulsion(projections, plateMotion, dt, plateBaseWidth * MAX_REPULSION_OFFSET);
+			const stackingLayers = plateStackingLayers(projections);
 
 			for (let i = 0; i < count; i++) {
 				const plate = plateRefs.current[i];
@@ -393,7 +406,7 @@ export function SlideRingHero() {
 				const depth = projection.depth;
 				const scale = 0.62 + 0.38 * depth;
 				plate.style.transform = `translate(${projection.x + particle.x}px, ${projection.y + particle.y}px) translate(-50%, -50%) scale(${scale})`;
-				plate.style.zIndex = String(Math.round(depth * 20) + (depth >= 0.5 ? 1 : 0));
+				plate.style.zIndex = String(stackingLayers[i] ?? 0);
 
 				/* depth bottoms out a quarter turn back from the ring's origin,
 				   so counting turns from there counts passes behind the orb */
