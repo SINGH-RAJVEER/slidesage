@@ -27,6 +27,95 @@ const VERTICAL_SPREAD = 0.55;
    reading as one repeated stamp. */
 const SIZE_SPREAD = 0.22;
 
+/* Plates are allowed to crowd and overlap, but nearby plates on the same part
+   of the ring push each other apart. A spring keeps that push close to the
+   ellipse instead of letting the belt slowly expand. */
+const REPULSION_ACCELERATION = 520;
+const REPULSION_DAMPING = 7;
+const ORBIT_SPRING = 8;
+const REPULSION_DISTANCE = 0.86;
+const MAX_REPULSION_OFFSET = 0.4;
+
+interface PlateProjection {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	depth: number;
+}
+
+interface PlateMotion {
+	x: number;
+	y: number;
+	vx: number;
+	vy: number;
+}
+
+function applyPlateRepulsion(
+	projections: PlateProjection[],
+	motion: PlateMotion[],
+	dt: number,
+	maxOffset: number,
+) {
+	if (dt <= 0 || maxOffset <= 0) return;
+	const forces = motion.map(({ x, y }) => ({ x: -x * ORBIT_SPRING, y: -y * ORBIT_SPRING }));
+
+	for (let left = 0; left < projections.length; left += 1) {
+		const a = projections[left];
+		const aMotion = motion[left];
+		if (!a || !aMotion) continue;
+		for (let right = left + 1; right < projections.length; right += 1) {
+			const b = projections[right];
+			const bMotion = motion[right];
+			if (!b || !bMotion) continue;
+
+			const dx = b.x + bMotion.x - (a.x + aMotion.x);
+			const dy = b.y + bMotion.y - (a.y + aMotion.y);
+			const rangeX = ((a.width + b.width) / 2) * REPULSION_DISTANCE;
+			const rangeY = ((a.height + b.height) / 2) * REPULSION_DISTANCE;
+			const proximity = Math.hypot(dx / rangeX, dy / rangeY);
+			if (proximity >= 1) continue;
+
+			/* Cards far apart in depth should still be able to pass over one
+			   another. Cards in the same layer resist a pile-up more strongly. */
+			const depthAffinity = Math.max(0.2, 1 - Math.abs(a.depth - b.depth) / 0.3);
+			const pressure = REPULSION_ACCELERATION * (1 - proximity) ** 2 * depthAffinity;
+			const distance = Math.hypot(dx, dy);
+			/* Exact coincidence is rare, but a stable fallback direction keeps the
+			   pair from remaining locked together. */
+			const directionX = distance > 0.01 ? dx / distance : left % 2 === 0 ? 1 : -1;
+			const directionY = distance > 0.01 ? dy / distance : 0;
+			const leftForce = forces[left];
+			const rightForce = forces[right];
+			if (!leftForce || !rightForce) continue;
+			leftForce.x -= directionX * pressure;
+			leftForce.y -= directionY * pressure;
+			rightForce.x += directionX * pressure;
+			rightForce.y += directionY * pressure;
+		}
+	}
+
+	const damping = Math.exp(-REPULSION_DAMPING * dt);
+	for (let index = 0; index < motion.length; index += 1) {
+		const particle = motion[index];
+		const force = forces[index];
+		if (!particle || !force) continue;
+		particle.vx = (particle.vx + force.x * dt) * damping;
+		particle.vy = (particle.vy + force.y * dt) * damping;
+		particle.x += particle.vx * dt;
+		particle.y += particle.vy * dt;
+
+		const offset = Math.hypot(particle.x, particle.y);
+		if (offset > maxOffset) {
+			const limit = maxOffset / offset;
+			particle.x *= limit;
+			particle.y *= limit;
+			particle.vx *= limit;
+			particle.vy *= limit;
+		}
+	}
+}
+
 /**
  * How much of an orbit a plate spends fading out and back in around the back of
  * the ring, as a fraction either side of the crossing point.
@@ -187,6 +276,7 @@ export function SlideRingHero() {
 
 		let width = 0;
 		let height = 0;
+		let plateBaseWidth = 0;
 		let spin = 0;
 		let last = performance.now();
 		let frameId = 0;
@@ -249,6 +339,12 @@ export function SlideRingHero() {
 		/* completed turns per plate, counted from the back of the ring; NaN
 		   until the first frame seeds them, so seeding is never a pass */
 		const passes = new Array<number>(count).fill(Number.NaN);
+		const plateMotion: PlateMotion[] = Array.from({ length: count }, () => ({
+			x: 0,
+			y: 0,
+			vx: 0,
+			vy: 0,
+		}));
 
 		const layout = () => {
 			width = root.clientWidth;
@@ -256,14 +352,14 @@ export function SlideRingHero() {
 			const radiusX = Math.min(width * 0.4, 540);
 			/* the plate base size only changes on resize, so layout work stays
 			   out of the frame loop */
-			const plateWidth = radiusX * PLATE_WIDTH;
+			plateBaseWidth = radiusX * PLATE_WIDTH;
 			for (let i = 0; i < count; i++) {
 				const node = plateRefs.current[i];
-				if (node) node.style.width = `${plateWidth * plateSpread(i).size}px`;
+				if (node) node.style.width = `${plateBaseWidth * plateSpread(i).size}px`;
 			}
 		};
 
-		const render = () => {
+		const render = (dt = 0) => {
 			const cx = width / 2;
 			const cy = height / 2;
 			const radiusX = Math.min(width * 0.4, 540);
@@ -271,9 +367,8 @@ export function SlideRingHero() {
 			const cosAxis = Math.cos(AXIS);
 			const sinAxis = Math.sin(AXIS);
 
+			const projections: PlateProjection[] = [];
 			for (let i = 0; i < count; i++) {
-				const plate = plateRefs.current[i];
-				if (!plate) continue;
 				const spread = plateSpread(i);
 				const angle = (i / count) * Math.PI * 2 + spread.phase + spin;
 				const depth = (Math.sin(angle) + 1) / 2;
@@ -282,7 +377,22 @@ export function SlideRingHero() {
 				const x = cx + ringX * cosAxis - ringY * sinAxis;
 				const y = cy + ringX * sinAxis + ringY * cosAxis;
 				const scale = 0.62 + 0.38 * depth;
-				plate.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${scale})`;
+				const width = plateBaseWidth * spread.size * scale;
+				projections.push({ x, y, width, height: width * (9 / 16), depth });
+			}
+
+			applyPlateRepulsion(projections, plateMotion, dt, plateBaseWidth * MAX_REPULSION_OFFSET);
+
+			for (let i = 0; i < count; i++) {
+				const plate = plateRefs.current[i];
+				const projection = projections[i];
+				const particle = plateMotion[i];
+				if (!plate || !projection || !particle) continue;
+				const spread = plateSpread(i);
+				const angle = (i / count) * Math.PI * 2 + spread.phase + spin;
+				const depth = projection.depth;
+				const scale = 0.62 + 0.38 * depth;
+				plate.style.transform = `translate(${projection.x + particle.x}px, ${projection.y + particle.y}px) translate(-50%, -50%) scale(${scale})`;
 				plate.style.zIndex = String(Math.round(depth * 20) + (depth >= 0.5 ? 1 : 0));
 
 				/* depth bottoms out a quarter turn back from the ring's origin,
@@ -303,6 +413,16 @@ export function SlideRingHero() {
 			}
 		};
 
+		/* A reduced-motion page still gets the separated resting layout. These
+		   fixed steps happen before paint and do not create visible motion. */
+		const settleReducedMotion = () => {
+			if (!reducedMotion) {
+				render();
+				return;
+			}
+			for (let step = 0; step < 48; step += 1) render(1 / 60);
+		};
+
 		const frame = (now: number) => {
 			const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
 			last = now;
@@ -310,7 +430,7 @@ export function SlideRingHero() {
 			   owns spin instead */
 			if (!dragging && !reducedMotion) {
 				spin += dt / ORBIT_SECONDS;
-				render();
+				render(dt);
 			}
 			frameId = requestAnimationFrame(frame);
 		};
@@ -341,7 +461,7 @@ export function SlideRingHero() {
 			spin += dSpin;
 			dragMoved += Math.abs(dx);
 			lastX = event.clientX;
-			render();
+			render(reducedMotion ? 1 / 60 : 0);
 		};
 
 		const onPointerUp = () => {
@@ -358,12 +478,12 @@ export function SlideRingHero() {
 			typeof ResizeObserver !== "undefined"
 				? new ResizeObserver(() => {
 						layout();
-						render();
+						settleReducedMotion();
 					})
 				: null;
 
 		layout();
-		render();
+		settleReducedMotion();
 		pump();
 		observer?.observe(root);
 		root.addEventListener("pointerdown", onPointerDown);
