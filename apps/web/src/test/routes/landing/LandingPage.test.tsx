@@ -9,7 +9,11 @@ import {
 	landingPlateCount,
 	randomLandingPool,
 } from "../../../routes/landing/landing-plates";
-import { plateStackingLayers } from "../../../routes/landing/SlideRingHero";
+import {
+	accelerateRing,
+	decelerateRing,
+	plateStackingLayers,
+} from "../../../routes/landing/SlideRingHero";
 
 const RING_LABEL = "Presentation templates orbiting the SlideSage wordmark";
 
@@ -157,6 +161,16 @@ describe("LandingPage", () => {
 });
 
 describe("Landing plates", () => {
+	it("adds momentum on repeated throws and then loses it gradually", () => {
+		const firstThrow = accelerateRing(0, 1);
+		const secondThrow = accelerateRing(firstThrow, 1);
+		const coasting = decelerateRing(secondThrow, 1);
+
+		expect(secondThrow).toBeGreaterThan(firstThrow);
+		expect(coasting).toBeLessThan(secondThrow);
+		expect(coasting).toBeGreaterThan(0);
+	});
+
 	it("keeps every distinct depth on its own stacking layer", () => {
 		const layers = plateStackingLayers([{ depth: 0.511 }, { depth: 0.512 }]);
 

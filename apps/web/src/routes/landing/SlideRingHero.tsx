@@ -8,9 +8,16 @@ import { WordmarkOrb } from "./WordmarkOrb";
    any plate opens in a hovering preview when clicked. */
 const AXIS = (-25.5 * Math.PI) / 180;
 const ORBIT_SECONDS = 26;
+const AMBIENT_VELOCITY = 1 / ORBIT_SECONDS;
 /* radians of spin per pixel of horizontal drag */
 const DRAG_SENSITIVITY = 1.15;
 const DRAG_CLICK_SLOP = 6;
+/* A quick drag becomes angular momentum. Repeated throws add to the velocity,
+   while friction draws the ring back to its slow ambient orbit. */
+const THROW_TRANSFER = 0.52;
+const THROW_FRICTION = 0.52;
+const MAX_GESTURE_VELOCITY = 4;
+const MAX_RING_VELOCITY = 2.6;
 /* slides fetched ahead of the plate that will show them */
 const PRELOAD_AHEAD = 4;
 
@@ -49,6 +56,18 @@ interface PlateMotion {
 	y: number;
 	vx: number;
 	vy: number;
+}
+
+export function accelerateRing(currentVelocity: number, gestureVelocity: number): number {
+	return Math.max(
+		-MAX_RING_VELOCITY,
+		Math.min(MAX_RING_VELOCITY, currentVelocity + gestureVelocity * THROW_TRANSFER),
+	);
+}
+
+export function decelerateRing(velocity: number, dt: number): number {
+	const friction = Math.exp(-THROW_FRICTION * Math.max(0, dt));
+	return AMBIENT_VELOCITY + (velocity - AMBIENT_VELOCITY) * friction;
 }
 
 export function plateStackingLayers(projections: Array<Pick<PlateProjection, "depth">>): number[] {
@@ -290,6 +309,7 @@ export function SlideRingHero() {
 		let height = 0;
 		let plateBaseWidth = 0;
 		let spin = 0;
+		let angularVelocity = AMBIENT_VELOCITY;
 		let last = performance.now();
 		let frameId = 0;
 		let disposed = false;
@@ -306,6 +326,8 @@ export function SlideRingHero() {
 		let dragMoved = 0;
 		let dragIndex = -1;
 		let lastX = 0;
+		let lastPointerTime = 0;
+		let gestureVelocity = 0;
 
 		/* Slides waiting their turn, and the ones already decoded. A plate that
 		   leaves the ring goes back on the queue, so the pool cycles rather
@@ -439,10 +461,11 @@ export function SlideRingHero() {
 		const frame = (now: number) => {
 			const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
 			last = now;
-			/* the ring always turns; while the pointer drags, the move handler
-			   owns spin instead */
+			/* While the pointer holds the ring, its movement owns the angle. Once
+			   released, stored momentum coasts and eases back to the ambient turn. */
 			if (!dragging && !reducedMotion) {
-				spin += dt / ORBIT_SECONDS;
+				angularVelocity = decelerateRing(angularVelocity, dt);
+				spin += angularVelocity * dt;
 				render(dt);
 			}
 			frameId = requestAnimationFrame(frame);
@@ -461,19 +484,29 @@ export function SlideRingHero() {
 				? Number.parseInt(plate.getAttribute("data-plate-index") ?? "", 10)
 				: -1;
 			lastX = event.clientX;
+			lastPointerTime = performance.now();
+			gestureVelocity = 0;
 		};
 
 		const onPointerMove = (event: PointerEvent) => {
 			if (!dragging) return;
 			const dx = event.clientX - lastX;
+			const now = performance.now();
+			const inputDt = Math.min(0.08, Math.max(1 / 240, (now - lastPointerTime) / 1000));
 			turning = true;
 			const radiusX = Math.min(width * 0.4, 540);
 			/* negate the delta so the ring reads as grabbed: dragging right
 			   pushes the front plates right */
-			const dSpin = -dx / (radiusX * DRAG_SENSITIVITY);
+			const dSpin = -dx / Math.max(1, radiusX * DRAG_SENSITIVITY);
+			const inputVelocity = Math.max(
+				-MAX_GESTURE_VELOCITY,
+				Math.min(MAX_GESTURE_VELOCITY, dSpin / inputDt),
+			);
+			gestureVelocity = gestureVelocity * 0.58 + inputVelocity * 0.42;
 			spin += dSpin;
 			dragMoved += Math.abs(dx);
 			lastX = event.clientX;
+			lastPointerTime = now;
 			render(reducedMotion ? 1 / 60 : 0);
 		};
 
@@ -483,8 +516,11 @@ export function SlideRingHero() {
 			if (dragMoved < DRAG_CLICK_SLOP) {
 				/* a tap, not a drag: open the plate under the pointer */
 				if (dragIndex >= 0) setPreview(ringRef.current[dragIndex] ?? null);
+			} else if (!reducedMotion) {
+				/* Keep existing momentum, so another throw in the same direction
+				   makes the ring faster like pushing a physical spinner. */
+				angularVelocity = accelerateRing(angularVelocity, gestureVelocity);
 			}
-			/* the ring resumes its constant turn on the next frame */
 		};
 
 		const observer =
