@@ -18,6 +18,10 @@ The browser requests `GET /template-previews/{id}/{version}` for the slide count
 
 These WebP slides are rendered from the actual CDN PPTX using the same LibreOffice renderer as generated decks. They are not semantic approximations or a cover-only fallback. Missing previews show an error with retry.
 
+Every slide is published at two widths: the full 1600 pixel render, and a 480 pixel copy under `previews/v1/small/{index}.webp` for readers that paint a slide at thumbnail size, which the landing ring does. `GET /template-previews/{id}/{version}/{digest}/{index}/small` serves it, falling back to the full slide for a template published before the variant existed — so a backfill improves a page that already works rather than fixing a broken one. The small copy is a second encode of the pages already rasterized, so publishing it costs one extra cwebp pass per slide and no extra rendering.
+
+The API holds fetched slide bytes in a bounded in-process LRU cache. Slide objects are immutable and digest-pinned — a republish lands on a new digest and so a new key — which is what makes caching them safe without revalidation, and what keeps a landing visit from costing one signed origin round trip per plate.
+
 ### Publishing full-deck previews
 
 `cmd/publish-templates` renders previews as part of publication, from the same sanitized bytes it uploaded, so a published template cannot be missing the previews for its digest. Rendering needs LibreOffice on `PATH`, which the development shell provides. Pass `-skip-previews` where it is unavailable; the command then says so, and the previews must be backfilled before the template is usable.

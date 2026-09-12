@@ -48,6 +48,46 @@ func TestLibreOfficeRendererPassesRequestedWidth(t *testing.T) {
 	}
 }
 
+// The landing ring paints slides at thumbnail size, so publication carries a
+// small copy of each one. It comes from a second encode of the pages already
+// rasterized, never a second rasterize.
+func TestLibreOfficeRendererEncodesASmallVariantFromTheSamePages(t *testing.T) {
+	runner := &fakeRunner{pages: 2}
+	renderer := NewLibreOfficeRenderer(LibreOfficeConfig{Runner: runner, TempDir: t.TempDir()})
+
+	document, err := renderer.RenderDocument(context.Background(), []byte("deck"), Limits{Width: 1600, SmallWidth: 480})
+	if err != nil {
+		t.Fatalf("RenderDocument() error = %v", err)
+	}
+	if len(document.Images) != 2 || len(document.Small) != 2 {
+		t.Fatalf("rendered %d full and %d small images, want 2 and 2", len(document.Images), len(document.Small))
+	}
+	rasterizes := 0
+	resized := 0
+	for _, command := range runner.commands {
+		if command.name == defaultPDFToPPMPath {
+			rasterizes++
+		}
+		if command.name == defaultCWebPPath && containsPair(command.args, "-resize", "480") {
+			resized++
+		}
+	}
+	if rasterizes != 1 {
+		t.Errorf("rasterized %d times, want once for both variants", rasterizes)
+	}
+	if resized != 2 {
+		t.Errorf("%d encodes were resized, want one per slide", resized)
+	}
+
+	plain, err := renderer.RenderDocument(context.Background(), []byte("deck"), Limits{Width: 1600})
+	if err != nil {
+		t.Fatalf("RenderDocument() error = %v", err)
+	}
+	if len(plain.Small) != 0 {
+		t.Error("a render that asked for no small width produced one anyway")
+	}
+}
+
 func TestLibreOfficeRendererRejectsMissingPDF(t *testing.T) {
 	runner := &fakeRunner{pages: 3, skipPDF: true}
 	renderer := NewLibreOfficeRenderer(LibreOfficeConfig{Runner: runner, TempDir: t.TempDir()})

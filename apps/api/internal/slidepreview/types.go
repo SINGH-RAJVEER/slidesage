@@ -14,7 +14,12 @@ const (
 	DefaultMaxRevisionBytes = int64(64 << 20)
 	DefaultMaxSlides        = 200
 	DefaultWidth            = 1600
-	DefaultTimeout          = 4 * time.Minute
+	// DefaultSmallWidth is the width of the small variant published beside each
+	// full preview. The landing ring paints a slide about 140 CSS pixels wide,
+	// so a full 1600 pixel render costs it several megabytes of decoded bitmap
+	// per plate to show a thumbnail.
+	DefaultSmallWidth = 480
+	DefaultTimeout    = 4 * time.Minute
 	// DefaultClaimRetryAfter delays a job whose revision another worker claimed.
 	DefaultClaimRetryAfter = time.Minute
 )
@@ -33,7 +38,10 @@ type Limits struct {
 	MaxRevisionBytes int64
 	MaxSlides        int
 	Width            int
-	Timeout          time.Duration
+	// SmallWidth additionally encodes every slide at this width. Zero renders
+	// the full size alone, which is what presentation previews want.
+	SmallWidth int
+	Timeout    time.Duration
 }
 
 func (limits Limits) withDefaults() Limits {
@@ -61,7 +69,10 @@ type Renderer interface {
 // RenderedDocument retains the PDF used to produce the complete preview set.
 type RenderedDocument struct {
 	Images [][]byte
-	PDF    []byte
+	// Small holds the same slides at Limits.SmallWidth, and is empty unless
+	// that width was asked for.
+	Small [][]byte
+	PDF   []byte
 }
 type DocumentRenderer interface {
 	RenderDocument(context.Context, []byte, Limits) (RenderedDocument, error)

@@ -114,15 +114,25 @@ func (renderer *LibreOfficeRenderer) RenderDocument(ctx context.Context, pptx []
 	if err != nil {
 		return RenderedDocument{}, err
 	}
-	images, err := renderer.encode(renderContext, workDir, pages)
+	images, err := renderer.encode(renderContext, workDir, pages, "", 0)
 	if err != nil {
 		return RenderedDocument{}, err
+	}
+	var small [][]byte
+	if limits.SmallWidth > 0 {
+		// Re-encoded from the rasterized pages rather than rasterized again:
+		// the expensive halves of a render are LibreOffice and pdftoppm, and
+		// both have already run by here.
+		small, err = renderer.encode(renderContext, workDir, pages, "-small", limits.SmallWidth)
+		if err != nil {
+			return RenderedDocument{}, err
+		}
 	}
 	pdf, err := os.ReadFile(pdfPath)
 	if err != nil {
 		return RenderedDocument{}, err
 	}
-	return RenderedDocument{Images: images, PDF: pdf}, nil
+	return RenderedDocument{Images: images, Small: small, PDF: pdf}, nil
 }
 
 func (renderer *LibreOfficeRenderer) convertToPDF(ctx context.Context, workDir, deckPath string) (string, error) {
@@ -172,11 +182,19 @@ func (renderer *LibreOfficeRenderer) rasterize(ctx context.Context, workDir, pdf
 	return pages, nil
 }
 
-func (renderer *LibreOfficeRenderer) encode(ctx context.Context, workDir string, pages []string) ([][]byte, error) {
+// encode writes one WebP per rasterized page. A non-empty suffix keeps a second
+// pass over the same pages from overwriting the first pass's output, and a
+// positive width scales the page down on the way through cwebp.
+func (renderer *LibreOfficeRenderer) encode(ctx context.Context, workDir string, pages []string, suffix string, width int) ([][]byte, error) {
 	images := make([][]byte, 0, len(pages))
 	for index, page := range pages {
-		target := filepath.Join(workDir, fmt.Sprintf("%s-%d.webp", pagePrefix, index))
-		arguments := []string{"-quiet", "-q", strconv.Itoa(renderer.quality), page, "-o", target}
+		target := filepath.Join(workDir, fmt.Sprintf("%s-%d%s.webp", pagePrefix, index, suffix))
+		arguments := []string{"-quiet", "-q", strconv.Itoa(renderer.quality)}
+		if width > 0 {
+			// A zero height keeps the page's aspect ratio.
+			arguments = append(arguments, "-resize", strconv.Itoa(width), "0")
+		}
+		arguments = append(arguments, page, "-o", target)
 		if err := renderer.runner.Run(ctx, workDir, renderer.cwebpPath, arguments...); err != nil {
 			return nil, fmt.Errorf("encode preview %d: %w", index, err)
 		}
