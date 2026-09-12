@@ -1,9 +1,22 @@
 import type React from "react";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { POINTS_UPDATED_EVENT, readPointBalanceStorage } from "../lib/points";
+import {
+	clearPointBalanceStorage,
+	POINTS_UPDATED_EVENT,
+	readPointBalanceStorage,
+} from "../lib/points";
 import { fetchSessionWithRetry, isSessionCheckStale, type SessionUser } from "../lib/session";
+import { rememberSignedIn } from "../lib/session-history";
 
 export type User = SessionUser;
+
+const SIGN_IN_PATH = "/sign-in";
+/** How long a sign out waits for the server before redirecting anyway. */
+const SIGN_OUT_REQUEST_GRACE_MS = 1_000;
+
+function wait(delayMs: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
 
 interface AuthContextType {
 	user: User | null;
@@ -45,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 			.then((nextUser) => {
 				if (!signingOut.current && requestId === sessionRequestId.current) {
 					lastSessionCheckAt.current = Date.now();
+					if (nextUser) rememberSignedIn();
 					setUser(nextUser);
 				}
 			})
@@ -114,22 +128,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 		};
 	}, []);
 
-	const signOut = async () => {
+	const signOut = useCallback(async () => {
+		if (signingOut.current) return;
 		signingOut.current = true;
+
+		// Drop every local trace of the session first so the UI reflects the sign out right away,
+		// even if the request to clear the cookie is slow or never answers.
 		sessionRequestId.current += 1;
+		sessionRequest.current = null;
+		lastSessionCheckAt.current = null;
+		setUser(null);
+		clearPointBalanceStorage();
 
-		try {
-			const { auth } = await import("../lib/auth-client");
-			await auth.signOut();
+		const serverSignOut = import("../lib/auth-client")
+			.then(({ auth }) => auth.signOut())
+			.catch((error) => {
+				console.error("Sign out failed:", error);
+			});
 
-			setUser(null);
-			window.location.replace("/sign-in");
-		} catch (error) {
-			signingOut.current = false;
-			console.error("Sign out failed:", error);
-			throw error;
-		}
-	};
+		// The request is sent with keepalive, so it still clears the cookie if the redirect wins.
+		await Promise.race([serverSignOut, wait(SIGN_OUT_REQUEST_GRACE_MS)]);
+		window.location.replace(SIGN_IN_PATH);
+	}, []);
 
 	return (
 		<AuthContext.Provider

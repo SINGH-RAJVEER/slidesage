@@ -65,6 +65,12 @@ Sign-out invalidates pending auth refreshes before clearing the JWT cookie. This
 
 The web application uses the endpoints listed above plus `POST /auth/sign-in/social` to start OAuth flows. Use the custom fetch-based client in `libs/ui/lib/auth-client.ts` for supported browser flows; it sends credentials with every request and throws an `AuthError` carrying the backend `code` (for example `EMAIL_NOT_VERIFIED` or `INVALID_EMAIL_OR_PASSWORD`).
 
+## Signing out in the browser
+
+`signOut` in `libs/ui/context/AuthContext.tsx` drops the local session before it waits on anything: it invalidates any in-flight session check, clears the context user, and removes the cached point balance, so the header and every guarded route react in the same tick the menu item is pressed.
+
+`POST /auth/sign-out` is then sent with `keepalive`, which lets the browser finish clearing the cookie across the redirect that follows. The redirect to `/sign-in` runs as soon as that request settles, or after a one second grace period if the API is slow or unreachable, so a failing API can never keep a user on a signed-in screen. A failed request is logged and does not throw; repeat presses while a sign out is in flight are ignored.
+
 ## Password and email changes
 
 `PUT /profile` keeps account-security mutations behind a valid JWT and current-password verification:

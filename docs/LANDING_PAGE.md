@@ -64,3 +64,17 @@ The route is public and the digest is part of the path, so the page addresses a 
 - `apps/web/src/app/Header.tsx` — app header; its icon links to `/landing`.
 - `apps/web/src/test/routes/landing/LandingPage.test.tsx` — render, route, and plate tests.
 - `apps/web/src/test/routes/landing/WordmarkOrb.test.tsx` — orb labelling, canvas layering, and fallback tests.
+
+## Clicking through the horizon
+
+Clicking the black hole expands its silhouette to cover the viewport, fades its reflections and lettering, and blends into the exact shared page-background gradient. The cover persists across navigation and page loading; it never swaps to an orb loader.
+
+- New signed-out visitors go to Sign Up. A browser that has previously held a successful session goes to Sign In. This uses only the local `slidesage-signed-in-before` boolean, never stored credentials or account details; clearing browser storage resets this hint.
+- Signed-in visitors go to their Generate or Presentations default. Choosing Landing as the default sends this click to Generate.
+- Lazy destination code warms during expansion. Auth forms and Generate report readiness after mounting; Presentations waits for its initial data request to succeed or fail, so an error can be revealed instead of trapping the user behind the cover.
+- After readiness and font loading, the header, title, form groups, and app sections appear in a short stagger. Controls stay inert until the reveal ends, then keyboard focus moves to the destination heading or main region. Reduced motion uses a brief fade without stagger or movement.
+- If a request stalls, the cover offers a direct-page recovery link after twelve seconds. Ordinary navigation outside this landing interaction keeps its existing loading behavior.
+
+The coordinator lives in `apps/web/src/app/transitions/HorizonTransition.tsx`, above the route outlet. Destination pages use `useHorizonPageReady` to signal when their initial content is ready.
+
+Transition refinements: pointer clicks are accepted only inside the visible horizon (with a six-pixel allowance), while Enter retains keyboard activation. Browser history changes cancel the cover and invalidate late animation completions. Cover sizing allows for window growth, and reduced motion uses a full-screen fade rather than a rapid spatial expansion. Destination elements use a lighter blur, shorter travel, and a stagger that starts just after the cover begins fading.

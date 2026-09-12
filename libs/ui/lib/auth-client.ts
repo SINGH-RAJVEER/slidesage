@@ -83,11 +83,15 @@ function extractErrorMessage(data: unknown, status: number): { message: string; 
 	return { message: `Request failed with status ${status}` };
 }
 
-async function request<T>(path: string, options: { method: string; body?: unknown }): Promise<T> {
+async function request<T>(
+	path: string,
+	options: { method: string; body?: unknown; keepalive?: boolean },
+): Promise<T> {
 	const response = await fetch(`${API_URL}${path}`, {
 		method: options.method,
 		headers: { "Content-Type": "application/json" },
 		credentials: "include",
+		keepalive: options.keepalive === true,
 		body: options.body === undefined ? undefined : JSON.stringify(options.body),
 	});
 	if (!response.ok) {
@@ -98,8 +102,8 @@ async function request<T>(path: string, options: { method: string; body?: unknow
 	return (await response.json()) as T;
 }
 
-function post<T>(path: string, body?: unknown): Promise<T> {
-	return request<T>(path, { method: "POST", body });
+function post<T>(path: string, body?: unknown, options: { keepalive?: boolean } = {}): Promise<T> {
+	return request<T>(path, { method: "POST", body, keepalive: options.keepalive === true });
 }
 
 export const auth = {
@@ -136,7 +140,8 @@ export const auth = {
 	},
 
 	signOut(): Promise<SuccessResult> {
-		return post<SuccessResult>("/auth/sign-out");
+		// keepalive keeps the cookie-clearing request alive across the redirect that follows it.
+		return post<SuccessResult>("/auth/sign-out", undefined, { keepalive: true });
 	},
 
 	startSocialSignIn(

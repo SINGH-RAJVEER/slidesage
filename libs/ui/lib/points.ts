@@ -31,3 +31,12 @@ export function readPointBalanceStorage(value: string | null): number | null {
 		return null;
 	}
 }
+
+export function clearPointBalanceStorage() {
+	if (typeof window === "undefined") return;
+	try {
+		window.localStorage.removeItem(POINTS_STORAGE_KEY);
+	} catch {
+		// Storage can be unavailable in private browsing.
+	}
+}
