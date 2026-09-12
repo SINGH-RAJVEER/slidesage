@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
-import { act, render, waitFor } from "@testing-library/react";
 import { AuthProvider, useAuth } from "@slidesage/ui/context/AuthContext";
 import { fetchSessionWithRetry, isSessionCheckStale } from "@slidesage/ui/lib/session";
+import { act, render, waitFor } from "@testing-library/react";
 
 describe("AuthProvider", () => {
 	it("only considers a checked session stale after five minutes", () => {
@@ -86,5 +86,81 @@ describe("AuthProvider", () => {
 		expect(fetchMock).toHaveBeenLastCalledWith(expect.stringContaining("/auth/get-session"), {
 			credentials: "include",
 		});
+	});
+
+	it("clears the session immediately and redirects even when the server never answers", async () => {
+		const originalFetch = globalThis.fetch;
+		const replace = mock(() => {});
+		const originalReplace = window.location.replace;
+		Object.defineProperty(window.location, "replace", { configurable: true, value: replace });
+
+		const sessionUser = {
+			id: "user_1",
+			name: "Test User",
+			email: "test@example.com",
+			image: null,
+			emailVerified: true,
+			slideTokens: 50,
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+		};
+
+		const fetchMock = mock((input: string) => {
+			if (input.includes("/auth/sign-out")) return new Promise<Response>(() => {});
+			return Promise.resolve(
+				new Response(JSON.stringify({ user: sessionUser }), {
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
+		});
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		window.localStorage.setItem("slidesage:points-updated", JSON.stringify({ slideTokens: 50 }));
+
+		let signOut: () => Promise<void> = async () => {};
+		function SessionState() {
+			const auth = useAuth();
+			signOut = auth.signOut;
+			return <span>{auth.user ? auth.user.email : "signed-out"}</span>;
+		}
+
+		try {
+			const view = render(
+				<AuthProvider>
+					<SessionState />
+				</AuthProvider>,
+			);
+			await waitFor(() => expect(view.getByText("test@example.com")).toBeInTheDocument());
+
+			let signOutDone = false;
+			await act(async () => {
+				void signOut().then(() => {
+					signOutDone = true;
+				});
+			});
+
+			// The user is gone before the sign out request settles.
+			expect(view.getByText("signed-out")).toBeInTheDocument();
+			expect(window.localStorage.getItem("slidesage:points-updated")).toBeNull();
+			expect(signOutDone).toBe(false);
+
+			await act(async () => {
+				await waitFor(
+					() => {
+						expect(
+							fetchMock.mock.calls.some(([input]) => String(input).includes("/auth/sign-out")),
+						).toBe(true);
+						expect(replace).toHaveBeenCalledWith("/sign-in");
+					},
+					{ timeout: 3000 },
+				);
+			});
+		} finally {
+			globalThis.fetch = originalFetch;
+			Object.defineProperty(window.location, "replace", {
+				configurable: true,
+				value: originalReplace,
+			});
+			window.localStorage.removeItem("slidesage:points-updated");
+		}
 	});
 });
