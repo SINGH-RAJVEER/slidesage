@@ -36,7 +36,7 @@ The landing page is the public entry point at `/` for visitors without a session
 
 ## The Plates
 
-Each plate is one rendered slide of a published template — a cover, a section divider, or a content page — read from `GET /template-previews/{id}/{version}/{digest}/{index}`, the same full-slide previews the marketplace viewer shows. The landing page ships no slide fixtures of its own, so it cannot drift from what the product actually produces.
+Each plate is one rendered slide of a published template — a cover, a section divider, or a content page — read from `GET /template-previews/{id}/{version}/{digest}/{index}/small`, the same full-slide previews the marketplace viewer shows, at the reduced width published beside them. The landing page ships no slide fixtures of its own, so it cannot drift from what the product actually produces.
 
 The route is public and the digest is part of the path, so the page addresses a slide straight from the catalog it already holds: no preview manifest is fetched, and the ring paints on the first render rather than after a round trip.
 
@@ -48,6 +48,8 @@ The route is public and the digest is part of the path, so the page addresses a 
 - Seventy-two is a surplus over the thirty the ring carries, which is what a plate is refilled from as it passes behind the orb. Bounding the draw bounds what the page downloads: one pass through the pool takes several minutes, after which every image is already in the browser cache and the ring costs nothing to keep turning.
 - The draw is made once per mount, so the ring differs between visits and no single template becomes the page's face. The random source is injectable, which is how the tests pin a draw.
 - If the catalog holds fewer slides than asked for, the pool is simply shorter and the ring cycles it sooner.
+- A plate paints about 140 CSS pixels wide, where the full render is 1600. A ring of thirty full renders is on the order of two hundred megabytes of decoded bitmap, so a plate reads the small variant and only the preview a plate opens into downloads the full slide. A template published before the variant existed serves its full slide in its place, so the ring never has a hole while a backfill is pending.
+- The ring mounts all thirty plates on the first frame, but only the opening sixteen carry an image; the rest take theirs once that batch settles, or after a bounded wait if one of them never does. The belt's layout, spacing and motion are untouched — this only keeps a cold visit from opening thirty image connections at once, where the slowest of them is as likely to be a plate in front of you as one behind the orb.
 - A slide preview that will not load falls back to its template's cover, and a queued slide that will not load is dropped from the pool. A template published before slide previews existed therefore contributes its cover and nothing else, and were previews ever unpublished wholesale the page would degrade to the all-covers ring it used to be rather than showing holes.
 
 ## Files

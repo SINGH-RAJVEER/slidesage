@@ -21,6 +21,25 @@ const MAX_RING_VELOCITY = 2.6;
 /* slides fetched ahead of the plate that will show them */
 const PRELOAD_AHEAD = 4;
 
+/**
+ * Plates that carry an image on the first paint.
+ *
+ * The ring still mounts its full count, so the belt's layout, spacing and
+ * motion are exactly what they were - only the network is sequenced. A cold
+ * visit opens this many image connections, and the remaining plates take theirs
+ * once the opening batch has settled, which keeps the slowest plate in a crowd
+ * of thirty parallel requests from being one of the ones you are looking at.
+ */
+export const LANDING_FIRST_PAINT_PLATES = 16;
+
+/**
+ * How long the rest of the ring waits on the opening batch.
+ *
+ * A plate whose image never settles must not strand the other half of the belt
+ * empty, so the wait is bounded rather than conditional on the batch alone.
+ */
+export const LANDING_FIRST_PAINT_DEADLINE_MS = 1200;
+
 /* Plate size as a fraction of the ring's major radius. Small enough that the
    ring can carry a crowd without the plates fusing into a solid band. */
 const PLATE_WIDTH = 0.26;
@@ -257,8 +276,9 @@ function revealSlide(image: HTMLImageElement) {
  * cache means every plate sits at zero and the ring is simply not there. The
  * mount is the only place that case can be caught.
  */
-function attachSlide(image: HTMLImageElement | null, plate: LandingPlate) {
+function attachSlide(image: HTMLImageElement | null, plate: LandingPlate, settled: () => void) {
 	if (!image?.complete) return;
+	settled();
 	if (image.naturalWidth > 0) revealSlide(image);
 	/* complete with no pixels is a failure the error handler will not be told
 	   about either, for the same reason */ else onSlideError({ currentTarget: image }, plate);
@@ -294,6 +314,25 @@ export function SlideRingHero() {
 	);
 	/* what the frame loop reads; `ring` is only what React paints */
 	const ringRef = useRef(ring);
+	/* plates carrying an image right now: the opening batch, then all of them */
+	const [staged, setStaged] = useState(() => Math.min(ring.length, LANDING_FIRST_PAINT_PLATES));
+	/* counted once per plate, since a failed slide settles again on its cover */
+	const paintedPlates = useRef(new Set<number>());
+
+	const platePainted = (index: number) => {
+		const painted = paintedPlates.current;
+		if (painted.has(index) || index >= LANDING_FIRST_PAINT_PLATES) return;
+		painted.add(index);
+		if (painted.size >= Math.min(ringRef.current.length, LANDING_FIRST_PAINT_PLATES)) {
+			setStaged(ringRef.current.length);
+		}
+	};
+
+	useEffect(() => {
+		if (staged >= ring.length) return undefined;
+		const timer = window.setTimeout(() => setStaged(ring.length), LANDING_FIRST_PAINT_DEADLINE_MS);
+		return () => window.clearTimeout(timer);
+	}, [staged, ring.length]);
 
 	useEffect(() => {
 		const root = rootRef.current;
@@ -689,23 +728,33 @@ export function SlideRingHero() {
 							}}
 							className="absolute inset-0 overflow-hidden rounded-[4%] ring-1 ring-white/10"
 						>
-							<img
-								/* keyed by the slide, so a refill mounts a clean element
+							{/* a plate past the opening batch has no image yet: its shell
+							    sits at zero opacity, which is where every plate starts */}
+							{index < staged && (
+								<img
+									/* keyed by the slide, so a refill mounts a clean element
 								   rather than inheriting the last slide's fallback state */
-								key={plate.key}
-								ref={(el) => attachSlide(el, plate)}
-								src={plate.slideUrl}
-								alt=""
-								/* Eager, deliberately. A plate is never at rest: it orbits
+									key={plate.key}
+									ref={(el) => attachSlide(el, plate, () => platePainted(index))}
+									src={plate.slideUrl}
+									alt=""
+									/* Eager, deliberately. A plate is never at rest: it orbits
 								   through the viewport whether or not it started there, so
 								   deferring the fetch until it arrives guarantees it pops in
 								   mid-flight. The whole ring is around a megabyte. */
-								decoding="async"
-								draggable={false}
-								onLoad={(event) => revealSlide(event.currentTarget)}
-								onError={(event) => onSlideError(event, plate)}
-								className="h-full w-full object-cover"
-							/>
+									decoding="async"
+									draggable={false}
+									onLoad={(event) => {
+										platePainted(index);
+										revealSlide(event.currentTarget);
+									}}
+									onError={(event) => {
+										platePainted(index);
+										onSlideError(event, plate);
+									}}
+									className="h-full w-full object-cover"
+								/>
+							)}
 						</div>
 					</div>
 				))}
@@ -737,7 +786,8 @@ export function SlideRingHero() {
 					>
 						<div className="h-full w-full overflow-hidden rounded-lg shadow-2xl ring-1 ring-white/15">
 							<img
-								src={preview.slideUrl}
+								/* the full render, not the plate's thumbnail-sized copy */
+								src={preview.fullUrl}
 								alt={`${preview.name}, slide ${preview.slideIndex + 1}`}
 								onError={(event) => onSlideError(event, preview)}
 								className="h-full w-full object-cover"

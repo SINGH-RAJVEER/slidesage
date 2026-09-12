@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { MARKETPLACE_ITEMS } from "@slidesage/ui/lib/catalog";
-import { fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
 	LANDING_PLATE_COUNT,
@@ -12,6 +12,8 @@ import {
 import {
 	accelerateRing,
 	decelerateRing,
+	LANDING_FIRST_PAINT_DEADLINE_MS,
+	LANDING_FIRST_PAINT_PLATES,
 	plateStackingLayers,
 } from "../../../routes/landing/SlideRingHero";
 
@@ -47,7 +49,7 @@ describe("LandingPage", () => {
 		expect(container.querySelectorAll("h1, h2, p")).toHaveLength(0);
 	});
 
-	it("renders one rendered slide per plate", async () => {
+	it("mounts the whole ring but only images the opening batch, then the rest", async () => {
 		const { default: LandingPage } = await import("../../../routes/landing/LandingPage");
 
 		const { container } = render(
@@ -56,11 +58,42 @@ describe("LandingPage", () => {
 			</MemoryRouter>,
 		);
 
-		const plates = container.querySelectorAll("[data-plate-index] img");
-		expect(plates.length).toBe(LANDING_PLATE_COUNT);
-		for (const plate of plates) {
+		/* every plate is on the belt from the first frame; a cold visit just
+		   does not open thirty image connections at once to fill it */
+		expect(container.querySelectorAll("[data-plate-index]").length).toBe(LANDING_PLATE_COUNT);
+		const opening = container.querySelectorAll("[data-plate-index] img");
+		expect(opening.length).toBe(LANDING_FIRST_PAINT_PLATES);
+		for (const plate of opening) {
 			expect(plate.getAttribute("src")).toContain("/template-previews/");
+			/* a plate is painted at thumbnail size, so it reads the small variant */
+			expect(plate.getAttribute("src")).toEndWith("/small");
 		}
+
+		act(() => {
+			for (const image of opening) fireEvent.load(image);
+		});
+
+		expect(container.querySelectorAll("[data-plate-index] img").length).toBe(LANDING_PLATE_COUNT);
+	});
+
+	it("fills the rest of the ring even when the opening batch never settles", async () => {
+		const { default: LandingPage } = await import("../../../routes/landing/LandingPage");
+
+		const { container } = render(
+			<MemoryRouter>
+				<LandingPage />
+			</MemoryRouter>,
+		);
+
+		expect(container.querySelectorAll("[data-plate-index] img").length).toBe(
+			LANDING_FIRST_PAINT_PLATES,
+		);
+		/* no load and no error: a stalled image must not strand half the belt */
+		await act(
+			() => new Promise((resolve) => setTimeout(resolve, LANDING_FIRST_PAINT_DEADLINE_MS + 60)),
+		);
+
+		expect(container.querySelectorAll("[data-plate-index] img").length).toBe(LANDING_PLATE_COUNT);
 	});
 
 	it("fetches every plate eagerly, since a plate orbits into view whether or not it starts there", async () => {
@@ -133,6 +166,11 @@ describe("LandingPage", () => {
 		fireEvent.pointerUp(window, { clientX: 100, clientY: 100 });
 
 		expect(getByRole("dialog")).toBeInTheDocument();
+		/* the plate carries a thumbnail-sized copy; opening it is the one place
+		   the full render is worth downloading */
+		const opened = getByRole("dialog").querySelector("img");
+		expect(opened?.getAttribute("src")).toContain("/template-previews/");
+		expect(opened?.getAttribute("src")).not.toEndWith("/small");
 
 		fireEvent.keyDown(window, { key: "Escape" });
 		expect(queryByRole("dialog")).not.toBeInTheDocument();
@@ -183,7 +221,9 @@ describe("Landing plates", () => {
 		expect(pool).toHaveLength(LANDING_POOL_SIZE);
 		for (const plate of pool) {
 			expect(plate.slideUrl).toContain(`/template-previews/${plate.templateId}/1/`);
-			expect(plate.slideUrl).toMatch(/\/[a-f0-9]{64}\/\d+$/);
+			/* the plate reads the small variant and the preview the full render */
+			expect(plate.slideUrl).toMatch(/\/[a-f0-9]{64}\/\d+\/small$/);
+			expect(plate.fullUrl).toMatch(/\/[a-f0-9]{64}\/\d+$/);
 			expect(plate.coverUrl).toContain(encodeURIComponent(`pptx-templates/${plate.templateId}/1/`));
 			expect(plate.name.length).toBeGreaterThan(0);
 		}
