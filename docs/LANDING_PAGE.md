@@ -43,6 +43,7 @@ The ring writes to thirty elements sixty times a second, so the loop is written 
 - Plate repulsion is O(n squared) by nature — thirty plates is 435 pairs — so it compares squared lengths and only takes a root where the value is used.
 - Transform changes every frame, but opacity, brightness, z-index and pointer events usually do not. Each plate remembers what was last written to it and skips the rest, because a style rewritten to its own value still costs a recalculation. Brightness and opacity are quantized so they settle rather than jitter in the last decimal.
 - Depth is carried by brightness alone. The blur that used to go with it topped out under half a pixel — invisible, while a blur radius that changes every frame is a fresh filter pass per plate per frame.
+- The star field is a separate concern: it repaints at 30fps rather than per frame, at CSS resolution, from pre-rendered sprites rather than a filled path per star, and without the `screen` composite it used to blend with. Stars drift over minutes; the orb itself still runs at the display's rate. The orb's own budget is 1.5x device pixels with multisampling off, since the shader antialiases the only edge in it, and its noise runs three octaves rather than four.
 
 ## The Plates
 

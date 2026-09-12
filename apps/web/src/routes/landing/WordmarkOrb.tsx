@@ -6,6 +6,57 @@ import { WORDMARK_ORB_FRAGMENT_SHADER, WORDMARK_ORB_VERTEX_SHADER } from "./word
 const STATIC_ELAPSED = 4.2;
 const DRAG_CLICK_SLOP = 6;
 
+/**
+ * How often the star field is redrawn.
+ *
+ * Stars drift across the viewport over minutes and twinkle slowly, so a repaint
+ * per animation frame buys nothing anyone can see. The whole field is cleared
+ * and repainted each time, which on a large display is the most expensive thing
+ * the landing page asks of the main thread; the orb itself still runs at the
+ * display's own rate.
+ */
+const STAR_FRAME_MS = 1000 / 30;
+
+/**
+ * Pixel budget for the star canvas.
+ *
+ * The stars are sub-pixel dots and faint hairlines: rendering them above CSS
+ * resolution multiplies the pixels cleared and composited every frame for a
+ * difference nobody can point at.
+ */
+const STAR_MAX_DPR = 1;
+
+/**
+ * Pixel budget for the orb.
+ *
+ * The orb is a smooth gradient behind a scale transform, not text, so it does
+ * not need the full device ratio of a 3x phone. The shader antialiases its own
+ * silhouette, which is the only edge in it.
+ */
+const ORB_MAX_DPR = 1.5;
+
+/* Pre-rendered star dots, bucketed by lightness. A filled arc is a path the
+   rasterizer builds for every star on every frame; a sprite is a blit. */
+const STAR_SPRITE_BUCKETS = 4;
+const STAR_SPRITE_RADIUS = 8;
+
+function createStarSprites(): (HTMLCanvasElement | null)[] {
+	return Array.from({ length: STAR_SPRITE_BUCKETS }, (_, bucket) => {
+		const canvas = document.createElement("canvas");
+		const size = STAR_SPRITE_RADIUS * 2;
+		canvas.width = size;
+		canvas.height = size;
+		const context = canvas.getContext("2d");
+		if (!has2dContext(context)) return null;
+		const lightness = 72 + (bucket / (STAR_SPRITE_BUCKETS - 1)) * 18;
+		context.fillStyle = `hsl(212, 62%, ${lightness}%)`;
+		context.beginPath();
+		context.arc(STAR_SPRITE_RADIUS, STAR_SPRITE_RADIUS, STAR_SPRITE_RADIUS, 0, Math.PI * 2);
+		context.fill();
+		return canvas;
+	});
+}
+
 type Star = { x: number; y: number; depth: number; phase: number; drift: number; size: number };
 
 function seeded(index: number, salt: number) {
@@ -103,11 +154,11 @@ export function WordmarkOrb() {
 
 		const starContext = starCanvas.getContext("2d", { alpha: true });
 		const gl =
-			glCanvas.getContext("webgl", { alpha: true, premultipliedAlpha: false, antialias: true }) ??
+			glCanvas.getContext("webgl", { alpha: true, premultipliedAlpha: false, antialias: false }) ??
 			glCanvas.getContext("experimental-webgl", {
 				alpha: true,
 				premultipliedAlpha: false,
-				antialias: true,
+				antialias: false,
 			});
 		if (!has2dContext(starContext) || !gl) {
 			showFallback();
@@ -149,6 +200,7 @@ export function WordmarkOrb() {
 			webgl.clearColor(0, 0, 0, 0);
 
 			const stars = createStars(180);
+			const starSprites = createStarSprites();
 			const flights = Array.from({ length: 115 }, (_, index) => ({
 				angle: seeded(index, 11) * Math.PI * 2,
 				offset: 0.12 + seeded(index, 12) * 0.72,
@@ -163,14 +215,15 @@ export function WordmarkOrb() {
 			let starDpr = 1;
 			let frame = 0;
 			let visible = true;
+			let lastStars = Number.NEGATIVE_INFINITY;
 			const startedAt = performance.now();
 
 			const resize = () => {
 				const bounds = host.getBoundingClientRect();
 				width = Math.max(1, bounds.width);
 				height = Math.max(1, bounds.height);
-				const dpr = Math.min(window.devicePixelRatio || 1, 2);
-				starDpr = Math.min(window.devicePixelRatio || 1, 1.5);
+				const dpr = Math.min(window.devicePixelRatio || 1, ORB_MAX_DPR);
+				starDpr = Math.min(window.devicePixelRatio || 1, STAR_MAX_DPR);
 
 				const starWidth = Math.max(1, Math.round(width * starDpr));
 				const starHeight = Math.max(1, Math.round(height * starDpr));
@@ -190,11 +243,10 @@ export function WordmarkOrb() {
 				webgl.uniform2f(uniforms.resolution, bufferWidth, bufferHeight);
 			};
 
-			const drawStars = (elapsed: number) => {
+			const drawStars = (elapsed: number, horizonScale: number) => {
 				starContext.setTransform(starDpr, 0, 0, starDpr, 0, 0);
 				starContext.clearRect(0, 0, starCanvas.width / starDpr, starCanvas.height / starDpr);
 				const count = Math.min(stars.length, Math.round((width * height) / 4200));
-				starContext.globalCompositeOperation = "screen";
 				for (let index = 0; index < count; index += 1) {
 					const star = stars[index];
 					if (!star) continue;
@@ -205,15 +257,17 @@ export function WordmarkOrb() {
 						: 0.58 + Math.sin(elapsed * (0.8 + star.depth) + star.phase) * 0.24;
 					const alpha = Math.max(0.08, twinkle * (0.22 + star.depth * 0.48));
 					const radius = Math.max(0.35, star.size * star.depth);
-					starContext.fillStyle = `hsla(212, 62%, ${72 + star.depth * 18}%, ${alpha})`;
-					starContext.beginPath();
-					starContext.arc(x, y, radius, 0, Math.PI * 2);
-					starContext.fill();
+					const sprite =
+						starSprites[
+							Math.min(STAR_SPRITE_BUCKETS - 1, Math.floor(star.depth * STAR_SPRITE_BUCKETS))
+						];
+					if (!sprite) continue;
+					starContext.globalAlpha = alpha;
+					starContext.drawImage(sprite, x - radius, y - radius, radius * 2, radius * 2);
 				}
+				starContext.globalAlpha = 1;
 				// Short hairlines approach the viewer and fade before they recycle.
 				// The larger horizon bends nearby paths a little more strongly.
-				const horizonScale =
-					Number(host.parentElement?.style.getPropertyValue("--horizon-scale")) || 1 / 3;
 				const extent = Math.min(width, height) * 0.42;
 				starContext.lineCap = "round";
 				for (const flight of flights) {
@@ -230,16 +284,19 @@ export function WordmarkOrb() {
 					}
 					starContext.stroke();
 				}
-				starContext.globalCompositeOperation = "source-over";
 			};
 
 			const render = (now: number) => {
 				frame = 0;
 				const elapsed = reducedMotion ? STATIC_ELAPSED : (now - startedAt) * 0.001;
-				drawStars(elapsed);
-				webgl.uniform1f(uniforms.time, elapsed);
+				/* one read per frame, shared by the field and the orb */
 				const scale =
 					Number(host.parentElement?.style.getPropertyValue("--horizon-scale")) || 1 / 3;
+				if (reducedMotion || now - lastStars >= STAR_FRAME_MS) {
+					lastStars = now;
+					drawStars(elapsed, scale);
+				}
+				webgl.uniform1f(uniforms.time, elapsed);
 				webgl.uniform1f(
 					uniforms.expansion,
 					Math.max(0, Math.min(1, (scale - 1 / 3) / (1.22 - 1 / 3))),
