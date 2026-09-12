@@ -6,6 +6,7 @@ import {
 	readPointBalanceStorage,
 } from "../lib/points";
 import { fetchSessionWithRetry, isSessionCheckStale, type SessionUser } from "../lib/session";
+import { rememberSignedIn } from "../lib/session-history";
 
 export type User = SessionUser;
 
@@ -57,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 			.then((nextUser) => {
 				if (!signingOut.current && requestId === sessionRequestId.current) {
 					lastSessionCheckAt.current = Date.now();
+					if (nextUser) rememberSignedIn();
 					setUser(nextUser);
 				}
 			})

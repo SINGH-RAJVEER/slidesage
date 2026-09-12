@@ -1,0 +1,74 @@
+.horizon-route-content {
+	min-height: 100dvh;
+}
+.horizon-route-cover {
+	position: fixed;
+	inset: 0;
+	z-index: 10000;
+	overflow: hidden;
+	will-change: opacity;
+}
+.horizon-route-disk {
+	position: absolute;
+	border-radius: 50%;
+	background: #010307;
+	will-change: transform, background-color;
+}
+.horizon-route-blue {
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(circle at top, hsl(220 20% 18%), hsl(222 27% 12%) 60%);
+	opacity: 0;
+	transition: opacity 450ms ease;
+}
+.horizon-route-cover:not([data-phase="cover"]) .horizon-route-blue {
+	opacity: 1;
+}
+.horizon-route-reflection {
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	background:
+		radial-gradient(ellipse at 32% 25%, #426485 0%, #152339 9%, transparent 25%),
+		radial-gradient(ellipse at 80% 62%, #0d3762 0%, transparent 22%);
+	animation: horizon-reflection-out 650ms ease-out forwards;
+}
+.horizon-route-mark {
+	position: absolute;
+	width: 167%;
+	max-width: none;
+	left: -33.5%;
+	top: 50%;
+	transform: translateY(-50%);
+	animation: horizon-reflection-out 300ms ease-out forwards;
+}
+@keyframes horizon-reflection-out {
+	to {
+		opacity: 0;
+	}
+}
+.horizon-route-wait {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 16px;
+	color: #a9b3bd;
+}
+.horizon-route-wait button {
+	cursor: pointer;
+	padding: 10px 18px;
+	border: 1px solid #a9b3bd60;
+	border-radius: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.horizon-route-blue {
+		transition-duration: 160ms;
+	}
+	.horizon-route-reflection,
+	.horizon-route-mark {
+		animation-duration: 160ms;
+	}
+}

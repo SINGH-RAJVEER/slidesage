@@ -5,6 +5,7 @@ import { auth } from "@slidesage/ui/lib/auth-client";
 import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Header from "../../app/Header";
+import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
 
 function sanitizeRedirectPath(value: string | null) {
 	if (!value) return "/";
@@ -25,6 +26,7 @@ export default function SignUpPage() {
 	const navigate = useNavigate();
 	const { isSignedIn } = useAuth();
 	const [name, setName] = useState("");
+	useHorizonPageReady(!isSignedIn);
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");

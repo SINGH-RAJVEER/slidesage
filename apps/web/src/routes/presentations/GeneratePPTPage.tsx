@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
 
 interface GenerateRouteState {
 	retry?: PresentationRetryOptions;
@@ -33,6 +34,7 @@ function templateSelection(
 }
 
 export default function GeneratePPTPage() {
+	useHorizonPageReady();
 	const location = useLocation();
 	const retry = (location.state as GenerateRouteState | null)?.retry;
 	const retryPresentationId = (location.state as GenerateRouteState | null)?.retryPresentationId;
@@ -169,6 +171,7 @@ export default function GeneratePPTPage() {
 			<Header />
 
 			<div
+				data-horizon-reveal
 				data-generation-selectors
 				className="relative flex w-full flex-col items-center px-4 pt-6 md:pt-8"
 			>
@@ -187,7 +190,10 @@ export default function GeneratePPTPage() {
 				/>
 			</div>
 
-			<main className="flex w-full flex-1 items-center justify-center overflow-y-auto px-4 py-12 md:px-8">
+			<main
+				data-horizon-reveal
+				className="flex w-full flex-1 items-center justify-center overflow-y-auto px-4 py-12 md:px-8"
+			>
 				<div className="w-full max-w-5xl">
 					<div className="relative -top-4 mx-auto flex w-full max-w-4xl flex-col items-center justify-center md:-top-6">
 						<GenerateForm

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { useHorizonTransition } from "../../app/transitions/HorizonTransition";
 import { WORDMARK_ORB_FRAGMENT_SHADER, WORDMARK_ORB_VERTEX_SHADER } from "./wordmark-orb-shaders";
 
 const STATIC_ELAPSED = 4.2;
@@ -70,6 +71,14 @@ function BlackHoleFallback() {
 }
 
 export function WordmarkOrb() {
+	const transition = useHorizonTransition();
+	const destination = transition?.href ?? "/sign-up";
+	const destinationLabel =
+		destination === "/sign-up"
+			? "SlideSage — sign up"
+			: destination === "/sign-in"
+				? "SlideSage — sign in"
+				: "Open SlideSage";
 	const hostRef = useRef<HTMLDivElement>(null);
 	const starCanvasRef = useRef<HTMLCanvasElement>(null);
 	const stageRef = useRef<HTMLAnchorElement>(null);
@@ -296,12 +305,43 @@ export function WordmarkOrb() {
 		}
 	}, []);
 
+	const enter = (event: React.MouseEvent<HTMLAnchorElement>) => {
+		if (event.detail !== 0 && dragDistance.current > DRAG_CLICK_SLOP) {
+			event.preventDefault();
+			return;
+		}
+		if (!transition || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+		event.preventDefault();
+
+		const bounds = event.currentTarget.getBoundingClientRect();
+
+		const scale =
+			Number(hostRef.current?.parentElement?.style.getPropertyValue("--horizon-scale")) || 1 / 3;
+		// Pointer activation follows the visible silhouette, not the square canvas.
+		if (
+			event.detail !== 0 &&
+			Math.hypot(
+				event.clientX - bounds.left - bounds.width / 2,
+				event.clientY - bounds.top - bounds.height / 2,
+			) >
+				bounds.height * 0.3 * scale + 6
+		)
+			return;
+		transition.begin({
+			x: bounds.left + bounds.width / 2,
+			y: bounds.top + bounds.height / 2,
+			radius: bounds.height * 0.3 * scale,
+			wordmark:
+				Number(hostRef.current?.parentElement?.style.getPropertyValue("--horizon-wordmark")) || 0,
+		});
+	};
+
 	return (
 		<div ref={hostRef} className="pointer-events-none absolute inset-0 z-10">
 			<canvas ref={starCanvasRef} className="absolute inset-0 h-full w-full" />
 			<Link
-				to="/sign-up"
-				aria-label="SlideSage — sign up"
+				to={destination}
+				aria-label={destinationLabel}
 				ref={stageRef}
 				onPointerDown={(event) => {
 					dragStartX.current = event.clientX;
@@ -311,9 +351,7 @@ export function WordmarkOrb() {
 					dragDistance.current += Math.abs(event.clientX - dragStartX.current);
 					dragStartX.current = event.clientX;
 				}}
-				onClick={(event) => {
-					if (dragDistance.current > DRAG_CLICK_SLOP) event.preventDefault();
-				}}
+				onClick={enter}
 				className="pointer-events-auto absolute top-1/2 left-1/2 aspect-square h-[min(76%,560px)] -translate-x-1/2 -translate-y-1/2 cursor-pointer"
 			>
 				<canvas
@@ -342,9 +380,18 @@ export function WordmarkOrb() {
 				className="absolute inset-0 place-items-center"
 			>
 				<Link
-					to="/sign-up"
-					aria-label="SlideSage — sign up"
-					className="grid aspect-square h-[min(76%,560px)] place-items-center"
+					to={destination}
+					aria-label={destinationLabel}
+					onPointerDown={(event) => {
+						dragStartX.current = event.clientX;
+						dragDistance.current = 0;
+					}}
+					onPointerMove={(event) => {
+						dragDistance.current += Math.abs(event.clientX - dragStartX.current);
+						dragStartX.current = event.clientX;
+					}}
+					onClick={enter}
+					className="pointer-events-auto grid aspect-square h-[min(76%,560px)] place-items-center"
 				>
 					<div
 						className="relative grid h-full w-full place-items-center"
