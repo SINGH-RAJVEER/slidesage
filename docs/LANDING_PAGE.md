@@ -72,7 +72,7 @@ The route is public and the digest is part of the path, so the page addresses a 
 - `apps/web/src/routes/landing/landing-plates.ts` — the slide pool and its randomiser.
 - `libs/ui/lib/template-thumbnails.ts` — the cover and slide-preview URL builders.
 - `libs/ui/lib/catalog.ts` — marketplace items, including the published digest, slide count, and `presentableSlideCount`.
-- `apps/web/src/app/router/EntranceRoute.tsx` — auth- and preference-aware index route.
+- `apps/web/src/app/router/EntranceRoute.tsx` — auth- and preference-aware index route. The landing page is split out of the initial bundle here: a signed-in visitor whose default is an app page never downloads the shader, the star field or the plate catalog. A browser with no sign-in history is the page's audience, so the chunk is warmed as the module loads and fetches alongside the session check rather than after it.
 - `libs/ui/components/Settings/LandingPreference.tsx` — the default-page picker, including the landing option.
 - `apps/web/src/app/Header.tsx` — app header; its icon links to `/landing`.
 - `apps/web/src/test/routes/landing/LandingPage.test.tsx` — render, route, and plate tests.

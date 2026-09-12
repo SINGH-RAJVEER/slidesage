@@ -357,13 +357,15 @@ describe("EntranceRoute", () => {
 		authState.user = null;
 		const { default: EntranceRoute } = await import("../../../app/router/EntranceRoute");
 
-		const { getByRole } = render(
+		const { findByRole } = render(
 			<MemoryRouter>
 				<EntranceRoute />
 			</MemoryRouter>,
 		);
 
-		expect(getByRole("img", { name: RING_LABEL })).toBeInTheDocument();
+		/* the landing page is split out of the initial bundle, so it arrives a
+		   chunk later rather than in the first render */
+		expect(await findByRole("img", { name: RING_LABEL })).toBeInTheDocument();
 	});
 
 	it("keeps a signed-in visitor on the landing page when that is their default", async () => {
@@ -371,13 +373,15 @@ describe("EntranceRoute", () => {
 		authState.user = { landingPage: "landing" };
 		const { default: EntranceRoute } = await import("../../../app/router/EntranceRoute");
 
-		const { getByRole } = render(
+		const { findByRole } = render(
 			<MemoryRouter>
 				<EntranceRoute />
 			</MemoryRouter>,
 		);
 
-		expect(getByRole("img", { name: RING_LABEL })).toBeInTheDocument();
+		/* the landing page is split out of the initial bundle, so it arrives a
+		   chunk later rather than in the first render */
+		expect(await findByRole("img", { name: RING_LABEL })).toBeInTheDocument();
 	});
 
 	it("forwards a signed-in visitor whose default is an app page", async () => {
@@ -391,6 +395,7 @@ describe("EntranceRoute", () => {
 			</MemoryRouter>,
 		);
 
+		await act(async () => {});
 		expect(queryByRole("img", { name: RING_LABEL })).not.toBeInTheDocument();
 	});
 });
