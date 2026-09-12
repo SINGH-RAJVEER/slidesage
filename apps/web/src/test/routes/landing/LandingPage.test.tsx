@@ -209,6 +209,18 @@ describe("Landing plates", () => {
 		expect(coasting).toBeGreaterThan(0);
 	});
 
+	it("reuses the caller's scratch buffers, so a frame allocates nothing", () => {
+		const order: number[] = [];
+		const layers: number[] = [];
+
+		const first = plateStackingLayers([{ depth: 0.4 }, { depth: 0.1 }], order, layers);
+		const second = plateStackingLayers([{ depth: 0.1 }, { depth: 0.4 }], order, layers);
+
+		expect(first).toBe(layers);
+		expect(second).toBe(layers);
+		expect(Array.from(second)).toEqual([0, 1]);
+	});
+
 	it("keeps every distinct depth on its own stacking layer", () => {
 		const layers = plateStackingLayers([{ depth: 0.511 }, { depth: 0.512 }]);
 
@@ -297,6 +309,45 @@ describe("Landing plates", () => {
 		const catalogOrder = randomLandingPool(LANDING_POOL_SIZE, () => 0);
 
 		expect(pinned.map((plate) => plate.key)).not.toEqual(catalogOrder.map((plate) => plate.key));
+	});
+});
+
+describe("Reduced motion", () => {
+	it("holds the ring still instead of running a frame loop over it", async () => {
+		const originalMatchMedia = window.matchMedia;
+		const originalFrame = window.requestAnimationFrame;
+		let scheduled = 0;
+		window.matchMedia = ((query: string) => ({
+			matches: query.includes("prefers-reduced-motion"),
+			media: query,
+			onchange: null,
+			addListener: () => {},
+			removeListener: () => {},
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => false,
+		})) as unknown as typeof window.matchMedia;
+		window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+			scheduled += 1;
+			return originalFrame(callback);
+		}) as typeof window.requestAnimationFrame;
+
+		try {
+			const { default: LandingPage } = await import("../../../routes/landing/LandingPage");
+			const { container } = render(
+				<MemoryRouter>
+					<LandingPage />
+				</MemoryRouter>,
+			);
+
+			/* the belt is laid out, but nothing is animating it: the old loop
+			   rewrote thirty plates a frame with the values they already held */
+			expect(container.querySelectorAll("[data-plate-index]").length).toBe(LANDING_PLATE_COUNT);
+			expect(scheduled).toBe(0);
+		} finally {
+			window.matchMedia = originalMatchMedia;
+			window.requestAnimationFrame = originalFrame;
+		}
 	});
 });
 

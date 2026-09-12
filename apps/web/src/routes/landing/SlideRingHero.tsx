@@ -89,26 +89,53 @@ export function decelerateRing(velocity: number, dt: number): number {
 	return AMBIENT_VELOCITY + (velocity - AMBIENT_VELOCITY) * friction;
 }
 
-export function plateStackingLayers(projections: Array<Pick<PlateProjection, "depth">>): number[] {
-	const ordered = projections
-		.map(({ depth }, index) => ({ depth, index }))
-		.sort((a, b) => a.depth - b.depth || a.index - b.index);
-	const layers = new Array<number>(projections.length);
-	for (let layer = 0; layer < ordered.length; layer += 1) {
-		const plate = ordered[layer];
-		if (plate) layers[plate.index] = layer;
+/**
+ * Stacking order of the belt, back to front.
+ *
+ * `order` and `layers` are optional scratch buffers. The frame loop owns a pair
+ * and hands them back every frame: a thirty-plate ring sorted sixty times a
+ * second is sixty throwaway arrays a second otherwise, which is steady garbage
+ * for a result that is the same shape each time.
+ */
+export function plateStackingLayers(
+	projections: Array<Pick<PlateProjection, "depth">>,
+	order: number[] = [],
+	layers: number[] = [],
+): number[] {
+	order.length = projections.length;
+	layers.length = projections.length;
+	for (let index = 0; index < projections.length; index += 1) order[index] = index;
+	order.sort((a, b) => {
+		const depths = (projections[a]?.depth ?? 0) - (projections[b]?.depth ?? 0);
+		return depths || a - b;
+	});
+	for (let layer = 0; layer < order.length; layer += 1) {
+		const plate = order[layer];
+		if (plate !== undefined) layers[plate] = layer;
 	}
 	return layers;
 }
 
+/**
+ * `forces` is the frame loop's scratch buffer, one entry per plate. Squared
+ * lengths decide every comparison here and a root is only taken where the
+ * result is used, which keeps an O(n squared) pass off the slow paths.
+ */
 function applyPlateRepulsion(
 	projections: PlateProjection[],
 	motion: PlateMotion[],
+	forces: { x: number; y: number }[],
 	dt: number,
 	maxOffset: number,
 ) {
 	if (dt <= 0 || maxOffset <= 0) return;
-	const forces = motion.map(({ x, y }) => ({ x: -x * ORBIT_SPRING, y: -y * ORBIT_SPRING }));
+	for (let index = 0; index < motion.length; index += 1) {
+		const particle = motion[index];
+		const force = forces[index];
+		if (!particle || !force) continue;
+		force.x = -particle.x * ORBIT_SPRING;
+		force.y = -particle.y * ORBIT_SPRING;
+	}
 
 	for (let left = 0; left < projections.length; left += 1) {
 		const a = projections[left];
@@ -123,14 +150,17 @@ function applyPlateRepulsion(
 			const dy = b.y + bMotion.y - (a.y + aMotion.y);
 			const rangeX = ((a.width + b.width) / 2) * REPULSION_DISTANCE;
 			const rangeY = ((a.height + b.height) / 2) * REPULSION_DISTANCE;
-			const proximity = Math.hypot(dx / rangeX, dy / rangeY);
-			if (proximity >= 1) continue;
+			const spanX = dx / rangeX;
+			const spanY = dy / rangeY;
+			const reach = spanX * spanX + spanY * spanY;
+			if (reach >= 1) continue;
+			const proximity = Math.sqrt(reach);
 
 			/* Cards far apart in depth should still be able to pass over one
 			   another. Cards in the same layer resist a pile-up more strongly. */
 			const depthAffinity = Math.max(0.2, 1 - Math.abs(a.depth - b.depth) / 0.3);
 			const pressure = REPULSION_ACCELERATION * (1 - proximity) ** 2 * depthAffinity;
-			const distance = Math.hypot(dx, dy);
+			const distance = Math.sqrt(dx * dx + dy * dy);
 			/* Exact coincidence is rare, but a stable fallback direction keeps the
 			   pair from remaining locked together. */
 			const directionX = distance > 0.01 ? dx / distance : left % 2 === 0 ? 1 : -1;
@@ -155,9 +185,9 @@ function applyPlateRepulsion(
 		particle.x += particle.vx * dt;
 		particle.y += particle.vy * dt;
 
-		const offset = Math.hypot(particle.x, particle.y);
-		if (offset > maxOffset) {
-			const limit = maxOffset / offset;
+		const travelled = particle.x * particle.x + particle.y * particle.y;
+		if (travelled > maxOffset * maxOffset) {
+			const limit = maxOffset / Math.sqrt(travelled);
 			particle.x *= limit;
 			particle.y *= limit;
 			particle.vx *= limit;
@@ -358,6 +388,7 @@ export function SlideRingHero() {
 		let deformY = 0;
 		let last = performance.now();
 		let frameId = 0;
+		let visible = true;
 		let disposed = false;
 
 		/* Whether the ring is going anywhere. A plate only needs to duck out for
@@ -425,6 +456,32 @@ export function SlideRingHero() {
 			vx: 0,
 			vy: 0,
 		}));
+		/* A plate's spread is a pure function of its index, and each read costs
+		   four sines. Held rather than recomputed, since the frame loop wants
+		   every plate's spread twice a frame. */
+		const spreads = Array.from({ length: count }, (_, index) => plateSpread(index));
+		/* Scratch the frame loop reuses, so a steady sixty frames a second
+		   allocates nothing. */
+		const projections: PlateProjection[] = Array.from({ length: count }, () => ({
+			x: 0,
+			y: 0,
+			width: 0,
+			height: 0,
+			depth: 0,
+		}));
+		const forces = Array.from({ length: count }, () => ({ x: 0, y: 0 }));
+		const stackingOrder: number[] = [];
+		const stackingLayers: number[] = [];
+		/* What was last written to each plate. Transform changes every frame, but
+		   the rest rarely do, and a filter or z-index rewritten to its own value
+		   still costs a style recalculation. */
+		const painted = Array.from({ length: count }, () => ({
+			transform: "",
+			filter: "",
+			opacity: "",
+			pointerEvents: "",
+			zIndex: "",
+		}));
 
 		const layout = () => {
 			width = root.clientWidth;
@@ -435,7 +492,8 @@ export function SlideRingHero() {
 			plateBaseWidth = radiusX * PLATE_WIDTH;
 			for (let i = 0; i < count; i++) {
 				const node = plateRefs.current[i];
-				if (node) node.style.width = `${plateBaseWidth * plateSpread(i).size}px`;
+				const spread = spreads[i];
+				if (node && spread) node.style.width = `${plateBaseWidth * spread.size}px`;
 			}
 		};
 
@@ -472,29 +530,39 @@ export function SlideRingHero() {
 			const cosAxis = Math.cos(AXIS);
 			const sinAxis = Math.sin(AXIS);
 
-			const projections: PlateProjection[] = [];
 			for (let i = 0; i < count; i++) {
-				const spread = plateSpread(i);
+				const spread = spreads[i];
+				const projection = projections[i];
+				if (!spread || !projection) continue;
 				const angle = (i / count) * Math.PI * 2 + spread.phase + spin;
 				const depth = (Math.sin(angle) + 1) / 2;
 				const ringX = Math.cos(angle) * radiusX * spread.radius;
 				const ringY = Math.sin(angle) * radiusY * spread.radius + spread.lift * radiusY;
-				const x = cx + ringX * cosAxis - ringY * sinAxis;
-				const y = cy + ringX * sinAxis + ringY * cosAxis;
 				const scale = 0.62 + 0.38 * depth;
 				const width = plateBaseWidth * spread.size * scale;
-				projections.push({ x, y, width, height: width * (9 / 16), depth });
+				projection.x = cx + ringX * cosAxis - ringY * sinAxis;
+				projection.y = cy + ringX * sinAxis + ringY * cosAxis;
+				projection.width = width;
+				projection.height = width * (9 / 16);
+				projection.depth = depth;
 			}
 
-			applyPlateRepulsion(projections, plateMotion, dt, plateBaseWidth * MAX_REPULSION_OFFSET);
-			const stackingLayers = plateStackingLayers(projections);
+			applyPlateRepulsion(
+				projections,
+				plateMotion,
+				forces,
+				dt,
+				plateBaseWidth * MAX_REPULSION_OFFSET,
+			);
+			plateStackingLayers(projections, stackingOrder, stackingLayers);
 
 			for (let i = 0; i < count; i++) {
 				const plate = plateRefs.current[i];
 				const projection = projections[i];
 				const particle = plateMotion[i];
 				if (!plate || !projection || !particle) continue;
-				const spread = plateSpread(i);
+				const spread = spreads[i];
+				if (!spread) continue;
 				const angle = (i / count) * Math.PI * 2 + spread.phase + spin;
 				const depth = projection.depth;
 				const scale = 0.62 + 0.38 * depth;
@@ -520,10 +588,33 @@ export function SlideRingHero() {
 				const a = along * c * c + across * sn * sn;
 				const b = (along - across) * c * sn;
 				const d = along * sn * sn + across * c * c;
-				plate.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) matrix(${a}, ${b}, ${b}, ${d}, 0, 0) scale(${scale * shrink})`;
-				plate.style.pointerEvents = pull > 0.65 ? "none" : "auto";
-				plate.style.zIndex = String(stackingLayers[i] ?? 0);
-				plate.style.filter = `brightness(${0.78 + depth * 0.22}) blur(${(1 - depth) ** 2 * 0.45}px)`;
+				const style = painted[i];
+				if (!style) continue;
+				const transform = `translate(${x}px, ${y}px) translate(-50%, -50%) matrix(${a}, ${b}, ${b}, ${d}, 0, 0) scale(${scale * shrink})`;
+				if (style.transform !== transform) {
+					plate.style.transform = transform;
+					style.transform = transform;
+				}
+				const pointerEvents = pull > 0.65 ? "none" : "auto";
+				if (style.pointerEvents !== pointerEvents) {
+					plate.style.pointerEvents = pointerEvents;
+					style.pointerEvents = pointerEvents;
+				}
+				const zIndex = String(stackingLayers[i] ?? 0);
+				if (style.zIndex !== zIndex) {
+					plate.style.zIndex = zIndex;
+					style.zIndex = zIndex;
+				}
+				/* Distance is carried by brightness alone. The depth blur this
+				   used to add topped out under half a pixel — invisible, while a
+				   blur radius that changes every frame is a fresh filter pass per
+				   plate per frame. Quantized for the same reason: a value that
+				   settles is a filter the compositor can leave alone. */
+				const filter = `brightness(${(Math.round((0.78 + depth * 0.22) * 100) / 100).toFixed(2)})`;
+				if (style.filter !== filter) {
+					plate.style.filter = filter;
+					style.filter = filter;
+				}
 
 				/* depth bottoms out a quarter turn back from the ring's origin,
 				   so counting turns from there counts passes behind the orb */
@@ -539,7 +630,11 @@ export function SlideRingHero() {
 				   of it, so the refill lands on an invisible plate */
 				const fromCrossing = Math.min(cycle - pass, 1 - (cycle - pass));
 				const dip = turning ? Math.min(1, fromCrossing / SWAP_DIP) : 1;
-				plate.style.opacity = String((0.42 + 0.58 * depth) * dip * dip * (1 - pull ** 3));
+				const opacity = ((0.42 + 0.58 * depth) * dip * dip * (1 - pull ** 3)).toFixed(3);
+				if (style.opacity !== opacity) {
+					plate.style.opacity = opacity;
+					style.opacity = opacity;
+				}
 			}
 		};
 
@@ -558,7 +653,7 @@ export function SlideRingHero() {
 			last = now;
 			/* While the pointer holds the ring, its movement owns the angle. Once
 			   released, stored momentum coasts and eases back to the ambient turn. */
-			if (!dragging && !reducedMotion) {
+			if (!dragging) {
 				angularVelocity = decelerateRing(angularVelocity, dt);
 				spin += angularVelocity * dt;
 			}
@@ -566,8 +661,27 @@ export function SlideRingHero() {
 			frameId = requestAnimationFrame(frame);
 		};
 
-		const onVisibility = () => {
+		/**
+		 * Runs the ring only while it is turning and on screen.
+		 *
+		 * A reduced-motion visitor gets a still ring, and a still ring does not
+		 * need a frame loop: the old one kept rewriting thirty plates a frame
+		 * with the values they already held. Drag and resize render directly, so
+		 * the page stays live without one.
+		 */
+		const start = () => {
+			if (reducedMotion || frameId || !visible || document.hidden) return;
 			last = performance.now();
+			frameId = requestAnimationFrame(frame);
+		};
+		const stop = () => {
+			if (frameId) cancelAnimationFrame(frameId);
+			frameId = 0;
+		};
+
+		const onVisibility = () => {
+			if (document.hidden) stop();
+			else start();
 		};
 
 		const onPointerDown = (event: PointerEvent) => {
@@ -646,23 +760,34 @@ export function SlideRingHero() {
 						settleReducedMotion();
 					})
 				: null;
+		/* A ring scrolled out of view is still a ring being animated. */
+		const intersection =
+			typeof IntersectionObserver !== "undefined"
+				? new IntersectionObserver(([entry]) => {
+						visible = entry?.isIntersecting ?? true;
+						if (visible) start();
+						else stop();
+					})
+				: null;
 
 		layout();
 		settleReducedMotion();
 		pump();
 		observer?.observe(root);
+		intersection?.observe(root);
 		root.addEventListener("pointerdown", onPointerDown);
 		root.addEventListener("pointerleave", onPointerLeave);
 		window.addEventListener("pointermove", onPointerMove);
 		window.addEventListener("pointerup", onPointerUp);
 		window.addEventListener("pointercancel", onPointerUp);
 		document.addEventListener("visibilitychange", onVisibility);
-		frameId = requestAnimationFrame(frame);
+		start();
 
 		return () => {
 			disposed = true;
-			cancelAnimationFrame(frameId);
+			stop();
 			observer?.disconnect();
+			intersection?.disconnect();
 			root.removeEventListener("pointerdown", onPointerDown);
 			root.removeEventListener("pointerleave", onPointerLeave);
 			window.removeEventListener("pointermove", onPointerMove);
