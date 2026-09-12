@@ -78,6 +78,13 @@ describe("horizon route handoff", () => {
 			false,
 		);
 		expect(view.getByText("Ready form")).toHaveFocus();
+		// The landing focus must not paint a ring across the revealed page.
+		expect(view.getByText("Ready form")).toHaveAttribute("data-horizon-focus");
+		act(() => {
+			fireEvent.blur(view.getByText("Ready form"));
+		});
+		expect(view.getByText("Ready form")).not.toHaveAttribute("data-horizon-focus");
+		expect(view.getByText("Ready form")).not.toHaveAttribute("tabindex");
 	});
 	it("cancels a pending cover on Back and ignores its late completion", async () => {
 		let finish: (() => void) | undefined;
