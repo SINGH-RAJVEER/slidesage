@@ -8,6 +8,8 @@ Each template has a stable kebab-case ID, version, availability, dimensions, and
 
 The truncated agriculture deck is excluded from the catalog and retained as `quarantine-agriculture-business-plan.pptx`. The duplicate Textured Scrapbook file was removed.
 
+The `/marketplace` grid is always ordered by template name and carries no control to reorder it: a catalog whose order never moves is one a reader can learn the shape of, and a name is what they arrive looking for. Its search bar sits at the same height as the presentations grid's, so moving between the two catalog pages does not shift the control under the pointer.
+
 Default templates appear in the presentation template selector without installation. Marketplace templates must first be installed from `/marketplace`. Installation stores versioned `{ id, version }` references in browser local storage. The store accepts old string entries only when the string matches a current binary catalog ID; synthetic legacy IDs are discarded.
 
 ## Browser preview

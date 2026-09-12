@@ -27,6 +27,25 @@ describe("MarketplacePage", () => {
 		expect(view.queryByRole("button", { name: /upvote/i })).toBeNull();
 	});
 
+	it("orders the catalog alphabetically, with no control to reorder it", async () => {
+		const { default: MarketplacePage } = await import(
+			"../../../routes/marketplace/MarketplacePage"
+		);
+		const view = render(
+			<MemoryRouter initialEntries={["/marketplace"]}>
+				<MarketplacePage />
+			</MemoryRouter>,
+		);
+
+		const names = view
+			.getAllByRole("button", { name: /^Preview .+ template$/ })
+			.map(
+				(button) => button.getAttribute("aria-label")?.replace(/^Preview | template$/g, "") ?? "",
+			);
+		expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+		expect(view.queryByRole("button", { name: /sort/i })).toBeNull();
+	});
+
 	it("opens a binary template ID in its preview route", async () => {
 		const { default: MarketplacePage } = await import(
 			"../../../routes/marketplace/MarketplacePage"
