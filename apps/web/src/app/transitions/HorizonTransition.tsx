@@ -1,6 +1,8 @@
 import { useAuth } from "@slidesage/ui";
+import { SlideSageLogo } from "@slidesage/ui/components/SlideSageLogo";
 import { hasSignedInBefore } from "@slidesage/ui/lib/session-history";
 import {
+	type CSSProperties,
 	createContext,
 	type ReactNode,
 	useCallback,
@@ -275,15 +277,21 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 						}}
 					>
 						<div className="horizon-route-reflection" />
-						{Boolean(transition.origin.wordmark) && (
-							<img
-								alt=""
-								src="/landing/slidesage-wordmark-current.png"
-								className="horizon-route-mark"
-								style={{ opacity: transition.origin.wordmark }}
-							/>
-						)}
 					</div>
+					{Boolean(transition.origin.wordmark) && (
+						<SlideSageLogo
+							framed
+							className="horizon-route-mark"
+							style={
+								{
+									left: transition.origin.x,
+									top: transition.origin.y,
+									"--horizon-mark-width": `${transition.origin.radius / 0.3}px`,
+									"--horizon-mark-opacity": transition.origin.wordmark,
+								} as CSSProperties
+							}
+						/>
+					)}
 					<div className="horizon-route-blue" />
 					{slow && (
 						<div className="horizon-route-wait" role="status">

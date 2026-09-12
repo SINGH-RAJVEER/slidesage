@@ -1,3 +1,4 @@
+import { SlideSageLogo } from "@slidesage/ui/components/SlideSageLogo";
 import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useHorizonTransition } from "../../app/transitions/HorizonTransition";
@@ -419,11 +420,9 @@ export function WordmarkOrb() {
 							"translate(var(--horizon-deform-x, 0px), var(--horizon-deform-y, 0px)) skewX(var(--horizon-skew, 0deg)) scaleY(var(--horizon-stretch, 1)) scale(var(--horizon-scale, 0.333333))",
 					}}
 				/>
-				<img
-					src="/landing/slidesage-wordmark-current.png"
-					alt=""
+				<SlideSageLogo
+					framed
 					aria-hidden="true"
-					draggable={false}
 					className="pointer-events-none absolute inset-0 h-full w-full object-contain"
 					style={{
 						opacity: "var(--horizon-wordmark, 0)",
@@ -458,11 +457,9 @@ export function WordmarkOrb() {
 						}}
 					>
 						<BlackHoleFallback />
-						<img
-							src="/landing/slidesage-wordmark-current.png"
-							alt=""
+						<SlideSageLogo
+							framed
 							aria-hidden="true"
-							draggable={false}
 							className="pointer-events-none absolute inset-0 h-full w-full object-contain"
 							style={{ opacity: "var(--horizon-wordmark, 0)" }}
 						/>
