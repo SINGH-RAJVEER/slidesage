@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 function clamp(value: number, min: number, max: number) {
 	return Math.min(Math.max(value, min), max);
@@ -166,34 +166,6 @@ export function useSlideNavigation({
 
 		return () => container.removeEventListener("scroll", onScroll);
 	}, [slideContainerRef, slideCount]);
-
-	// Auto-scroll thumbnails when current slide changes
-	const thumbnailScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	useEffect(() => {
-		if (thumbnailScrollTimeoutRef.current) {
-			clearTimeout(thumbnailScrollTimeoutRef.current);
-		}
-
-		thumbnailScrollTimeoutRef.current = setTimeout(() => {
-			requestAnimationFrame(() => {
-				const currentThumbnail = document.querySelector<HTMLElement>(
-					`[data-slide-index="${currentSlide}"]`,
-				);
-				currentThumbnail?.scrollIntoView({
-					behavior: "smooth",
-					inline: "center",
-					block: "nearest",
-				});
-			});
-		}, 50);
-
-		return () => {
-			if (thumbnailScrollTimeoutRef.current) {
-				clearTimeout(thumbnailScrollTimeoutRef.current);
-			}
-		};
-	}, [currentSlide]);
 
 	return {
 		currentSlide,

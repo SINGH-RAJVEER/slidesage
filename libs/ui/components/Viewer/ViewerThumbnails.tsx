@@ -1,5 +1,6 @@
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import type React from "react";
+import { useEffect, useRef } from "react";
 import type { ViewerDocument } from "../../lib/viewer-document";
 import { PreviewSlide } from "./PreviewSlide";
 
@@ -11,13 +12,37 @@ export const ViewerThumbnails: React.FC<{
 	onSelect: (index: number) => void;
 }> = ({ document, currentSlide, isStreamingMode, isStreaming, onSelect }) => {
 	const slideCount = document?.slideCount ?? 0;
+	const thumbnailContainerRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const container = thumbnailContainerRef.current;
+		const currentThumbnail = container?.querySelector<HTMLElement>(
+			`[data-slide-index="${currentSlide}"]`,
+		);
+		if (!container || !currentThumbnail) return;
+
+		const containerRect = container.getBoundingClientRect();
+		const thumbnailRect = currentThumbnail.getBoundingClientRect();
+		const left =
+			container.scrollLeft +
+			thumbnailRect.left -
+			containerRect.left -
+			(containerRect.width - thumbnailRect.width) / 2;
+		container.scrollTo({
+			left,
+			behavior: "smooth",
+		});
+	}, [currentSlide, slideCount]);
 
 	return (
 		<div
 			className="viewer-thumbnails w-full overflow-hidden flex-shrink-0 relative"
 			style={{ minHeight: 40 }}
 		>
-			<div className="slide-thumbnails-container flex gap-3 overflow-x-auto py-6 px-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+			<div
+				ref={thumbnailContainerRef}
+				className="slide-thumbnails-container flex gap-3 overflow-x-auto py-6 px-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
+			>
 				{document &&
 					Array.from({ length: slideCount }, (_, index) => {
 						const isFirstThumbnail = index === 0;
