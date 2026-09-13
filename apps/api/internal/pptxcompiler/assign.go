@@ -28,8 +28,8 @@ type Assignment struct {
 	Archetype templatepublish.Archetype
 }
 
-// Assign allocates exactly count archetypes: a cover, a closing when the
-// template has one, and repeatable content archetypes in between.
+// Assign allocates exactly count archetypes: a cover followed by repeatable
+// content archetypes.
 //
 // Content archetypes rotate so a long deck alternates through the layouts the
 // template provides instead of repeating one slide design. Rotation is by
@@ -44,12 +44,7 @@ func Assign(manifest templatepublish.Manifest, count int) ([]Assignment, error) 
 	if len(content) == 0 {
 		return nil, fmt.Errorf("%w: %s has no repeatable content archetype", ErrUnsupportedSlideCount, manifest.TemplateID)
 	}
-	closing, hasClosing := lastArchetype(manifest, templatepublish.RoleClosing)
-
-	minimum := 2 // a cover and at least one content slide
-	if hasClosing {
-		minimum++
-	}
+	const minimum = 2 // a cover and at least one content slide
 	if count < minimum {
 		return nil, fmt.Errorf("%w: %s needs at least %d slides, requested %d", ErrUnsupportedSlideCount, manifest.TemplateID, minimum, count)
 	}
@@ -58,18 +53,13 @@ func Assign(manifest templatepublish.Manifest, count int) ([]Assignment, error) 
 	assignments = append(assignments, Assignment{Position: 1, Archetype: cover})
 
 	contentSlides := count - 1
-	if hasClosing {
-		contentSlides--
-	}
 	for index := 0; index < contentSlides; index++ {
 		assignments = append(assignments, Assignment{
 			Position:  len(assignments) + 1,
 			Archetype: content[index%len(content)],
 		})
 	}
-	if hasClosing {
-		assignments = append(assignments, Assignment{Position: len(assignments) + 1, Archetype: closing})
-	}
+
 	if len(assignments) != count {
 		return nil, fmt.Errorf("assigned %d slides for a %d-slide deck", len(assignments), count)
 	}
@@ -83,17 +73,6 @@ func singleArchetype(manifest templatepublish.Manifest, role templatepublish.Nar
 		}
 	}
 	return templatepublish.Archetype{}, fmt.Errorf("%w: %s has no %s archetype", ErrUnsupportedSlideCount, manifest.TemplateID, role)
-}
-
-func lastArchetype(manifest templatepublish.Manifest, role templatepublish.NarrativeRole) (templatepublish.Archetype, bool) {
-	var found templatepublish.Archetype
-	present := false
-	for _, archetype := range manifest.Archetypes {
-		if archetype.Role == role {
-			found, present = archetype, true
-		}
-	}
-	return found, present
 }
 
 func repeatableContent(manifest templatepublish.Manifest) []templatepublish.Archetype {

@@ -27,7 +27,7 @@ func archetype(id string, role templatepublish.NarrativeRole, repeatable bool) t
 	}
 }
 
-func TestAssignPlacesCoverContentAndClosing(t *testing.T) {
+func TestAssignDoesNotUseClosingArchetypes(t *testing.T) {
 	manifest := manifestWith(
 		archetype("cover", templatepublish.RoleCover, false),
 		archetype("body", templatepublish.RoleContent, true),
@@ -43,16 +43,11 @@ func TestAssignPlacesCoverContentAndClosing(t *testing.T) {
 	if assignments[0].Archetype.ID != "cover" {
 		t.Fatalf("first slide = %s, want cover", assignments[0].Archetype.ID)
 	}
-	if assignments[4].Archetype.ID != "closing" {
-		t.Fatalf("last slide = %s, want closing", assignments[4].Archetype.ID)
-	}
 	for index, assignment := range assignments {
 		if assignment.Position != index+1 {
 			t.Fatalf("assignment %d has position %d", index, assignment.Position)
 		}
-	}
-	for _, assignment := range assignments[1:4] {
-		if assignment.Archetype.Role != templatepublish.RoleContent {
+		if index > 0 && assignment.Archetype.Role != templatepublish.RoleContent {
 			t.Fatalf("slide %d has role %s, want content", assignment.Position, assignment.Archetype.Role)
 		}
 	}
@@ -121,12 +116,8 @@ func TestAssignRejectsCountsTheTemplateCannotProduce(t *testing.T) {
 		archetype("body", templatepublish.RoleContent, true),
 		archetype("closing", templatepublish.RoleClosing, false),
 	)
-	// A cover and a closing leave no room for content in a two-slide deck.
-	if _, err := Assign(withClosing, 2); !errors.Is(err, ErrUnsupportedSlideCount) {
-		t.Fatalf("Assign(2) error = %v, want ErrUnsupportedSlideCount", err)
-	}
-	if _, err := Assign(withClosing, 3); err != nil {
-		t.Fatalf("Assign(3) error = %v, want the minimum deck to be allowed", err)
+	if _, err := Assign(withClosing, 2); err != nil {
+		t.Fatalf("Assign(2) error = %v, want the minimum deck to be allowed", err)
 	}
 
 	noCover := manifestWith(archetype("body", templatepublish.RoleContent, true))

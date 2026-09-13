@@ -68,7 +68,7 @@ Source slide numbers alone are not stable identifiers. Publication resolves each
 
 ### Assignment
 
-The compiler allocates exactly the requested number of archetypes before requesting slide copy. The assignment normally includes one cover and one closing slide, then fills the remaining positions with repeatable content archetypes. Template rules may define other sequences.
+The compiler allocates exactly the requested number of archetypes before requesting slide copy. The assignment includes one cover and fills every remaining position with repeatable content archetypes. Closing archetypes from source templates are not included in generated presentations.
 
 If a template cannot produce the requested count, the request fails before points are charged. The UI must only offer counts supported by the selected template.
 

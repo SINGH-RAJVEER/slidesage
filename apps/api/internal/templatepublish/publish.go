@@ -142,8 +142,8 @@ func DeriveManifest(contents []byte, templateID string, version int) (Manifest, 
 	if len(archetypes) == 0 {
 		return Manifest{}, ErrNoArchetypes
 	}
-	// The last slide of a curated deck is conventionally a closing slide, and a
-	// deck needs one that is not reused for body content.
+	// The last slide of a curated deck is conventionally a closing slide. Mark it
+	// as non-repeatable so the compiler never reuses it as body content.
 	if last := &archetypes[len(archetypes)-1]; last.Role == RoleContent && len(archetypes) > 2 {
 		last.Role = RoleClosing
 		last.Repeatable = false

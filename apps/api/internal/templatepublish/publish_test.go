@@ -206,8 +206,8 @@ func TestSupportedCountsNeedCoverAndRepeatableContent(t *testing.T) {
 		{Role: RoleContent, Repeatable: true},
 		{Role: RoleClosing},
 	}}
-	counts := manifest.SupportedCounts(5, 7)
-	if len(counts) != 3 || counts[0] != 5 {
+	counts := manifest.SupportedCounts(1, 3)
+	if len(counts) != 2 || counts[0] != 2 || counts[1] != 3 {
 		t.Fatalf("counts = %v", counts)
 	}
 
