@@ -1,6 +1,6 @@
 # Observability
 
-The Go API, the generation worker, and the preview renderer emit OpenTelemetry traces, metrics, and logs over OTLP. The exporter supports gRPC for collectors and HTTP/protobuf for direct intake services. Everything is configured through standard `OTEL_*` environment variables and lives in `apps/api/internal/observability`.
+The Go API and generation worker emit OpenTelemetry traces, metrics, and logs over OTLP. The exporter supports gRPC for collectors and HTTP/protobuf for direct intake services. Everything is configured through standard `OTEL_*` environment variables and lives in `apps/api/internal/observability`.
 
 ## Signals
 
@@ -71,7 +71,7 @@ OTEL_SERVICE_VERSION=<deployed-git-sha>
 OTEL_TRACES_SAMPLING_RATIO=1
 ```
 
-Keep `OTEL_SERVICE_NAME` unset so the API, worker, and preview renderer retain their separate defaults. On Cloud Run, the GCP resource detector adds the project, region, service, revision, and instance attributes that Datadog uses for serverless identification.
+Keep `OTEL_SERVICE_NAME` unset so the API and worker retain their separate defaults. On Cloud Run, the GCP resource detector adds the project, region, service, revision, and instance attributes that Datadog uses for serverless identification.
 
 Do not put the API key in a normal Cloud Run environment variable. Store the complete header value in Secret Manager. Terraform maps it to `OTEL_EXPORTER_OTLP_HEADERS` when `otel_exporter_otlp_endpoint` is set:
 
@@ -108,4 +108,4 @@ If no data appears, check Cloud Run logs for exporter errors. A `403` usually me
 
 ## Lifecycle
 
-`observability.Setup` installs global tracer, meter, and logger providers plus the W3C propagator and returns a handle whose `Shutdown` flushes all three signals. `cmd/api`, `cmd/worker`, and `cmd/previewworker` each defer this shutdown with a five second budget during graceful termination, so buffered telemetry is exported before exit.
+`observability.Setup` installs global tracer, meter, and logger providers plus the W3C propagator and returns a handle whose `Shutdown` flushes all three signals. `cmd/api` and `cmd/worker` each defer this shutdown with a five second budget during graceful termination, so buffered telemetry is exported before exit.

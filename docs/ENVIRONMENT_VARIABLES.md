@@ -51,25 +51,6 @@ The worker also requires `DATABASE_URL` and uses `DATABASE_CONNECT_TIMEOUT` and 
 
 For Cloud Run Worker Pools, start with one instance and change the fixed/manual instance count deliberately. Account for both the instance count and `WORKER_CONCURRENCY` when sizing PostgreSQL connection limits and provider capacity. See [GENERATION_WORKER.md](GENERATION_WORKER.md). When deployed as a Cloud Run service rather than a Worker Pool, the worker must use instance-based billing with CPU throttling disabled so River and maintenance continue between HTTP requests.
 
-## Preview renderer
-
-| Variable                    | Required | Default                    | Purpose                                                              |
-| --------------------------- | -------- | -------------------------- | -------------------------------------------------------------------- |
-| `PREVIEW_CONCURRENCY`       | No       | `1`                        | Maximum concurrent River preview jobs in one renderer process        |
-| `PREVIEW_DATABASE_POOL_MAX` | No       | `PREVIEW_CONCURRENCY + 2`  | Maximum open and idle connections in the renderer database pool      |
-| `PREVIEW_DRAIN_TIMEOUT`     | No       | `8`                        | Graceful shutdown timeout in seconds after `SIGINT` or `SIGTERM`     |
-| `PREVIEW_HEALTH_PORT`       | No       | `8080`                     | Renderer `/live` and `/ready` health server port                     |
-| `PREVIEW_MAX_SLIDES`        | No       | `200`                      | Slide ceiling for one render                                         |
-| `PREVIEW_WIDTH`             | No       | `1600`                     | Rasterized preview width in pixels                                   |
-| `PREVIEW_TIMEOUT_SECONDS`   | No       | `240`                      | Wall-clock budget for one deck conversion                            |
-| `PREVIEW_WEBP_QUALITY`      | No       | `82`                       | `cwebp` quality factor                                               |
-| `PREVIEW_TEMP_DIR`          | No       | Operating system temporary directory | Parent directory for per-render working directories        |
-| `SOFFICE_PATH`              | No       | `soffice`                  | LibreOffice executable                                               |
-| `PDFTOPPM_PATH`             | No       | `pdftoppm`                 | poppler rasterizer executable                                        |
-| `CWEBP_PATH`                | No       | `cwebp`                    | WebP encoder executable                                              |
-
-The renderer also requires `DATABASE_URL` and `PRESENTATION_GCS_BUCKET`. It reads revisions and writes preview images with the attached service account. See [SLIDE_PREVIEWS.md](SLIDE_PREVIEWS.md).
-
 ## Office editor
 
 The browser editor is not part of this build. No API process reads any `ONLYOFFICE_*` or `EDITOR_*`

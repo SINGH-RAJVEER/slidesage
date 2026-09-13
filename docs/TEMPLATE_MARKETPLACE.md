@@ -18,45 +18,32 @@ Opening a marketplace thumbnail loads the complete template deck at `/marketplac
 
 The browser requests `GET /template-previews/{id}/{version}` for the slide count and package digest, then loads each slide through `GET /template-previews/{id}/{version}/{digest}/{index}`. The API resolves the published catalog entry and signs CDN requests server-side. Slides come from `https://api.slidesage.app/pptx-templates/{id}/{version}/{digest}/previews/v1/`. Signing credentials never reach the browser.
 
-These WebP slides are rendered from the actual CDN PPTX using the same LibreOffice renderer as generated decks. They are not semantic approximations or a cover-only fallback. Missing previews show an error with retry.
+These WebP slides are rendered from the actual sanitized PPTX with the same browser renderer used for generated decks. They are static publishing artifacts rather than part of the generated-presentation runtime. Missing previews show an error with retry.
 
-Every slide is published at two widths: the full 1600 pixel render, and a 480 pixel copy under `previews/v1/small/{index}.webp` for readers that paint a slide at thumbnail size, which the landing ring does. `GET /template-previews/{id}/{version}/{digest}/{index}/small` serves it, falling back to the full slide for a template published before the variant existed — so a backfill improves a page that already works rather than fixing a broken one. The small copy is a second encode of the pages already rasterized, so publishing it costs one extra cwebp pass per slide and no extra rendering.
+Every slide is published at two widths: the full 1600 pixel render, and a 480 pixel copy under `previews/v1/small/{index}.webp` for readers that paint a slide at thumbnail size, which the landing ring does. `GET /template-previews/{id}/{version}/{digest}/{index}/small` serves it, falling back to the full slide for a template published before the variant existed. Chromium renders each slide once and encodes both WebP sizes in the page.
 
 The API holds fetched slide bytes in a bounded in-process LRU cache. Slide objects are immutable and digest-pinned — a republish lands on a new digest and so a new key — which is what makes caching them safe without revalidation, and what keeps a landing visit from costing one signed origin round trip per plate.
 
 ### Publishing full-deck previews
 
-`cmd/publish-templates` renders previews as part of publication, from the same sanitized bytes it uploaded, so a published template cannot be missing the previews for its digest. Rendering needs LibreOffice on `PATH`, which the development shell provides. Pass `-skip-previews` where it is unavailable; the command then says so, and the previews must be backfilled before the template is usable.
-
-`cmd/publish-template-previews` renders previews on their own. It is for backfilling a template published before previews existed, or for re-rendering after a renderer change. Stage a template locally for inspection:
+`cmd/publish-templates` sanitizes each package and stages the digest-pinned PPTX object. `scripts/render-template-previews.ts` then opens those exact staged bytes in headless Chromium and writes every full slide, small slide, cover, and readiness manifest into the same object tree:
 
 ```sh
-devenv shell -- go -C apps/api run ./cmd/publish-template-previews \
-  -id charli-xcx-brat-album-inspired -out /tmp/template-previews
+devenv shell -- go -C apps/api run ./cmd/publish-templates \
+	-only charli-xcx-brat-album-inspired
+
+devenv shell -- bun scripts/render-template-previews.ts \
+	--source .published-templates --out .published-templates \
+	--only charli-xcx-brat-album-inspired
 ```
 
-After approval to write cloud objects, publish to the bucket backing the template CDN:
+Inspect the staged object tree, then upload it to the bucket backing the template CDN. Upload manifests last if the transfer tool does not preserve tree ordering, because readers treat each `manifest.json` as the readiness marker.
 
 ```sh
-devenv shell -- go -C apps/api run ./cmd/publish-template-previews \
-  -bucket YOUR_TEMPLATE_BUCKET
+gcloud storage cp -r -n .published-templates/pptx-templates gs://YOUR_TEMPLATE_BUCKET/
 ```
 
-Omit `-id` to process all published templates. Both commands verify the rendered slide count against the compiler manifest, write immutable slide objects, and write `manifest.json` last so incomplete sets are not advertised. Existing objects with different bytes are rejected; changes to rendering output require a new preview format version rather than overwriting cached slides.
-
-Uploading with `-bucket` needs application default credentials, which are separate from a `gcloud` login:
-
-```sh
-gcloud auth application-default login
-```
-
-Without them, stage with `-out` and upload with the CLI. `--no-clobber` preserves the create-only precondition the bucket path relies on, and the manifests go last for the same reason the publisher writes them last:
-
-```sh
-gcloud storage cp -r -n /tmp/template-previews/pptx-templates gs://YOUR_TEMPLATE_BUCKET/
-```
-
-Both commands print this guidance when the bucket cannot be opened.
+Omit `--only` to process every published template. The script verifies the parsed slide count against the digest record and writes `manifest.json` after all images. Existing digest paths are immutable; changes to rendering output require a new preview format version rather than overwriting cached slides.
 
 ## Cover thumbnails
 
@@ -66,7 +53,7 @@ The browser cannot address the CDN itself: unsigned requests to `/pptx-templates
 
 The route refuses anything that is not exactly a cover path, and refuses templates absent from `apps/api/internal/templatecatalog/published.json`, so it cannot be used to sign arbitrary bucket objects. Responses carry `Cache-Control: public, max-age=604800`, matching the CDN's client TTL, because a cover is immutable for the life of a template version. An upstream failure answers `502`.
 
-Covers are produced by `scripts/render-template-thumbnails.ts` and uploaded beside the package. A template with no uploaded cover answers `502` until one exists.
+Covers are produced with the first slide by `scripts/render-template-previews.ts` and uploaded beside the package. A template with no uploaded cover answers `502` until one exists.
 
 ## Publication gating
 
