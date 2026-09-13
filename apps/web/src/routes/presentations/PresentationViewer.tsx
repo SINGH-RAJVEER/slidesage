@@ -100,7 +100,7 @@ export default function PresentationViewerPage() {
 	}, [presentationId, previews.revision?.revision]);
 
 	const slideContainerRef = useRef<HTMLDivElement | null>(null);
-	const slideCount = pptxDocument?.slides.length ?? 0;
+	const slideCount = pptxDocument?.slideCount ?? 0;
 	const navigation = useSlideNavigation({ slideCount, slideContainerRef });
 
 	const { isFullscreenMode, enter: enterFullscreen, exit: exitFullscreen } = useFullscreenMode();
@@ -337,7 +337,9 @@ export default function PresentationViewerPage() {
 				)}
 				{!isFullscreenMode &&
 					(previews.error ||
-						(previews.revision && previews.revision.previewStatus !== "ready")) && (
+						(!pptxDocument &&
+							previews.revision &&
+							previews.revision.previewStatus !== "ready")) && (
 						<div role="status" className="px-4 py-3 text-sm">
 							{previews.error ??
 								(previews.revision?.previewStatus === "failed"

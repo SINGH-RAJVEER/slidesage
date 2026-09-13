@@ -27,6 +27,8 @@ export function useTemplatePreviews(id: string, version: number, available: bool
 					throw new Error("The template preview is invalid.");
 				if (!controller.signal.aborted)
 					setDocument({
+						viewer: null,
+						slideCount: manifest.slideCount,
 						slides: Array.from(
 							{ length: manifest.slideCount },
 							(_, index) => `${base}/${manifest.sha256}/${index}`,

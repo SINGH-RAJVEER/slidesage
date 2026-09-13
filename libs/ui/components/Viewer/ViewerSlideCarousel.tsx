@@ -19,7 +19,7 @@ export const ViewerSlideCarousel: React.FC<ViewerSlideCarouselProps> = ({
 	onSelectSlide,
 	isWaitingForFirstSlide = false,
 }) => {
-	const slideCount = document?.slides.length ?? 0;
+	const slideCount = document?.slideCount ?? 0;
 
 	return (
 		<div

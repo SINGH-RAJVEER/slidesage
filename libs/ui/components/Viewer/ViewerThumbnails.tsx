@@ -10,7 +10,7 @@ export const ViewerThumbnails: React.FC<{
 	isStreaming: boolean;
 	onSelect: (index: number) => void;
 }> = ({ document, currentSlide, isStreamingMode, isStreaming, onSelect }) => {
-	const slideCount = document?.slides.length ?? 0;
+	const slideCount = document?.slideCount ?? 0;
 
 	return (
 		<div

@@ -1,11 +1,20 @@
+import type { PptxViewer } from "@aiden0z/pptx-renderer";
 import type { PresentationRevision } from "@slidesage/types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_URL } from "../lib/api";
+import { fetchPresentationRevision } from "../lib/presentation-revision";
 
 export interface PreviewDocument {
+	viewer: PptxViewer | null;
+	slideCount: number;
 	slides: string[];
 }
 export type RevisionStatus = PresentationRevision;
+
+interface BrowserRevision {
+	revision: number;
+	viewer: PptxViewer;
+}
 
 export function useRevisionPreviews(
 	id: string | undefined,
@@ -15,6 +24,8 @@ export function useRevisionPreviews(
 ) {
 	const [revision, setRevision] = useState<RevisionStatus | null>(null);
 	const [error, setError] = useState<string>();
+	const [browserRevision, setBrowserRevision] = useState<BrowserRevision | null>(null);
+	const [browserError, setBrowserError] = useState<string>();
 	const [refresh, setRefresh] = useState(0);
 	const reload = useCallback(() => setRefresh((value) => value + 1), []);
 	useEffect(() => {
@@ -58,6 +69,60 @@ export function useRevisionPreviews(
 			clearTimeout(timer);
 		};
 	}, [id, revisionNumber, enabled, refresh, selectedRevision]);
+
+	const activeRevision = revision?.revision;
+	const expectedSlideCount = revision?.slideCount;
+	useEffect(() => {
+		setBrowserRevision(null);
+		setBrowserError(undefined);
+		if (!id || !enabled || activeRevision === undefined || expectedSlideCount === undefined) return;
+
+		const controller = new AbortController();
+		let loadedViewer: PptxViewer | null = null;
+		const requestedRevision = activeRevision;
+
+		void (async () => {
+			try {
+				const bytes = await fetchPresentationRevision(id, controller.signal, requestedRevision);
+				const {
+					PptxViewer: BrowserPptxViewer,
+					RECOMMENDED_ZIP_LIMITS,
+					buildPresentation,
+					parseZipLazyMedia,
+				} = await import("@aiden0z/pptx-renderer");
+				if (controller.signal.aborted) return;
+
+				const files = await parseZipLazyMedia(bytes, RECOMMENDED_ZIP_LIMITS);
+				if (controller.signal.aborted) return;
+				const presentation = buildPresentation(files, { lazySlides: true });
+				if (presentation.slides.length !== expectedSlideCount) {
+					throw new Error("The PowerPoint slide count does not match its revision.");
+				}
+
+				loadedViewer = new BrowserPptxViewer(document.createElement("div"));
+				loadedViewer.load(presentation);
+				if (controller.signal.aborted) {
+					loadedViewer.destroy();
+					loadedViewer = null;
+					return;
+				}
+				setBrowserRevision({ revision: requestedRevision, viewer: loadedViewer });
+			} catch (cause) {
+				if (controller.signal.aborted) return;
+				setBrowserError(
+					cause instanceof Error
+						? cause.message
+						: "Could not render the PowerPoint in this browser.",
+				);
+			}
+		})();
+
+		return () => {
+			controller.abort();
+			loadedViewer?.destroy();
+		};
+	}, [activeRevision, enabled, expectedSlideCount, id]);
+
 	const retry = async () => {
 		if (!id || !revision) return;
 		try {
@@ -71,22 +136,37 @@ export function useRevisionPreviews(
 			setError(cause instanceof Error ? cause.message : "Could not schedule previews.");
 		}
 	};
-	const document: PreviewDocument | null =
-		revision?.previewStatus === "ready"
-			? {
-					slides: Array.from(
+	const imageSlides = useMemo(
+		() =>
+			revision?.previewStatus === "ready"
+				? Array.from(
 						{ length: revision.previewCount },
 						(_, index) =>
 							`${API_URL}/presentations/${id}/revisions/${revision.revision}/previews/${index}`,
-					),
-				}
+					)
+				: [],
+		[id, revision],
+	);
+	const browserViewer =
+		browserRevision && browserRevision.revision === revision?.revision
+			? browserRevision.viewer
 			: null;
+	const previewDocument: PreviewDocument | null = revision
+		? browserViewer
+			? { viewer: browserViewer, slideCount: browserViewer.slideCount, slides: imageSlides }
+			: imageSlides.length > 0
+				? { viewer: null, slideCount: revision.slideCount, slides: imageSlides }
+				: null
+		: null;
+	const resolvedError =
+		error ?? (browserError && revision?.previewStatus === "failed" ? browserError : undefined);
 	return {
-		document,
+		document: previewDocument,
 		revision,
-		error,
+		error: resolvedError,
+		browserError,
 		reload,
 		retry,
-		isLoading: enabled && !!id && !revision && !error,
+		isLoading: enabled && !!id && !previewDocument && !resolvedError,
 	};
 }
