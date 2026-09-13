@@ -1,10 +1,10 @@
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import type React from "react";
-import type { PreviewDocument } from "../../hooks/useRevisionPreviews";
+import type { ViewerDocument } from "../../lib/viewer-document";
 import { PreviewSlide } from "./PreviewSlide";
 
 export const ViewerThumbnails: React.FC<{
-	document: PreviewDocument | null;
+	document: ViewerDocument | null;
 	currentSlide: number;
 	isStreamingMode: boolean;
 	isStreaming: boolean;

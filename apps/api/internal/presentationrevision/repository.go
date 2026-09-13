@@ -6,15 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 )
 
-// DefaultStalePreviewClaim bounds how long a crashed renderer can hold a
-// revision before another worker may take the claim over.
-const DefaultStalePreviewClaim = 15 * time.Minute
-
 const revisionColumns = `presentation_id, revision, object_key, sha256, byte_size, slide_count, mime_type,
-	author_id, source_operation_id, source_operation_kind, preview_status, preview_count,
+	author_id, source_operation_id, source_operation_kind,
 	template_id, template_version, template_sha256, compiler_version, editor_provider, base_revision, created_at, revision_index`
 
 type PostgresRepository struct {
@@ -23,7 +18,6 @@ type PostgresRepository struct {
 
 var (
 	_ RevisionRepository = (*PostgresRepository)(nil)
-	_ PreviewRepository  = (*PostgresRepository)(nil)
 )
 
 func NewPostgresRepository(database *sql.DB) *PostgresRepository {
@@ -81,7 +75,8 @@ func (repository *PostgresRepository) CommitRevision(ctx context.Context, expect
 	return result, nil
 }
 
-// CommitRevisionTx joins revision persistence to billing and preview scheduling.
+// CommitRevisionTx joins revision persistence to the transaction that owns the
+// surrounding write, such as generation billing.
 func CommitRevisionTx(ctx context.Context, transaction *sql.Tx, expected RevisionNumber, revision Revision) (RepositoryCommit, error) {
 	var current RevisionNumber
 	lockErr := transaction.QueryRowContext(ctx, `SELECT COALESCE(current_pptx_revision, 0)
@@ -123,77 +118,6 @@ func CommitRevisionTx(ctx context.Context, transaction *sql.Tx, expected Revisio
 	return RepositoryCommit{Revision: revision, Advanced: !stale}, nil
 }
 
-func (repository *PostgresRepository) ClaimPreviewRender(ctx context.Context, presentationID string, number RevisionNumber, staleAfter time.Duration) (Revision, PreviewClaim, error) {
-	seconds := staleAfter.Seconds()
-	if seconds <= 0 {
-		seconds = DefaultStalePreviewClaim.Seconds()
-	}
-	query := `UPDATE presentation_revisions
-		SET preview_status = 'rendering', preview_count = 0, preview_started_at = NOW()
-		WHERE presentation_id = $1 AND revision = $2
-			AND (preview_status IN ('pending', 'failed')
-				OR (preview_status = 'rendering'
-					AND preview_started_at < NOW() - make_interval(secs => $3)))
-		RETURNING ` + revisionColumns
-	revision, err := scanRevision(repository.database.QueryRowContext(ctx, query, presentationID, number, seconds))
-	if errors.Is(err, sql.ErrNoRows) {
-		// The claim was refused. Only a revision whose previews are ready is
-		// finished; anything else is held by another worker, or not committed
-		// yet, and has to be claimed again later.
-		var status PreviewStatus
-		err := repository.database.QueryRowContext(ctx,
-			`SELECT preview_status FROM presentation_revisions WHERE presentation_id = $1 AND revision = $2`,
-			presentationID, number).Scan(&status)
-		if errors.Is(err, sql.ErrNoRows) {
-			return Revision{}, PreviewClaimBusy, nil
-		}
-		if err != nil {
-			return Revision{}, PreviewClaimBusy, fmt.Errorf("read presentation revision preview status: %w", err)
-		}
-		if status == PreviewReady {
-			return Revision{}, PreviewClaimSettled, nil
-		}
-		return Revision{}, PreviewClaimBusy, nil
-	}
-	if err != nil {
-		return Revision{}, PreviewClaimBusy, fmt.Errorf("claim presentation revision previews: %w", err)
-	}
-	return revision, PreviewClaimGranted, nil
-}
-
-func (repository *PostgresRepository) MarkPreviewsReady(ctx context.Context, presentationID string, number RevisionNumber, count int) error {
-	result, err := repository.database.ExecContext(ctx, `UPDATE presentation_revisions
-		SET preview_status = 'ready', preview_count = slide_count, preview_started_at = NULL
-		WHERE presentation_id = $1 AND revision = $2 AND preview_status = 'rendering' AND slide_count = $3`,
-		presentationID, number, count)
-	if err != nil {
-		return fmt.Errorf("mark presentation revision previews ready: %w", err)
-	}
-	return requireAffectedRow(result)
-}
-
-func (repository *PostgresRepository) MarkPreviewsFailed(ctx context.Context, presentationID string, number RevisionNumber) error {
-	result, err := repository.database.ExecContext(ctx, `UPDATE presentation_revisions
-		SET preview_status = 'failed', preview_count = 0, preview_started_at = NULL
-		WHERE presentation_id = $1 AND revision = $2 AND preview_status = 'rendering'`,
-		presentationID, number)
-	if err != nil {
-		return fmt.Errorf("mark presentation revision previews failed: %w", err)
-	}
-	return requireAffectedRow(result)
-}
-
-func requireAffectedRow(result sql.Result) error {
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("read affected presentation revision rows: %w", err)
-	}
-	if affected == 0 {
-		return ErrPreviewStateConflict
-	}
-	return nil
-}
-
 type revisionQuerier interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
@@ -214,12 +138,12 @@ func findRevisionByOperation(ctx context.Context, querier revisionQuerier, prese
 func insertRevision(ctx context.Context, transaction *sql.Tx, revision Revision) error {
 	_, err := transaction.ExecContext(ctx, `INSERT INTO presentation_revisions (
 		presentation_id, revision, object_key, sha256, byte_size, slide_count, mime_type,
-		author_id, source_operation_id, source_operation_kind, preview_status, preview_count,
+		author_id, source_operation_id, source_operation_kind,
 		template_id, template_version, template_sha256, compiler_version, editor_provider, base_revision, created_at, revision_index
-	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb)`,
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb)`,
 		revision.PresentationID, revision.Number, revision.ObjectKey, revision.SHA256, revision.ByteSize,
 		revision.SlideCount, revision.MIMEType, revision.AuthorID, revision.SourceOperation.ID,
-		revision.SourceOperation.Kind, revision.PreviewStatus, revision.PreviewCount, nullableString(revision.TemplateID),
+		revision.SourceOperation.Kind, nullableString(revision.TemplateID),
 		nullablePositiveInt(revision.TemplateVersion), nullableString(revision.TemplateSHA256), nullableString(revision.CompilerVersion),
 		nullableString(revision.EditorProvider), nullableRevision(revision.BaseRevision), revision.CreatedAt, revision.Index)
 	if err != nil {
@@ -240,7 +164,7 @@ func scanRevision(row rowScanner) (Revision, error) {
 	err := row.Scan(
 		&revision.PresentationID, &revision.Number, &revision.ObjectKey, &revision.SHA256, &revision.ByteSize,
 		&revision.SlideCount, &revision.MIMEType, &revision.AuthorID, &revision.SourceOperation.ID,
-		&revision.SourceOperation.Kind, &revision.PreviewStatus, &revision.PreviewCount, &templateID,
+		&revision.SourceOperation.Kind, &templateID,
 		&templateVersion, &templateSHA256, &compilerVersion, &editorProvider, &baseRevision, &revision.CreatedAt, &revisionIndex,
 	)
 	if err != nil {

@@ -100,16 +100,12 @@ export interface ResearchOptions {
 	maxAgeHours?: number;
 }
 
-export type PresentationPreviewStatus = "pending" | "rendering" | "ready" | "failed";
-
-/** One immutable PPTX revision. Downloads and previews both come from it. */
+/** One immutable PPTX revision used by the viewer and downloads. */
 export interface PresentationRevision {
 	revision: number;
 	slideCount: number;
 	byteSize: number;
 	sha256: string;
-	previewStatus: PresentationPreviewStatus;
-	previewCount: number;
 	createdAt: string;
 }
 

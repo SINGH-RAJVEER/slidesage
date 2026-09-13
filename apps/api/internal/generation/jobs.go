@@ -16,7 +16,6 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/observability"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentationrevision"
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/slidepreview"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 )
@@ -457,10 +456,7 @@ func (h *handler) completeQueuedJob(ctx context.Context, riverJob *river.Job[Job
 	if err != nil {
 		return err
 	}
-	if err := slidepreview.Enqueue(ctx, h.previewQueue, tx, job.presentationID, committed.Revision.Number); err != nil {
-		return err
-	}
-	document["currentRevision"] = map[string]any{"revision": committed.Revision.Number, "sha256": committed.Revision.SHA256, "byteSize": committed.Revision.ByteSize, "slideCount": committed.Revision.SlideCount, "previewStatus": "pending", "previewCount": 0}
+	document["currentRevision"] = presentationrevision.Snapshot(committed.Revision)
 	total := 3
 	if job.kind == "generation" {
 		total = 4

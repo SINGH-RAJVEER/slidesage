@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { API_URL } from "../lib/api";
-import type { PreviewDocument } from "./useRevisionPreviews";
+import type { ViewerDocument } from "../lib/viewer-document";
 
 export function useTemplatePreviews(id: string, version: number, available: boolean) {
-	const [document, setDocument] = useState<PreviewDocument | null>(null);
+	const [document, setDocument] = useState<ViewerDocument | null>(null);
 	const [error, setError] = useState<string>();
 	const [attempt, setAttempt] = useState(0);
 	useEffect(() => {
@@ -27,7 +27,7 @@ export function useTemplatePreviews(id: string, version: number, available: bool
 					throw new Error("The template preview is invalid.");
 				if (!controller.signal.aborted)
 					setDocument({
-						viewer: null,
+						kind: "images",
 						slideCount: manifest.slideCount,
 						slides: Array.from(
 							{ length: manifest.slideCount },

@@ -3,12 +3,12 @@
 import { expect, it, mock } from "bun:test";
 import type { PptxViewer, SlideHandle } from "@aiden0z/pptx-renderer";
 import { PreviewSlide } from "@slidesage/ui/components/Viewer/PreviewSlide";
-import type { PreviewDocument } from "@slidesage/ui/hooks/useRevisionPreviews";
+import type { ViewerDocument } from "@slidesage/ui/lib/viewer-document";
 import { render, waitFor } from "@testing-library/react";
 
 it("uses an immutable image when browser rendering is unavailable", () => {
-	const document: PreviewDocument = {
-		viewer: null,
+	const document: ViewerDocument = {
+		kind: "images",
 		slideCount: 1,
 		slides: ["/previews/0.webp"],
 	};
@@ -55,10 +55,10 @@ it("renders the canonical PPTX into the existing slide box", async () => {
 		slideHeight: 540,
 		renderThumbnailToContainer,
 	} as unknown as PptxViewer;
-	const pptx: PreviewDocument = {
+	const pptx: ViewerDocument = {
+		kind: "pptx",
 		viewer,
 		slideCount: 1,
-		slides: ["/previews/0.webp"],
 	};
 
 	try {
@@ -66,7 +66,7 @@ it("renders the canonical PPTX into the existing slide box", async () => {
 
 		await waitFor(() => expect(renderThumbnailToContainer).toHaveBeenCalledTimes(1));
 		expect(view.container.querySelector('[data-rendered-slide="0"]')).toBeInTheDocument();
-		expect(view.getByRole("img", { name: "Slide 1" })).toBeInTheDocument();
+		expect(view.container.querySelector("img")).toBeNull();
 
 		view.unmount();
 		expect(dispose).toHaveBeenCalledTimes(1);

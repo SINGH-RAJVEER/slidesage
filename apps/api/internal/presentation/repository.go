@@ -108,7 +108,7 @@ func scanPresentation(row scanner) (Presentation, error) {
 }
 
 // Canonical document metadata comes from the current revision, including editor saves.
-// The stored semantic slides array is never returned; nothing renders it, because canonical
-// decks draw from preview images. A presentation without a committed revision is still
+// The stored semantic slides array is never returned; the viewer renders the canonical PPTX.
+// A presentation without a committed revision is still
 // generating and reports no revision and zero slides.
-const documentProjection = `(slides_data - 'slides') || COALESCE((SELECT jsonb_build_object('totalSlides',r.slide_count,'currentRevision',jsonb_build_object('revision',r.revision,'slideCount',r.slide_count,'byteSize',r.byte_size,'sha256',r.sha256,'previewStatus',r.preview_status,'previewCount',r.preview_count,'createdAt',r.created_at)) FROM presentation_revisions r WHERE r.presentation_id=presentations.id AND r.revision=presentations.current_pptx_revision),'{}'::jsonb)`
+const documentProjection = `(slides_data - 'slides') || COALESCE((SELECT jsonb_build_object('totalSlides',r.slide_count,'currentRevision',jsonb_build_object('revision',r.revision,'slideCount',r.slide_count,'byteSize',r.byte_size,'sha256',r.sha256,'createdAt',r.created_at)) FROM presentation_revisions r WHERE r.presentation_id=presentations.id AND r.revision=presentations.current_pptx_revision),'{}'::jsonb)`

@@ -13,12 +13,8 @@ export async function fetchPresentationRevision(
 	presentationId: string,
 	signal?: AbortSignal,
 	revision?: number,
-	format: "pptx" | "pdf" = "pptx",
 ): Promise<ArrayBuffer> {
-	const path =
-		format === "pdf"
-			? `revisions/${revision}/pdf`
-			: `revision${revision ? `?revision=${revision}` : ""}`;
+	const path = `revision${revision ? `?revision=${revision}` : ""}`;
 	const response = await fetch(`${API_URL}/presentations/${presentationId}/${path}`, {
 		credentials: "include",
 		signal,

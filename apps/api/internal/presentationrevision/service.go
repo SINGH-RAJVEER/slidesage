@@ -158,7 +158,6 @@ func (s *Service) Prepare(ctx context.Context, input CommitInput) (Revision, err
 		MIMEType:        input.MIMEType,
 		AuthorID:        input.AuthorID,
 		SourceOperation: input.Operation,
-		PreviewStatus:   PreviewPending,
 		TemplateID:      input.TemplateID,
 		TemplateVersion: input.TemplateVersion,
 		TemplateSHA256:  input.TemplateSHA256,

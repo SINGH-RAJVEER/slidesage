@@ -151,8 +151,7 @@ func (h *handler) configureDocuments(ctx context.Context) error {
 		return err
 	}
 	h.revisions = presentationrevision.NewPostgresRepository(h.database)
-	h.previewQueue, err = newInsertClient(h.database)
-	return err
+	return nil
 }
 
 func (h *handler) revisePPTX(ctx context.Context, job streamJob, source []byte) ([]byte, string, int, error) {

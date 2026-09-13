@@ -249,8 +249,7 @@ func testRevision(presentationID, userID, operationID string, kind SourceOperati
 			ID:   operationID,
 			Kind: kind,
 		},
-		PreviewStatus: PreviewPending,
-		CreatedAt:     time.Date(2026, time.September, 3, 12, 0, 0, 0, time.UTC),
+		CreatedAt: time.Date(2026, time.September, 3, 12, 0, 0, 0, time.UTC),
 	}
 }
 

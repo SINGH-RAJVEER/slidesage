@@ -1,5 +1,5 @@
 export { CenteredStatusScreen } from "./CenteredStatusScreen";
-export type { ExportFormat, PresentationExporter } from "./DownloadMenu";
+export type { PresentationExporter } from "./DownloadMenu";
 export { default as DownloadMenu } from "./DownloadMenu";
 export { default as IterateModal } from "./IterateModal";
 export { PreviewSlide } from "./PreviewSlide";

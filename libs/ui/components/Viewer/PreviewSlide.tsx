@@ -1,30 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import type { PreviewDocument } from "../../hooks/useRevisionPreviews";
+import type { ViewerDocument } from "../../lib/viewer-document";
 
 export function PreviewSlide({
 	document,
 	index,
 	className = "",
 }: {
-	document: PreviewDocument;
+	document: ViewerDocument;
 	index: number;
 	className?: string;
 }) {
-	const fallback = document.slides[index];
-	if (document.viewer) {
-		return (
-			<BrowserRenderedSlide
-				document={document}
-				index={index}
-				fallback={fallback}
-				className={className}
-			/>
-		);
+	if (document.kind === "pptx") {
+		return <BrowserRenderedSlide viewer={document.viewer} index={index} className={className} />;
 	}
-	if (!fallback) return null;
+	const source = document.slides[index];
+	if (!source) return null;
 	return (
 		<img
-			src={fallback}
+			src={source}
 			alt={`Slide ${index + 1}`}
 			className={`h-full object-contain ${className}`}
 			loading="lazy"
@@ -34,23 +27,20 @@ export function PreviewSlide({
 }
 
 function BrowserRenderedSlide({
-	document,
+	viewer,
 	index,
-	fallback,
 	className,
 }: {
-	document: PreviewDocument;
+	viewer: Extract<ViewerDocument, { kind: "pptx" }>["viewer"];
 	index: number;
-	fallback?: string;
 	className: string;
 }) {
 	const hostRef = useRef<HTMLDivElement | null>(null);
-	const [ready, setReady] = useState(false);
+	const [failed, setFailed] = useState(false);
 
 	useEffect(() => {
 		const host = hostRef.current;
-		const viewer = document.viewer;
-		if (!host || !viewer) return;
+		if (!host) return;
 
 		let disposed = false;
 		let slideHandle: ReturnType<typeof viewer.renderThumbnailToContainer> = null;
@@ -69,15 +59,19 @@ function BrowserRenderedSlide({
 			lastHeight = height;
 			slideHandle?.dispose();
 			host.replaceChildren();
-			slideHandle = viewer.renderThumbnailToContainer(index, host, { width, height });
-			if (!slideHandle) return;
-			void slideHandle.ready
-				.then(() => {
-					if (!disposed) setReady(true);
-				})
-				.catch(() => {
-					if (!disposed) setReady(false);
+			try {
+				slideHandle = viewer.renderThumbnailToContainer(index, host, { width, height });
+				if (!slideHandle) {
+					setFailed(true);
+					return;
+				}
+				setFailed(false);
+				void slideHandle.ready.catch(() => {
+					if (!disposed) setFailed(true);
 				});
+			} catch {
+				setFailed(true);
+			}
 		};
 
 		const scheduleRender = () => {
@@ -114,7 +108,7 @@ function BrowserRenderedSlide({
 			slideHandle?.dispose();
 			host.replaceChildren();
 		};
-	}, [document.viewer, index]);
+	}, [index, viewer]);
 
 	return (
 		<div
@@ -122,21 +116,12 @@ function BrowserRenderedSlide({
 			role="img"
 			aria-label={`Slide ${index + 1}`}
 		>
-			{fallback && (
-				<img
-					src={fallback}
-					alt=""
-					aria-hidden="true"
-					className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-200 ${ready ? "opacity-0" : "opacity-100"}`}
-					loading="lazy"
-					crossOrigin="use-credentials"
-				/>
-			)}
 			<div
 				ref={hostRef}
 				data-pptx-slide={index}
-				className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${ready ? "opacity-100" : "opacity-0"}`}
+				className="absolute inset-0 flex items-center justify-center"
 			/>
+			{failed && <span className="text-sm text-slate-700">Could not render this slide.</span>}
 		</div>
 	);
 }

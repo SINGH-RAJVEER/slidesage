@@ -1,80 +1,70 @@
 import type { PptxViewer } from "@aiden0z/pptx-renderer";
 import type { PresentationRevision } from "@slidesage/types";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { API_URL } from "../lib/api";
 import { fetchPresentationRevision } from "../lib/presentation-revision";
-
-export interface PreviewDocument {
-	viewer: PptxViewer | null;
-	slideCount: number;
-	slides: string[];
-}
-export type RevisionStatus = PresentationRevision;
+import type { ViewerDocument } from "../lib/viewer-document";
 
 interface BrowserRevision {
 	revision: number;
-	viewer: PptxViewer;
+	document: ViewerDocument;
 }
 
-export function useRevisionPreviews(
+export function useRevisionDocument(
 	id: string | undefined,
 	revisionNumber?: number,
 	enabled = true,
 	selectedRevision?: number,
 ) {
-	const [revision, setRevision] = useState<RevisionStatus | null>(null);
-	const [error, setError] = useState<string>();
+	const [revision, setRevision] = useState<PresentationRevision | null>(null);
 	const [browserRevision, setBrowserRevision] = useState<BrowserRevision | null>(null);
-	const [browserError, setBrowserError] = useState<string>();
+	const [error, setError] = useState<string>();
 	const [refresh, setRefresh] = useState(0);
 	const reload = useCallback(() => setRefresh((value) => value + 1), []);
+
 	useEffect(() => {
 		setRevision(null);
 		setError(undefined);
 		if (!id || !enabled) return;
 		const controller = new AbortController();
 		let timer: ReturnType<typeof setTimeout>;
+
 		async function poll() {
 			try {
 				const response = await fetch(
-					`${API_URL}/presentations/${id}/revision/status${selectedRevision ? `?revision=${selectedRevision}` : ""}`,
+					`${API_URL}/presentations/${id}/revision/metadata${selectedRevision ? `?revision=${selectedRevision}` : ""}`,
 					{ credentials: "include", signal: controller.signal },
 				);
-				if (!response.ok)
+				if (!response.ok) {
 					throw new Error(
 						response.status === 409
-							? "This presentation has no PPTX revision. Regenerate it to use the viewer and editor."
-							: "Could not load revision status.",
+							? "This presentation has no PPTX revision. Regenerate it to use the viewer."
+							: "Could not load the presentation revision.",
 					);
-				const current: RevisionStatus = await response.json();
+				}
+				const current: PresentationRevision = await response.json();
 				if (controller.signal.aborted) return;
 				setRevision(current);
 				setError(undefined);
-				// Editor final saves can arrive after the iframe closes. Keep observing the current pointer.
-				timer = setTimeout(
-					() => void poll(),
-					current.previewStatus === "pending" || current.previewStatus === "rendering"
-						? 2000
-						: 10000,
-				);
+				timer = setTimeout(() => void poll(), 10000);
 			} catch (cause) {
 				if (controller.signal.aborted) return;
-				setError(cause instanceof Error ? cause.message : "Could not load previews.");
+				setError(cause instanceof Error ? cause.message : "Could not load the presentation.");
 				timer = setTimeout(() => void poll(), 10000);
 			}
 		}
+
 		void poll();
 		return () => {
 			controller.abort();
 			clearTimeout(timer);
 		};
-	}, [id, revisionNumber, enabled, refresh, selectedRevision]);
+	}, [enabled, id, refresh, revisionNumber, selectedRevision]);
 
 	const activeRevision = revision?.revision;
 	const expectedSlideCount = revision?.slideCount;
 	useEffect(() => {
 		setBrowserRevision(null);
-		setBrowserError(undefined);
 		if (!id || !enabled || activeRevision === undefined || expectedSlideCount === undefined) return;
 
 		const controller = new AbortController();
@@ -106,10 +96,13 @@ export function useRevisionPreviews(
 					loadedViewer = null;
 					return;
 				}
-				setBrowserRevision({ revision: requestedRevision, viewer: loadedViewer });
+				setBrowserRevision({
+					revision: requestedRevision,
+					document: { kind: "pptx", viewer: loadedViewer, slideCount: loadedViewer.slideCount },
+				});
 			} catch (cause) {
 				if (controller.signal.aborted) return;
-				setBrowserError(
+				setError(
 					cause instanceof Error
 						? cause.message
 						: "Could not render the PowerPoint in this browser.",
@@ -123,50 +116,15 @@ export function useRevisionPreviews(
 		};
 	}, [activeRevision, enabled, expectedSlideCount, id]);
 
-	const retry = async () => {
-		if (!id || !revision) return;
-		try {
-			const response = await fetch(
-				`${API_URL}/presentations/${id}/revisions/${revision.revision}/previews/retry`,
-				{ method: "POST", credentials: "include" },
-			);
-			if (!response.ok) throw new Error("Could not schedule previews. Please try again.");
-			reload();
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Could not schedule previews.");
-		}
-	};
-	const imageSlides = useMemo(
-		() =>
-			revision?.previewStatus === "ready"
-				? Array.from(
-						{ length: revision.previewCount },
-						(_, index) =>
-							`${API_URL}/presentations/${id}/revisions/${revision.revision}/previews/${index}`,
-					)
-				: [],
-		[id, revision],
-	);
-	const browserViewer =
+	const viewerDocument =
 		browserRevision && browserRevision.revision === revision?.revision
-			? browserRevision.viewer
+			? browserRevision.document
 			: null;
-	const previewDocument: PreviewDocument | null = revision
-		? browserViewer
-			? { viewer: browserViewer, slideCount: browserViewer.slideCount, slides: imageSlides }
-			: imageSlides.length > 0
-				? { viewer: null, slideCount: revision.slideCount, slides: imageSlides }
-				: null
-		: null;
-	const resolvedError =
-		error ?? (browserError && revision?.previewStatus === "failed" ? browserError : undefined);
 	return {
-		document: previewDocument,
+		document: viewerDocument,
 		revision,
-		error: resolvedError,
-		browserError,
+		error,
 		reload,
-		retry,
-		isLoading: enabled && !!id && !previewDocument && !resolvedError,
+		isLoading: enabled && !!id && !viewerDocument && !error,
 	};
 }
