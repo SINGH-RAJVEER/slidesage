@@ -146,7 +146,7 @@ Preview failure does not corrupt or replace the PPTX revision. The UI offers dow
 
 ## Viewer and editor
 
-The regular viewer displays revision preview images. It retains navigation, thumbnails, fullscreen, playback, generation progress, revision history, download, delete-presentation, delete-slide, and editor launch controls.
+The regular viewer downloads the immutable PPTX revision and renders its slides directly in the browser. It retains navigation, thumbnails, fullscreen, playback, generation progress, revision history, download, delete-presentation, delete-slide, and editor launch controls. Browser parsing and slide media are lazy, and the LibreOffice-generated WebP set remains an automatic fallback rather than a prerequisite for opening the deck.
 
 ### Deleting a slide
 

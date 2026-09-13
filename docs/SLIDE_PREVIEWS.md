@@ -1,8 +1,10 @@
 # Slide previews
 
-Previews are the images the viewer, thumbnails, and fullscreen playback display for a committed PPTX revision. They are a derived view: the canonical package is never rewritten by rendering, so a preview failure leaves the deck downloadable and editable.
+The viewer renders a committed PPTX revision directly in the browser. It downloads the immutable package once, parses slide content and media lazily, and mounts only slides near the viewport. The same rendered slide component drives the carousel, thumbnails, and fullscreen playback.
 
-## Pipeline
+The preview worker still creates WebP images and a PDF in the background. WebP images provide an automatic fallback when a browser cannot parse a package, and can sit underneath browser-rendered slides while their asynchronous media finishes. The PDF remains the downloadable PDF artifact. These files are derived views: rendering never rewrites the canonical package, so a preview failure leaves the deck viewable in supported browsers, downloadable as PPTX, and editable.
+
+## Background pipeline
 
 `cmd/previewworker` consumes the `previews` River queue. For one revision the worker:
 
@@ -13,13 +15,19 @@ Previews are the images the viewer, thumbnails, and fullscreen playback display 
 5. encodes each page to WebP with `cwebp`;
 6. uploads every image, then marks the revision `ready`.
 
-The revision is only marked ready once the complete set is stored, so a reader never sees a partial deck. Preview objects use immutable keys:
+The revision is only marked ready once the complete derived set is stored, so an image-fallback reader never sees a partial deck and PDF download never serves an incomplete conversion. Preview objects use immutable keys:
 
 ```text
 presentations/{presentation-id}/revisions/{revision}/previews/{slide-index}.webp
 ```
 
 Slide indexes are zero-based and follow package slide order.
+
+## Browser viewer
+
+`useRevisionPreviews` starts two independent operations after the status endpoint returns a committed revision. It continues polling preview status, and it fetches that revision's exact PPTX bytes without waiting for `preview_status`. The PPTX renderer uses the same ZIP resource limits as the standalone template renderer and rejects a parsed slide count that disagrees with the revision row.
+
+The renderer package is loaded through a dynamic import on the presentation route. Media and slide nodes are parsed lazily. `PreviewSlide` observes each carousel or thumbnail container and renders it only when it approaches the viewport, then resizes the intrinsic slide into the existing box. When WebP previews are already ready, the image stays underneath until asynchronous browser rendering finishes. If PPTX parsing fails, the viewer uses the immutable WebP set as soon as the worker marks it ready.
 
 ## Claims and recovery
 
