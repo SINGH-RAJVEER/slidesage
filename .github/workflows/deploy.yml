@@ -73,18 +73,6 @@ jobs:
             ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/worker:${{ env.IMAGE_VERSION }}
             ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/worker:latest
 
-      - name: Build and push preview renderer image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/api/Dockerfile
-          target: preview
-          push: true
-          cache-from: type=gha
-          tags: |
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/preview:${{ env.IMAGE_VERSION }}
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/preview:latest
-
       - name: Build and push migrate image
         uses: docker/build-push-action@v6
         with:
@@ -141,7 +129,7 @@ jobs:
           : "${TF_VAR_gcp_project_id:?Set GCP_PROJECT_ID}"
           : "${TF_VAR_cloudflare_account_id:?Set CLOUDFLARE_ACCOUNT_ID}"
           : "${TF_VAR_cloudflare_api_token:?Set CLOUDFLARE_API_TOKEN}"
-          for component in api worker preview migrate; do
+          for component in api worker migrate; do
             echo "TF_VAR_${component}_image=$REGISTRY_LOCATION-docker.pkg.dev/$PROJECT_ID/$REGISTRY_REPOSITORY/$component:$IMAGE_VERSION" >> "$GITHUB_ENV"
           done
 
@@ -179,15 +167,9 @@ jobs:
         run: |
           set -euo pipefail
           args=(-var=maintenance_mode=true)
-          services=$(gcloud run services list --project="$PROJECT_ID" \
-            --region="$RUN_REGION" --format='value(metadata.name)')
-          for component in api worker preview; do
+          for component in api worker; do
             service="$component"
             resource="$component"
-            if [ "$component" = preview ]; then
-              service=preview-worker
-              if ! grep -Fxq "$service" <<< "$services"; then continue; fi
-            fi
             image=$(gcloud run services describe "$service" \
               --project="$PROJECT_ID" --region="$RUN_REGION" \
               --format='value(spec.template.spec.containers[0].image)')
@@ -198,6 +180,15 @@ jobs:
           terraform plan -input=false -lock-timeout=5m -no-color \
             "${args[@]}" -out=maintenance.tfplan
           terraform apply -input=false -lock-timeout=5m -no-color maintenance.tfplan
+
+      - name: Remove the legacy preview worker
+        shell: bash
+        run: |
+          if gcloud run services describe preview-worker \
+            --project="$PROJECT_ID" --region="$RUN_REGION" >/dev/null 2>&1; then
+            gcloud run services delete preview-worker \
+              --project="$PROJECT_ID" --region="$RUN_REGION" --quiet
+          fi
 
       - name: Run migrations
         run: |
@@ -221,18 +212,7 @@ jobs:
             --project="$PROJECT_ID" \
             --region="$RUN_REGION" \
             --format="value(metadata.annotations.'run.googleapis.com/ingress')")
-          PREVIEW_INGRESS=$(gcloud run services describe preview-worker \
-            --project="$PROJECT_ID" \
-            --region="$RUN_REGION" \
-            --format="value(metadata.annotations.'run.googleapis.com/ingress')")
           WORKER_PUBLIC_BINDING=$(gcloud run services get-iam-policy worker \
-            --project="$PROJECT_ID" \
-            --region="$RUN_REGION" \
-            --flatten='bindings[].members' \
-            --filter='bindings.role=roles/run.invoker AND bindings.members=allUsers' \
-            --format='value(bindings.members)')
-
-          PREVIEW_PUBLIC_BINDING=$(gcloud run services get-iam-policy preview-worker \
             --project="$PROJECT_ID" \
             --region="$RUN_REGION" \
             --flatten='bindings[].members' \
@@ -241,6 +221,4 @@ jobs:
 
           test "$API_INGRESS" = internal-and-cloud-load-balancing
           test "$WORKER_INGRESS" = internal
-          test "$PREVIEW_INGRESS" = internal
           test -z "$WORKER_PUBLIC_BINDING"
-          test -z "$PREVIEW_PUBLIC_BINDING"

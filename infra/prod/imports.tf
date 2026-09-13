@@ -2,8 +2,8 @@
 # dev-to-main PR is merged. Import blocks are evaluated by plan; apply writes
 # their results into state and may also change resource settings.
 #
-# The revision bucket, its runtime IAM, registry reader IAM, and preview worker
-# are planned additions. Secret values and the GCS state bucket are provisioned
+# The revision bucket, its runtime IAM, and registry reader IAM are planned
+# additions. Secret values and the GCS state bucket are provisioned
 # separately before the first approved apply.
 
 import {
