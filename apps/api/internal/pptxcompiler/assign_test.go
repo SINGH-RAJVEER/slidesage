@@ -170,3 +170,48 @@ func TestAssignAgainstPublishedManifests(t *testing.T) {
 		}
 	}
 }
+
+func withTable(a templatepublish.Archetype) templatepublish.Archetype {
+	a.Slots = append(append([]templatepublish.Slot{}, a.Slots...), templatepublish.Slot{ID: "figures", ShapeID: 9, Kind: templatepublish.SlotTable})
+	return a
+}
+
+func TestAssignPrefersContentWithoutUnwritableSlots(t *testing.T) {
+	manifest := manifestWith(
+		archetype("cover", templatepublish.RoleCover, false),
+		withTable(archetype("tabular", templatepublish.RoleContent, true)),
+		archetype("plain", templatepublish.RoleContent, true),
+	)
+	assignments, err := Assign(manifest, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, assignment := range assignments[1:] {
+		if assignment.Archetype.ID != "plain" {
+			t.Fatalf("slide %d used %s while a writable archetype was available", assignment.Position, assignment.Archetype.ID)
+		}
+	}
+}
+
+// A template whose only cover carries a table is still a template the user
+// picked, so it compiles with the table cloned through rather than failing.
+func TestAssignKeepsArchetypesWhenNoneAreFullyWritable(t *testing.T) {
+	manifest := manifestWith(
+		withTable(archetype("cover", templatepublish.RoleCover, false)),
+		withTable(archetype("tabular", templatepublish.RoleContent, true)),
+	)
+	assignments, err := Assign(manifest, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateAssignments(assignments); err != nil {
+		t.Fatal(err)
+	}
+	for _, assignment := range assignments {
+		for _, slot := range assignment.Archetype.Slots {
+			if slot.Kind == templatepublish.SlotTable {
+				t.Fatalf("slide %d asks for content in a table slot", assignment.Position)
+			}
+		}
+	}
+}
