@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatecatalog"
 )
 
 func decodeSubmitBody(t *testing.T, raw string) map[string]any {
@@ -446,5 +447,23 @@ func TestRunBoundedLimitsConcurrentWork(t *testing.T) {
 	}
 	if maximum.Load() != 2 {
 		t.Fatalf("maximum concurrency = %d", maximum.Load())
+	}
+}
+
+func TestResolveGenerationTemplatePinsThePublishedDigest(t *testing.T) {
+	entry, found := templatecatalog.Lookup("soft-skills-training", 1)
+	if !found {
+		t.Fatal("soft-skills-training is not published")
+	}
+	resolved, err := resolveGenerationTemplate(&presentation.TemplateReference{ID: entry.ID, Version: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.SHA256 != entry.SHA256 {
+		t.Fatalf("resolved digest %s, want %s", resolved.SHA256, entry.SHA256)
+	}
+	mismatched := presentation.TemplateReference{ID: entry.ID, Version: 1, SHA256: strings.Repeat("a", 64)}
+	if _, err := resolveGenerationTemplate(&mismatched); err == nil {
+		t.Fatal("a digest the catalog does not publish was accepted")
 	}
 }

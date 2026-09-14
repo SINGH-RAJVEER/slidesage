@@ -237,8 +237,13 @@ func (h *handler) generationJob(ctx context.Context, userID string, input submit
 		}
 		var document map[string]any
 		_ = json.Unmarshal(existing.Data, &document)
-		if template, parseErr := presentation.ParseTemplateReference(document["template"]); parseErr == nil {
-			input.Template = &template
+		// A retry is submitted from the generate page with the template
+		// selector in hand, so the selection on the request wins. The stored
+		// reference is the fallback for a retry that names none.
+		if input.Template == nil {
+			if template, parseErr := presentation.ParseTemplateReference(document["template"]); parseErr == nil {
+				input.Template = &template
+			}
 		}
 		if document["status"] != "failed" {
 			duplicate, err := h.existingSubmission(ctx, userID, jobID, hash)
