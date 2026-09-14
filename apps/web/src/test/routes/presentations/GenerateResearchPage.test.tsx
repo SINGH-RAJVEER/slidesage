@@ -36,6 +36,7 @@ describe("GenerateResearchPage", () => {
 								slideCount: 7,
 								detailLevel: "detailed",
 								tonality: "persuasive",
+								template: { id: "5s-training", version: 1 },
 								researchPayload: {
 									sources: [
 										{
@@ -198,6 +199,7 @@ describe("GenerateResearchPage", () => {
 								slideCount: 6,
 								detailLevel: "balanced",
 								tonality: "professional",
+								template: { id: "5s-training", version: 1 },
 							},
 						},
 					]}
@@ -245,6 +247,43 @@ describe("GenerateResearchPage", () => {
 				0,
 			);
 			expect(fetchMock).toHaveBeenCalledTimes(1);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+	// Generating from a default when the selection is gone would hand the user a
+	// deck in a template they never picked.
+	it("returns to the generate page when the route state names no template", async () => {
+		const originalFetch = globalThis.fetch;
+		const fetchMock = mock(async () => new Response(null, { status: 500 }));
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		try {
+			const view = render(
+				<MemoryRouter
+					initialEntries={[
+						{
+							pathname: "/generate/research",
+							state: {
+								prompt: "Grid storage policy",
+								slideCount: 6,
+								detailLevel: "balanced",
+								tonality: "professional",
+							},
+						},
+					]}
+				>
+					<StreamingProvider>
+						<Routes>
+							<Route path="/generate" element={<span>Generate</span>} />
+							<Route path="/generate/research" element={<GenerateResearchPage />} />
+						</Routes>
+					</StreamingProvider>
+				</MemoryRouter>,
+			);
+
+			await waitFor(() => expect(view.getByText("Generate")).toBeInTheDocument());
+			expect(fetchMock).not.toHaveBeenCalled();
 		} finally {
 			globalThis.fetch = originalFetch;
 		}

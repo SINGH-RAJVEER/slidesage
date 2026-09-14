@@ -1,8 +1,7 @@
-import {
-	type AIModelSelection,
-	type PresentationTemplateReference,
-	DEFAULT_BINARY_PPTX_TEMPLATE,
-	type ResearchPayload,
+import type {
+	AIModelSelection,
+	PresentationTemplateReference,
+	ResearchPayload,
 } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
@@ -40,10 +39,9 @@ export default function GenerateResearchPage() {
 	const savedResearch = routeState?.researchPayload;
 	const retryPresentationId = routeState?.retryPresentationId;
 	const ai = routeState?.ai;
-	const template = routeState?.template ?? {
-		id: DEFAULT_BINARY_PPTX_TEMPLATE.id,
-		version: DEFAULT_BINARY_PPTX_TEMPLATE.version,
-	};
+	// Falling back to a default here would generate a deck in a template the
+	// user never chose, so a lost route state sends them back to pick one.
+	const template = routeState?.template;
 
 	const [isProceeding, setIsProceeding] = useState(false);
 	const [researchAttempt, setResearchAttempt] = useState(0);
@@ -80,20 +78,29 @@ export default function GenerateResearchPage() {
 	};
 
 	useEffect(() => {
-		if (!prompt || !slideCount) {
+		if (!prompt || !slideCount || !template) {
 			navigate(ROUTES.generate);
 		}
-	}, [navigate, prompt, slideCount]);
+	}, [navigate, prompt, slideCount, template]);
 
 	useEffect(() => {
-		if (!prompt || !slideCount) return;
+		if (!prompt || !slideCount || !template) return;
 		void previewResearch(researchRequest, savedResearch, researchAttempt > 0);
-	}, [prompt, slideCount, researchAttempt, researchRequest, savedResearch, previewResearch]);
+	}, [
+		prompt,
+		slideCount,
+		template,
+		researchAttempt,
+		researchRequest,
+		savedResearch,
+		previewResearch,
+	]);
 
 	const handleProceed = useCallback(async () => {
 		if (
 			!prompt ||
 			!slideCount ||
+			!template ||
 			researchStatus !== "ready" ||
 			streamingState.isStreaming ||
 			isProceedingRef.current
