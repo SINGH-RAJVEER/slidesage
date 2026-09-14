@@ -150,7 +150,19 @@ The ONLYOFFICE iframe owns element selection, movement, resizing, content change
 
 An editor save may change any supported PPTX object. After accepting a revision, SlideSage extracts slide order, text, notes, object inventory, and native slide count into a revision index. AI iteration reads this index and produces explicit content operations against the current revision.
 
-The compiler applies those operations to a copy of the current PPTX rather than returning to the original template. This preserves manual edits. If the editor changed or removed a targeted object, the operation fails with a revision conflict and the worker requests a new index.
+The compiler applies those operations to a copy of the saved PPTX rather than returning to the original template. It checks each targeted shape against its indexed original text. Invalid operations receive one repair attempt against the same base document; they never silently switch to a newer revision.
+
+### Changing the slide count
+
+The iteration control defaults to the loaded revision's count and accepts 1–40 slides. Initial generation still requires 5–40. The viewer sends `base_revision` with the request. The API rejects a stale base with `409`, and the revision commit checks it again so an edit made during generation cannot be overwritten. Clients that omit the pin use the current revision at submission. Duplicate job IDs with the same request resolve to the existing job before the stale-base check.
+
+Keeping the count unchanged uses the existing text-operation path and preserves slide order. A different count requests a complete ordered revision plan. Each entry names an original slide part, whether to clone it, and any text replacements. An original can be retained once or cloned multiple times; omitted originals are removed. Every reference and old-text check resolves against the pinned base, not positions changed by earlier operations.
+
+For reductions, the prompt asks the model to condense or merge the main points into retained slides. Explicit deletion instructions take precedence. For expansion, it asks the model to retain unaffected slides and populate copies of suitable text-only donors. This is a content-generation instruction, not a guarantee that the model preserves every fact.
+
+The compiler preserves untouched slide XML and retained slide IDs, allocates collision-free clone parts, copies owned notes with corrected references, and keeps shared design resources. Cloning pictures, charts, tables, groups, embedded objects, or unsupported extension payloads is not supported. Structural changes involving custom shows or sections, and deletions leaving dangling slide references, also fail validation. A deck without a safe donor cannot expand through this path; the worker does not fall back to regenerating the deck.
+
+The final native slide count must exactly match the requested count. Valid output follows the existing immutable GCS upload and revision-commit flow. No generated revision becomes a published template or needs a separate CDN export. Previous revisions remain available in history.
 
 ## Legacy behavior removed
 

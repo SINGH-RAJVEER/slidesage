@@ -48,6 +48,43 @@ func TestSubmitInputReadsTopicAndDisabledResearch(t *testing.T) {
 	}
 }
 
+func TestSubmitIterationCountAndBaseRevision(t *testing.T) {
+	for _, test := range []struct {
+		name, fields string
+		valid        bool
+	}{
+		{"omitted", `"parent_presentation_id":"p"`, true},
+		{"one", `"parent_presentation_id":"p","slide_count":1,"base_revision":7`, true},
+		{"forty", `"parent_presentation_id":"p","slide_count":40`, true},
+		{"zero count", `"parent_presentation_id":"p","slide_count":0`, false},
+		{"large count", `"parent_presentation_id":"p","slide_count":41`, false},
+		{"fraction count", `"parent_presentation_id":"p","slide_count":1.5`, false},
+		{"generation minimum", `"slide_count":1`, false},
+		{"generation pin", `"slide_count":5,"base_revision":1`, false},
+		{"retry pin", `"retry_presentation_id":"p","slide_count":5,"base_revision":1`, false},
+		{"zero pin", `"parent_presentation_id":"p","base_revision":0`, false},
+		{"negative pin", `"parent_presentation_id":"p","base_revision":-1`, false},
+		{"fraction pin", `"parent_presentation_id":"p","base_revision":1.5`, false},
+		{"string pin", `"parent_presentation_id":"p","base_revision":"1"`, false},
+		{"null pin", `"parent_presentation_id":"p","base_revision":null`, false},
+		{"overflow pin", `"parent_presentation_id":"p","base_revision":9223372036854775808`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			input, err := parseSubmitInput(decodeSubmitBody(t, `{"topic":"Revise",`+test.fields+`}`))
+			if (err == nil) != test.valid {
+				t.Fatalf("input=%+v error=%v", input, err)
+			}
+			if input.BaseRevision != 0 {
+				other := input
+				other.BaseRevision++
+				if requestHash(input) == requestHash(other) {
+					t.Fatal("base revision missing from request hash")
+				}
+			}
+		})
+	}
+}
+
 func TestSubmitInputKeepsEnabledResearch(t *testing.T) {
 	body := decodeSubmitBody(t, `{
 		"topic":"Grid storage",

@@ -180,7 +180,15 @@ export default function PresentationViewerPage() {
 		tonality: string,
 		useWebResearch: boolean,
 	) => {
-		if (!prompt.trim() || !presentationId || !presentation?.template) return false;
+		if (
+			!prompt.trim() ||
+			!presentationId ||
+			!pptxDocument ||
+			!revisionDocument.revision ||
+			selectedRevision ||
+			shouldShowGenerating
+		)
+			return false;
 		requestGenerationNotificationPermission();
 
 		const success = await generate({
@@ -190,7 +198,8 @@ export default function PresentationViewerPage() {
 			tonality,
 			researchEnabled: useWebResearch,
 			parentPresentationId: presentationId,
-			template: presentation.template,
+			baseRevision: revisionDocument.revision.revision,
+			template: presentation?.template,
 		});
 
 		if (success) {
@@ -304,7 +313,7 @@ export default function PresentationViewerPage() {
 				{showControls && !isFullscreenMode && (
 					<ViewerHeaderControls
 						title={viewerTitle}
-						canIterate={!!revisionDocument.revision && !!presentationId && !selectedRevision}
+						canIterate={canEditDeck && !!pptxDocument}
 						onBack={() => navigate(isStreamingMode ? ROUTES.generate : ROUTES.presentations)}
 						onIterate={() => setShowIterateModal((current) => !current)}
 						onPresent={() => void enterFullscreen()}
@@ -482,9 +491,9 @@ export default function PresentationViewerPage() {
 					open={showIterateModal}
 					onOpenChange={setShowIterateModal}
 					onIterate={handleIteratePresentation}
-					currentSlideCount={revisionDocument.revision?.slideCount}
+					currentSlideCount={pptxDocument?.slideCount}
 					error={streamingState.operation === "iteration" ? streamingState.error : undefined}
-					isStreaming={streamingState.isStreaming}
+					isStreaming={streamingState.isStreaming || !canEditDeck || !pptxDocument}
 				/>
 			)}
 		</div>
