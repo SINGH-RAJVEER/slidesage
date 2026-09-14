@@ -12,11 +12,33 @@ export interface InstalledMarketplaceTheme {
 	thumbnailPath: string;
 }
 
+/**
+ * What a first visit starts with: one template from every category, so the
+ * selector is useful before the reader has opened the marketplace.
+ *
+ * This is a seed, not a floor. Removing all of them leaves the selector empty
+ * and generation blocked until one is installed, which is the honest state to
+ * be in; nothing is silently reinstated.
+ */
+function preinstalledReferences(): PresentationTemplateReference[] {
+	return MARKETPLACE_ITEMS.filter((item) => item.preinstalled && item.available).map(
+		(item) => item.templateReference,
+	);
+}
+
 function getStoredReferences(): PresentationTemplateReference[] {
 	if (typeof window === "undefined") return [];
 
 	try {
-		const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
+		const raw = window.localStorage.getItem(STORAGE_KEY);
+		// Absent and empty are different answers: absent is a reader who has
+		// never installed anything, empty is one who removed everything.
+		if (raw === null) {
+			const seeded = preinstalledReferences();
+			window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+			return seeded;
+		}
+		const stored = JSON.parse(raw);
 		if (!Array.isArray(stored)) return [];
 
 		const references = stored.flatMap((value): PresentationTemplateReference[] => {

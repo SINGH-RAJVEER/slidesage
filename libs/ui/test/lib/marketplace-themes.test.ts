@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test";
+import { BINARY_PPTX_TEMPLATE_CATALOG, BINARY_TEMPLATE_CATEGORIES } from "@slidesage/types";
 import { MARKETPLACE_ITEMS } from "@slidesage/ui/lib/catalog";
 import {
 	getInstalledMarketplaceThemes,
@@ -11,9 +12,12 @@ const STORAGE_KEY = "slidesage-installed-marketplace-themes";
 describe("installed marketplace templates", () => {
 	beforeEach(() => localStorage.clear());
 
+	// A first visit seeds the preinstalled set, so a test about explicit
+	// installation starts from a library the reader has emptied.
 	it("stores and returns versioned binary template references", () => {
 		const item = MARKETPLACE_ITEMS[0];
 		if (!item) throw new Error("Expected a marketplace template");
+		localStorage.setItem(STORAGE_KEY, "[]");
 
 		expect(installMarketplaceTheme(item.id)).toBe(true);
 		expect(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")).toEqual([item.templateReference]);
@@ -26,6 +30,23 @@ describe("installed marketplace templates", () => {
 				thumbnailPath: item.thumbnailPath,
 			},
 		]);
+	});
+
+	// Preinstalled themes are a starting point rather than a privilege: they are
+	// seeded once, cover every category, and can be removed like any other.
+	it("starts a first visit with a theme from every category", () => {
+		const seeded = getInstalledMarketplaceThemes();
+		const categories = new Set(
+			seeded.map(
+				(theme) =>
+					BINARY_PPTX_TEMPLATE_CATALOG.find((entry) => entry.id === theme.templateReference.id)
+						?.category,
+			),
+		);
+
+		expect(categories).toEqual(new Set(BINARY_TEMPLATE_CATEGORIES.map((entry) => entry.id)));
+		expect(seeded.every((theme) => removeMarketplaceTheme(theme.marketplaceId))).toBe(true);
+		expect(getInstalledMarketplaceThemes()).toEqual([]);
 	});
 
 	it("upgrades matching string IDs and drops unrelated synthetic IDs", () => {
