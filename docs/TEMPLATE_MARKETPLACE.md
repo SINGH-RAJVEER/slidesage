@@ -1,16 +1,26 @@
 # Template marketplace
 
-The authenticated `/marketplace` route lists curated binary PowerPoint templates. `BINARY_PPTX_TEMPLATE_CATALOG` in `libs/types/src/template-catalog.ts` is the catalog authority. The initial catalog contains six default templates and 24 marketplace templates.
+The authenticated `/marketplace` route lists curated binary PowerPoint templates. `BINARY_PPTX_TEMPLATE_CATALOG` in `libs/types/src/template-catalog.ts` is the catalog authority. The catalog contains 30 templates, seven of them preinstalled.
 
 ## Catalog model
 
-Each template has a stable kebab-case ID, version, availability, dimensions, and object-storage path. Source files under the ignored root `templates/` directory use the same ID as their filename, for example `simple-business-proposal.pptx`.
+Each template has a stable kebab-case ID, version, category, preinstalled flag, dimensions, and object-storage path. Source files under the ignored root `templates/` directory use the same ID as their filename, for example `simple-business-proposal.pptx`.
+
+A category says what a template is for - `business`, `marketing`, `education`, or `creative` - because that is what someone opening the selector is choosing between; it is not a description of styling. `BINARY_TEMPLATE_CATEGORIES` carries the display order and labels, and the marketplace search matches a category label as well as a name, so "education" finds the lesson decks none of which carry the word.
+
+A name is what the template is, not what the source file was called. Names stay short enough to read in the selector, describe the deck rather than the artwork it was cut from, and avoid naming the artists and brands the original Canva templates were themed after. The ID never changes with a rename: it is the published identity, and renaming one would orphan a bucket object and every presentation compiled from it.
 
 The truncated agriculture deck is excluded from the catalog and retained as `quarantine-agriculture-business-plan.pptx`. The duplicate Textured Scrapbook file was removed.
 
 The `/marketplace` grid is always ordered by template name and carries no control to reorder it: a catalog whose order never moves is one a reader can learn the shape of, and a name is what they arrive looking for. Its search bar sits at the same height as the presentations grid's, so moving between the two catalog pages does not shift the control under the pointer.
 
-Default templates appear in the presentation template selector without installation. Marketplace templates must first be installed from `/marketplace`. Installation stores versioned `{ id, version }` references in browser local storage. The store accepts old string entries only when the string matches a current binary catalog ID; synthetic legacy IDs are discarded.
+Every template is a marketplace template. Seven are preinstalled, which means a first visit starts with them in the reader's library rather than that they are privileged: they are listed in `/marketplace` and removable like any other. The seeded set covers every category, so someone who has never opened the marketplace still has somewhere to start whatever they are writing.
+
+Installation stores versioned `{ id, version }` references in browser local storage. An absent key and an empty array are different answers: absent is a reader who has never installed anything and is seeded, empty is one who removed everything and is left with an empty selector and generation blocked until they install one. Nothing is silently reinstated. The store accepts old string entries only when the string matches a current binary catalog ID; synthetic legacy IDs are discarded.
+
+The selector lists the reader's library and nothing else, laid out as columns of one category each. A category taller than eight rows continues into another column instead of growing a scrollbar, and the panel width follows the column count, so installing more themes widens the menu rather than lengthening it; below the `sm` breakpoint it falls back to a single column. The panel is centred on the page rather than on its trigger, which is what a surface this wide reads as; the offset is measured when the menu opens and on resize, and it is applied with `align="start"` because floating-ui ignores an alignment offset when the alignment is `center`. A category with nothing in it is not drawn, and an installed reference this build has no catalog entry for is listed last under `Installed` rather than filed under a category nobody assigned it. Nothing is labelled by where it came from, because everything came from the same place.
+
+Each row carries a remove control in its right corner, revealed on hover or when the row takes keyboard focus, which takes the theme out of the library from the page the reader is already on. It reserves no width: a row is as wide as its title, and the control arrives over the end of it behind a short fade, so a column is sized by the names in it rather than by a gutter that is empty most of the time. It is a sibling of the menu row rather than a child, so it stays out of the menu's roving focus; `Delete` on a focused row is the keyboard path to the same action. Removing the selected theme clears the selection instead of moving to another one, because generating in a template the reader did not choose is the failure this selector exists to prevent.
 
 ## Browser preview
 
@@ -59,7 +69,7 @@ Covers are produced with the first slide by `scripts/render-template-previews.ts
 
 Three artifacts must exist before a template can produce a presentation: the digest-pinned object in the bucket, a digest recorded in both `libs/types/src/template-digests.json` and `apps/api/internal/templatecatalog/published.json`, and a compiler manifest under `apps/api/internal/templatemanifest/manifests`. A template missing any of them is listed but not usable.
 
-The browser derives `asset.status` from the digest map, so an unpublished template reads as `pending-upload` without anyone maintaining a second list. Selection is gated on it in three places: the template dropdown disables the entry, `GeneratePPTPage` disables generation while an unselectable template is chosen, and `installMarketplaceTheme` refuses to install one, because installing it would only add a permanently disabled entry to the selector. Marketplace cards show `Unpublished` in place of `Install`.
+The browser derives `asset.status` from the digest map, so an unpublished template reads as `pending-upload` without anyone maintaining a second list. Selection is gated on it in four places: the template dropdown disables the entry, `GeneratePPTPage` disables generation while an unselectable template is chosen, `installMarketplaceTheme` refuses to install one, and the first-visit seed skips one, because either would only add a permanently disabled entry to the selector. Marketplace cards show `Unpublished` in place of `Install`.
 
 `go run ./cmd/publish-templates -verify` checks those artifacts for every published entry, plus the cover and the preview set, and exits non-zero on any mismatch. Each object check is a signed `HEAD`, so it costs one request per template rather than a download. The preview check reads `manifest.json`, which is uploaded after its images, so its presence means the whole set resolved.
 
@@ -79,6 +89,8 @@ A presentation stores the PowerPoint template it was generated from:
 ```
 
 The reference is carried through retries, queued jobs, resumable streaming, and the final persisted document.
+
+There is no default template. Nothing is selected until the reader picks one, and pressing Generate with no selection warns instead of generating. A retried presentation whose template this build no longer carries leaves the selector empty and says so rather than substituting another. Installing a marketplace theme adds it to the selector; it does not select it.
 
 The ID and version are the whole of what the browser sends. The API resolves the digest from `published.json` and pins it onto the job payload and the stored document, the worker resolves it a second time before compiling, and the compiler edits that exact package, so the deck a user receives is built from the template they picked and nothing else. Two rules keep a selection from being quietly substituted: a retry uses the template selected on the retry request rather than the one the failed presentation stored, and the research step refuses to generate with a default when its route state has lost the selection, returning to the generate page instead.
 
