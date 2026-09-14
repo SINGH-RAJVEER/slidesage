@@ -3,7 +3,6 @@ package pptxcompiler
 import (
 	"fmt"
 	"path"
-	"strings"
 )
 
 // Retain only parts reachable from the package root, including their relationships.
@@ -91,9 +90,19 @@ func cloneOwnedParts(p *pkg, original map[string][]byte, sourcePart, targetPart 
 				return nil, err
 			}
 			mapped, exists := mapping[resolved]
-			owned := strings.Contains(resolved, "/notesSlides/") || strings.Contains(resolved, "/charts/") || strings.Contains(resolved, "/diagrams/") || strings.Contains(resolved, "/tags/")
+			owned := isOwnedPart(resolved)
 			if owned && !exists {
 				mapped = path.Join(path.Dir(resolved), fmt.Sprintf("clone%d-%s", number, path.Base(resolved)))
+				for suffix := 1; ; suffix++ {
+					_, occupied := p.parts[mapped]
+					_, originalPart := original[mapped]
+					_, hasRels := p.parts[relsPartFor(mapped)]
+					_, declared := types.overrideFor(mapped)
+					if !occupied && !originalPart && !hasRels && !declared {
+						break
+					}
+					mapped = path.Join(path.Dir(resolved), fmt.Sprintf("clone%d-%d-%s", number, suffix, path.Base(resolved)))
+				}
 				mapping[resolved] = mapped
 				body, ok := original[resolved]
 				if !ok {
