@@ -16,15 +16,28 @@ import (
 
 const slotSystemPrompt = `Return one JSON object with title and slides. Every slide has position (one-based) and slots (values keyed by the exact manifest slot ID). Follow the supplied ordered assignments exactly. A text slot takes a string; a list slot takes an array of strings. maxCharacters applies per string and maxListItems limits array length. Required slots cannot be empty. Use null for optional images unless a supplied image asset provides verified base64 and mimeType; never invent image bytes or URLs. Omit optional slots only when the slide does not need them; omitted sample objects are cleared. No styling, coordinates, layouts, regions, CSS, or semantic slide blocks. Use research sources accurately and do not invent citations.`
 
+const slotRepairPrompt = `Fix only what the validation error names and leave every other slot byte-identical to the previous slide. A length error means the copy is too long: rewrite that string to say the same thing in fewer words and count characters before returning it, staying at or under maxCharacters including spaces and punctuation. Do not pad short copy, do not drop required slots, and do not move content into a different slot. Return {"position":number,"slots":{...}}.`
+
 func assignmentForJob(job streamJob) ([]pptxcompiler.Assignment, error) {
 	if job.template == nil {
 		return nil, fmt.Errorf("template is required")
 	}
-	m, err := templatemanifest.Lookup(job.template.ID, job.template.Version)
+	// The worker resolves the template against the published catalog again
+	// rather than trusting the reference the queue payload carries, so a job
+	// can only ever compile from the package the catalog names for the ID the
+	// user selected.
+	resolved, err := resolveGenerationTemplate(job.template)
 	if err != nil {
 		return nil, err
 	}
-	if m.SHA256 != job.template.SHA256 {
+	if resolved != *job.template {
+		return nil, fmt.Errorf("template %s is no longer published at the digest this job was queued with", job.template.ID)
+	}
+	m, err := templatemanifest.Lookup(resolved.ID, resolved.Version)
+	if err != nil {
+		return nil, err
+	}
+	if m.SHA256 != resolved.SHA256 {
 		return nil, fmt.Errorf("template manifest digest mismatch")
 	}
 	a, err := pptxcompiler.Assign(m, job.slideCount)
@@ -62,10 +75,10 @@ func (h *handler) generateSlots(ctx context.Context, job streamJob, assignments 
 		if duplicates[a.Position] {
 			issue = fmt.Errorf("duplicate position")
 		}
-		for attempt := 0; issue != nil && attempt < 2; attempt++ {
+		for attempt := 0; issue != nil && attempt < 3; attempt++ {
 			assignment, _ := json.Marshal(a)
 			previous, _ := json.Marshal(content)
-			repair, used, e := h.generateJSON(ctx, job, slotSystemPrompt, user+"\nRepair only this slide: "+string(assignment)+"\nPrevious: "+string(previous)+"\nValidation error: "+issue.Error()+"\nReturn {\"position\":number,\"slots\":{...}}.", maxOutputTokens(1))
+			repair, used, e := h.generateJSON(ctx, job, slotSystemPrompt, user+"\nRepair only this slide: "+string(assignment)+"\nPrevious: "+string(previous)+"\nValidation error: "+issue.Error()+"\n"+slotRepairPrompt, maxOutputTokens(1))
 			tokens += used
 			if e != nil {
 				return "", nil, tokens, e

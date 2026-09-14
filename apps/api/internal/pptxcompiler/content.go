@@ -89,9 +89,14 @@ func ValidateSlide(a Assignment, content SlideContent) error {
 		} else {
 			filled++
 		}
-		for _, line := range lines {
-			if utf8.RuneCountInString(line) > s.MaxCharacters {
-				return fmt.Errorf("slot %s exceeds %d characters per item", s.ID, s.MaxCharacters)
+		for i, line := range lines {
+			// The repair turn is only as good as this message, so it reports
+			// which item is too long and by how much.
+			if length := utf8.RuneCountInString(line); length > s.MaxCharacters {
+				if s.Kind == templatepublish.SlotList {
+					return fmt.Errorf("slot %s item %d is %d characters and exceeds %d characters per item", s.ID, i+1, length, s.MaxCharacters)
+				}
+				return fmt.Errorf("slot %s is %d characters and exceeds %d characters per item", s.ID, length, s.MaxCharacters)
 			}
 		}
 	}
@@ -133,7 +138,7 @@ func textValue(s templatepublish.Slot, value any) ([]string, error) {
 		return nil, fmt.Errorf("slot %s needs a list", s.ID)
 	}
 	if len(lines) > s.MaxListItems {
-		return nil, fmt.Errorf("slot %s exceeds %d items", s.ID, s.MaxListItems)
+		return nil, fmt.Errorf("slot %s has %d items and exceeds %d items", s.ID, len(lines), s.MaxListItems)
 	}
 	return lines, nil
 }
