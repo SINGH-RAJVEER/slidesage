@@ -12,10 +12,9 @@ import {
 	DropdownMenuGroup,
 	DropdownMenuItem,
 	DropdownMenuLabel,
-	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@slidesage/ui/components/dropdown-menu";
-import { Check, ChevronDown, Sparkles, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Trash2 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { templateIsSelectable } from "../../lib/template-selection";
@@ -45,21 +44,15 @@ interface TemplateOption {
 }
 
 interface TemplateColumn {
-	key: string;
 	label: string;
-	/** False on a category's continuation columns, which keep one heading. */
-	showLabel: boolean;
 	options: TemplateOption[];
 }
 
 /**
- * How tall one column is allowed to get before a category spills into the next.
- *
- * The menu grows sideways into space the page already has rather than down into
- * a list nobody scrolls to the end of, so installing more themes widens it
- * instead of adding a scrollbar.
+ * A category is one column, however tall it gets. The menu widens as the reader
+ * installs themes from categories they had none in, and lengthens as they
+ * install more within one, so a category always reads as a single list.
  */
-const ITEMS_PER_COLUMN = 8;
 const COLUMN_WIDTH_REM = 15;
 const MIN_WIDTH_REM = 18;
 const MAX_VIEWPORT_FRACTION = 0.92;
@@ -111,18 +104,7 @@ function templateColumns(installedThemes: InstalledTemplateOption[]): TemplateCo
 		{ label: "Installed", options: options.filter((option) => !option.category) },
 	].filter((group) => group.options.length > 0);
 
-	const columns: TemplateColumn[] = [];
-	for (const group of groups) {
-		for (let start = 0; start < group.options.length; start += ITEMS_PER_COLUMN) {
-			columns.push({
-				key: `${group.label}-${start}`,
-				label: group.label,
-				showLabel: start === 0,
-				options: group.options.slice(start, start + ITEMS_PER_COLUMN),
-			});
-		}
-	}
-	return columns;
+	return groups;
 }
 
 const TemplateSelector: React.FC<TemplateSelectorProps> = ({
@@ -199,30 +181,24 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 							"--template-columns": Math.max(1, columns.length),
 						} as React.CSSProperties
 					}
-					className="rounded-xl border-white/10 bg-gray-900/95 p-1 shadow-2xl backdrop-blur-xl"
+					className="rounded-xl border border-white/10 bg-black/40 p-2 text-white shadow-2xl backdrop-blur-xl"
 					align="start"
 					alignOffset={alignOffset}
 					collisionPadding={16}
 				>
-					<DropdownMenuLabel className="flex items-center gap-2 px-2 py-2 text-xs font-medium tracking-wider text-white/40 uppercase">
-						<Sparkles className="w-3 h-3" />
-						Choose template
-					</DropdownMenuLabel>
-					<DropdownMenuSeparator className="mx-2 bg-white/5" />
-
 					{columns.length === 0 ? (
-						<p className="px-3 py-4 text-sm text-white/40">
+						<p className="px-2 py-1 text-sm text-white/40">
 							No themes installed. Add one from the marketplace.
 						</p>
 					) : (
 						<div className="grid grid-cols-1 items-start sm:grid-cols-[repeat(var(--template-columns),minmax(0,1fr))]">
 							{columns.map((column) => (
 								<DropdownMenuGroup
-									key={column.key}
+									key={column.label}
 									className="min-w-0 sm:border-l sm:border-white/5 sm:first:border-l-0"
 								>
-									<DropdownMenuLabel className="px-3 py-2 text-[10px] font-medium tracking-wider text-white/35 uppercase">
-										{column.showLabel ? column.label : " "}
+									<DropdownMenuLabel className="px-2 py-0.5 text-[10px] font-medium tracking-wider text-white/35 uppercase">
+										{column.label}
 									</DropdownMenuLabel>
 									{column.options.map(({ theme }) => {
 										const isSelected =
@@ -247,7 +223,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 														event.preventDefault();
 														onTemplateRemove(theme);
 													}}
-													className={`mx-1 my-1 cursor-pointer rounded-lg px-3 py-2.5 text-white/80 hover:bg-white/5 focus:bg-white/5 ${isSelected ? "bg-white/5" : ""}`}
+													className={`my-0.5 cursor-pointer rounded-lg px-2 py-2.5 text-white/80 hover:bg-white/10 focus:bg-white/10 focus:text-white ${isSelected ? "bg-white/10" : ""}`}
 												>
 													<div className="flex min-w-0 flex-col">
 														<div className="flex items-center gap-2">
@@ -276,13 +252,13 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 												    title, and the control arrives over the end of it on
 												    hover, behind a short fade so it never sits on a
 												    glyph. */}
-												<div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+												<div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
 													{isSelected && (
 														<Check className="h-4 w-4 text-blue-400 group-hover/theme:invisible" />
 													)}
 												</div>
 												{onTemplateRemove && (
-													<div className="pointer-events-none absolute inset-y-0 right-1 flex items-center rounded-r-lg bg-gradient-to-l from-gray-900 via-gray-900 to-transparent pr-2 pl-8 opacity-0 transition duration-200 group-hover/theme:opacity-100 group-focus-within/theme:opacity-100">
+													<div className="pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-r-lg bg-gradient-to-l from-black/80 via-black/70 to-transparent pr-2 pl-8 opacity-0 transition duration-200 group-hover/theme:opacity-100 group-focus-within/theme:opacity-100">
 														<button
 															type="button"
 															aria-label={`Remove ${theme.name}`}

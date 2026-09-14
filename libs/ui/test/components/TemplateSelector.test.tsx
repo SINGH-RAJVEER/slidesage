@@ -84,9 +84,9 @@ it("groups themes into a column per category", () => {
 	);
 });
 
-// The menu widens rather than scrolling, so a category taller than one column
-// continues into the next one instead of growing a scrollbar.
-it("spills a long category into another column and widens the menu", () => {
+// A category is one column however tall it gets, so a long one lengthens the
+// list rather than spilling sideways and reading as two categories.
+it("keeps a long category in a single column", () => {
 	const manyEducation = [
 		theme("5s-training", "5S Training"),
 		theme("soft-skills-training", "Soft Skills Training"),
@@ -106,10 +106,10 @@ it("spills a long category into another column and widens the menu", () => {
 	) as HTMLElement;
 	const grid = content.querySelector("div.grid") as HTMLElement;
 
-	expect(grid.children).toHaveLength(2);
-	expect(content.style.width).toBe("30rem");
-	// The heading is not repeated over the continuation column.
+	expect(grid.children).toHaveLength(1);
+	expect(grid.children[0]?.querySelectorAll('[role="menuitem"]')).toHaveLength(10);
 	expect(view.getAllByText("Education & Training")).toHaveLength(1);
+	expect(content.style.width).toBe("18rem");
 });
 
 it("removes a theme from its own row and leaves the menu open", () => {
