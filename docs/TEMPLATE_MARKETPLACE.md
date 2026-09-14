@@ -80,6 +80,8 @@ A presentation stores the PowerPoint template it was generated from:
 
 The reference is carried through retries, queued jobs, resumable streaming, and the final persisted document.
 
+The ID and version are the whole of what the browser sends. The API resolves the digest from `published.json` and pins it onto the job payload and the stored document, the worker resolves it a second time before compiling, and the compiler edits that exact package, so the deck a user receives is built from the template they picked and nothing else. Two rules keep a selection from being quietly substituted: a retry uses the template selected on the retry request rather than the one the failed presentation stored, and the research step refuses to generate with a default when its route state has lost the selection, returning to the generate page instead.
+
 ## Download readiness
 
 Catalog visibility, installation, and download readiness are separate. A template can appear in the marketplace while its asset remains `pending-upload`. Download returns the exact bytes of the presentation's current revision, so it requires only that generation committed one. Whether a template can produce a revision at all is decided by the publication gating above.

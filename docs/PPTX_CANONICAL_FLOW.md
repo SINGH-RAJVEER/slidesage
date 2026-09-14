@@ -70,13 +70,19 @@ Source slide numbers alone are not stable identifiers. Publication resolves each
 
 The compiler allocates exactly the requested number of archetypes before requesting slide copy. The assignment includes one cover and fills every remaining position with repeatable content archetypes. Closing archetypes from source templates are not included in generated presentations.
 
+Only text, list, and image slots are writable. A table, chart, or unclassified shape stays in the manifest but is dropped from the assignment, so it is never offered to the provider and is cloned through with the template's own content. Assignment prefers archetypes whose shapes are all writable, and falls back to one carrying an unwritable shape only when the template offers no alternative for that role. A published template is therefore always generatable: an archetype holding a table no longer disqualifies the template the user selected.
+
 If a template cannot produce the requested count, the request fails before points are charged. The UI must only offer counts supported by the selected template.
+
+### Template identity
+
+The selected template ID and version are the only template input the client sends. The API resolves them against the published catalog, which is the sole authority for the package digest; a digest arriving on the request is never trusted as the pin and is rejected outright when it disagrees with the published one. The worker resolves the reference again before compiling, so a queued job that outlived a catalog change fails rather than compiling from bytes the catalog no longer names. A retry generates with the template selected on the retry request, falling back to the failed presentation's stored reference only when the request names none.
 
 ### Content request
 
 The AI receives the ordered assignments and slot limits. A slide response contains values keyed by manifest slot ID. It does not contain layout names, regions, coordinates, themes, effects, CSS, or browser component names.
 
-The worker validates every slot. It performs targeted repair for missing slides, malformed values, or content that exceeds a slot limit. It does not accept a shorter deck and does not silently discard invalid slides.
+The worker validates every slot. It performs targeted repair for missing slides, malformed values, or content that exceeds a slot limit, retrying a failing slide up to three times. A limit error reports the measured length and, for a list slot, the offending item, and the repair turn asks the provider to shorten only the named slot and leave the rest of the slide byte-identical. It does not accept a shorter deck and does not silently discard invalid slides.
 
 Slot limits alone do not make a deck substantive, because most slots are optional. A slide that has any text or list slot must fill at least one of them, so an empty slot map fails validation and repair rather than compiling into a blank deck at the requested slide count.
 
@@ -86,7 +92,7 @@ The compiler downloads and verifies the immutable template package, clones the a
 
 Hyperlink relationships survive cloning unchanged: they name a URI rather than a package part, so they are neither resolved nor pruned. Compilation and revision validation apply the same policy as publication, which keeps a template carrying template-author links compilable.
 
-The first implementation must support native text and images. Charts and tables require dedicated native OOXML writers before manifests may expose those slot types. Unsupported slots fail before generation.
+The compiler writes native text and images. Charts and tables require dedicated native OOXML writers before generated content may reach those shapes; until then they are cloned through untouched rather than written or removed.
 
 Generation succeeds only after package validation, immutable upload, and database commit. The viewer can fetch that PPTX immediately.
 
