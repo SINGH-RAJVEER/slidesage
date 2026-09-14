@@ -15,10 +15,6 @@ import { publishPresentationUpdated } from "../lib/presentation-events";
 import { consumeSSEStream } from "../lib/sse-stream";
 
 const ACTIVE_GENERATION_KEY = "slidesage-active-generation";
-const DEFAULT_TEMPLATE_REFERENCE: PresentationTemplateReference = {
-	id: "simple-business-proposal",
-	version: 1,
-};
 
 interface StoredGeneration {
 	jobId: string;
@@ -26,7 +22,7 @@ interface StoredGeneration {
 	operation: "generation" | "iteration";
 	prompt?: string;
 	requestedSlides: number;
-	template: PresentationTemplateReference;
+	template?: PresentationTemplateReference;
 	lastEventId: number;
 }
 
@@ -56,18 +52,18 @@ function readStoredGeneration(): StoredGeneration | null {
 			window.localStorage.removeItem(ACTIVE_GENERATION_KEY);
 			return null;
 		}
+		// New generations need a stored template; iterations can inherit deck metadata.
 		const template = value.template;
 		if (
-			template !== undefined &&
-			(!template || typeof template.id !== "string" || typeof template.version !== "number")
+			(template === undefined && value.operation !== "iteration") ||
+			(template !== undefined &&
+				(!template || typeof template.id !== "string" || typeof template.version !== "number"))
 		) {
 			window.localStorage.removeItem(ACTIVE_GENERATION_KEY);
+			inMemoryGeneration = null;
 			return null;
 		}
-		inMemoryGeneration = {
-			...(value as StoredGeneration),
-			template: template || DEFAULT_TEMPLATE_REFERENCE,
-		};
+		inMemoryGeneration = value as StoredGeneration;
 		return inMemoryGeneration;
 	} catch {
 		generationStorageUnavailable = true;
@@ -134,9 +130,10 @@ export interface GenerateOptions {
 	researchEnabled?: boolean;
 	researchPayload?: ResearchPayload;
 	parentPresentationId?: string;
+	baseRevision?: number;
 	retryPresentationId?: string;
 	ai?: AIModelSelection;
-	template: PresentationTemplateReference;
+	template?: PresentationTemplateReference;
 }
 
 type ResearchPreviewStatus = "idle" | "loading" | "ready" | "error";
@@ -402,7 +399,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				setStreamingState((prev) => ({
 					...prev,
 					completedDocument: document,
-					template: document.template || prev.template,
+					template: document.template,
 					title: document.title || prev.title,
 					revision: document.currentRevision ?? prev.revision,
 					slideCount: document.totalSlides || prev.slideCount,
@@ -545,6 +542,10 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 	const generate = useCallback(
 		async (options: GenerateOptions): Promise<boolean> => {
 			if (activeStreamRef.current) return false;
+			if (!options.parentPresentationId && !options.template) return false;
+			const template = options.template
+				? { id: options.template.id, version: options.template.version }
+				: undefined;
 			activeStreamRef.current = true;
 			const jobId = crypto.randomUUID();
 			const operation = options.parentPresentationId ? "iteration" : "generation";
@@ -555,7 +556,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				isStreaming: true,
 				jobId,
 				requestedSlides: options.slideCount,
-				template: { id: options.template.id, version: options.template.version },
+				template,
 				operation,
 				prompt: options.prompt,
 				presentationId: targetPresentationId || undefined,
@@ -567,7 +568,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				operation,
 				prompt: options.prompt,
 				requestedSlides: options.slideCount,
-				template: { id: options.template.id, version: options.template.version },
+				template,
 				lastEventId: 0,
 			};
 			storeGeneration(stored);
@@ -609,9 +610,10 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 						research: { enabled: Boolean(options.researchEnabled) },
 						research_payload: options.researchPayload,
 						parent_presentation_id: options.parentPresentationId,
+						base_revision: options.parentPresentationId ? options.baseRevision : undefined,
 						retry_presentation_id: options.retryPresentationId,
 						ai: options.ai,
-						template: { id: options.template.id, version: options.template.version },
+						template,
 					}),
 					signal: controller.signal,
 				});
@@ -825,7 +827,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 		if (!completed) return null;
 		return {
 			...completed,
-			template: streamingState.template ?? completed.template,
+			template: completed.template,
 			title: streamingState.title,
 			currentRevision: streamingState.revision ?? completed.currentRevision,
 			totalSlides: streamingState.slideCount || completed.totalSlides,

@@ -53,7 +53,7 @@ function GenerateStarter({ onNavigateAway }: { onNavigateAway?: () => void }) {
 	);
 }
 
-function IterateStarter() {
+function IterateStarter({ withoutTemplate = false }: { withoutTemplate?: boolean }) {
 	const { generate, streamingState } = useStreaming();
 	const [result, setResult] = useState<boolean>();
 
@@ -68,15 +68,13 @@ function IterateStarter() {
 				type="button"
 				onClick={() => {
 					void generate({
-						template: {
-							id: "simple-business-proposal",
-							version: 1,
-						},
 						prompt: "Update this presentation",
+						template: withoutTemplate ? undefined : { id: "simple-business-proposal", version: 1 },
 						slideCount: 2,
 						detailLevel: "balanced",
 						tonality: "professional",
 						parentPresentationId: "presentation_1",
+						baseRevision: 7,
 					}).then(setResult);
 				}}
 			>
@@ -198,6 +196,7 @@ it("submits a job and continues processing after the initiating page unmounts", 
 			template: { id: "simple-business-proposal", version: 1 },
 		});
 		expect(typeof JSON.parse(requestBody).job_id).toBe("string");
+		expect(JSON.parse(requestBody)).not.toHaveProperty("base_revision");
 		fireEvent.click(view.getByRole("button", { name: "Navigate away" }));
 
 		await waitFor(() => {
@@ -304,37 +303,52 @@ it("reconnects to the event log when the first stream ends before saved", async 
 	}
 });
 
-it("treats saved as terminal when a later frame follows it", async () => {
-	const originalFetch = globalThis.fetch;
+it.each([false, true])(
+	"treats saved as terminal, without client template: %s",
+	async (withoutTemplate) => {
+		const originalFetch = globalThis.fetch;
+		let requestBody: Record<string, unknown> = {};
 
-	globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-		const url = String(input);
-		if (url.endsWith("/presentation-jobs")) {
-			return Response.json({ job_id: "job_2", presentation_id: "presentation_1" }, { status: 202 });
+		globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+			const url = String(input);
+			if (url.endsWith("/presentation-jobs")) {
+				requestBody = JSON.parse(String(init?.body));
+				return Response.json(
+					{ job_id: "job_2", presentation_id: "presentation_1" },
+					{ status: 202 },
+				);
+			}
+			return sse(
+				'id: 1\nevent: complete\ndata: {"title":"Updated deck","slides":[],"totalSlides":0}\n\n' +
+					'id: 2\nevent: saved\ndata: {"presentation_id":"presentation_1"}\n\n' +
+					'id: 3\nevent: error\ndata: {"error":"Save confirmation was revoked"}\n\n',
+			);
+		}) as unknown as typeof fetch;
+
+		try {
+			const view = render(
+				<StreamingProvider>
+					<IterateStarter withoutTemplate={withoutTemplate} />
+				</StreamingProvider>,
+			);
+
+			fireEvent.click(view.getByRole("button", { name: "Iterate" }));
+			await waitFor(() => {
+				expect(view.getByTestId("iteration-state")).toHaveTextContent("idle:complete:no-error");
+				expect(view.getByTestId("iteration-result")).toHaveTextContent("true");
+			});
+			expect(requestBody).toMatchObject({
+				parent_presentation_id: "presentation_1",
+				base_revision: 7,
+				slide_count: 2,
+			});
+			if (withoutTemplate) expect(requestBody).not.toHaveProperty("template");
+			else expect(requestBody["template"]).toEqual({ id: "simple-business-proposal", version: 1 });
+		} finally {
+			globalThis.fetch = originalFetch;
 		}
-		return sse(
-			'id: 1\nevent: complete\ndata: {"title":"Updated deck","slides":[],"totalSlides":0}\n\n' +
-				'id: 2\nevent: saved\ndata: {"presentation_id":"presentation_1"}\n\n' +
-				'id: 3\nevent: error\ndata: {"error":"Save confirmation was revoked"}\n\n',
-		);
-	}) as unknown as typeof fetch;
-
-	try {
-		const view = render(
-			<StreamingProvider>
-				<IterateStarter />
-			</StreamingProvider>,
-		);
-
-		fireEvent.click(view.getByRole("button", { name: "Iterate" }));
-		await waitFor(() => {
-			expect(view.getByTestId("iteration-state")).toHaveTextContent("idle:complete:no-error");
-			expect(view.getByTestId("iteration-result")).toHaveTextContent("true");
-		});
-	} finally {
-		globalThis.fetch = originalFetch;
-	}
-});
+	},
+);
 
 it("replays a durable generation stream after the provider remounts", async () => {
 	const originalFetch = globalThis.fetch;
@@ -346,7 +360,7 @@ it("replays a durable generation stream after the provider remounts", async () =
 			operation: "generation",
 			prompt: "Reconnect this deck",
 			requestedSlides: 1,
-			theme: "corporate-blue",
+			template: { id: "5s-training", version: 1 },
 			lastEventId: 1,
 		}),
 	);
@@ -388,7 +402,7 @@ it("clears a stored job that is no longer available", async () => {
 			presentationId: "expired_presentation",
 			operation: "generation",
 			requestedSlides: 1,
-			theme: "corporate-blue",
+			template: { id: "5s-training", version: 1 },
 			lastEventId: 0,
 		}),
 	);
