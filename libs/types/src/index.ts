@@ -2,14 +2,11 @@ export type {
 	BinaryPptxTemplate,
 	BinaryTemplateAspectRatio,
 	BinaryTemplateAssetStatus,
-	BinaryTemplateAvailability,
+	BinaryTemplateCategory,
 	BinaryTemplateDimensions,
 	PresentationTemplateReference,
 } from "./template-catalog";
-export {
-	BINARY_PPTX_TEMPLATE_CATALOG,
-	DEFAULT_BINARY_PPTX_TEMPLATE,
-} from "./template-catalog";
+export { BINARY_PPTX_TEMPLATE_CATALOG, BINARY_TEMPLATE_CATEGORIES } from "./template-catalog";
 
 export type PresentationGenerationStage =
 	| "researching"
