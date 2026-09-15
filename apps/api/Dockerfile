@@ -1,5 +1,5 @@
 # build
-from --platform=$BUILDPLATFORM docker.io/library/golang:1.26-alpine as build
+from --platform=$BUILDPLATFORM docker.io/library/golang:1.27-alpine as build
 
 workdir /src/apps/api
 
