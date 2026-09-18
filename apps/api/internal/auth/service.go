@@ -21,6 +21,7 @@ var (
 	ErrEmailInUse         = errors.New("email already in use")
 	ErrInvalidOTP         = errors.New("verification code is invalid or expired")
 	ErrEmailDelivery      = errors.New("email delivery is temporarily unavailable")
+	ErrAccountNotFound    = errors.New("no account exists for this email address")
 )
 
 var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
@@ -189,9 +190,11 @@ func (service *Service) SendPasswordResetOTP(ctx context.Context, email string) 
 	if email == "" {
 		return errors.New("enter a valid email address")
 	}
+	// A reset code is only worth sending to an address that owns an account, so
+	// an unknown address is reported rather than answered with a silent success.
 	user, err := service.repository.UserByEmail(ctx, email)
 	if errors.Is(err, ErrNotFound) {
-		return nil
+		return ErrAccountNotFound
 	}
 	if err != nil {
 		return err

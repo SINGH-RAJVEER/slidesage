@@ -369,6 +369,8 @@ func writeServiceError(writer http.ResponseWriter, err error) {
 		writeError(writer, http.StatusBadRequest, "Current password is incorrect")
 	case errors.Is(err, ErrInvalidOTP):
 		writeError(writer, http.StatusBadRequest, "Verification code is invalid or expired")
+	case errors.Is(err, ErrAccountNotFound):
+		writeErrorCode(writer, http.StatusNotFound, "No account exists for this email address. Create an account to continue.", "ACCOUNT_NOT_FOUND")
 	case errors.Is(err, ErrNotFound):
 		writeError(writer, http.StatusNotFound, "User not found")
 	default:
