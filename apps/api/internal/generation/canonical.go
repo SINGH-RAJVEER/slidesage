@@ -47,26 +47,55 @@ func assignmentForJob(job streamJob) ([]pptxcompiler.Assignment, error) {
 	return a, pptxcompiler.ValidateAssignments(a)
 }
 
+// slotBatchSize bounds how many slides one drafting call may produce. A whole
+// deck in a single completion is a long stream, and the longer it runs the more
+// exposure it has to an upstream stall part way through. Batching keeps each
+// call short enough to finish, at the cost of repeating the system prompt. It
+// is a var so tests can drive the batching path without a large deck.
+var slotBatchSize = 4
+
+// slotBatchPrompt tells the model the assignments it can see are a slice of a
+// larger deck, so it returns those positions instead of renumbering from one.
+const slotBatchPrompt = "\nThese assignments are one part of a larger deck. Return only the positions listed above, using their given position numbers."
+
 func (h *handler) generateSlots(ctx context.Context, job streamJob, assignments []pptxcompiler.Assignment) (string, []pptxcompiler.SlideContent, int, error) {
 	plan, _ := json.Marshal(assignments)
+	// Repair keeps the whole plan in view so a rewritten slide stays consistent
+	// with its neighbours; only the drafting calls are split.
 	user := generationUserPrompt(job) + "\nOrdered manifest assignments and limits: " + string(plan)
-	document, tokens, err := h.generateJSON(ctx, job, slotSystemPrompt, user, maxOutputTokens(job.slideCount))
-	if err != nil {
-		return "", nil, tokens, err
-	}
-	raw, _ := json.Marshal(document["slides"])
-	var received []pptxcompiler.SlideContent
-	_ = json.Unmarshal(raw, &received)
+
+	title := ""
+	tokens := 0
 	byPosition := map[int]pptxcompiler.SlideContent{}
 	duplicates := map[int]bool{}
-	for _, s := range received {
-		if s.Position < 1 || s.Position > len(assignments) {
-			return "", nil, tokens, fmt.Errorf("provider returned unexpected slide %d", s.Position)
+	for start := 0; start < len(assignments); start += slotBatchSize {
+		end := min(start+slotBatchSize, len(assignments))
+		batch := assignments[start:end]
+		batchUser := user
+		if len(batch) != len(assignments) {
+			batchPlan, _ := json.Marshal(batch)
+			batchUser = generationUserPrompt(job) + "\nOrdered manifest assignments and limits: " + string(batchPlan) + slotBatchPrompt
 		}
-		if _, ok := byPosition[s.Position]; ok {
-			duplicates[s.Position] = true
+		document, used, err := h.generateJSON(ctx, job, slotSystemPrompt, batchUser, maxOutputTokens(len(batch)))
+		tokens += used
+		if err != nil {
+			return "", nil, tokens, err
 		}
-		byPosition[s.Position] = s
+		if title == "" {
+			title = text(document["title"], "")
+		}
+		raw, _ := json.Marshal(document["slides"])
+		var received []pptxcompiler.SlideContent
+		_ = json.Unmarshal(raw, &received)
+		for _, s := range received {
+			if s.Position < 1 || s.Position > len(assignments) {
+				return "", nil, tokens, fmt.Errorf("provider returned unexpected slide %d", s.Position)
+			}
+			if _, ok := byPosition[s.Position]; ok {
+				duplicates[s.Position] = true
+			}
+			byPosition[s.Position] = s
+		}
 	}
 	result := make([]pptxcompiler.SlideContent, len(assignments))
 	for i, a := range assignments {
@@ -93,7 +122,10 @@ func (h *handler) generateSlots(ctx context.Context, job streamJob, assignments 
 		}
 		result[i] = content
 	}
-	return truncate(text(document["title"], "Untitled Presentation"), 255), result, tokens, nil
+	if title == "" {
+		title = "Untitled Presentation"
+	}
+	return truncate(title, 255), result, tokens, nil
 }
 
 func (h *handler) compileJob(ctx context.Context, job streamJob) (presentationrevision.Revision, map[string]any, int, error) {
