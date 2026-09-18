@@ -12,6 +12,8 @@ on:
 
 permissions:
   contents: read
+  # Required by dorny/paths-filter to list a pull request's changed files.
+  pull-requests: read
 
 concurrency:
   # In a called run github.workflow is the caller's name, so gating runs get
@@ -28,25 +30,87 @@ jobs:
       CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+
+      # A web-only change has no reason to compile and test the Go module, and
+      # the reverse holds too. This stays inside the one job rather than
+      # splitting into two, so the check name branch protection requires is
+      # always reported. Only pull requests are filtered: on a release gate the
+      # comparison base is less certain, and there everything runs.
+      - id: changes
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+              - 'libs/types/**'
+              - '.github/workflows/checks.yml'
+            web:
+              - 'apps/web/**'
+              - 'libs/**'
+              - 'package.json'
+              - 'bun.lock'
+              - 'tsconfig.json'
+              - 'biome.json'
+              - '.github/workflows/checks.yml'
+
+      - id: go
+        if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
+        uses: actions/setup-go@v5
         with:
           go-version-file: apps/api/go.mod
-          cache-dependency-path: apps/api/go.sum
+          # setup-go keys its cache on go.sum, so the build cache is never
+          # refreshed while only our own source changes and each run recompiles
+          # more of the module from scratch. The cache below is keyed to write
+          # a fresh entry every run instead.
+          cache: false
+
+      - name: Restore the Go module and build caches
+        if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          # The sha suffix means the key never hits exactly, so every run saves
+          # a new entry and the restore keys fall back to the most recent one.
+          key: ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-
+            ${{ runner.os }}-go-
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.13
+
       - run: bun install --frozen-lockfile
-      - run: bun run type-check
-      - run: bun test
+
+      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+        run: bun run type-check
+
+      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+        run: bun test
         working-directory: libs/types
-      - run: bun run test:ui
-      - run: bun run test:web
-      - run: go test ./...
+
+      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+        run: bun run test:ui
+
+      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+        run: bun run test:web
+
+      - if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
+        run: go test ./...
         working-directory: apps/api
-      - run: go vet ./...
+
+      - if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
+        run: go vet ./...
         working-directory: apps/api
-      - run: bun run build
-      - run: bun run build:api
+
+      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+        run: bun run build
+
+      - if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
+        run: bun run build:api
 
   terraform:
     runs-on: ubuntu-latest
@@ -59,6 +123,7 @@ jobs:
       - name: Check Terraform formatting
         working-directory: infra/prod
         run: terraform fmt -check -recursive
+
       - name: Validate Terraform configuration
         working-directory: infra/prod
         run: |
