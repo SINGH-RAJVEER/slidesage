@@ -46,44 +46,62 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "$REGISTRY_LOCATION-docker.pkg.dev" --quiet
 
-      - uses: docker/setup-buildx-action@v3
+      - id: buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build and push API image
-        uses: docker/build-push-action@v6
+      # BuildKit keeps layer cache and cache-mount contents in two separate
+      # places, and type=gha only carries the former. Without this the Go module
+      # and build caches mounted in apps/api/Dockerfile start empty every run,
+      # so every dependency is recompiled from scratch.
+      - name: Restore the Go caches mounted during the build
+        id: go-mount-cache
+        uses: actions/cache@v4
         with:
-          context: .
-          file: apps/api/Dockerfile
-          target: api
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: |
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/api:${{ env.IMAGE_VERSION }}
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/api:latest
+          path: |
+            go-mod-cache
+            go-build-cache
+          # The key never hits exactly, so a fresh entry is written every run
+          # and the restore key falls back to the most recent one. Keying on
+          # go.sum alone would freeze the build cache until a dependency moved.
+          key: ${{ runner.os }}-docker-go-${{ hashFiles('apps/api/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docker-go-${{ hashFiles('apps/api/go.sum') }}-
+            ${{ runner.os }}-docker-go-
 
-      - name: Build and push worker image
-        uses: docker/build-push-action@v6
+      - name: Inject the Go caches into the builder
+        uses: reproducible-containers/buildkit-cache-dance@v3
         with:
-          context: .
-          file: apps/api/Dockerfile
-          target: worker
-          push: true
-          cache-from: type=gha
-          tags: |
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/worker:${{ env.IMAGE_VERSION }}
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/worker:latest
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-map: |
+            {
+              "go-mod-cache": "/go/pkg/mod",
+              "go-build-cache": "/root/.cache/go-build"
+            }
 
-      - name: Build and push migrate image
-        uses: docker/build-push-action@v6
+      # One bake builds all three images. They share a single `build` stage, so
+      # BuildKit compiles it once rather than re-entering the builder per image.
+      #
+      # Each image gets its own cache scope: an unscoped type=gha makes every
+      # build overwrite the previous one's entry, leaving only the last. Only
+      # the api scope is written with mode=max, because that is where the shared
+      # build stage lives; worker and migrate read from it and write back just
+      # their own trivial scratch layers.
+      - name: Build and push the API, worker, and migrate images
+        uses: docker/bake-action@v7
         with:
-          context: .
-          file: apps/api/Dockerfile
-          target: migrate
+          source: .
+          files: docker-bake.hcl
           push: true
-          cache-from: type=gha
-          tags: |
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/migrate:${{ env.IMAGE_VERSION }}
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/migrate:latest
+          set: |
+            *.cache-from=type=gha,scope=slidesage-api
+            api.cache-to=type=gha,mode=max,scope=slidesage-api
+            worker.cache-to=type=gha,mode=min,scope=slidesage-worker
+            migrate.cache-to=type=gha,mode=min,scope=slidesage-migrate
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          REGISTRY: ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev
+          REPOSITORY: ${{ env.REGISTRY_REPOSITORY }}
+          IMAGE_VERSION: ${{ env.IMAGE_VERSION }}
 
   deploy:
     needs: build
