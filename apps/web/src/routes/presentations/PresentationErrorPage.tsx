@@ -6,7 +6,7 @@ import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
 import { getPresentationRetryDestination } from "@slidesage/ui/lib/presentation-retry";
 import { RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 
@@ -21,10 +21,13 @@ export default function PresentationErrorPage({
 }: PresentationErrorPageProps = {}) {
 	const navigate = useNavigate();
 	const location = useLocation();
+	const [searchParams] = useSearchParams();
 	const [isRetrying, setIsRetrying] = useState(false);
 	const [retryError, setRetryError] = useState("");
 
-	const presentationId = location.state?.presentationId || propPresentationId;
+	// A reload drops history state, so the id in the URL keeps retry reachable.
+	const presentationId =
+		location.state?.presentationId || propPresentationId || searchParams.get("id") || undefined;
 
 	const handleRetry = async () => {
 		if (!presentationId || isRetrying) return;

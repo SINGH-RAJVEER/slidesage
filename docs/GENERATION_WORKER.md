@@ -77,7 +77,8 @@ Application accounting remains transactional:
 - Submission reserves points, records the reservation ledger entry, creates application state, and inserts the River job atomically.
 - Success settles the operation, saves the presentation with its expected revision, releases unused authorization, records terminal events, and completes the River job atomically.
 - Failure or cancellation finalizes the operation, returns the active reservation with its ledger entry, records the terminal event, and finalizes the queue state atomically.
-- The operation status prevents a reservation from being settled or refunded more than once.
+- The operation status prevents a reservation from being settled or refunded more than once. Recording the failed presentation does not depend on that refund happening, so a reservation already released elsewhere still leaves a deck the user can retry.
+- A failed deck stores the settings it was submitted with, template included, under `failure.retry`. The error page reads them back to repopulate the generate page. If the presentation's revision has moved past the one the job expected, the failure is recorded in place against a still-generating deck instead of replacing the document, so the deck never stays stranded in `generating` without retry settings.
 - BYOK generation reserves zero SlideSage model points, while the durable job and event behavior remains the same.
 
 These guarantees cover SlideSage balances and persisted state. They cannot make an external provider request transactional or prevent a provider from billing a duplicate attempt.

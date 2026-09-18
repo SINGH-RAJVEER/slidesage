@@ -504,3 +504,31 @@ func TestResolveGenerationTemplatePinsThePublishedDigest(t *testing.T) {
 		t.Fatal("a digest the catalog does not publish was accepted")
 	}
 }
+
+func TestGenerationFailureDocumentCarriesSubmittedSettingsIntoRetryState(t *testing.T) {
+	job := streamJob{
+		kind:        "generation",
+		prompt:      "Grid storage",
+		slideCount:  12,
+		detailLevel: "detailed",
+		tonality:    "persuasive",
+		template:    &presentation.TemplateReference{ID: "soft-skills-training", Version: 1},
+	}
+	failed := generationFailureDocument(job, "provider was unreachable")
+
+	retry := failed["failure"].(map[string]any)["retry"].(map[string]any)
+	if retry["prompt"] != "Grid storage" || retry["slide_count"] != 12 {
+		t.Fatalf("retry prompt and slide count = %#v", retry)
+	}
+	if retry["detail_level"] != "detailed" || retry["tonality"] != "persuasive" {
+		t.Fatalf("retry detail level and tonality = %#v", retry)
+	}
+	encoded, _ := json.Marshal(retry["template"])
+	if string(encoded) != `{"id":"soft-skills-training","version":1}` {
+		t.Fatalf("retry template = %s", encoded)
+	}
+	topLevel, _ := json.Marshal(failed["template"])
+	if string(topLevel) != `{"id":"soft-skills-training","version":1}` {
+		t.Fatalf("document template = %s", topLevel)
+	}
+}
