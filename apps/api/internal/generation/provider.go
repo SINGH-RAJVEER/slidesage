@@ -11,6 +11,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
@@ -18,6 +20,13 @@ import (
 
 // defaultModel is used when no model is configured and no per-user AI selection exists.
 const defaultModel = "openrouter/free"
+
+// streamIdleTimeout bounds the gap between two chunks of an accepted stream. A
+// stalled upstream would otherwise cost the whole three-minute request timeout
+// before the job could retry, and the provider often reports the stall first,
+// which reads as its failure rather than a slow one. It is a var so tests can
+// shorten it; nothing at runtime reassigns it.
+var streamIdleTimeout = 45 * time.Second
 
 // doProviderRequest sends a provider request and retries transient failures (429 and 5xx) with exponential backoff, honoring Retry-After when present.
 func (h *handler) doProviderRequest(ctx context.Context, send func() (*http.Response, error)) (*http.Response, error) {
@@ -133,7 +142,21 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 	sawDone := false
 	scanner := bufio.NewScanner(response.Body)
 	scanner.Buffer(make([]byte, 16*1024), 2*1024*1024)
+	// Closing the body is what unblocks a scanner parked on a silent upstream.
+	// The flag records why it was closed, since the read then fails with an
+	// unhelpful "read on closed response body". A buffered line can still
+	// arrive after the timer fires and reschedule it, so the close is guarded.
+	var stalled atomic.Bool
+	var once sync.Once
+	idle := time.AfterFunc(streamIdleTimeout, func() {
+		once.Do(func() {
+			stalled.Store(true)
+			_ = response.Body.Close()
+		})
+	})
+	defer idle.Stop()
 	for scanner.Scan() {
+		idle.Reset(streamIdleTimeout)
 		line := strings.TrimSpace(scanner.Text())
 		if !strings.HasPrefix(line, "data:") {
 			continue
@@ -182,6 +205,14 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 		}
 		if chunk.Usage.TotalTokens > 0 {
 			tokens = chunk.Usage.TotalTokens
+		}
+	}
+	// Checked before scanner.Err() because a stall that lands on a buffer
+	// boundary can end the scan without surfacing any read error at all.
+	if stalled.Load() {
+		return nil, 0, &providerRequestError{
+			Message:   fmt.Sprintf("OpenRouter request failed: no output for %s", streamIdleTimeout),
+			Retryable: true,
 		}
 	}
 	if err := scanner.Err(); err != nil {

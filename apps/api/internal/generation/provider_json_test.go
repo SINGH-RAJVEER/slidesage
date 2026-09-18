@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 )
@@ -142,6 +143,54 @@ func TestGenerateJSONTreatsMidStreamProviderErrorAsRetryable(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "Upstream idle timeout exceeded") {
 		t.Fatalf("error %v should keep the provider's own wording", err)
+	}
+}
+
+// streamIdleTimeoutForTest swaps the stream idle deadline and returns the
+// previous value so the caller can restore it.
+func streamIdleTimeoutForTest(value time.Duration) time.Duration {
+	previous := streamIdleTimeout
+	streamIdleTimeout = value
+	return previous
+}
+
+// A stream that opens and then goes silent must fail on the idle deadline
+// rather than holding the job until the whole-request timeout, and must be
+// retryable so the remaining attempts are used.
+func TestGenerateJSONFailsFastOnAStalledStream(t *testing.T) {
+	previous := streamIdleTimeoutForTest(60 * time.Millisecond)
+	defer streamIdleTimeoutForTest(previous)
+
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		_, _ = writer.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"{\"}}]}\n\n"))
+		if flusher, ok := writer.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		<-release
+	}))
+	defer server.Close()
+	defer close(release)
+
+	t.Setenv("OPEN_ROUTER_API_BASE", server.URL)
+	t.Setenv("OPEN_ROUTER_MODEL", "test-model")
+	t.Setenv("OPEN_ROUTER_API_KEY", "test-key")
+
+	handler := &handler{client: server.Client()}
+	started := time.Now()
+	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 5}, "system", "user", 1000)
+	if err == nil {
+		t.Fatal("a stalled stream must not decode as success")
+	}
+	if elapsed := time.Since(started); elapsed > 5*time.Second {
+		t.Fatalf("stall took %s to surface, the idle deadline did not fire", elapsed)
+	}
+	if !retryableProviderError(err) {
+		t.Fatalf("error %v must be retryable so the job uses its remaining attempts", err)
+	}
+	if !strings.Contains(err.Error(), "no output for") {
+		t.Fatalf("error %v should name the idle deadline", err)
 	}
 }
 
