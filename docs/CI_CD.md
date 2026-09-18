@@ -4,7 +4,7 @@ The repository deploys its Go API and generation worker to Google Cloud Run. Eve
 
 ## Flow
 
-1. GitHub Actions builds three image targets from `apps/api/Dockerfile` using Docker BuildKit. The Dockerfile also provides Linux/amd64 defaults for `BUILDPLATFORM`, `TARGETOS`, and `TARGETARCH`, so plain Docker builds (including Google Cloud Build's Docker builder) do not expand the platform to an empty value:
+1. GitHub Actions builds three image targets from `apps/api/Dockerfile` with a single `docker buildx bake` over `docker-bake.hcl`. All three share one `build` stage, so BuildKit compiles it once instead of re-entering the builder per image. The Dockerfile also provides Linux/amd64 defaults for `BUILDPLATFORM`, `TARGETOS`, and `TARGETARCH`, so plain Docker builds (including Google Cloud Build's Docker builder) do not expand the platform to an empty value:
    - `api` (web server, port 8000) -> Cloud Run **service** `api`
    - `worker` (River queue consumer with a health server, port 8080) -> Cloud Run **service** `worker`
    - `migrate` (Goose + River migrations, one-shot) -> Cloud Run **job** `slidesage-migrate`
@@ -17,6 +17,28 @@ After this testing bookmark is merged through dev into main and the documented b
 Trigger: a push to `main` after the dev-to-main PR is merged, or a manual dispatch on `main`. Both jobs explicitly reject other refs, so dispatching from the testing bookmark cannot publish images or change production. All production runs share one concurrency group.
 
 A complete plan runs before the targeted migration update. Missing secrets, missing Cloudflare DNS permissions, or invalid import IDs stop deployment before any Terraform apply. The first deployment also needs the state bucket, credentials, and imports described in [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
+
+## Build caching
+
+A small change does not rebuild the whole stack. Four caches carry unchanged work between runs, and each one exists because a default was quietly not working.
+
+| Cache | Where | Key |
+| ----- | ----- | --- |
+| Go module and build cache, for tests and vet | `checks.yml` | `go.sum` hash plus the commit SHA |
+| Go module and build cache, for the image build | `deploy.yml` | `apps/api/go.sum` hash plus the commit SHA |
+| Docker layer cache | `deploy.yml`, `type=gha` | one scope per image |
+| Terraform providers | all three Terraform workflows | `infra/prod/.terraform.lock.hcl` hash |
+
+Two things are easy to get wrong here and both were:
+
+- **`actions/setup-go` caching is off on purpose.** It keys its cache on `go.sum`, so the build cache is only ever rewritten when a dependency moves, and every run in between recompiles more of the module from scratch. `cache: false` plus an explicit `actions/cache` whose key ends in the commit SHA means the key never hits exactly, a fresh entry is saved every run, and `restore-keys` falls back to the most recent one. The same pattern keys the image build's cache.
+- **BuildKit cache mounts are not covered by `type=gha`.** Layer cache and cache-mount contents are separate mechanisms, and `cache-to: type=gha` exports only the former. The `--mount=type=cache` directories in `apps/api/Dockerfile` would start empty on every run, recompiling every dependency, so `reproducible-containers/buildkit-cache-dance` round-trips them through `actions/cache` around the bake step.
+
+Each image writes to its own `type=gha` scope. An unscoped backend gives every build the same entry to overwrite, leaving only the last one. Only the `api` scope is written with `mode=max`, because that is where the shared `build` stage lives; `worker` and `migrate` read from it and write back their own trivial scratch layers.
+
+The pull request checks also filter on changed paths. A change confined to `apps/web` skips the Go test, vet, and build steps, and a change confined to `apps/api` skips the type check, the TypeScript tests, and the web build. The filtering happens inside the one `test-and-build` job rather than splitting it, so the check name branch protection requires is always reported. A release gate runs everything regardless.
+
+Cloudflare Pages has its own build cache enabled through `build_caching` in `infra/prod/edge.tf`, and `BUN_VERSION` is pinned there so a deployment builds on the same Bun the checks ran on rather than the older Pages default.
 
 ## Artifact Registry layout
 
@@ -237,8 +259,12 @@ or atomically in the console: Cloud Run -> service -> Revisions -> select revisi
 ```bash
 gcloud auth configure-docker asia-south1-docker.pkg.dev
 
+# One image:
 docker build --target api --file apps/api/Dockerfile --tag asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev .
 docker push asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev
+
+# Or all three, the way CI does:
+PROJECT_ID=slidesage-504414 IMAGE_VERSION=dev docker buildx bake -f docker-bake.hcl --push
 ```
 
 ## Troubleshooting
@@ -250,7 +276,7 @@ docker push asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev
 
 ## Migration cutover
 
-Every production release takes an on-demand Cloud SQL backup before running migrations. Terraform then sets the existing API and queue services to manual scaling with zero instances, preserving their previous images for this phase. This stops new submissions and queue processing while schema changes run. The API is temporarily unavailable during the cutover.
+Every production release takes an on-demand Cloud SQL backup before running migrations. The backup starts as soon as the release job authenticates and runs alongside the Terraform planning, because nothing before the migration depends on it; the workflow blocks on its completion immediately before the schema changes, where the guarantee has to hold. Terraform then sets the existing API and queue services to manual scaling with zero instances, preserving their previous images for this phase. This stops new submissions and queue processing while schema changes run. The API is temporarily unavailable during the cutover.
 
 The cutover deletes the retired `preview-worker` service before migration 27 removes its claim columns. The full release apply restores automatic scaling with the new API and generation-worker images. If migration or release apply fails, services remain paused; inspect the failure before retrying rather than restarting an old binary against a changed schema.
 
