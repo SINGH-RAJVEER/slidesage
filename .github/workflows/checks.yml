@@ -114,12 +114,28 @@ jobs:
 
   terraform:
     runs-on: ubuntu-latest
+    env:
+      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform-plugin-cache
     steps:
       - uses: actions/checkout@v4
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.16.0
           terraform_wrapper: false
+
+      # The google and cloudflare providers are large and otherwise downloaded
+      # from the registry on every init, in this workflow and two others.
+      - name: Restore the Terraform provider cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: ${{ runner.os }}-terraform-${{ hashFiles('infra/prod/.terraform.lock.hcl') }}
+          restore-keys: ${{ runner.os }}-terraform-
+
+      - name: Create the provider cache directory
+        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
+
       - name: Check Terraform formatting
         working-directory: infra/prod
         run: terraform fmt -check -recursive

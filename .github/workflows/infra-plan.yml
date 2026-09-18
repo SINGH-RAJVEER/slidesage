@@ -26,6 +26,7 @@ jobs:
       TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.DATADOG_OTLP_ENDPOINT }}
       TF_VAR_otel_logs_exporter: ${{ vars.OTEL_LOGS_EXPORTER || 'otlp' }}
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform-plugin-cache
     steps:
       - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v2
@@ -37,6 +38,19 @@ jobs:
         with:
           terraform_version: 1.16.0
           terraform_wrapper: false
+
+      # The google and cloudflare providers are large and otherwise downloaded
+      # from the registry on every init, in this workflow and two others.
+      - name: Restore the Terraform provider cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: ${{ runner.os }}-terraform-${{ hashFiles('infra/prod/.terraform.lock.hcl') }}
+          restore-keys: ${{ runner.os }}-terraform-
+
+      - name: Create the provider cache directory
+        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
+
       - name: Use deployed images for a read-only infrastructure plan
         shell: bash
         run: |
