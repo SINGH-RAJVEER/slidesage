@@ -511,7 +511,7 @@ func (h *handler) cancelQueuedJob(ctx context.Context, record generationJobRecor
 func retryableProviderError(err error) bool {
 	var provider *providerRequestError
 	if errors.As(err, &provider) {
-		return provider.Status == http.StatusTooManyRequests || provider.Status >= 500
+		return provider.Retryable || provider.Status == http.StatusTooManyRequests || provider.Status >= 500
 	}
 	var network net.Error
 	return errors.As(err, &network)
@@ -779,6 +779,11 @@ func writeJSON(writer http.ResponseWriter, status int, value any) {
 type providerRequestError struct {
 	Status  int
 	Message string
+	// Retryable marks a failure that carries no HTTP status of its own, such as
+	// an error the provider reports inside an already-accepted stream. Without
+	// it those failures look permanent and the job is finalized on its first
+	// attempt even though the cause is transient.
+	Retryable bool
 }
 
 func (err *providerRequestError) Error() string { return err.Message }

@@ -161,7 +161,13 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 			continue
 		}
 		if chunk.Error != nil {
-			return nil, 0, errors.New(chunk.Error.Message)
+			// OpenRouter accepted the request and then reported an upstream
+			// failure mid-stream. It carries no status of its own, so it is
+			// marked retryable explicitly rather than read as a clean refusal.
+			return nil, 0, &providerRequestError{
+				Message:   fmt.Sprintf("OpenRouter request failed: %s", chunk.Error.Message),
+				Retryable: true,
+			}
 		}
 		for _, choice := range chunk.Choices {
 			if choice.FinishReason != nil && *choice.FinishReason != "" {

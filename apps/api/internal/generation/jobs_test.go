@@ -54,6 +54,7 @@ func TestRetryableProviderError(t *testing.T) {
 		{name: "rate limited", err: &providerRequestError{Status: http.StatusTooManyRequests}, retryable: true},
 		{name: "provider unavailable", err: &providerRequestError{Status: http.StatusServiceUnavailable}, retryable: true},
 		{name: "invalid request", err: &providerRequestError{Status: http.StatusBadRequest}, retryable: false},
+		{name: "mid-stream upstream stall", err: &providerRequestError{Message: "OpenRouter request failed: Upstream idle timeout exceeded", Retryable: true}, retryable: true},
 		{name: "network failure", err: &net.DNSError{Err: "temporary"}, retryable: true},
 		{name: "validation failure", err: errors.New("invalid presentation"), retryable: false},
 	}

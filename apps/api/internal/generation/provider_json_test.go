@@ -114,6 +114,37 @@ func TestGenerateJSONReportsLengthCappedStream(t *testing.T) {
 	}
 }
 
+// An error the provider reports inside an accepted stream is transient, so it
+// has to reach the worker as a retryable provider failure rather than as a
+// bare message that reads like a permanent application error.
+func TestGenerateJSONTreatsMidStreamProviderErrorAsRetryable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		_, _ = writer.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"title\\\":\\\"Deck\\\"\"}}]}\n\n"))
+		_, _ = writer.Write([]byte("data: {\"error\":{\"message\":\"Upstream idle timeout exceeded\"}}\n\n"))
+	}))
+	defer server.Close()
+
+	t.Setenv("OPEN_ROUTER_API_BASE", server.URL)
+	t.Setenv("OPEN_ROUTER_MODEL", "test-model")
+	t.Setenv("OPEN_ROUTER_API_KEY", "test-key")
+
+	handler := &handler{client: server.Client()}
+	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 5}, "system", "user", 1000)
+	if err == nil {
+		t.Fatal("a mid-stream provider error must not decode as success")
+	}
+	if !retryableProviderError(err) {
+		t.Fatalf("error %v must be retryable so the job uses its remaining attempts", err)
+	}
+	if !strings.Contains(err.Error(), "OpenRouter request failed") {
+		t.Fatalf("error %v should name the provider it came from", err)
+	}
+	if !strings.Contains(err.Error(), "Upstream idle timeout exceeded") {
+		t.Fatalf("error %v should keep the provider's own wording", err)
+	}
+}
+
 func TestDirectProviderReportsLengthCap(t *testing.T) {
 	const body = `{"choices":[{"message":{"content":"{\"title\":\"Deck\",\"slides\":[tru"},"finish_reason":"length"}],"usage":{"total_tokens":10}}`
 	// directProvider hardcodes real provider endpoints, so stub the transport.
