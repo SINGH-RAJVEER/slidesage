@@ -141,6 +141,12 @@ resource "cloudflare_record" "api" {
   proxied = false
 }
 
+locals {
+  # Kept in step with the packageManager field in package.json and the version
+  # oven-sh/setup-bun pins in the checks workflow.
+  bun_version = "1.3.13"
+}
+
 resource "cloudflare_pages_project" "web" {
   account_id        = var.cloudflare_account_id
   name              = "slidesage"
@@ -160,6 +166,9 @@ resource "cloudflare_pages_project" "web" {
 
       environment_variables = {
         VITE_API_URL = "https://api.${var.domain_name}"
+        # Pages still defaults to an older Bun than CI and the lockfile use.
+        # Pin it so a deployment builds on the same toolchain the checks ran on.
+        BUN_VERSION = local.bun_version
       }
     }
   }
