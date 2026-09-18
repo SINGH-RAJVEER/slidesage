@@ -1,13 +1,12 @@
 module github.com/SINGH-RAJVEER/SlideSage/apps/api
 
-go 1.26.3
-
-require github.com/jackc/pgx/v5 v5.10.0
+go 1.27.1
 
 require (
 	cloud.google.com/go/storage v1.66.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/googleapis/gax-go/v2 v2.23.0
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pressly/goose/v3 v3.27.3
 	github.com/riverqueue/river v0.43.0
 	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.43.0

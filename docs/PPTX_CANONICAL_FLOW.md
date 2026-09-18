@@ -13,7 +13,6 @@ This document specifies the replacement for semantic slide generation, React sli
 5. A generated presentation has exactly the requested number of slides when generation completes.
 6. AI output contains content, not presentation styling or geometry.
 7. A successful Office editor save creates a new revision. It never overwrites an existing object.
-8. A preview set belongs to one revision and has the same slide count as that revision.
 
 ## Deep module
 
@@ -29,7 +28,7 @@ interface PresentationDocument {
 }
 ```
 
-The interface guarantees revision checks, idempotency, exact slide counts, package validation, immutable storage, and preview scheduling. Callers do not manipulate ZIP files, object keys, editor callbacks, or LibreOffice processes.
+The interface guarantees revision checks, idempotency, exact slide counts, package validation, and immutable storage. Callers do not manipulate ZIP files, object keys, or editor callbacks.
 
 ## Template publication
 
@@ -39,9 +38,9 @@ The ignored root `templates/` directory remains the local authoring source. A pu
 2. Remove comments, author metadata, unused slides, signatures, unapproved embedded objects, and every external relationship other than an ordinary hyperlink.
 3. Validate relationships, content types, slide dimensions, and manifest shape references.
 4. Calculate the package SHA-256 digest.
-5. Render source-slide previews for review.
-6. Upload with the PowerPoint MIME type to an immutable CDN object key.
-7. Publish catalog metadata only after the object and manifest pass validation.
+5. Stage the sanitized package under its immutable CDN object key.
+6. Render marketplace images from the staged package with the browser renderer.
+7. Upload the complete object tree and publish catalog metadata after validation.
 
 Object keys use this form:
 
@@ -69,15 +68,21 @@ Source slide numbers alone are not stable identifiers. Publication resolves each
 
 ### Assignment
 
-The compiler allocates exactly the requested number of archetypes before requesting slide copy. The assignment normally includes one cover and one closing slide, then fills the remaining positions with repeatable content archetypes. Template rules may define other sequences.
+The compiler allocates exactly the requested number of archetypes before requesting slide copy. The assignment includes one cover and fills every remaining position with repeatable content archetypes. Closing archetypes from source templates are not included in generated presentations.
+
+Only text, list, and image slots are writable. A table, chart, or unclassified shape stays in the manifest but is dropped from the assignment, so it is never offered to the provider and is cloned through with the template's own content. Assignment prefers archetypes whose shapes are all writable, and falls back to one carrying an unwritable shape only when the template offers no alternative for that role. A published template is therefore always generatable: an archetype holding a table no longer disqualifies the template the user selected.
 
 If a template cannot produce the requested count, the request fails before points are charged. The UI must only offer counts supported by the selected template.
+
+### Template identity
+
+The selected template ID and version are the only template input the client sends. The API resolves them against the published catalog, which is the sole authority for the package digest; a digest arriving on the request is never trusted as the pin and is rejected outright when it disagrees with the published one. The worker resolves the reference again before compiling, so a queued job that outlived a catalog change fails rather than compiling from bytes the catalog no longer names. A retry generates with the template selected on the retry request, falling back to the failed presentation's stored reference only when the request names none.
 
 ### Content request
 
 The AI receives the ordered assignments and slot limits. A slide response contains values keyed by manifest slot ID. It does not contain layout names, regions, coordinates, themes, effects, CSS, or browser component names.
 
-The worker validates every slot. It performs targeted repair for missing slides, malformed values, or content that exceeds a slot limit. It does not accept a shorter deck and does not silently discard invalid slides.
+The worker validates every slot. It performs targeted repair for missing slides, malformed values, or content that exceeds a slot limit, retrying a failing slide up to three times. A limit error reports the measured length and, for a list slot, the offending item, and the repair turn asks the provider to shorten only the named slot and leave the rest of the slide byte-identical. It does not accept a shorter deck and does not silently discard invalid slides.
 
 Slot limits alone do not make a deck substantive, because most slots are optional. A slide that has any text or list slot must fill at least one of them, so an empty slot map fails validation and repair rather than compiling into a blank deck at the requested slide count.
 
@@ -87,9 +92,9 @@ The compiler downloads and verifies the immutable template package, clones the a
 
 Hyperlink relationships survive cloning unchanged: they name a URI rather than a package part, so they are neither resolved nor pruned. Compilation and revision validation apply the same policy as publication, which keeps a template carrying template-author links compilable.
 
-The first implementation must support native text and images. Charts and tables require dedicated native OOXML writers before manifests may expose those slot types. Unsupported slots fail before generation.
+The compiler writes native text and images. Charts and tables require dedicated native OOXML writers before generated content may reach those shapes; until then they are cloned through untouched rather than written or removed.
 
-Generation succeeds only after package validation, immutable upload, and database commit. Preview rendering may finish afterward, but download is already available.
+Generation succeeds only after package validation, immutable upload, and database commit. The viewer can fetch that PPTX immediately.
 
 ## Revision storage
 
@@ -97,7 +102,6 @@ Canonical objects use immutable keys:
 
 ```text
 presentations/{presentation-id}/objects/{sha256}.pptx
-presentations/{presentation-id}/revisions/{revision}/previews/{slide-index}.webp
 ```
 
 PostgreSQL records:
@@ -106,7 +110,6 @@ PostgreSQL records:
 - object key, digest, byte size, slide count, and MIME type;
 - source template identity and compiler version;
 - author, source operation, and creation time;
-- preview status and preview count;
 - editor provider and base revision where applicable.
 
 Writers use compare-and-swap against the expected current revision. Duplicate operation IDs return the prior result. Stale saves remain available as conflict revisions but do not replace the current revision.
@@ -121,8 +124,8 @@ Template delivery through a private Cloud CDN origin uses signed URLs. `KeyName`
 
 This section describes the target design, not this build. The implementation is complete but is
 not on the dev line: it lives on the `onlyoffice-editor` bookmark, because no document server is
-provisioned and an editor with nothing to connect to is worse than none. Dev renders preview
-images and serves downloads; everything below returns with that bookmark.
+provisioned and an editor with nothing to connect to is worse than none. Dev renders PPTX files
+in the browser and serves downloads; everything below returns with that bookmark.
 
 
 The Go API creates a signed editor configuration for one user, presentation, permission set, and base revision. The ONLYOFFICE document key derives from the presentation ID and immutable revision. The stable file identity remains the presentation ID.
@@ -131,22 +134,9 @@ The source URL is read-only and expires after the editor has fetched the documen
 
 For a final save, SlideSage downloads the assembled PPTX from the trusted Document Server, writes a staging object while hashing it, validates it, promotes it to an immutable content-addressed object, commits the database revision, and then acknowledges the callback.
 
-## LibreOffice preview worker
-
-The preview job names one immutable presentation revision. The worker:
-
-1. downloads the PPTX;
-2. creates an isolated temporary LibreOffice profile;
-3. converts the deck to PDF with headless LibreOffice;
-4. rasterizes each page to WebP under CPU, memory, time, and pixel limits;
-5. uploads the complete preview set;
-6. marks previews ready only if every expected slide exists.
-
-Preview failure does not corrupt or replace the PPTX revision. The UI offers download and retry while previews are unavailable.
-
 ## Viewer and editor
 
-The regular viewer displays revision preview images. It retains navigation, thumbnails, fullscreen, playback, generation progress, revision history, download, delete-presentation, delete-slide, and editor launch controls.
+The regular viewer downloads the immutable PPTX revision and renders its slides directly in the browser. It retains navigation, thumbnails, fullscreen, playback, generation progress, revision history, download, delete-presentation, delete-slide, and editor launch controls. Browser parsing and slide media are lazy. No PDF or image conversion runs when generation completes.
 
 ### Deleting a slide
 
@@ -156,13 +146,23 @@ The API reads the named revision's package, drops the slide's part, its presenta
 
 The ONLYOFFICE iframe owns element selection, movement, resizing, content changes, slide duplication, reordering, chart and table editing, and undo or redo. SlideSage removes its custom element canvas, semantic layout selector, scene renderer, widget renderer, and browser theme substitution.
 
-PDF export uses the PDF produced from the canonical revision. It does not rasterize React DOM.
-
 ## AI revisions after manual editing
 
 An editor save may change any supported PPTX object. After accepting a revision, SlideSage extracts slide order, text, notes, object inventory, and native slide count into a revision index. AI iteration reads this index and produces explicit content operations against the current revision.
 
-The compiler applies those operations to a copy of the current PPTX rather than returning to the original template. This preserves manual edits. If the editor changed or removed a targeted object, the operation fails with a revision conflict and the worker requests a new index.
+The compiler applies those operations to a copy of the saved PPTX rather than returning to the original template. It checks each targeted shape against its indexed original text. Invalid operations receive one repair attempt against the same base document; they never silently switch to a newer revision.
+
+### Changing the slide count
+
+The iteration control defaults to the loaded revision's count and accepts 1–40 slides. Initial generation still requires 5–40. The viewer sends `base_revision` with the request. The API rejects a stale base with `409`, and the revision commit checks it again so an edit made during generation cannot be overwritten. Clients that omit the pin use the current revision at submission. Duplicate job IDs with the same request resolve to the existing job before the stale-base check.
+
+Keeping the count unchanged uses the existing text-operation path and preserves slide order. A different count requests a complete ordered revision plan. Each entry names an original slide part, whether to clone it, and any text replacements. An original can be retained once or cloned multiple times; omitted originals are removed. Every reference and old-text check resolves against the pinned base, not positions changed by earlier operations.
+
+For reductions, the prompt asks the model to condense or merge the main points into retained slides. Explicit deletion instructions take precedence. For expansion, it asks the model to retain unaffected slides and populate copies of suitable text-only donors. This is a content-generation instruction, not a guarantee that the model preserves every fact.
+
+The compiler preserves untouched slide XML and retained slide IDs, allocates collision-free clone parts, copies owned notes with corrected references, and keeps shared design resources. Cloning pictures, charts, tables, groups, embedded objects, or unsupported extension payloads is not supported. Structural changes involving custom shows or sections, and deletions leaving dangling slide references, also fail validation. A deck without a safe donor cannot expand through this path; the worker does not fall back to regenerating the deck.
+
+The final native slide count must exactly match the requested count. Valid output follows the existing immutable GCS upload and revision-commit flow. No generated revision becomes a published template or needs a separate CDN export. Previous revisions remain available in history.
 
 ## Legacy behavior removed
 
@@ -184,14 +184,14 @@ Presentations produced by the semantic pipeline are deleted, not migrated. Migra
 every presentation without a committed PPTX revision and drops the `document_kind` column along
 with its check constraints, so a presentation is either generating or backed by a revision. The
 row projection still strips the stored `slides` array, because nothing renders it: canonical decks
-draw from preview images. A presentation with no committed revision reports no revision and zero
+draw from the PPTX revision. A presentation with no committed revision reports no revision and zero
 slides, and AI iteration on it is refused until generation completes.
 
 ## Acceptance tests
 
-- Generate every supported slide count for each published template and assert exact counts at assignment, content, PPTX, database, and preview stages.
+- Generate every supported slide count for each published template and assert exact counts at assignment, content, PPTX, and database stages.
 - Open, edit, save, and reopen each template through ONLYOFFICE at least five times.
 - Validate each revision with an OOXML validator and desktop PowerPoint smoke test.
-- Compare LibreOffice previews with approved images for fonts, charts, tables, groups, SmartArt, media, portrait slides, and embedded fonts.
-- Exercise callback retries, duplicate saves, stale revisions, concurrent AI and editor saves, expired URLs, object-store failures, editor crashes, and preview-worker failures.
+- Compare browser-rendered slides with approved images for fonts, charts, tables, groups, SmartArt, media, portrait slides, and embedded fonts.
+- Exercise callback retries, duplicate saves, stale revisions, concurrent AI and editor saves, expired URLs, object-store failures, editor crashes, and unsupported browser-renderer features.
 - Reject ZIP bombs, path traversal, macros, external relationships other than ordinary hyperlinks, unapproved embedded objects, oversized media, and callbacks to untrusted result URLs.

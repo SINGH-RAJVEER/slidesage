@@ -21,7 +21,14 @@ export interface LandingPlate {
 	name: string;
 	/** Zero-based, in package slide order. */
 	slideIndex: number;
+	/**
+	 * The plate's own image: the small variant, because a plate is painted
+	 * around 140 CSS pixels wide and a full 1600 pixel render costs megabytes
+	 * of decoded bitmap to fill it.
+	 */
 	slideUrl: string;
+	/** The full-size render, for the preview a plate opens into. */
+	fullUrl: string;
 	/**
 	 * The template's cover, which every published template has. A slide preview
 	 * that will not load falls back to it rather than leaving a hole in the
@@ -101,6 +108,13 @@ function plate(item: PublishedTemplate, slideIndex: number): LandingPlate {
 		name: item.name,
 		slideIndex,
 		slideUrl: templateSlidePreviewUrl(
+			item.id,
+			item.templateReference.version,
+			item.sha256,
+			slideIndex,
+			"small",
+		),
+		fullUrl: templateSlidePreviewUrl(
 			item.id,
 			item.templateReference.version,
 			item.sha256,

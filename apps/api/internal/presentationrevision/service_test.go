@@ -30,7 +30,7 @@ func TestServiceCommit(t *testing.T) {
 	if revision.ObjectKey != wantKey {
 		t.Fatalf("ObjectKey = %q, want %q", revision.ObjectKey, wantKey)
 	}
-	if revision.MIMEType != PPTXContentType || revision.PreviewStatus != PreviewPending {
+	if revision.MIMEType != PPTXContentType {
 		t.Fatalf("Commit() metadata = %+v", revision)
 	}
 	if !bytes.Equal(blobs.objects[wantKey], pptx) {

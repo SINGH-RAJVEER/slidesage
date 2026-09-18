@@ -43,7 +43,77 @@ it("prefills a failed presentation prompt and generation options", () => {
 	expect(view.getByText("Comprehensive")).toBeInTheDocument();
 	expect(view.getByText("Casual")).toBeInTheDocument();
 	expect(view.getByRole("button", { name: /Web Research/ })).toHaveClass("bg-white/10");
-	expect(view.getByRole("button", { name: /Simple Business Proposal/ })).toBeInTheDocument();
+	// Nothing stands in for a template the retry state never named, and the
+	// reader is only told so once they ask for a deck.
+	expect(view.getByRole("button", { name: /Template Select/ })).toBeInTheDocument();
+	expect(view.queryByText("Select a template before generating.")).not.toBeInTheDocument();
+});
+
+it("warns instead of generating when Generate is pressed with no template", async () => {
+	const originalFetch = globalThis.fetch;
+	const fetchMock = mock(
+		async (_input: string | URL | Request, _init?: RequestInit) =>
+			new Response(null, { status: 500 }),
+	);
+	globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+	try {
+		const view = render(
+			<MemoryRouter initialEntries={["/generate"]}>
+				<StreamingProvider>
+					<Routes>
+						<Route path="/generate" element={<GeneratePPTPage />} />
+						<Route path="/presentation" element={<div>Viewer</div>} />
+					</Routes>
+				</StreamingProvider>
+			</MemoryRouter>,
+		);
+
+		fireEvent.change(view.getByRole("textbox", { name: "Prompt" }), {
+			target: { value: "A deck with no template picked" },
+		});
+		fireEvent.click(view.getByRole("button", { name: "Generate" }));
+
+		await waitFor(() =>
+			expect(view.getByText("Select a template before generating.")).toBeInTheDocument(),
+		);
+		expect(
+			fetchMock.mock.calls.some(([input]) => String(input).includes("/presentation-jobs")),
+		).toBe(false);
+		expect(view.queryByText("Viewer")).not.toBeInTheDocument();
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});
+
+it("selects the template a retried presentation was generated from", () => {
+	const view = render(
+		<MemoryRouter
+			initialEntries={[
+				{
+					pathname: "/generate",
+					state: {
+						retry: {
+							prompt: "Retry this market analysis",
+							slide_count: 12,
+							detail_level: "comprehensive",
+							tonality: "casual",
+							research_enabled: false,
+							template: { id: "5s-training", version: 1 },
+						},
+					},
+				},
+			]}
+		>
+			<StreamingProvider>
+				<Routes>
+					<Route path="/generate" element={<GeneratePPTPage />} />
+				</Routes>
+			</StreamingProvider>
+		</MemoryRouter>,
+	);
+
+	expect(view.getByRole("button", { name: /5S Training/ })).toBeInTheDocument();
 	expect(view.getByRole("button", { name: "Generate" })).not.toBeDisabled();
 });
 
@@ -92,6 +162,7 @@ it("opens the viewer immediately while generation waits for the stream", async (
 									provider: "anthropic",
 									model: "claude-sonnet-4-20250514",
 								},
+								template: { id: "5s-training", version: 1 },
 							},
 						},
 					},
@@ -127,7 +198,7 @@ it("opens the viewer immediately while generation waits for the stream", async (
 			provider: "anthropic",
 			model: "claude-sonnet-4-20250514",
 		});
-		expect(requestBody["template"]).toEqual({ id: "simple-business-proposal", version: 1 });
+		expect(requestBody["template"]).toEqual({ id: "5s-training", version: 1 });
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
@@ -214,6 +285,7 @@ it("starts generation on Enter even when focus sits on an options-bar control", 
 								detail_level: "balanced",
 								tonality: "professional",
 								research_enabled: false,
+								template: { id: "5s-training", version: 1 },
 							},
 						},
 					},
@@ -311,6 +383,7 @@ it("preserves retry AI selection when routing through research", async () => {
 								tonality: "professional",
 								research_enabled: true,
 								ai: { provider: "openai", model: "gpt-4.1" },
+								template: { id: "5s-training", version: 1 },
 							},
 							retryPresentationId: "failed_1",
 						},

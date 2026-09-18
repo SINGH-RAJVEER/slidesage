@@ -1,7 +1,6 @@
 locals {
   api_name     = "api"
   worker_name  = "worker"
-  preview_name = "preview-worker"
   migrate_name = "slidesage-migrate"
 
   api_secret_names = toset([
@@ -29,12 +28,6 @@ locals {
     "CDN_SIGNING_KEY_SECRET",
   ])
 
-  # The preview renderer only reads revisions from object storage, so it needs
-  # nothing beyond the database.
-  preview_secret_names = toset([
-    "DATABASE_URL",
-  ])
-
   # Telemetry export is opt-in: with no endpoint the services keep their local
   # loggers and Terraform never asks for the Datadog headers secret.
   observability_enabled = trimspace(var.otel_exporter_otlp_endpoint) != ""
@@ -49,7 +42,6 @@ locals {
   runtime_secret_names = setunion(
     local.api_secret_names,
     local.worker_secret_names,
-    local.preview_secret_names,
     local.observability_secret_names,
   )
 
@@ -402,122 +394,6 @@ resource "google_cloud_run_v2_service" "worker" {
   # Client metadata describes the tool that last touched the resource.
   lifecycle {
     ignore_changes = [client, client_version]
-  }
-
-  depends_on = [google_secret_manager_secret_iam_member.runtime_accessor]
-}
-
-# The preview renderer runs headless LibreOffice, so it needs far more memory
-# than the generation worker. Keep one instance polling the PostgreSQL queue.
-resource "google_cloud_run_v2_service" "preview" {
-  name     = local.preview_name
-  location = var.gcp_region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
-
-  scaling {
-    scaling_mode          = var.maintenance_mode ? "MANUAL" : "AUTOMATIC"
-    manual_instance_count = var.maintenance_mode ? 0 : null
-  }
-
-  template {
-    service_account                  = google_service_account.runtime.email
-    max_instance_request_concurrency = 1
-
-    scaling {
-      min_instance_count = var.maintenance_mode ? 0 : 1
-      max_instance_count = 4
-    }
-
-    containers {
-      image = var.preview_image
-
-      volume_mounts {
-        name       = "cloudsql"
-        mount_path = "/cloudsql"
-      }
-
-      ports {
-        container_port = 8080
-      }
-
-      resources {
-        limits = {
-          cpu    = "2"
-          memory = "4Gi"
-        }
-        cpu_idle          = false
-        startup_cpu_boost = true
-      }
-
-      env {
-        name  = "NODE_ENV"
-        value = "production"
-      }
-      env {
-        name  = "PREVIEW_CONCURRENCY"
-        value = "1"
-      }
-      env {
-        name  = "PREVIEW_TEMP_DIR"
-        value = "/tmp"
-      }
-      env {
-        name  = "PRESENTATION_GCS_BUCKET"
-        value = local.presentation_gcs_bucket
-      }
-
-      dynamic "env" {
-        for_each = local.observability_environment
-        content {
-          name  = env.key
-          value = env.value
-        }
-      }
-
-      dynamic "env" {
-        for_each = local.observability_secret_names
-        content {
-          name = "OTEL_EXPORTER_OTLP_HEADERS"
-          value_source {
-            secret_key_ref {
-              secret  = data.google_secret_manager_secret.runtime[env.value].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
-
-      dynamic "env" {
-        for_each = local.preview_secret_names
-        content {
-          name = env.value
-          value_source {
-            secret_key_ref {
-              secret  = data.google_secret_manager_secret.runtime[env.value].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
-
-      startup_probe {
-        http_get {
-          path = "/ready"
-          port = 8080
-        }
-        failure_threshold     = 10
-        period_seconds        = 3
-        timeout_seconds       = 1
-        initial_delay_seconds = 0
-      }
-    }
-
-    volumes {
-      name = "cloudsql"
-      cloud_sql_instance {
-        instances = [google_sql_database_instance.primary.connection_name]
-      }
-    }
   }
 
   depends_on = [google_secret_manager_secret_iam_member.runtime_accessor]

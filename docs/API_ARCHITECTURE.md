@@ -56,7 +56,7 @@ Authentication is implemented in `apps/api/internal/auth`. The API supports emai
 
 Presentation contracts shared with the web application live in `libs/types`. A presentation is a stored reference to its template plus the immutable PPTX revisions committed for it; the document itself carries identity and retry state, not slide content.
 
-The viewer displays the preview images rendered from the current revision. Download returns that revision's exact bytes, and PDF export comes from the PDF produced from it. See [PPTX_CANONICAL_FLOW.md](PPTX_CANONICAL_FLOW.md).
+The viewer renders the current revision's exact PPTX bytes in the browser. Download returns those same bytes; the API creates no image or PDF derivative for generated presentations. See [PPTX_CANONICAL_FLOW.md](PPTX_CANONICAL_FLOW.md).
 
 ## Persistence
 

@@ -1,29 +1,37 @@
 import { describe, expect, it } from "bun:test";
-import { BINARY_PPTX_TEMPLATE_CATALOG } from "./template-catalog";
+import { BINARY_PPTX_TEMPLATE_CATALOG, BINARY_TEMPLATE_CATEGORIES } from "./template-catalog";
 
 describe("binary PPTX template catalog", () => {
-	it("contains six default and 24 marketplace templates", () => {
-		expect(
-			BINARY_PPTX_TEMPLATE_CATALOG.filter((entry) => entry.availability === "default"),
-		).toHaveLength(6);
-		expect(
-			BINARY_PPTX_TEMPLATE_CATALOG.filter((entry) => entry.availability === "marketplace"),
-		).toHaveLength(24);
+	it("contains 30 templates, seven of them preinstalled", () => {
+		expect(BINARY_PPTX_TEMPLATE_CATALOG).toHaveLength(30);
+		expect(BINARY_PPTX_TEMPLATE_CATALOG.filter((entry) => entry.preinstalled)).toHaveLength(7);
 	});
 
-	it("uses the selected general-purpose templates as defaults", () => {
-		expect(
-			BINARY_PPTX_TEMPLATE_CATALOG.filter((entry) => entry.availability === "default").map(
-				(entry) => entry.id,
-			),
-		).toEqual([
+	// A reader who has never opened the marketplace still has somewhere to start
+	// whatever they are writing, so the seeded set spans every category.
+	it("preinstalls a template from every category", () => {
+		const preinstalled = BINARY_PPTX_TEMPLATE_CATALOG.filter((entry) => entry.preinstalled);
+
+		expect(new Set(preinstalled.map((entry) => entry.category))).toEqual(
+			new Set(BINARY_TEMPLATE_CATEGORIES.map((category) => category.id)),
+		);
+		expect(preinstalled.map((entry) => entry.id)).toEqual([
 			"5s-training",
 			"modern-minimal-grid-financial-management",
 			"minimalist-marketing-annual-report",
 			"simple-business-proposal",
 			"simple-performance-review",
 			"soft-skills-training",
+			"my-travel-wrapped",
 		]);
+	});
+
+	it("gives every template a category", () => {
+		const categories = new Set(BINARY_TEMPLATE_CATEGORIES.map((category) => category.id));
+
+		expect(BINARY_PPTX_TEMPLATE_CATALOG.every((entry) => categories.has(entry.category))).toBe(
+			true,
+		);
 	});
 
 	it("uses stable IDs as unique source filenames", () => {
@@ -38,7 +46,7 @@ describe("binary PPTX template catalog", () => {
 		);
 	});
 
-	it("derives availability and digest from the published digest map", () => {
+	it("derives asset status and digest from the published digest map", () => {
 		for (const entry of BINARY_PPTX_TEMPLATE_CATALOG) {
 			expect(entry.version).toBe(1);
 			expect(entry.thumbnailPath).toBe(`pptx-templates/${entry.id}/1/thumbnails/cover.webp`);

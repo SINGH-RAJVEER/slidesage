@@ -15,7 +15,6 @@ The API, worker, and migration job connect through the Cloud SQL Unix socket at 
 - Artifact Registry repository `slidesage` in `asia-south1`
 - Cloud Run service `api`, public only through the external HTTPS load balancer
 - Cloud Run service `worker`, private, scaling from zero to ten instances, with CPU kept allocated while an instance is running
-- Cloud Run service `preview-worker`, private, scaling from zero to four instances with two CPUs and 4 GiB of memory, running headless LibreOffice to render revision previews
 - Cloud Run job `slidesage-migrate`, invoked by deployment automation after an image update
 - A single-zone Enterprise `db-f1-micro` Cloud SQL PostgreSQL 18 instance with 10 GB SSD storage, no automated backups, and no point-in-time recovery
 - Global external HTTPS load balancer and serverless NEG for `api`, with an HTTP listener that redirects to HTTPS
@@ -25,8 +24,6 @@ The API, worker, and migration job connect through the Cloud SQL Unix socket at 
 - Existing Cloudflare Pages project `slidesage` and its apex domain. The live Pages API does not list `www`; attaching it is outside this adoption.
 - Private GCS bucket for immutable canonical presentation revisions
 - Existing private template-origin bucket `slidesage-504414-templates`, read by the Cloud CDN cache-fill service account and routed under `https://api.slidesage.app/pptx-templates/`
-
-The preview renderer shares the runtime service account and the revision bucket. It needs only `DATABASE_URL` from Secret Manager, because it reads canonical objects with the attached account rather than through the CDN. See [Slide previews](SLIDE_PREVIEWS.md).
 
 Terraform creates the revision bucket and grants the Cloud Run runtime account bucket-scoped object creator and viewer access. It references the existing template-origin bucket and grants its Google-managed Cloud CDN cache-fill account object viewer access. Override `presentation_gcs_bucket` or `template_gcs_bucket` when the bucket names differ from their defaults.
 
@@ -74,14 +71,13 @@ Keep `terraform.tfvars` out of version control if it includes values that do not
 
 ## Deploying containers
 
-Terraform expects immutable values for `api_image`, `worker_image`, `preview_image`, and `migrate_image`. Pass the commit-tagged Artifact Registry images after CI has pushed them. Update the job, run it, then update the services.
+Terraform expects immutable values for `api_image`, `worker_image`, and `migrate_image`. Pass the commit-tagged Artifact Registry images after CI has pushed them. Update the job, run it, then update the services.
 
 ```bash
 terraform apply \
 	-target=google_cloud_run_v2_job.migrate \
 	-var="api_image=asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:$GITHUB_SHA" \
 	-var="worker_image=asia-south1-docker.pkg.dev/slidesage-504414/slidesage/worker:$GITHUB_SHA" \
-	-var="preview_image=asia-south1-docker.pkg.dev/slidesage-504414/slidesage/preview:$GITHUB_SHA" \
 	-var="migrate_image=asia-south1-docker.pkg.dev/slidesage-504414/slidesage/migrate:$GITHUB_SHA"
 
 gcloud run jobs execute slidesage-migrate \
@@ -92,7 +88,6 @@ gcloud run jobs execute slidesage-migrate \
 terraform apply \
 	-var="api_image=asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:$GITHUB_SHA" \
 	-var="worker_image=asia-south1-docker.pkg.dev/slidesage-504414/slidesage/worker:$GITHUB_SHA" \
-	-var="preview_image=asia-south1-docker.pkg.dev/slidesage-504414/slidesage/preview:$GITHUB_SHA" \
 	-var="migrate_image=asia-south1-docker.pkg.dev/slidesage-504414/slidesage/migrate:$GITHUB_SHA"
 ```
 
@@ -108,6 +103,6 @@ This project's resources were originally created with the `gcloud` CLI, so the r
 
 Cloudflare Pages and apex imports use the configured account ID. The API DNS import looks up the existing A record using the zone and hostname. Import blocks can remain after adoption; Terraform skips addresses already in state.
 
-Adoption is not a no-op release. The revision bucket, runtime bucket permissions, registry reader binding, and preview service are planned additions. The new application also needs revision/CDN environment variables, HTTP startup probes, worker EXA credentials, proxy-header handling, and Razorpay secret references. Those differences from the older live application are intentional and must be reviewed in the release plan. Existing Cloud SQL connector enforcement and migration retry settings are preserved.
+Adoption is not a no-op release. The revision bucket, runtime bucket permissions, and registry reader binding are planned additions. The new application also needs revision/CDN environment variables, HTTP startup probes, worker EXA credentials, proxy-header handling, and Razorpay secret references. Those differences from the older live application are intentional and must be reviewed in the release plan. Existing Cloud SQL connector enforcement and migration retry settings are preserved.
 
 The audit found `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` absent. Create them and populate their values through an approved secret-management step before release. Terraform deliberately fails planning when required secrets are missing; it does not create empty secret versions or silently disable payments.

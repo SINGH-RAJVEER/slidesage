@@ -20,6 +20,7 @@ type submitInput struct {
 	ParentID        string
 	RetryID         string
 	SlideCount      int
+	BaseRevision    int `json:",omitempty"`
 	DetailLevel     string
 	Tonality        string
 	Research        any
@@ -147,17 +148,6 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 			writeError(writer, http.StatusBadRequest, err.Error())
 			return
 		}
-	} else {
-		var count int
-		err := h.database.QueryRowContext(request.Context(), `SELECT r.revision,r.slide_count FROM presentations p JOIN presentation_revisions r ON r.presentation_id=p.id AND r.revision=p.current_pptx_revision WHERE p.id=$1 AND p.user_id=$2`, job.presentationID, userID).Scan(&job.pptxRevision, &count)
-		if err != nil {
-			writeError(writer, http.StatusConflict, "This presentation has no completed revision to edit yet")
-			return
-		}
-		if job.slideCount != count {
-			writeError(writer, http.StatusBadRequest, "AI text revisions preserve the current slide count. Generate a new presentation to change the number of slides.")
-			return
-		}
 	}
 
 	balance, _, err := h.enqueue(request.Context(), job, requestHashValue, create, input.Topic, placeholder)
@@ -190,6 +180,14 @@ func parseSubmitInput(body map[string]any) (submitInput, error) {
 	}
 	if input.ParentID != "" && input.RetryID != "" {
 		return submitInput{}, errors.New("parent_presentation_id and retry_presentation_id are mutually exclusive")
+	}
+	if value, found := body["base_revision"]; found {
+		number, ok := value.(json.Number)
+		parsed, err := number.Int64()
+		if input.ParentID == "" || !ok || err != nil || parsed <= 0 || int64(int(parsed)) != parsed {
+			return submitInput{}, errors.New("base_revision must be a positive integer and is only allowed for iterations")
+		}
+		input.BaseRevision = int(parsed)
 	}
 	slides, err := slideCount(body, input.ParentID == "")
 	if err != nil {
@@ -237,8 +235,13 @@ func (h *handler) generationJob(ctx context.Context, userID string, input submit
 		}
 		var document map[string]any
 		_ = json.Unmarshal(existing.Data, &document)
-		if template, parseErr := presentation.ParseTemplateReference(document["template"]); parseErr == nil {
-			input.Template = &template
+		// A retry is submitted from the generate page with the template
+		// selector in hand, so the selection on the request wins. The stored
+		// reference is the fallback for a retry that names none.
+		if input.Template == nil {
+			if template, parseErr := presentation.ParseTemplateReference(document["template"]); parseErr == nil {
+				input.Template = &template
+			}
 		}
 		if document["status"] != "failed" {
 			duplicate, err := h.existingSubmission(ctx, userID, jobID, hash)
@@ -286,22 +289,40 @@ func generationPlaceholder(input submitInput) map[string]any {
 }
 
 func (h *handler) iterationJob(ctx context.Context, userID string, input submitInput, jobID string) (streamJob, error) {
+	duplicate, err := h.existingSubmission(ctx, userID, jobID, requestHash(input))
+	if err == nil {
+		return streamJob{}, duplicateSubmit{jobID: duplicate.jobID, presentationID: duplicate.presentationID}
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return streamJob{}, err
+	}
 	base, err := h.ownedPresentation(ctx, input.ParentID, userID)
 	if err != nil {
 		return streamJob{}, writeStatusError{http.StatusNotFound, "Presentation not found"}
 	}
+	if err := requireRecordedTemplate(base.Data); err != nil {
+		return streamJob{}, err
+	}
+	var revision, currentCount int
+	if err := h.database.QueryRowContext(ctx, `SELECT r.revision,r.slide_count FROM presentations p JOIN presentation_revisions r ON r.presentation_id=p.id AND r.revision=p.current_pptx_revision WHERE p.id=$1 AND p.user_id=$2`, base.ID, userID).Scan(&revision, &currentCount); err != nil {
+		return streamJob{}, writeStatusError{http.StatusConflict, "This presentation has no completed revision to edit yet"}
+	}
+	if input.BaseRevision != 0 && input.BaseRevision != revision {
+		return streamJob{}, writeStatusError{http.StatusConflict, "This presentation has changed. Reload the current revision before revising it."}
+	}
 	count := input.SlideCount
 	if count == 0 {
-		if err := h.database.QueryRowContext(ctx, `SELECT r.slide_count FROM presentations p JOIN presentation_revisions r ON r.presentation_id=p.id AND r.revision=p.current_pptx_revision WHERE p.id=$1 AND p.user_id=$2`, base.ID, userID).Scan(&count); err != nil {
-			return streamJob{}, writeStatusError{http.StatusConflict, "This presentation has no completed revision to edit yet"}
-		}
+		count = currentCount
 	}
 
 	operationID, err := uuid()
 	if err != nil {
 		return streamJob{}, err
 	}
-	quote := authorizationMillis(count, input.Topic, base.Data, input.Research, nil, 0)
+	// Reserve for the full indexed source and one complete plan repair, including
+	// reductions whose input is larger than their requested output.
+	budgetCount := max(count, currentCount)
+	quote := authorizationMillis(budgetCount, input.Topic, base.Data, input.Research, input.ResearchPayload, 2*maxOutputTokens(budgetCount))
 	selection, _, err := h.connections.CredentialForGeneration(ctx, userID, input.AI)
 	if err != nil {
 		return streamJob{}, writeStatusError{http.StatusConflict, err.Error()}
@@ -310,6 +331,7 @@ func (h *handler) iterationJob(ctx context.Context, userID string, input submitI
 		quote = 0
 	}
 	job := buildIterationJob(jobID, userID, operationID, base, input, count, quote, selection)
+	job.pptxRevision = revision
 	return job, nil
 }
 
@@ -351,7 +373,7 @@ func templateFromDocument(data []byte) *presentation.TemplateReference {
 func generationUserPrompt(job streamJob) string {
 	user := fmt.Sprintf("Create a %d-slide %s, %s presentation about: %s", job.slideCount, job.detailLevel, job.tonality, job.prompt)
 	if job.kind == "iteration" {
-		user = fmt.Sprintf("Revise this presentation according to: %s\n\nCurrent presentation: %s", job.prompt, string(job.current))
+		user = fmt.Sprintf("Revise this presentation to exactly %d slides according to: %s\n\nCurrent presentation: %s", job.slideCount, job.prompt, string(job.current))
 	}
 	if job.research != nil {
 		encoded, _ := json.Marshal(job.research)

@@ -103,3 +103,76 @@ func TestPreviewExistsReportsWhetherThePreviewSetResolved(t *testing.T) {
 		t.Fatal("invalid asset accepted")
 	}
 }
+
+// The landing ring asks for the small variant. Templates published before it
+// existed carry only the full size, which the route serves in its place rather
+// than leaving a hole in the ring.
+func TestSmallPreviewVariantFallsBackToTheFullSlide(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	t.Cleanup(templatecatalog.Swap([]templatecatalog.Entry{{ID: "brat", Version: 1, SHA256: digest}}))
+	prefix := "/pptx-templates/brat/1/" + digest + "/previews/v1/"
+	backfilled := true
+	paths := []string{}
+	mux := newThumbnailServer(t, func(string, int) bool { return true }, func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if strings.HasPrefix(r.URL.Path, prefix+"small/") && !backfilled {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", ThumbnailContentType)
+		_, _ = w.Write([]byte(r.URL.Path))
+	})
+
+	small := httptest.NewRecorder()
+	mux.ServeHTTP(small, httptest.NewRequest("GET", "/template-previews/brat/1/"+digest+"/1/small", nil))
+	if small.Code != 200 || small.Body.String() != prefix+"small/1.webp" {
+		t.Fatalf("small variant: %d %s", small.Code, small.Body.String())
+	}
+
+	backfilled = false
+	paths = nil
+	legacy := httptest.NewRecorder()
+	mux.ServeHTTP(legacy, httptest.NewRequest("GET", "/template-previews/brat/1/"+digest+"/2/small", nil))
+	if legacy.Code != 200 || legacy.Body.String() != prefix+"2.webp" {
+		t.Fatalf("fallback: %d %s", legacy.Code, legacy.Body.String())
+	}
+	if len(paths) != 2 || paths[0] != prefix+"small/2.webp" {
+		t.Fatalf("fallback did not try the small slide first: %v", paths)
+	}
+
+	unknown := httptest.NewRecorder()
+	mux.ServeHTTP(unknown, httptest.NewRequest("GET", "/template-previews/brat/1/"+digest+"/1/huge", nil))
+	if unknown.Code != 404 {
+		t.Errorf("unknown variant: %d", unknown.Code)
+	}
+}
+
+// Slide objects are immutable and digest-pinned, so the first visit of the day
+// is the only one that should cost an origin fetch.
+func TestPublishedSlidesAreServedFromCacheAfterTheFirstFetch(t *testing.T) {
+	digest := strings.Repeat("a", 64)
+	t.Cleanup(templatecatalog.Swap([]templatecatalog.Entry{{ID: "brat", Version: 1, SHA256: digest}}))
+	fetches := 0
+	mux := newThumbnailServer(t, func(string, int) bool { return true }, func(w http.ResponseWriter, r *http.Request) {
+		fetches++
+		w.Header().Set("Content-Type", ThumbnailContentType)
+		_, _ = w.Write([]byte("RIFF....WEBP"))
+	})
+
+	for range 3 {
+		recorder := httptest.NewRecorder()
+		mux.ServeHTTP(recorder, httptest.NewRequest("GET", "/template-previews/brat/1/"+digest+"/1/small", nil))
+		if recorder.Code != 200 || recorder.Body.String() != "RIFF....WEBP" {
+			t.Fatalf("status %d body %q", recorder.Code, recorder.Body.String())
+		}
+	}
+	if fetches != 1 {
+		t.Fatalf("origin fetches = %d, want 1", fetches)
+	}
+
+	other := httptest.NewRecorder()
+	mux.ServeHTTP(other, httptest.NewRequest("GET", "/template-previews/brat/1/"+digest+"/1", nil))
+	if other.Code != 200 || fetches != 2 {
+		t.Fatalf("the full size shares the small variant's cache entry: %d fetches", fetches)
+	}
+}

@@ -11,7 +11,7 @@ mock.module("@slidesage/ui/context/AuthContext", () => ({
 describe("MarketplacePage", () => {
 	beforeEach(() => localStorage.clear());
 
-	it("lists all 24 binary marketplace templates", async () => {
+	it("lists every binary template, preinstalled ones included", async () => {
 		const { default: MarketplacePage } = await import(
 			"../../../routes/marketplace/MarketplacePage"
 		);
@@ -21,10 +21,29 @@ describe("MarketplacePage", () => {
 			</MemoryRouter>,
 		);
 
-		expect(view.getByText("24 templates")).toBeInTheDocument();
-		expect(view.getAllByRole("button", { name: /^Preview .+ template$/ })).toHaveLength(24);
+		expect(view.getByText("30 templates")).toBeInTheDocument();
+		expect(view.getAllByRole("button", { name: /^Preview .+ template$/ })).toHaveLength(30);
 		expect(view.queryByText(/^by .+$/)).toBeNull();
 		expect(view.queryByRole("button", { name: /upvote/i })).toBeNull();
+	});
+
+	it("orders the catalog alphabetically, with no control to reorder it", async () => {
+		const { default: MarketplacePage } = await import(
+			"../../../routes/marketplace/MarketplacePage"
+		);
+		const view = render(
+			<MemoryRouter initialEntries={["/marketplace"]}>
+				<MarketplacePage />
+			</MemoryRouter>,
+		);
+
+		const names = view
+			.getAllByRole("button", { name: /^Preview .+ template$/ })
+			.map(
+				(button) => button.getAttribute("aria-label")?.replace(/^Preview | template$/g, "") ?? "",
+			);
+		expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+		expect(view.queryByRole("button", { name: /sort/i })).toBeNull();
 	});
 
 	it("opens a binary template ID in its preview route", async () => {
@@ -45,7 +64,7 @@ describe("MarketplacePage", () => {
 
 		fireEvent.click(
 			view.getByRole("button", {
-				name: "Preview Festive Pattern Travel Agency Business Plan template",
+				name: "Preview Travel Agency Business Plan template",
 			}),
 		);
 		expect(view.getByText("Binary template preview")).toBeInTheDocument();
@@ -77,8 +96,9 @@ describe("MarketplacePage", () => {
 			"../../../routes/marketplace/MarketplacePage"
 		);
 		const { MARKETPLACE_ITEMS } = await import("@slidesage/ui/lib/catalog");
-		const item = MARKETPLACE_ITEMS[0];
+		const item = MARKETPLACE_ITEMS.find((candidate) => !candidate.preinstalled);
 		if (!item) throw new Error("Expected marketplace fixture");
+		localStorage.setItem("slidesage-installed-marketplace-themes", "[]");
 		const view = render(
 			<MemoryRouter initialEntries={["/marketplace"]}>
 				<MarketplacePage />

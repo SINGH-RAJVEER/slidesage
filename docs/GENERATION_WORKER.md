@@ -101,17 +101,16 @@ The API discovers model catalogs for independent BYOK connections concurrently, 
 
 ## Deployment
 
-Production uses Cloud Run services for the API, generation worker, and preview worker. Terraform configures instance-based billing (`cpu_idle = false`) and at least one running instance for each queue worker. The generation worker permits one to ten instances; the preview worker permits one to four. API-to-worker coordination uses PostgreSQL only; there is no HTTP or RPC call to wake a worker from zero instances. The worker makes outbound calls to PostgreSQL and the selected AI provider.
+Production uses Cloud Run services for the API and generation worker. Terraform configures instance-based billing (`cpu_idle = false`) and at least one running generation-worker instance. API-to-worker coordination uses PostgreSQL only; there is no HTTP or RPC call to wake a worker from zero instances. The worker makes outbound calls to PostgreSQL and the selected AI provider.
 
 Cloud Run does not scale on PostgreSQL queue depth. Monitor queue latency, provider limits, PostgreSQL connections, and job duration, then adjust the minimum instance count in Terraform as needed. Total potential job concurrency is the worker instance count multiplied by `WORKER_CONCURRENCY`; size the database pool and provider limits accordingly.
 
-`apps/api/Dockerfile` exposes four targets from the same source.
+`apps/api/Dockerfile` exposes three targets from the same source.
 
 | Target    | Entrypoint     | Use                   |
 | --------- | -------------- | --------------------- |
 | `api`     | `/app/api`     | Cloud Run API service |
 | `worker`  | `/app/worker`  | Cloud Run service |
-| `preview` | `/app/previewworker` | Cloud Run preview service |
 | `migrate` | `/app/migrate` | One-off migration job |
 
 Run the `migrate` target successfully before starting or updating either runtime. `cmd/migrate` applies embedded Goose migrations first and River migrations second. It also recognizes the legacy Go API schema and baselines migrations 1-13 before applying migration 14. Migration 14 is an intentional pre-launch accounting reset that removes existing user-owned data, so do not run it against a database containing data that must be retained. Migration 25 is a second intentional deletion: it removes every presentation without a committed PPTX revision, which discards semantic-pipeline decks and any generation that is still in flight when it runs. Migration 26 is a third: it drops the semantic memory and outline cache tables, whose embeddings have had no producer or consumer since the canonical pipeline replaced that path and cannot be rebuilt. The required deployment order is therefore:

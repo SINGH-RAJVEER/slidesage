@@ -1,9 +1,3 @@
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@slidesage/ui/components/dropdown-menu";
 import MarketplaceCard from "@slidesage/ui/components/Marketplace/MarketplaceCard";
 import { SearchBar } from "@slidesage/ui/components/SearchBar";
 import { MARKETPLACE_ITEMS, type MarketplaceItem } from "@slidesage/ui/lib/catalog";
@@ -13,13 +7,10 @@ import {
 	removeMarketplaceTheme,
 } from "@slidesage/ui/lib/marketplace-themes";
 import { templateThumbnailUrl } from "@slidesage/ui/lib/template-thumbnails";
-import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
-
-type MarketplaceSort = "catalog" | "name";
 
 function matchesSearch(item: MarketplaceItem, query: string) {
 	const searchable = [item.id, item.name, item.description, item.sourceFilename, ...item.tags]
@@ -30,15 +21,15 @@ function matchesSearch(item: MarketplaceItem, query: string) {
 
 export default function MarketplacePage() {
 	const navigate = useNavigate();
-	const [sort, setSort] = useState<MarketplaceSort>("catalog");
 	const [query, setQuery] = useState("");
 	const [installedThemeIds, setInstalledThemeIds] = useState<Set<string>>(
 		() => new Set(getInstalledMarketplaceThemes().map((theme) => theme.marketplaceId)),
 	);
-	const visibleItems = MARKETPLACE_ITEMS.filter((item) => matchesSearch(item, query));
-	if (sort === "name") {
-		visibleItems.sort((a, b) => (a.name === b.name ? 0 : a.name < b.name ? -1 : 1));
-	}
+	/* Always by name. A catalog the reader cannot reorder is one they can learn
+	   the shape of, and alphabetical is the order a name is looked up in. */
+	const visibleItems = MARKETPLACE_ITEMS.filter((item) => matchesSearch(item, query)).sort((a, b) =>
+		a.name.localeCompare(b.name),
+	);
 
 	const handleInstall = (itemId: string) => {
 		if (!installMarketplaceTheme(itemId)) return;
@@ -64,9 +55,11 @@ export default function MarketplacePage() {
 		<div className="flex h-dvh flex-col overflow-hidden bg-transparent text-white">
 			<Header />
 			<main className="min-h-0 flex-1 overflow-y-auto pb-[max(5rem,env(safe-area-inset-bottom))]">
-				<section className="px-4 py-8 md:px-8 md:py-12">
+				{/* The top padding matches the presentations grid, so the search bar
+				    sits at the same height on both catalog pages. */}
+				<section className="px-4 pt-6 pb-8 md:px-8 md:pt-8 md:pb-12">
 					<div className="mx-auto max-w-7xl">
-						<div className="grid gap-3 border-b border-white/10 pb-6 md:grid-cols-[minmax(16rem,1fr)_auto] md:items-center">
+						<div className="border-b border-white/10 pb-6">
 							<SearchBar
 								id="marketplace-search"
 								label="Search marketplace"
@@ -74,41 +67,6 @@ export default function MarketplacePage() {
 								onChange={setQuery}
 								placeholder="Search templates"
 							/>
-							<div className="flex justify-end">
-								<DropdownMenu>
-									<DropdownMenuTrigger asChild>
-										<button
-											type="button"
-											aria-label="Sort marketplace"
-											className="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-black/15 px-4 text-sm text-white/60 transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-										>
-											<SlidersHorizontal className="h-3.5 w-3.5" />
-											{sort === "catalog" ? "Catalog order" : "Name A-Z"}
-											<ChevronDown className="h-3.5 w-3.5 text-white/35" />
-										</button>
-									</DropdownMenuTrigger>
-									<DropdownMenuContent
-										align="end"
-										className="min-w-44 rounded-xl border border-white/10 bg-[hsl(222,27%,12%)] p-1 text-white shadow-2xl"
-									>
-										{(
-											[
-												{ id: "catalog", label: "Catalog order" },
-												{ id: "name", label: "Name A-Z" },
-											] as const
-										).map((option) => (
-											<DropdownMenuItem
-												key={option.id}
-												onSelect={() => setSort(option.id)}
-												className="my-1 cursor-pointer rounded-lg px-3 py-2.5 text-white/70 focus:bg-white/10 focus:text-white"
-											>
-												<span className="flex-1">{option.label}</span>
-												{sort === option.id && <Check className="h-4 w-4 text-amber-100/70" />}
-											</DropdownMenuItem>
-										))}
-									</DropdownMenuContent>
-								</DropdownMenu>
-							</div>
 						</div>
 
 						<div className="mb-7 mt-8 flex justify-end">

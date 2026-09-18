@@ -16,15 +16,28 @@ import (
 
 const slotSystemPrompt = `Return one JSON object with title and slides. Every slide has position (one-based) and slots (values keyed by the exact manifest slot ID). Follow the supplied ordered assignments exactly. A text slot takes a string; a list slot takes an array of strings. maxCharacters applies per string and maxListItems limits array length. Required slots cannot be empty. Use null for optional images unless a supplied image asset provides verified base64 and mimeType; never invent image bytes or URLs. Omit optional slots only when the slide does not need them; omitted sample objects are cleared. No styling, coordinates, layouts, regions, CSS, or semantic slide blocks. Use research sources accurately and do not invent citations.`
 
+const slotRepairPrompt = `Fix only what the validation error names and leave every other slot byte-identical to the previous slide. A length error means the copy is too long: rewrite that string to say the same thing in fewer words and count characters before returning it, staying at or under maxCharacters including spaces and punctuation. Do not pad short copy, do not drop required slots, and do not move content into a different slot. Return {"position":number,"slots":{...}}.`
+
 func assignmentForJob(job streamJob) ([]pptxcompiler.Assignment, error) {
 	if job.template == nil {
 		return nil, fmt.Errorf("template is required")
 	}
-	m, err := templatemanifest.Lookup(job.template.ID, job.template.Version)
+	// The worker resolves the template against the published catalog again
+	// rather than trusting the reference the queue payload carries, so a job
+	// can only ever compile from the package the catalog names for the ID the
+	// user selected.
+	resolved, err := resolveGenerationTemplate(job.template)
 	if err != nil {
 		return nil, err
 	}
-	if m.SHA256 != job.template.SHA256 {
+	if resolved != *job.template {
+		return nil, fmt.Errorf("template %s is no longer published at the digest this job was queued with", job.template.ID)
+	}
+	m, err := templatemanifest.Lookup(resolved.ID, resolved.Version)
+	if err != nil {
+		return nil, err
+	}
+	if m.SHA256 != resolved.SHA256 {
 		return nil, fmt.Errorf("template manifest digest mismatch")
 	}
 	a, err := pptxcompiler.Assign(m, job.slideCount)
@@ -62,10 +75,10 @@ func (h *handler) generateSlots(ctx context.Context, job streamJob, assignments 
 		if duplicates[a.Position] {
 			issue = fmt.Errorf("duplicate position")
 		}
-		for attempt := 0; issue != nil && attempt < 2; attempt++ {
+		for attempt := 0; issue != nil && attempt < 3; attempt++ {
 			assignment, _ := json.Marshal(a)
 			previous, _ := json.Marshal(content)
-			repair, used, e := h.generateJSON(ctx, job, slotSystemPrompt, user+"\nRepair only this slide: "+string(assignment)+"\nPrevious: "+string(previous)+"\nValidation error: "+issue.Error()+"\nReturn {\"position\":number,\"slots\":{...}}.", maxOutputTokens(1))
+			repair, used, e := h.generateJSON(ctx, job, slotSystemPrompt, user+"\nRepair only this slide: "+string(assignment)+"\nPrevious: "+string(previous)+"\nValidation error: "+issue.Error()+"\n"+slotRepairPrompt, maxOutputTokens(1))
 			tokens += used
 			if e != nil {
 				return "", nil, tokens, e
@@ -151,8 +164,7 @@ func (h *handler) configureDocuments(ctx context.Context) error {
 		return err
 	}
 	h.revisions = presentationrevision.NewPostgresRepository(h.database)
-	h.previewQueue, err = newInsertClient(h.database)
-	return err
+	return nil
 }
 
 func (h *handler) revisePPTX(ctx context.Context, job streamJob, source []byte) ([]byte, string, int, error) {
@@ -162,25 +174,41 @@ func (h *handler) revisePPTX(ctx context.Context, job streamJob, source []byte) 
 	}
 	encoded, _ := json.Marshal(index)
 	system := `Return one JSON object with title and operations. Each operation replaces text on the current revision: {"position":1,"shapeId":2,"expectedText":"exact indexed text","text":"replacement"}. Use only indexed text shapes, preserve all other objects and slide order. Do not return templates, slides, styling or geometry.`
+	structural := job.slideCount != len(index.Slides)
+	outputBudget := maxOutputTokens(job.slideCount)
+	if structural {
+		outputBudget *= 2
+		system = `Return one JSON object with title and slides. slides is the complete final ordering, with exactly the requested target count. Each entry is {"sourcePart":"ppt/slides/slide1.xml","clone":false,"operations":[{"shapeId":2,"expectedText":"exact original indexed text","text":"replacement"}]}. sourcePart must name an original indexed slide part. Retain each original at most once with clone:false; originals omitted from the final list are deleted. clone:true copies an original donor and may repeat it. Clone only safe text-only slides, never slides with pictures, charts, tables, media, groups, or unsupported objects or relationships. Operations edit indexed text shapes on that entry using the original donor text, not earlier edits. Use empty operations for unaffected slides and preserve their content and relative order. When reducing the count, condense or merge the main points into retained slides by default rather than silently dropping content. Explicit user deletion instructions take precedence: delete the requested content instead of merging it back. When expanding, retain unaffected originals and clone suitable donors for added content. Never return templates, styling, geometry, or invented source parts.`
+	}
 	user := generationUserPrompt(job) + "\nUse a " + job.detailLevel + " level of detail and a " + job.tonality + " tone.\nCurrent revision index: " + string(encoded)
 	var tokens int
 	for attempt := 0; attempt < 2; attempt++ {
-		response, used, e := h.generateJSON(ctx, job, system, user, maxOutputTokens(job.slideCount))
+		response, used, e := h.generateJSON(ctx, job, system, user, outputBudget)
 		tokens += used
 		if e != nil {
 			return nil, "", tokens, e
 		}
-		raw, _ := json.Marshal(response["operations"])
-		var operations []pptxcompiler.TextOperation
-		err = json.Unmarshal(raw, &operations)
 		var output []byte
-		if err == nil {
-			output, err = pptxcompiler.ApplyTextOperations(source, operations)
+		if structural {
+			raw, _ := json.Marshal(response["slides"])
+			var plan pptxcompiler.RevisionPlan
+			err = json.Unmarshal(raw, &plan.Slides)
+			if err == nil {
+				output, err = pptxcompiler.ApplyRevisionPlan(source, plan, job.slideCount)
+			}
+		} else {
+			raw, _ := json.Marshal(response["operations"])
+			var operations []pptxcompiler.TextOperation
+			err = json.Unmarshal(raw, &operations)
+			if err == nil {
+				output, err = pptxcompiler.ApplyTextOperations(source, operations)
+			}
 		}
 		if err == nil {
 			return output, truncate(text(response["title"], "Untitled Presentation"), 255), tokens, nil
 		}
-		user += "\nRepair operations. Validation error: " + err.Error()
+		previous, _ := json.Marshal(response)
+		user += "\nPrevious response: " + string(previous) + "\nRepair the response and return the complete JSON object. Validation error: " + err.Error()
 	}
 	return nil, "", tokens, err
 }

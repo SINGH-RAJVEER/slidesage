@@ -5,22 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"time"
 )
 
 const (
-	PPTXContentType    = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-	PreviewContentType = "image/webp"
+	PPTXContentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 )
-
-// PreviewObjectKey names the preview image of one slide in one revision. Slide
-// indexes are zero-based and follow package slide order. A revision is
-// immutable, so a preview key always describes the same slide.
-func PreviewObjectKey(presentationID string, number RevisionNumber, slideIndex int) string {
-	return fmt.Sprintf("presentations/%s/revisions/%d/previews/%d.webp", presentationID, number, slideIndex)
-}
 
 var (
 	ErrInvalidCommit           = errors.New("invalid presentation revision commit")
@@ -33,7 +24,6 @@ var (
 	ErrRevisionConflict        = errors.New("presentation revision conflict")
 	ErrSlideCountMismatch      = errors.New("PPTX slide count does not match the expected count")
 	ErrObjectNotFound          = errors.New("object does not exist")
-	ErrPreviewStateConflict    = errors.New("presentation revision no longer holds the preview claim")
 )
 
 type RevisionNumber int
@@ -61,15 +51,6 @@ type SourceOperation struct {
 	Kind SourceOperationKind
 }
 
-type PreviewStatus string
-
-const (
-	PreviewPending   PreviewStatus = "pending"
-	PreviewRendering PreviewStatus = "rendering"
-	PreviewReady     PreviewStatus = "ready"
-	PreviewFailed    PreviewStatus = "failed"
-)
-
 // Revision is immutable after RevisionRepository.CommitRevision succeeds.
 type Revision struct {
 	Index           json.RawMessage
@@ -82,8 +63,6 @@ type Revision struct {
 	MIMEType        string
 	AuthorID        string
 	SourceOperation SourceOperation
-	PreviewStatus   PreviewStatus
-	PreviewCount    int
 	TemplateID      string
 	TemplateVersion int
 	TemplateSHA256  string
@@ -115,40 +94,11 @@ type BlobStore interface {
 	PutImmutable(ctx context.Context, key string, body io.Reader, size int64, contentType, sha256 string) error
 }
 
-// ObjectStore adds read access for callers that consume stored objects, such as
-// the preview renderer and the download endpoint.
+// ObjectStore adds read access for callers that download stored revisions.
 type ObjectStore interface {
 	BlobStore
 	// OpenObject returns ErrObjectNotFound when key holds no object.
 	OpenObject(ctx context.Context, key string) (io.ReadCloser, error)
-}
-
-// PreviewClaim says what happened to a preview render claim. The three
-// outcomes need different handling: a granted claim renders, a settled revision
-// is done, and a busy one has to be tried again later.
-type PreviewClaim int
-
-const (
-	// PreviewClaimGranted means the caller owns the render.
-	PreviewClaimGranted PreviewClaim = iota
-	// PreviewClaimSettled means previews are already ready.
-	PreviewClaimSettled
-	// PreviewClaimBusy means another worker holds a claim younger than
-	// staleAfter, or the revision row is not visible yet.
-	PreviewClaimBusy
-)
-
-// PreviewRepository owns the preview lifecycle of a committed revision. Preview
-// state is the only mutable part of a revision row.
-type PreviewRepository interface {
-	// ClaimPreviewRender marks a revision as rendering and returns it. The
-	// revision is only populated for PreviewClaimGranted.
-	ClaimPreviewRender(ctx context.Context, presentationID string, number RevisionNumber, staleAfter time.Duration) (Revision, PreviewClaim, error)
-	// MarkPreviewsReady requires the full preview set, so count must equal the
-	// revision slide count. It returns ErrPreviewStateConflict when the claim
-	// was taken over in the meantime.
-	MarkPreviewsReady(ctx context.Context, presentationID string, number RevisionNumber, count int) error
-	MarkPreviewsFailed(ctx context.Context, presentationID string, number RevisionNumber) error
 }
 
 type RepositoryCommit struct {
@@ -168,9 +118,6 @@ type RevisionRepository interface {
 	CommitRevision(ctx context.Context, expected RevisionNumber, revision Revision) (RepositoryCommit, error)
 }
 
-func PDFObjectKey(id string, number RevisionNumber) string {
-	return fmt.Sprintf("presentations/%s/revisions/%d/document.pdf", id, number)
-}
 func Snapshot(r Revision) map[string]any {
-	return map[string]any{"revision": r.Number, "slideCount": r.SlideCount, "byteSize": r.ByteSize, "sha256": r.SHA256, "previewStatus": r.PreviewStatus, "previewCount": r.PreviewCount, "createdAt": r.CreatedAt}
+	return map[string]any{"revision": r.Number, "slideCount": r.SlideCount, "byteSize": r.ByteSize, "sha256": r.SHA256, "createdAt": r.CreatedAt}
 }

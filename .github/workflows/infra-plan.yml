@@ -47,11 +47,6 @@ jobs:
               --format='value(spec.template.spec.containers[0].image)')
             test -n "$image"
             echo "TF_VAR_${component}_image=$image" >> "$GITHUB_ENV"
-            if [ "$component" = worker ]; then
-              # The first release creates this service. Planning checks the
-              # resource configuration; deployment supplies its built image.
-              echo "TF_VAR_preview_image=$image" >> "$GITHUB_ENV"
-            fi
           done
           image=$(gcloud run jobs describe slidesage-migrate \
             --project="$TF_VAR_gcp_project_id" --region=asia-south1 \

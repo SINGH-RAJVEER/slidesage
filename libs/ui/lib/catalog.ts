@@ -1,5 +1,6 @@
 import {
 	BINARY_PPTX_TEMPLATE_CATALOG,
+	BINARY_TEMPLATE_CATEGORIES,
 	type BinaryPptxTemplate,
 	type PresentationTemplateReference,
 } from "@slidesage/types";
@@ -15,6 +16,8 @@ export interface MarketplaceItem {
 	dimensions: BinaryPptxTemplate["dimensions"];
 	/** Object path of the cover thumbnail rendered from the package itself. */
 	thumbnailPath: string;
+	/** Whether a first visit starts with this template installed. */
+	preinstalled: boolean;
 	/** Digest of the published package, absent until the template is published. */
 	sha256?: string;
 	/** Slides in the published package, zero when nothing is published yet. */
@@ -39,6 +42,11 @@ export function presentableSlideCount(item: MarketplaceItem): number {
 function marketplaceTags(entry: BinaryPptxTemplate): string[] {
 	return [
 		...entry.name.toLowerCase().split(/[^a-z0-9]+/),
+		// The category is searchable so "education" finds the lesson decks even
+		// though none of them carry the word in their name.
+		...(BINARY_TEMPLATE_CATEGORIES.find((category) => category.id === entry.category)?.label ?? "")
+			.toLowerCase()
+			.split(/[^a-z0-9]+/),
 		"pptx",
 		"powerpoint",
 		entry.dimensions.aspectRatio.label.toLowerCase(),
@@ -56,12 +64,15 @@ export function marketplaceItem(entry: BinaryPptxTemplate): MarketplaceItem {
 		aspectRatio: entry.dimensions.aspectRatio,
 		dimensions: entry.dimensions,
 		thumbnailPath: entry.thumbnailPath,
+		preinstalled: entry.preinstalled,
 		sha256: entry.asset.sha256,
 		slideCount: entry.slideCount,
 		available: entry.asset.status === "available",
 	};
 }
 
-export const MARKETPLACE_ITEMS: MarketplaceItem[] = BINARY_PPTX_TEMPLATE_CATALOG.filter(
-	(entry) => entry.availability === "marketplace",
-).map(marketplaceItem);
+// Every published template is a marketplace template. A preinstalled one is
+// installed for a reader who has never opened the marketplace, not hidden from
+// it, so it is listed and can be removed like any other.
+export const MARKETPLACE_ITEMS: MarketplaceItem[] =
+	BINARY_PPTX_TEMPLATE_CATALOG.map(marketplaceItem);

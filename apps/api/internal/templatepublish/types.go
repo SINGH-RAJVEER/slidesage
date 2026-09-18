@@ -93,27 +93,19 @@ type Manifest struct {
 	Archetypes []Archetype `json:"archetypes"`
 }
 
-// SupportedCounts reports the deck sizes this manifest can satisfy: one cover,
-// one closing when available, and repeatable content archetypes in between.
+// SupportedCounts reports the deck sizes this manifest can satisfy: one cover
+// followed by repeatable content archetypes.
 func (m Manifest) SupportedCounts(minimum, maximum int) []int {
 	if !m.hasRole(RoleCover) || !m.hasRepeatableContent() {
 		return nil
 	}
 	counts := make([]int, 0, maximum-minimum+1)
 	for count := minimum; count <= maximum; count++ {
-		if count >= m.minimumSlides() {
+		if count >= 2 {
 			counts = append(counts, count)
 		}
 	}
 	return counts
-}
-
-func (m Manifest) minimumSlides() int {
-	minimum := 1
-	if m.hasRole(RoleClosing) {
-		minimum++
-	}
-	return minimum + 1
 }
 
 func (m Manifest) hasRole(role NarrativeRole) bool {

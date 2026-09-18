@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -48,8 +47,12 @@ func slideCount(body map[string]any, mandatory bool) (int, error) {
 	}
 	number, ok := value.(json.Number)
 	parsed, err := number.Int64()
-	if !ok || err != nil || parsed < 5 || parsed > 40 {
-		return 0, errors.New("slide_count must be an integer between 5 and 40")
+	minimum := int64(1)
+	if mandatory {
+		minimum = 5
+	}
+	if !ok || err != nil || parsed < minimum || parsed > 40 {
+		return 0, fmt.Errorf("slide_count must be an integer between %d and 40", minimum)
 	}
 	return int(parsed), nil
 }

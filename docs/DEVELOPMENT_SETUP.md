@@ -4,6 +4,8 @@
 
 Install Nix with [devenv](https://devenv.sh/getting-started/). The environment provides Go, Bun, PostgreSQL, Goose, Clang, and `just`.
 
+`apps/api` targets Go 1.27.1. The pinned devenv nixpkgs still ships Go 1.26, so the first `go` command in the shell downloads the 1.27.1 toolchain through the default `GOTOOLCHAIN=auto` and caches it under the module cache. That first build needs network access; later builds reuse the cached toolchain.
+
 ```bash
 cp .env.example .env
 devenv shell

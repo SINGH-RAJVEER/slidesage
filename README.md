@@ -9,7 +9,7 @@ SlideSage is a presentation builder with AI-assisted research and generation. Th
 - Streaming presentation generation and revision
 - Web research with cited sources
 - Reviewed web sources attached to generated decks
-- PPTX and PDF export
+- PPTX export
 
 ## Repository
 

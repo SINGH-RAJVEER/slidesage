@@ -35,7 +35,7 @@ import {
 	usePresentationData,
 	type ViewerLocationState,
 } from "@slidesage/ui/hooks/usePresentationData";
-import { useRevisionPreviews } from "@slidesage/ui/hooks/useRevisionPreviews";
+import { useRevisionDocument } from "@slidesage/ui/hooks/useRevisionDocument";
 import { useSlideNavigation } from "@slidesage/ui/hooks/useSlideNavigation";
 import { useViewerKeyboardNavigation } from "@slidesage/ui/hooks/useViewerKeyboardNavigation";
 import { API_URL } from "@slidesage/ui/lib/api";
@@ -78,15 +78,15 @@ export default function PresentationViewerPage() {
 
 	const [selectedRevision, setSelectedRevision] = useState<number>();
 	const [history, setHistory] = useState<Array<{ revision: number; source: string }>>([]);
-	const previews = useRevisionPreviews(
+	const revisionDocument = useRevisionDocument(
 		presentationId,
 		presentation?.currentRevision?.revision,
 		!shouldShowGenerating,
 		selectedRevision,
 	);
-	const { document: pptxDocument, isLoading: isRevisionLoading } = previews;
+	const { document: pptxDocument, isLoading: isRevisionLoading } = revisionDocument;
 	useEffect(() => {
-		if (!presentationId || !previews.revision) return;
+		if (!presentationId || !revisionDocument.revision) return;
 		const controller = new AbortController();
 		void fetch(`${API_URL}/presentations/${presentationId}/revisions`, {
 			credentials: "include",
@@ -97,10 +97,10 @@ export default function PresentationViewerPage() {
 			})
 			.catch(() => {});
 		return () => controller.abort();
-	}, [presentationId, previews.revision?.revision]);
+	}, [presentationId, revisionDocument.revision?.revision]);
 
 	const slideContainerRef = useRef<HTMLDivElement | null>(null);
-	const slideCount = pptxDocument?.slides.length ?? 0;
+	const slideCount = pptxDocument?.slideCount ?? 0;
 	const navigation = useSlideNavigation({ slideCount, slideContainerRef });
 
 	const { isFullscreenMode, enter: enterFullscreen, exit: exitFullscreen } = useFullscreenMode();
@@ -180,7 +180,15 @@ export default function PresentationViewerPage() {
 		tonality: string,
 		useWebResearch: boolean,
 	) => {
-		if (!prompt.trim() || !presentationId || !presentation?.template) return false;
+		if (
+			!prompt.trim() ||
+			!presentationId ||
+			!pptxDocument ||
+			!revisionDocument.revision ||
+			selectedRevision ||
+			shouldShowGenerating
+		)
+			return false;
 		requestGenerationNotificationPermission();
 
 		const success = await generate({
@@ -190,7 +198,8 @@ export default function PresentationViewerPage() {
 			tonality,
 			researchEnabled: useWebResearch,
 			parentPresentationId: presentationId,
-			template: presentation.template,
+			baseRevision: revisionDocument.revision.revision,
+			template: presentation?.template,
 		});
 
 		if (success) {
@@ -206,13 +215,17 @@ export default function PresentationViewerPage() {
 	// The deck without the slide becomes the next revision, so the viewer only
 	// has to reload the current pointer to show it.
 	const handleDeleteSlide = async () => {
-		if (!presentationId || !previews.revision || slideToDelete === undefined) return;
+		if (!presentationId || !revisionDocument.revision || slideToDelete === undefined) return;
 		setIsDeletingSlide(true);
 		try {
-			await deletePresentationSlide(presentationId, previews.revision.revision, slideToDelete);
+			await deletePresentationSlide(
+				presentationId,
+				revisionDocument.revision.revision,
+				slideToDelete,
+			);
 			focusSlideRef.current = slideToDelete;
 			setSlideToDelete(undefined);
-			previews.reload();
+			revisionDocument.reload();
 		} catch (cause) {
 			setDeleteError(cause instanceof Error ? cause.message : "Could not delete the slide.");
 		} finally {
@@ -232,26 +245,22 @@ export default function PresentationViewerPage() {
 
 	// Download serves the revision's exact bytes; the deck is already a PPTX, so
 	// there is nothing to convert and nothing that can diverge from what renders.
-	const exportPresentation: PresentationExporter = async (format, presentationToExport) => {
+	const exportPresentation: PresentationExporter = async (presentationToExport) => {
 		if (!presentationId) return;
 		const bytes = await fetchPresentationRevision(
 			presentationId,
 			undefined,
-			previews.revision?.revision,
-			format,
+			revisionDocument.revision?.revision,
 		);
 		const url = URL.createObjectURL(
 			new Blob([bytes], {
-				type:
-					format === "pdf"
-						? "application/pdf"
-						: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+				type: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 			}),
 		);
 		try {
 			const link = document.createElement("a");
 			link.href = url;
-			link.download = `${presentationToExport.title || "presentation"}.${format}`;
+			link.download = `${presentationToExport.title || "presentation"}.pptx`;
 			link.click();
 		} finally {
 			URL.revokeObjectURL(url);
@@ -272,7 +281,7 @@ export default function PresentationViewerPage() {
 	// Only the deck's live revision can be edited: an older one is history, and a
 	// deck that is still generating has nothing committed to edit yet.
 	const canEditDeck =
-		!!presentationId && !!previews.revision && !selectedRevision && !shouldShowGenerating;
+		!!presentationId && !!revisionDocument.revision && !selectedRevision && !shouldShowGenerating;
 	const canCancelGeneration =
 		shouldShowGenerating &&
 		streamingState.operation === "generation" &&
@@ -288,8 +297,8 @@ export default function PresentationViewerPage() {
 			template: streamingState.template ?? { id: "", version: 0 },
 			totalSlides: 0,
 		}),
-		currentRevision: previews.revision ?? presentation?.currentRevision,
-		totalSlides: previews.revision?.slideCount ?? 0,
+		currentRevision: revisionDocument.revision ?? presentation?.currentRevision,
+		totalSlides: revisionDocument.revision?.slideCount ?? 0,
 	};
 
 	return (
@@ -304,7 +313,7 @@ export default function PresentationViewerPage() {
 				{showControls && !isFullscreenMode && (
 					<ViewerHeaderControls
 						title={viewerTitle}
-						canIterate={!!previews.revision && !!presentationId && !selectedRevision}
+						canIterate={canEditDeck && !!pptxDocument}
 						onBack={() => navigate(isStreamingMode ? ROUTES.generate : ROUTES.presentations)}
 						onIterate={() => setShowIterateModal((current) => !current)}
 						onPresent={() => void enterFullscreen()}
@@ -335,25 +344,14 @@ export default function PresentationViewerPage() {
 						</Select>
 					</div>
 				)}
-				{!isFullscreenMode &&
-					(previews.error ||
-						(previews.revision && previews.revision.previewStatus !== "ready")) && (
-						<div role="status" className="px-4 py-3 text-sm">
-							{previews.error ??
-								(previews.revision?.previewStatus === "failed"
-									? "Preview rendering failed. Your PowerPoint is available to download."
-									: "Rendering slide previews. Your PowerPoint is available to download.")}
-							{previews.revision && previews.revision.previewStatus !== "ready" && (
-								<Button
-									variant="link"
-									className="ml-3 h-auto p-0"
-									onClick={() => void previews.retry()}
-								>
-									Retry previews
-								</Button>
-							)}
-						</div>
-					)}
+				{!isFullscreenMode && revisionDocument.error && (
+					<div role="status" className="px-4 py-3 text-sm">
+						{revisionDocument.error}
+						<Button variant="link" className="ml-3 h-auto p-0" onClick={revisionDocument.reload}>
+							Retry
+						</Button>
+					</div>
+				)}
 				{!isFullscreenMode && (
 					<ViewerSlideCarousel
 						document={pptxDocument}
@@ -493,9 +491,9 @@ export default function PresentationViewerPage() {
 					open={showIterateModal}
 					onOpenChange={setShowIterateModal}
 					onIterate={handleIteratePresentation}
-					currentSlideCount={previews.revision?.slideCount}
+					currentSlideCount={pptxDocument?.slideCount}
 					error={streamingState.operation === "iteration" ? streamingState.error : undefined}
-					isStreaming={streamingState.isStreaming}
+					isStreaming={streamingState.isStreaming || !canEditDeck || !pptxDocument}
 				/>
 			)}
 		</div>

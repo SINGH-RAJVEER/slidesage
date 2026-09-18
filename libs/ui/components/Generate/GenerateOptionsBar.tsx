@@ -12,13 +12,15 @@ interface GenerateOptionsBarProps {
 	tonality: string;
 	useWebResearch: boolean;
 	slideCount: string;
-	selectedTemplate: PresentationTemplateReference;
+	/** Undefined until the reader picks one; there is no default to assume. */
+	selectedTemplate?: PresentationTemplateReference;
 	installedThemes?: InstalledTemplateOption[];
 	onDetailLevelChange: (level: string) => void;
 	onTonalityChange: (tonality: string) => void;
 	onUseWebResearchChange: (enabled: boolean) => void;
 	onSlideCountChange: (count: string) => void;
 	onTemplateChange: (template: PresentationTemplateReference) => void;
+	onTemplateRemove?: (theme: InstalledTemplateOption) => void;
 }
 
 export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
@@ -33,6 +35,7 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 	onUseWebResearchChange,
 	onSlideCountChange,
 	onTemplateChange,
+	onTemplateRemove,
 }) => {
 	return (
 		<div className="mb-2 w-full flex items-center justify-center">
@@ -58,6 +61,7 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 				<TemplateSelector
 					selectedTemplate={selectedTemplate}
 					onTemplateChange={onTemplateChange}
+					onTemplateRemove={onTemplateRemove}
 					installedThemes={installedThemes}
 				/>
 				<DetailLevelSelector detailLevel={detailLevel} onDetailLevelChange={onDetailLevelChange} />

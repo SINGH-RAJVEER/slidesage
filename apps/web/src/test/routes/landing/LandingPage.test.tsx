@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import { MARKETPLACE_ITEMS } from "@slidesage/ui/lib/catalog";
-import { fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
 	LANDING_PLATE_COUNT,
@@ -12,6 +12,8 @@ import {
 import {
 	accelerateRing,
 	decelerateRing,
+	LANDING_FIRST_PAINT_DEADLINE_MS,
+	LANDING_FIRST_PAINT_PLATES,
 	plateStackingLayers,
 } from "../../../routes/landing/SlideRingHero";
 
@@ -47,7 +49,7 @@ describe("LandingPage", () => {
 		expect(container.querySelectorAll("h1, h2, p")).toHaveLength(0);
 	});
 
-	it("renders one rendered slide per plate", async () => {
+	it("mounts the whole ring but only images the opening batch, then the rest", async () => {
 		const { default: LandingPage } = await import("../../../routes/landing/LandingPage");
 
 		const { container } = render(
@@ -56,11 +58,42 @@ describe("LandingPage", () => {
 			</MemoryRouter>,
 		);
 
-		const plates = container.querySelectorAll("[data-plate-index] img");
-		expect(plates.length).toBe(LANDING_PLATE_COUNT);
-		for (const plate of plates) {
+		/* every plate is on the belt from the first frame; a cold visit just
+		   does not open thirty image connections at once to fill it */
+		expect(container.querySelectorAll("[data-plate-index]").length).toBe(LANDING_PLATE_COUNT);
+		const opening = container.querySelectorAll("[data-plate-index] img");
+		expect(opening.length).toBe(LANDING_FIRST_PAINT_PLATES);
+		for (const plate of opening) {
 			expect(plate.getAttribute("src")).toContain("/template-previews/");
+			/* a plate is painted at thumbnail size, so it reads the small variant */
+			expect(plate.getAttribute("src")).toEndWith("/small");
 		}
+
+		act(() => {
+			for (const image of opening) fireEvent.load(image);
+		});
+
+		expect(container.querySelectorAll("[data-plate-index] img").length).toBe(LANDING_PLATE_COUNT);
+	});
+
+	it("fills the rest of the ring even when the opening batch never settles", async () => {
+		const { default: LandingPage } = await import("../../../routes/landing/LandingPage");
+
+		const { container } = render(
+			<MemoryRouter>
+				<LandingPage />
+			</MemoryRouter>,
+		);
+
+		expect(container.querySelectorAll("[data-plate-index] img").length).toBe(
+			LANDING_FIRST_PAINT_PLATES,
+		);
+		/* no load and no error: a stalled image must not strand half the belt */
+		await act(
+			() => new Promise((resolve) => setTimeout(resolve, LANDING_FIRST_PAINT_DEADLINE_MS + 60)),
+		);
+
+		expect(container.querySelectorAll("[data-plate-index] img").length).toBe(LANDING_PLATE_COUNT);
 	});
 
 	it("fetches every plate eagerly, since a plate orbits into view whether or not it starts there", async () => {
@@ -133,6 +166,11 @@ describe("LandingPage", () => {
 		fireEvent.pointerUp(window, { clientX: 100, clientY: 100 });
 
 		expect(getByRole("dialog")).toBeInTheDocument();
+		/* the plate carries a thumbnail-sized copy; opening it is the one place
+		   the full render is worth downloading */
+		const opened = getByRole("dialog").querySelector("img");
+		expect(opened?.getAttribute("src")).toContain("/template-previews/");
+		expect(opened?.getAttribute("src")).not.toEndWith("/small");
 
 		fireEvent.keyDown(window, { key: "Escape" });
 		expect(queryByRole("dialog")).not.toBeInTheDocument();
@@ -171,6 +209,18 @@ describe("Landing plates", () => {
 		expect(coasting).toBeGreaterThan(0);
 	});
 
+	it("reuses the caller's scratch buffers, so a frame allocates nothing", () => {
+		const order: number[] = [];
+		const layers: number[] = [];
+
+		const first = plateStackingLayers([{ depth: 0.4 }, { depth: 0.1 }], order, layers);
+		const second = plateStackingLayers([{ depth: 0.1 }, { depth: 0.4 }], order, layers);
+
+		expect(first).toBe(layers);
+		expect(second).toBe(layers);
+		expect(Array.from(second)).toEqual([0, 1]);
+	});
+
 	it("keeps every distinct depth on its own stacking layer", () => {
 		const layers = plateStackingLayers([{ depth: 0.511 }, { depth: 0.512 }]);
 
@@ -183,7 +233,9 @@ describe("Landing plates", () => {
 		expect(pool).toHaveLength(LANDING_POOL_SIZE);
 		for (const plate of pool) {
 			expect(plate.slideUrl).toContain(`/template-previews/${plate.templateId}/1/`);
-			expect(plate.slideUrl).toMatch(/\/[a-f0-9]{64}\/\d+$/);
+			/* the plate reads the small variant and the preview the full render */
+			expect(plate.slideUrl).toMatch(/\/[a-f0-9]{64}\/\d+\/small$/);
+			expect(plate.fullUrl).toMatch(/\/[a-f0-9]{64}\/\d+$/);
 			expect(plate.coverUrl).toContain(encodeURIComponent(`pptx-templates/${plate.templateId}/1/`));
 			expect(plate.name.length).toBeGreaterThan(0);
 		}
@@ -260,19 +312,60 @@ describe("Landing plates", () => {
 	});
 });
 
+describe("Reduced motion", () => {
+	it("holds the ring still instead of running a frame loop over it", async () => {
+		const originalMatchMedia = window.matchMedia;
+		const originalFrame = window.requestAnimationFrame;
+		let scheduled = 0;
+		window.matchMedia = ((query: string) => ({
+			matches: query.includes("prefers-reduced-motion"),
+			media: query,
+			onchange: null,
+			addListener: () => {},
+			removeListener: () => {},
+			addEventListener: () => {},
+			removeEventListener: () => {},
+			dispatchEvent: () => false,
+		})) as unknown as typeof window.matchMedia;
+		window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+			scheduled += 1;
+			return originalFrame(callback);
+		}) as typeof window.requestAnimationFrame;
+
+		try {
+			const { default: LandingPage } = await import("../../../routes/landing/LandingPage");
+			const { container } = render(
+				<MemoryRouter>
+					<LandingPage />
+				</MemoryRouter>,
+			);
+
+			/* the belt is laid out, but nothing is animating it: the old loop
+			   rewrote thirty plates a frame with the values they already held */
+			expect(container.querySelectorAll("[data-plate-index]").length).toBe(LANDING_PLATE_COUNT);
+			expect(scheduled).toBe(0);
+		} finally {
+			window.matchMedia = originalMatchMedia;
+			window.requestAnimationFrame = originalFrame;
+		}
+	});
+});
+
 describe("EntranceRoute", () => {
 	it("shows the landing page to anonymous visitors", async () => {
 		authState.isSignedIn = false;
 		authState.user = null;
 		const { default: EntranceRoute } = await import("../../../app/router/EntranceRoute");
 
-		const { getByRole } = render(
+		const { findByRole } = render(
 			<MemoryRouter>
 				<EntranceRoute />
 			</MemoryRouter>,
 		);
 
-		expect(getByRole("img", { name: RING_LABEL })).toBeInTheDocument();
+		/* the landing page is split out of the initial bundle, so it arrives a
+		   chunk later rather than in the first render */
+		expect(await findByRole("img", { name: RING_LABEL })).toBeInTheDocument();
 	});
 
 	it("keeps a signed-in visitor on the landing page when that is their default", async () => {
@@ -280,13 +373,15 @@ describe("EntranceRoute", () => {
 		authState.user = { landingPage: "landing" };
 		const { default: EntranceRoute } = await import("../../../app/router/EntranceRoute");
 
-		const { getByRole } = render(
+		const { findByRole } = render(
 			<MemoryRouter>
 				<EntranceRoute />
 			</MemoryRouter>,
 		);
 
-		expect(getByRole("img", { name: RING_LABEL })).toBeInTheDocument();
+		/* the landing page is split out of the initial bundle, so it arrives a
+		   chunk later rather than in the first render */
+		expect(await findByRole("img", { name: RING_LABEL })).toBeInTheDocument();
 	});
 
 	it("forwards a signed-in visitor whose default is an app page", async () => {
@@ -300,6 +395,7 @@ describe("EntranceRoute", () => {
 			</MemoryRouter>,
 		);
 
+		await act(async () => {});
 		expect(queryByRole("img", { name: RING_LABEL })).not.toBeInTheDocument();
 	});
 });

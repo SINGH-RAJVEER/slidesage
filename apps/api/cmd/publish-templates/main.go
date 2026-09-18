@@ -1,17 +1,14 @@
 // Command publish-templates turns curated PPTX files into immutable,
 // digest-pinned template packages.
 //
-// It sanitizes each package, hashes the sanitized bytes, uploads it to
-// pptx-templates/{id}/{version}/{sha256}/template.pptx, renders the full-slide
-// previews the marketplace reads, writes the manifest the compiler reads, and
-// records the digest so the catalog can be backfilled.
+// It sanitizes each package, hashes the sanitized bytes, stages it at
+// pptx-templates/{id}/{version}/{sha256}/template.pptx, writes the manifest the
+// compiler reads, and records the digest. The browser-based preview script
+// renders this staged package before the object tree is uploaded.
 //
-// Rendering previews needs LibreOffice on PATH. Use -skip-previews where it is
-// unavailable, then backfill with cmd/publish-template-previews.
-//
-//	go run ./cmd/publish-templates -source ../../templates/v1 -dry-run
-//	go run ./cmd/publish-templates -source ../../templates/v1 -out /tmp/staged
-//	go run ./cmd/publish-templates -source ../../templates/v1 -bucket slidesage-504414-templates
+//	go run ./cmd/publish-templates -dry-run
+//	go run ./cmd/publish-templates
+//	bun ../../scripts/render-template-previews.ts --source ../../.published-templates
 //	go run ./cmd/publish-templates -verify
 package main
 
@@ -28,10 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentationrevision"
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/slidepreview"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templateasset"
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatepreview"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatepublish"
 )
 
@@ -50,17 +44,15 @@ type catalogEntry struct {
 }
 
 func main() {
-	source := flag.String("source", "templates/v1", "directory of curated .pptx files named {template-id}.pptx")
-	manifestDir := flag.String("manifests", "apps/api/internal/templatemanifest/manifests", "directory to write compiler manifests into")
-	digestFile := flag.String("digests", "libs/types/src/template-digests.json", "digest map the browser catalog reads")
-	catalogFile := flag.String("published", "apps/api/internal/templatecatalog/published.json", "published set the API embeds to gate generation")
-	bucket := flag.String("bucket", "", "GCS bucket for published packages; empty means prepare only")
-	outDir := flag.String("out", "", "write published packages to this directory instead of a bucket, in the object layout the CDN serves")
+	source := flag.String("source", "../../templates/v1", "directory of curated .pptx files named {template-id}.pptx")
+	manifestDir := flag.String("manifests", "internal/templatemanifest/manifests", "directory to write compiler manifests into")
+	digestFile := flag.String("digests", "../../libs/types/src/template-digests.json", "digest map the browser catalog reads")
+	catalogFile := flag.String("published", "internal/templatecatalog/published.json", "published set the API embeds to gate generation")
+	outDir := flag.String("out", "../../.published-templates", "stage packages in this directory using the object layout the CDN serves")
 	version := flag.Int("version", 1, "template version to publish")
 	only := flag.String("only", "", "comma-separated template IDs; empty means every file in -source")
 	skip := flag.String("skip", "quarantine-agriculture-business-plan", "comma-separated template IDs to leave unpublished")
 	maxBytes := flag.Int64("max-bytes", templatepublish.DefaultMaxPackageBytes, "reject packages larger than this many bytes")
-	skipPreviews := flag.Bool("skip-previews", false, "upload packages without rendering marketplace previews; they must be backfilled with cmd/publish-template-previews")
 	dryRun := flag.Bool("dry-run", false, "prepare and report without uploading or writing files")
 	verify := flag.Bool("verify", false, "check that every published template resolves in the bucket, and report nothing else")
 	flag.Parse()
@@ -96,34 +88,14 @@ func main() {
 		log.Fatalf("no templates matched in %s", *source)
 	}
 
-	if *bucket != "" && *outDir != "" {
-		log.Fatal("choose either -bucket or -out, not both")
-	}
-
 	ctx := context.Background()
 	var uploader templatepublish.Uploader
 	if *outDir != "" && !*dryRun {
 		uploader = directoryUploader{root: *outDir}
 	}
-	if *bucket != "" && !*dryRun {
-		store, storeErr := presentationrevision.NewGCSBlobStore(ctx, *bucket)
-		if storeErr != nil {
-			log.Fatal(bucketError(*bucket, storeErr))
-		}
-		defer store.Close()
-		uploader = store
-	}
-
-	// Previews are rendered from the same sanitized bytes that were uploaded,
-	// so a published template can never be missing the previews for its digest.
-	var renderer slidepreview.Renderer
-	if uploader != nil && !*skipPreviews {
-		renderer = slidepreview.NewLibreOfficeRenderer(slidepreview.LibreOfficeConfig{})
-	}
 
 	digests := map[string]digestRecord{}
 	failures := 0
-	previewFailures := 0
 	for _, id := range ids {
 		result, publishErr := publishOne(ctx, filepath.Join(*source, id+".pptx"), id, *version, *maxBytes, uploader)
 		if publishErr != nil {
@@ -148,16 +120,6 @@ func main() {
 			if err := writeManifest(*manifestDir, id, result.Manifest); err != nil {
 				log.Fatalf("write manifest for %s: %v", id, err)
 			}
-		}
-
-		if renderer != nil {
-			asset := templateasset.Asset{ID: id, Version: *version, SHA256: result.SHA256}
-			if err := templatepreview.Publish(ctx, uploader, renderer, asset, result.Package, result.Manifest.SlideCount); err != nil {
-				previewFailures++
-				fmt.Printf("FAIL      %-52s previews: %v\n", id, err)
-				continue
-			}
-			fmt.Printf("previews  %-52s %d slides\n", id, result.Manifest.SlideCount)
 		}
 	}
 
@@ -184,33 +146,12 @@ func main() {
 		}
 		fmt.Printf("\nwrote %d manifests to %s\nwrote %d digests to %s\nwrote %d published entries to %s\n",
 			len(ids)-failures, *manifestDir, len(digests), *digestFile, len(digests), *catalogFile)
+		fmt.Println("render staged previews with: bun scripts/render-template-previews.ts --source .published-templates --out .published-templates")
 	}
 	fmt.Printf("\n%d succeeded, %d failed\n", len(digests), failures)
-	if previewFailures > 0 {
-		// The packages themselves are published, so the catalog records stand;
-		// only the previews need another run.
-		fmt.Printf("%d published without previews; backfill with cmd/publish-template-previews\n", previewFailures)
-	}
-	if *skipPreviews && uploader != nil {
-		fmt.Println("previews were skipped; backfill with cmd/publish-template-previews")
-	}
-	if failures > 0 || previewFailures > 0 {
+	if failures > 0 {
 		os.Exit(1)
 	}
-}
-
-// bucketError explains the credentials a bucket upload needs. A workstation
-// that can reach the bucket through gcloud still has no application default
-// credentials until they are created separately.
-func bucketError(bucket string, err error) string {
-	return fmt.Sprintf(`open bucket %s: %v
-
-Uploading needs application default credentials:
-  gcloud auth application-default login
-
-Without them, stage the files and upload them with gcloud:
-  go run ./cmd/publish-templates -source ../../templates/v1 -out /tmp/staged
-  gcloud storage cp -r -n /tmp/staged/pptx-templates gs://%s/`, bucket, err, bucket)
 }
 
 // verifyPublished checks the artifacts a usable template needs: the digest

@@ -7,6 +7,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "./dropdown-menu";
+import { SlideSageLogo } from "./SlideSageLogo";
 
 export interface HeaderUser {
 	name?: string | null;
@@ -102,7 +103,7 @@ export function Header({
 			<div className="grid h-16 w-full grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 md:grid-cols-3 md:px-10">
 				<div className="hidden items-center md:flex md:w-full">
 					<LinkComponent to={routes.landing} aria-label="SlideSage — landing">
-						<img src="/icon.webp" alt="SlideSage" className="h-10 w-auto object-contain" />
+						<SlideSageLogo className="h-9 w-auto" />
 					</LinkComponent>
 				</div>
 

@@ -6,7 +6,6 @@ import ResetPasswordPage from "../../routes/auth/ResetPasswordPage";
 import SignInPage from "../../routes/auth/SignInPage";
 import SignUpPage from "../../routes/auth/SignUpPage";
 import VerifyEmailPage from "../../routes/auth/VerifyEmailPage";
-import LandingPage from "../../routes/landing/LandingPage";
 import NotFoundPage from "../../routes/NotFoundPage";
 import RouteErrorPage from "../../routes/RouteErrorPage";
 import ProfilePage from "../../routes/settings/ProfilePage";
@@ -31,7 +30,7 @@ export const router = createBrowserRouter([
 			{ index: true, element: <EntranceRoute /> },
 			/* the landing page is always public, so a signed-in user can still
 			   reach it even when it is not their default page */
-			{ path: "landing", element: <LandingPage /> },
+			{ path: "landing", lazy: lazyRoute(() => import("../../routes/landing/LandingPage")) },
 			{ path: "sign-in/*", element: <SignInPage /> },
 			{ path: "sign-up/*", element: <SignUpPage /> },
 			{ path: "sign-up/verify-email", element: <VerifyEmailPage /> },

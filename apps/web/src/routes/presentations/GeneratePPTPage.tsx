@@ -1,13 +1,14 @@
 import {
 	BINARY_PPTX_TEMPLATE_CATALOG,
-	DEFAULT_BINARY_PPTX_TEMPLATE,
 	type PresentationRetryOptions,
 	type PresentationTemplateReference,
 } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { GenerateForm, GenerateOptionsBar } from "@slidesage/ui/components/Generate";
+import type { InstalledTemplateOption } from "@slidesage/ui/components/Generate/TemplateSelector";
 import { useInstalledMarketplaceThemes } from "@slidesage/ui/hooks/useInstalledMarketplaceThemes";
 import { requestGenerationNotificationPermission } from "@slidesage/ui/lib/generation-notifications";
+import { removeMarketplaceTheme } from "@slidesage/ui/lib/marketplace-themes";
 import { templateIsSelectable } from "@slidesage/ui/lib/template-selection";
 import { useDebouncedCallback } from "@tanstack/react-pacer/debouncer";
 import { useEffect, useRef, useState } from "react";
@@ -21,16 +22,19 @@ interface GenerateRouteState {
 	retryPresentationId?: string;
 }
 
+// A retried presentation names the template it was generated from. Standing a
+// default in for one this build does not carry would generate the retry in a
+// template the reader never chose, so an unknown reference leaves the selector
+// empty and says so.
 function templateSelection(
 	reference: PresentationRetryOptions["template"],
-): PresentationTemplateReference {
+): PresentationTemplateReference | undefined {
+	if (!reference) return undefined;
 	const template = BINARY_PPTX_TEMPLATE_CATALOG.find(
-		(candidate) => candidate.id === reference?.id && candidate.version === reference.version,
+		(candidate) => candidate.id === reference.id && candidate.version === reference.version,
 	);
-	return {
-		id: template?.id ?? DEFAULT_BINARY_PPTX_TEMPLATE.id,
-		version: template?.version ?? DEFAULT_BINARY_PPTX_TEMPLATE.version,
-	};
+	if (!template) return undefined;
+	return { id: template.id, version: template.version };
 }
 
 export default function GeneratePPTPage() {
@@ -49,10 +53,41 @@ export default function GeneratePPTPage() {
 	const [selectedTemplate, setSelectedTemplate] = useState(() =>
 		templateSelection(retry?.template),
 	);
+	// Raised by pressing Generate with nothing selected. Nothing is preselected
+	// and nothing stands in for a choice, so the reader is told at the moment
+	// they ask for a deck rather than prompted before they have asked.
+	const [templateWarning, setTemplateWarning] = useState(false);
 	const navigate = useNavigate();
 	const { streamingState, generate } = useStreaming();
 	const installedThemes = useInstalledMarketplaceThemes();
-	const generationDisabled = !templateIsSelectable(selectedTemplate);
+	const templateSelectable = selectedTemplate ? templateIsSelectable(selectedTemplate) : false;
+	const generationDisabled = Boolean(selectedTemplate) && !templateSelectable;
+	const templateNotice =
+		retry?.template && !selectedTemplate
+			? "This presentation was generated with a template this build no longer offers. Choose a template to retry it."
+			: selectedTemplate && !templateSelectable
+				? "The selected template is not ready for generation yet."
+				: templateWarning
+					? "Select a template before generating."
+					: "";
+
+	const handleTemplateChange = (template: PresentationTemplateReference) => {
+		setTemplateWarning(false);
+		setSelectedTemplate(template);
+	};
+
+	// Removing the theme a deck was about to be generated with leaves nothing
+	// selected. Quietly moving to another one would generate in a template the
+	// reader did not choose.
+	const handleTemplateRemove = (theme: InstalledTemplateOption) => {
+		if (!removeMarketplaceTheme(theme.marketplaceId)) return;
+		if (
+			selectedTemplate?.id === theme.templateReference.id &&
+			selectedTemplate.version === theme.templateReference.version
+		) {
+			setSelectedTemplate(undefined);
+		}
+	};
 
 	useEffect(() => {
 		if (streamingState.error) {
@@ -85,7 +120,8 @@ export default function GeneratePPTPage() {
 
 	const handleGenerateInternal = async (selectedPrompt: string) => {
 		const normalizedPrompt = selectedPrompt.trim();
-		if (!normalizedPrompt || streamingState.isStreaming || generationDisabled) return;
+		if (!normalizedPrompt || streamingState.isStreaming || generationDisabled || !selectedTemplate)
+			return;
 
 		setLoading(true);
 
@@ -132,7 +168,12 @@ export default function GeneratePPTPage() {
 
 	const handleGenerate = () => {
 		if (!prompt.trim() || generationDisabled) return;
+		if (!selectedTemplate) {
+			setTemplateWarning(true);
+			return;
+		}
 
+		setTemplateWarning(false);
 		requestGenerationNotificationPermission();
 		debouncedGenerate(prompt);
 	};
@@ -186,8 +227,14 @@ export default function GeneratePPTPage() {
 					onTonalityChange={setTonality}
 					onUseWebResearchChange={setUseWebResearch}
 					onSlideCountChange={setSlideCount}
-					onTemplateChange={setSelectedTemplate}
+					onTemplateChange={handleTemplateChange}
+					onTemplateRemove={handleTemplateRemove}
 				/>
+				{templateNotice && (
+					<p className="mt-3 text-sm text-amber-200/70" role="status">
+						{templateNotice}
+					</p>
+				)}
 			</div>
 
 			<main

@@ -48,11 +48,6 @@ variable "worker_image" {
   type        = string
 }
 
-variable "preview_image" {
-  description = "Artifact Registry image for the LibreOffice preview renderer. CI should pass an immutable digest or commit tag."
-  type        = string
-}
-
 variable "migrate_image" {
   description = "Artifact Registry image for the migration job. CI should pass an immutable digest or commit tag."
   type        = string

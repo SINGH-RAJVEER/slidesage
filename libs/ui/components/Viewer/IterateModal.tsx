@@ -38,7 +38,7 @@ export default function IterateModal({
 	error,
 }: IterateModalProps) {
 	const [iteratePrompt, setIteratePrompt] = useState("");
-	const [slideCount, setSlideCount] = useState("5");
+	const [slideCount, setSlideCount] = useState(String(currentSlideCount ?? 5));
 	const [detailLevel, setDetailLevel] = useState("balanced");
 	const [tonality, setTonality] = useState("professional");
 	const [useWebResearch, setUseWebResearch] = useState(false);
@@ -47,6 +47,10 @@ export default function IterateModal({
 	// The error is owned by the streaming state upstream, so dismissal is tracked
 	// locally against the message that was last acknowledged.
 	const visibleError = open && error && error !== dismissedError ? error : null;
+
+	useEffect(() => {
+		if (open) setSlideCount(String(currentSlideCount ?? 5));
+	}, [open, currentSlideCount]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -70,7 +74,7 @@ export default function IterateModal({
 
 	const handleSubmit = async () => {
 		if (iteratePrompt.trim() && !isStreaming) {
-			const count = currentSlideCount ?? Math.min(40, Math.max(5, parseInt(slideCount, 10) || 5));
+			const count = Math.min(40, Math.max(1, parseInt(slideCount, 10) || 1));
 			const accepted = await onIterate(iteratePrompt, count, detailLevel, tonality, useWebResearch);
 			if (accepted === true) setIteratePrompt("");
 		}
@@ -173,24 +177,22 @@ export default function IterateModal({
 
 						<div className="flex items-center gap-3">
 							<p className="text-sm font-light whitespace-nowrap text-white/50">Slide count</p>
-							{currentSlideCount !== undefined ? (
-								<p className="text-sm text-white/60">
-									{currentSlideCount} slides. Text revisions keep the current slide count.
-								</p>
-							) : (
-								<Slider
-									value={[Number(slideCount)]}
-									min={5}
-									max={40}
-									step={1}
-									disabled={isStreaming}
-									className="flex-1"
-									onValueChange={(values) => setSlideCount(values[0]?.toString() ?? "5")}
-								>
-									<SliderThumb aria-label="Slide count">{slideCount}</SliderThumb>
-								</Slider>
-							)}
+							<Slider
+								value={[Number(slideCount)]}
+								min={1}
+								max={40}
+								step={1}
+								disabled={isStreaming}
+								className="flex-1"
+								onValueChange={(values) => setSlideCount(values[0]?.toString() ?? "5")}
+							>
+								<SliderThumb aria-label="Slide count">{slideCount}</SliderThumb>
+							</Slider>
 						</div>
+						<p className="text-sm text-white/50">
+							Fewer slides condenses the content. Leave the count unchanged to keep the same number
+							of slides.
+						</p>
 					</div>
 				</div>
 			</div>

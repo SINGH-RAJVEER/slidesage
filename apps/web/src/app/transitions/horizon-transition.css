@@ -36,6 +36,7 @@
 .horizon-route-mark {
 	position: absolute;
 	width: 167%;
+	height: auto;
 	max-width: none;
 	left: -33.5%;
 	top: 50%;
@@ -46,6 +47,10 @@
 	to {
 		opacity: 0;
 	}
+}
+[data-horizon-focus]:focus,
+[data-horizon-focus]:focus-visible {
+	outline: none;
 }
 .horizon-route-wait {
 	position: absolute;

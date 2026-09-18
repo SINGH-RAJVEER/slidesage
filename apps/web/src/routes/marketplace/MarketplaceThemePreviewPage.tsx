@@ -26,7 +26,7 @@ function TemplateViewer({ item }: { item: MarketplaceItem }) {
 	const navigate = useNavigate();
 	const previews = useTemplatePreviews(item.id, item.templateReference.version, item.available);
 	const containerRef = useRef<HTMLDivElement | null>(null);
-	const slideCount = previews.document?.slides.length ?? 0;
+	const slideCount = previews.document?.slideCount ?? 0;
 	const navigation = useSlideNavigation({ slideCount, slideContainerRef: containerRef });
 	const fullscreen = useFullscreenMode();
 	useViewerKeyboardNavigation({

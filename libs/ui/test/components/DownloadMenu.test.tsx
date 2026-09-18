@@ -9,7 +9,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react";
 
 const exportPptx = mock(async (_presentation: PresentationData) => {});
 
-const exportPresentation: PresentationExporter = async (_format, presentation) => {
+const exportPresentation: PresentationExporter = async (presentation) => {
 	await exportPptx(presentation);
 };
 
@@ -22,8 +22,6 @@ const presentation: PresentationData = {
 		slideCount: 1,
 		byteSize: 2048,
 		sha256: "a".repeat(64),
-		previewStatus: "ready",
-		previewCount: 1,
 		createdAt: "2026-01-01T00:00:00Z",
 	},
 };
@@ -72,7 +70,7 @@ describe("DownloadMenu", () => {
 		fireEvent.click(await view.findByText("PowerPoint"));
 		await waitFor(() => expect(exportPptx).toHaveBeenCalledTimes(1));
 
-		openMenu(view.getByRole("button", { name: /Exporting/ }));
+		fireEvent.click(view.getByRole("button", { name: /Exporting/ }));
 		expect(exportPptx).toHaveBeenCalledTimes(1);
 
 		release?.();

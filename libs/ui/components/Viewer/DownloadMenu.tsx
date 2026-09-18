@@ -17,39 +17,29 @@ interface Props {
 	onExport?: PresentationExporter;
 }
 
-export type ExportFormat = "pptx" | "pdf";
-export type PresentationExporter = (
-	format: ExportFormat,
-	presentation: PresentationData,
-) => Promise<void>;
+export type PresentationExporter = (presentation: PresentationData) => Promise<void>;
 
 const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
 	const exportInProgress = useRef(false);
-	const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
+	const [isExporting, setIsExporting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const download = async (format: ExportFormat) => {
+	const download = async () => {
 		if (exportInProgress.current) return;
-
 		exportInProgress.current = true;
-		setExportingFormat(format);
+		setIsExporting(true);
 		setError(null);
 		try {
 			if (!onExport) throw new Error("No presentation exporter was provided.");
-			await onExport(format, presentation);
+			await onExport(presentation);
 		} catch (exportError) {
-			console.error(`Failed to export ${format.toUpperCase()} presentation`, exportError);
-			setError(`${format.toUpperCase()} export failed. Please try again.`);
+			console.error("Failed to export PPTX presentation", exportError);
+			setError("PPTX export failed. Please try again.");
 		} finally {
 			exportInProgress.current = false;
-			setExportingFormat(null);
+			setIsExporting(false);
 		}
 	};
-
-	const isExporting = exportingFormat !== null;
-	// Download serves the bytes of the current revision, so it is available as
-	// soon as one exists.
-	const revision = presentation.currentRevision;
 
 	return (
 		<div className="relative flex flex-col items-start gap-1">
@@ -57,7 +47,7 @@ const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
 				<DropdownMenuTrigger asChild>
 					<Button
 						type="button"
-						disabled={isExporting || !revision}
+						disabled={isExporting || !presentation.currentRevision}
 						variant="outline"
 						className="bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 shadow-none transition-colors duration-200"
 					>
@@ -66,7 +56,7 @@ const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
 						) : (
 							<Download className="w-4 h-4 mr-2" />
 						)}
-						{isExporting ? `Exporting ${exportingFormat.toUpperCase()}` : "Download"}
+						{isExporting ? "Exporting PPTX" : "Download"}
 						{!isExporting && <ChevronDown className="w-4 h-4 ml-2 opacity-60" />}
 					</Button>
 				</DropdownMenuTrigger>
@@ -76,19 +66,12 @@ const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
 					className="w-48 bg-gray-900/80 backdrop-blur-md border border-white/10 text-white shadow-xl"
 				>
 					<DropdownMenuItem
-						disabled={isExporting || !revision}
-						onSelect={() => void download("pptx")}
+						disabled={isExporting || !presentation.currentRevision}
+						onSelect={() => void download()}
 						className="focus:bg-white/10 focus:text-white cursor-pointer"
 					>
 						<Presentation />
 						<span>PowerPoint</span>
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						disabled={isExporting || revision?.previewStatus !== "ready"}
-						onSelect={() => void download("pdf")}
-					>
-						<Download />
-						<span>PDF</span>
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>

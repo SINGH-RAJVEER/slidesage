@@ -82,7 +82,7 @@ it("uses the existing deck count and displays submission errors", () => {
 			error="Insufficient points"
 		/>,
 	);
-	expect(view.queryByRole("slider")).toBeNull();
+	expect(view.getByRole("slider", { name: "Slide count" })).toHaveAttribute("aria-valuenow", "12");
 	expect(view.getByRole("alert")).toHaveTextContent("Insufficient points");
 	fireEvent.input(view.getByRole("textbox"), { target: { value: "Rewrite the conclusion" } });
 	fireEvent.keyDown(view.getByRole("textbox"), { key: "Enter" });
@@ -93,4 +93,54 @@ it("uses the existing deck count and displays submission errors", () => {
 		"professional",
 		false,
 	);
+});
+
+it("allows reducing and increasing the current count within 1 to 40", () => {
+	const onIterate = mock(() => false);
+	const view = render(
+		<IterateModal
+			open={true}
+			onOpenChange={mock()}
+			onIterate={onIterate}
+			isStreaming={false}
+			currentSlideCount={12}
+		/>,
+	);
+	fireEvent.input(view.getByRole("textbox"), { target: { value: "Reshape the deck" } });
+	const count = view.getByRole("slider", { name: "Slide count" });
+	expect(count).toHaveAttribute("aria-valuemin", "1");
+	expect(count).toHaveAttribute("aria-valuemax", "40");
+	fireEvent.keyDown(count, { key: "Home" });
+	fireEvent.keyDown(count, { key: "ArrowLeft" });
+	fireEvent.click(view.getByRole("button", { name: "Generate revision" }));
+	expect(onIterate).toHaveBeenLastCalledWith(
+		"Reshape the deck",
+		1,
+		"balanced",
+		"professional",
+		false,
+	);
+	fireEvent.keyDown(count, { key: "End" });
+	fireEvent.keyDown(count, { key: "ArrowRight" });
+	fireEvent.click(view.getByRole("button", { name: "Generate revision" }));
+	expect(onIterate).toHaveBeenLastCalledWith(
+		"Reshape the deck",
+		40,
+		"balanced",
+		"professional",
+		false,
+	);
+	expect(view.getByText(/Fewer slides condenses the content/)).toBeInTheDocument();
+});
+
+it("resets to the loaded count on reopen and when the deck changes", () => {
+	const props = { onOpenChange: mock(), onIterate: mock(), isStreaming: false };
+	const view = render(<IterateModal {...props} open={true} currentSlideCount={3} />);
+	fireEvent.keyDown(view.getByRole("slider"), { key: "ArrowRight" });
+	expect(view.getByRole("slider")).toHaveAttribute("aria-valuenow", "4");
+	view.rerender(<IterateModal {...props} open={false} currentSlideCount={3} />);
+	view.rerender(<IterateModal {...props} open={true} currentSlideCount={3} />);
+	expect(view.getByRole("slider")).toHaveAttribute("aria-valuenow", "3");
+	view.rerender(<IterateModal {...props} open={true} currentSlideCount={1} />);
+	expect(view.getByRole("slider")).toHaveAttribute("aria-valuenow", "1");
 });

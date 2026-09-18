@@ -100,10 +100,9 @@ func RecoverExpired(ctx context.Context, database *sql.DB) error {
 }
 
 type handler struct {
-	templates    *templateasset.CDNFetcher
-	objects      presentationrevision.ObjectStore
-	revisions    *presentationrevision.PostgresRepository
-	previewQueue *queueClient
+	templates *templateasset.CDNFetcher
+	objects   presentationrevision.ObjectStore
+	revisions *presentationrevision.PostgresRepository
 
 	database      *sql.DB
 	identity      Identity

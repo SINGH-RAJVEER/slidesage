@@ -1,4 +1,5 @@
 import { useAuth } from "@slidesage/ui";
+import { SlideSageLogo } from "@slidesage/ui/components/SlideSageLogo";
 import { hasSignedInBefore } from "@slidesage/ui/lib/session-history";
 import {
 	createContext,
@@ -232,6 +233,17 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 		const focus = contentRef.current?.querySelector<HTMLElement>("h1, main, input");
 		if (focus) {
 			focus.setAttribute("tabindex", "-1");
+			// The landing focus is an announcement for assistive tech, so it carries no focus ring:
+			// on a full-bleed landmark the ring reads as a stray line across the page.
+			focus.setAttribute("data-horizon-focus", "");
+			focus.addEventListener(
+				"blur",
+				() => {
+					focus.removeAttribute("data-horizon-focus");
+					focus.removeAttribute("tabindex");
+				},
+				{ once: true },
+			);
 			focus.focus({ preventScroll: true });
 		}
 	}, [transition]);
@@ -265,9 +277,8 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 					>
 						<div className="horizon-route-reflection" />
 						{Boolean(transition.origin.wordmark) && (
-							<img
-								alt=""
-								src="/landing/slidesage-wordmark-current.png"
+							<SlideSageLogo
+								framed
 								className="horizon-route-mark"
 								style={{ opacity: transition.origin.wordmark }}
 							/>

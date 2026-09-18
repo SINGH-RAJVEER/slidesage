@@ -1,11 +1,11 @@
 import { Card } from "@slidesage/ui/components/card";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import type React from "react";
-import type { PreviewDocument } from "../../hooks/useRevisionPreviews";
+import type { ViewerDocument } from "../../lib/viewer-document";
 import { PreviewSlide } from "./PreviewSlide";
 
 interface ViewerSlideCarouselProps {
-	document: PreviewDocument | null;
+	document: ViewerDocument | null;
 	visibleSlide: number;
 	containerRef: React.RefObject<HTMLDivElement | null>;
 	onSelectSlide: (index: number) => void;
@@ -19,7 +19,7 @@ export const ViewerSlideCarousel: React.FC<ViewerSlideCarouselProps> = ({
 	onSelectSlide,
 	isWaitingForFirstSlide = false,
 }) => {
-	const slideCount = document?.slides.length ?? 0;
+	const slideCount = document?.slideCount ?? 0;
 
 	return (
 		<div

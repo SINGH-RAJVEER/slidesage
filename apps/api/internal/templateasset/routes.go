@@ -26,6 +26,9 @@ const thumbnailCacheControl = "public, max-age=604800"
 type Handler struct {
 	Fetcher   *CDNFetcher
 	Published func(id string, version int) bool
+	// Cache holds slide bytes between requests. RegisterRoutes installs one
+	// when the caller leaves it nil; a nil cache simply fetches every time.
+	Cache *ObjectCache
 }
 
 // RegisterRoutes installs public template cover and full-deck preview endpoints.
@@ -33,9 +36,13 @@ func RegisterRoutes(mux *http.ServeMux, handler Handler) {
 	if mux == nil || handler.Fetcher == nil || handler.Published == nil {
 		panic("template thumbnail routes require a mux, fetcher, and published lookup")
 	}
+	if handler.Cache == nil {
+		handler.Cache = NewObjectCache(DefaultPreviewCacheBytes)
+	}
 	mux.HandleFunc("GET /template-thumbnails/{path...}", handler.cover)
 	mux.HandleFunc("GET /template-previews/{id}/{version}", handler.previewManifest)
 	mux.HandleFunc("GET /template-previews/{id}/{version}/{digest}/{index}", handler.previewSlide)
+	mux.HandleFunc("GET /template-previews/{id}/{version}/{digest}/{index}/{variant}", handler.previewSlide)
 }
 
 func (h Handler) cover(writer http.ResponseWriter, request *http.Request) {

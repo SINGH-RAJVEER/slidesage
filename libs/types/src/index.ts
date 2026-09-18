@@ -2,14 +2,11 @@ export type {
 	BinaryPptxTemplate,
 	BinaryTemplateAspectRatio,
 	BinaryTemplateAssetStatus,
-	BinaryTemplateAvailability,
+	BinaryTemplateCategory,
 	BinaryTemplateDimensions,
 	PresentationTemplateReference,
 } from "./template-catalog";
-export {
-	BINARY_PPTX_TEMPLATE_CATALOG,
-	DEFAULT_BINARY_PPTX_TEMPLATE,
-} from "./template-catalog";
+export { BINARY_PPTX_TEMPLATE_CATALOG, BINARY_TEMPLATE_CATEGORIES } from "./template-catalog";
 
 export type PresentationGenerationStage =
 	| "researching"
@@ -100,16 +97,12 @@ export interface ResearchOptions {
 	maxAgeHours?: number;
 }
 
-export type PresentationPreviewStatus = "pending" | "rendering" | "ready" | "failed";
-
-/** One immutable PPTX revision. Downloads and previews both come from it. */
+/** One immutable PPTX revision used by the viewer and downloads. */
 export interface PresentationRevision {
 	revision: number;
 	slideCount: number;
 	byteSize: number;
 	sha256: string;
-	previewStatus: PresentationPreviewStatus;
-	previewCount: number;
 	createdAt: string;
 }
 

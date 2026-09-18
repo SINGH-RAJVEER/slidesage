@@ -4,16 +4,15 @@ The repository deploys its Go API and generation worker to Google Cloud Run. Eve
 
 ## Flow
 
-1. GitHub Actions builds four image targets from `apps/api/Dockerfile` using Docker BuildKit. The Dockerfile also provides Linux/amd64 defaults for `BUILDPLATFORM`, `TARGETOS`, and `TARGETARCH`, so plain Docker builds (including Google Cloud Build's Docker builder) do not expand the platform to an empty value:
+1. GitHub Actions builds three image targets from `apps/api/Dockerfile` using Docker BuildKit. The Dockerfile also provides Linux/amd64 defaults for `BUILDPLATFORM`, `TARGETOS`, and `TARGETARCH`, so plain Docker builds (including Google Cloud Build's Docker builder) do not expand the platform to an empty value:
    - `api` (web server, port 8000) -> Cloud Run **service** `api`
    - `worker` (River queue consumer with a health server, port 8080) -> Cloud Run **service** `worker`
-   - `preview` (LibreOffice preview renderer with a health server, port 8080) -> Cloud Run **service** `preview-worker`
    - `migrate` (Goose + River migrations, one-shot) -> Cloud Run **job** `slidesage-migrate`
 2. Each image is tagged with the full git commit SHA (e.g. `api:a1b2c3d...`) plus `latest` and pushed to Artifact Registry.
 3. `terraform apply -target=google_cloud_run_v2_job.migrate` updates the migration job to the new image, then `gcloud run jobs execute` runs it against the database and waits.
-4. A fresh full plan and `terraform apply` point the `api`, `worker`, and `preview-worker` Cloud Run services at the SHA-tagged image. Cloud Run creates a new revision and routes 100% of traffic to it, which is the "latest iteration" seen by users. Previous revisions remain available by SHA for rollback.
+4. A fresh full plan and `terraform apply` point the `api` and `worker` Cloud Run services at the SHA-tagged image. Cloud Run creates a new revision and routes 100% of traffic to it, which is the "latest iteration" seen by users. Previous revisions remain available by SHA for rollback.
 
-After this testing bookmark is merged through dev into main and the documented bootstrap is complete, Terraform will own the Cloud Run services, the job, the load balancer, and supporting IAM. The currently deployed services were created with gcloud; no adoption has been applied from this bookmark. The workflow supplies only the image references, through `TF_VAR_api_image`, `TF_VAR_worker_image`, `TF_VAR_preview_image`, and `TF_VAR_migrate_image`. It needs the `TF_STATE_BUCKET`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` repository secrets alongside the existing workload-identity secrets. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
+After this testing bookmark is merged through dev into main and the documented bootstrap is complete, Terraform will own the Cloud Run services, the job, the load balancer, and supporting IAM. The currently deployed services were created with gcloud; no adoption has been applied from this bookmark. The workflow supplies only the image references, through `TF_VAR_api_image`, `TF_VAR_worker_image`, and `TF_VAR_migrate_image`. It needs the `TF_STATE_BUCKET`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` repository secrets alongside the existing workload-identity secrets. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
 
 Trigger: a push to `main` after the dev-to-main PR is merged, or a manual dispatch on `main`. Both jobs explicitly reject other refs, so dispatching from the testing bookmark cannot publish images or change production. All production runs share one concurrency group.
 
@@ -28,8 +27,6 @@ asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/api:<sha>
 asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/api:latest
 asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/worker:<sha>
 asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/worker:latest
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/preview:<sha>
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/preview:latest
 asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/migrate:<sha>
 asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/migrate:latest
 ```
@@ -171,9 +168,8 @@ The Cloud SQL socket mount and the `roles/cloudsql.client` grant on the runtime 
 | ------- | ---- | ------------- | ----------- | --------------------------- |
 | `api`   | 8000 | min 0, max 10 | 80          | Scales from zero on traffic |
 | `worker` | 8080 | min 1, max 10 | 1           | Polls River and performs OpenRouter generation using `OPEN_ROUTER_API_KEY`. |
-| `preview-worker` | 8080 | min 1, max 4 | 1 | Polls River and renders committed PPTX revisions with LibreOffice. |
 
-Both queue services keep at least one instance running with CPU available between requests (`cpu_idle = false`). API-to-worker coordination uses PostgreSQL only; queued work cannot wake a Cloud Run service from zero instances. River uses row-level `SKIP LOCKED`, so concurrent workers can claim jobs safely. Monitor queue latency and size worker capacity explicitly; Cloud Run does not scale on PostgreSQL queue depth.
+The queue worker keeps at least one instance running with CPU available between requests (`cpu_idle = false`). API-to-worker coordination uses PostgreSQL only; queued work cannot wake a Cloud Run service from zero instances. River uses row-level `SKIP LOCKED`, so concurrent workers can claim jobs safely. Monitor queue latency and size worker capacity explicitly; Cloud Run does not scale on PostgreSQL queue depth.
 
 ### Ingress and invocation
 
@@ -256,6 +252,6 @@ docker push asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev
 
 Every production release takes an on-demand Cloud SQL backup before running migrations. Terraform then sets the existing API and queue services to manual scaling with zero instances, preserving their previous images for this phase. This stops new submissions and queue processing while schema changes run. The API is temporarily unavailable during the cutover.
 
-The full release apply restores automatic scaling with the new images. Generation and preview workers retain at least one instance so database queues continue processing. If migration or release apply fails, services remain paused; inspect the failure before retrying rather than restarting an old binary against a changed schema.
+The cutover deletes the retired `preview-worker` service before migration 27 removes its claim columns. The full release apply restores automatic scaling with the new API and generation-worker images. If migration or release apply fails, services remain paused; inspect the failure before retrying rather than restarting an old binary against a changed schema.
 
 Migration 25 deletes presentations without a committed PPTX revision, as required by the canonical-only transition. The backup preserves the pre-release database for recovery; it does not make the deletion reversible through a schema downgrade.
