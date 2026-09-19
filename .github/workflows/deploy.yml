@@ -233,13 +233,27 @@ jobs:
           fi
 
       # No schema change may start until the backup that covers it exists.
+      #
+      # `gcloud sql operations wait` documents a timeout and nothing about what
+      # it returns for an operation that finished with an error, so its exit
+      # status is not trusted here. Read the operation back and assert on the
+      # status and error fields, which are unambiguous.
       - name: Wait for the pre-migration database backup
         shell: bash
         run: |
           set -euo pipefail
           : "${BACKUP_OPERATION:?The backup was never started}"
           gcloud sql operations wait "$BACKUP_OPERATION" \
-            --project="$PROJECT_ID" --timeout=1800
+            --project="$PROJECT_ID" --timeout=1800 || true
+          operation=$(gcloud sql operations describe "$BACKUP_OPERATION" \
+            --project="$PROJECT_ID" --format=json)
+          status=$(jq -r '.status // empty' <<<"$operation")
+          error=$(jq -r '.error // empty' <<<"$operation")
+          if [ "$status" != "DONE" ] || [ -n "$error" ]; then
+            echo "The pre-migration backup did not complete cleanly:" >&2
+            jq . <<<"$operation" >&2
+            exit 1
+          fi
 
       - name: Run migrations
         run: |
