@@ -30,16 +30,38 @@ jobs:
       CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@v4
+        with:
+          # A push is compared against its previous head, which has to be in
+          # the checkout. Fifty commits covers any realistic push range; beyond
+          # that the filter below falls open and the whole suite runs.
+          fetch-depth: ${{ github.event_name == 'push' && 50 || 1 }}
+
+      # A pull request is diffed through the API against its base. A push has
+      # no base to infer, so use the commit the branch moved from, and only
+      # when it is a real commit that is actually present.
+      - name: Resolve the comparison base for a push
+        if: github.event_name == 'push'
+        id: base
+        shell: bash
+        run: |
+          set -euo pipefail
+          before='${{ github.event.before }}'
+          if [ -n "$before" ] \
+            && [ "$before" != "0000000000000000000000000000000000000000" ] \
+            && git cat-file -e "$before^{commit}" 2>/dev/null; then
+            echo "ref=$before" >> "$GITHUB_OUTPUT"
+          fi
 
       # A web-only change has no reason to compile and test the Go module, and
       # the reverse holds too. This stays inside the one job rather than
       # splitting into two, so the check name branch protection requires is
-      # always reported. Only pull requests are filtered: on a release gate the
-      # comparison base is less certain, and there everything runs.
+      # always reported.
       - id: changes
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || steps.base.outputs.ref != ''
+        continue-on-error: true
         uses: dorny/paths-filter@v4
         with:
+          base: ${{ steps.base.outputs.ref }}
           filters: |
             api:
               - 'apps/api/**'
@@ -54,27 +76,43 @@ jobs:
               - 'biome.json'
               - '.github/workflows/checks.yml'
 
-      - id: go
-        if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
+      # Fail open. A skipped filter, an unresolvable base, or a filter that
+      # errored all mean the whole suite runs, because a check that silently
+      # narrows itself is worse than one that occasionally does too much.
+      - id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ '${{ steps.changes.outcome }}' = 'success' ]; then
+            echo 'api=${{ steps.changes.outputs.api }}' >> "$GITHUB_OUTPUT"
+            echo 'web=${{ steps.changes.outputs.web }}' >> "$GITHUB_OUTPUT"
+          else
+            echo 'api=true' >> "$GITHUB_OUTPUT"
+            echo 'web=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.scope.outputs.api == 'true'
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/api/go.mod
-          # setup-go keys its cache on go.sum, so the build cache is never
-          # refreshed while only our own source changes and each run recompiles
-          # more of the module from scratch. The cache below is keyed to write
-          # a fresh entry every run instead.
+          # setup-go keys its cache on go.sum and restores on an exact match
+          # only, so a dependency bump starts from nothing. The cache below
+          # keeps a restore-keys fallback for that case.
           cache: false
 
+      - name: Stamp the Go cache key
+        if: steps.scope.outputs.api == 'true'
+        run: echo "GO_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+
       - name: Restore the Go module and build caches
-        if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
-        uses: actions/cache@v4
+        if: steps.scope.outputs.api == 'true'
+        id: go-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          # The sha suffix means the key never hits exactly, so every run saves
-          # a new entry and the restore keys fall back to the most recent one.
-          key: ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ github.sha }}
+          key: ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}
           restore-keys: |
             ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-
             ${{ runner.os }}-go-
@@ -85,32 +123,51 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+      - if: steps.scope.outputs.web == 'true'
         run: bun run type-check
 
-      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+      - if: steps.scope.outputs.web == 'true'
         run: bun test
         working-directory: libs/types
 
-      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+      - if: steps.scope.outputs.web == 'true'
         run: bun run test:ui
 
-      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+      - if: steps.scope.outputs.web == 'true'
         run: bun run test:web
 
-      - if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
+      - if: steps.scope.outputs.api == 'true'
         run: go test ./...
         working-directory: apps/api
 
-      - if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
+      - if: steps.scope.outputs.api == 'true'
         run: go vet ./...
         working-directory: apps/api
 
-      - if: github.event_name != 'pull_request' || steps.changes.outputs.web == 'true'
+      - if: steps.scope.outputs.web == 'true'
         run: bun run build
 
-      - if: github.event_name != 'pull_request' || steps.changes.outputs.api == 'true'
+      - if: steps.scope.outputs.api == 'true'
         run: bun run build:api
+
+      # A cache written by a pull request run is scoped to that run's merge ref
+      # and can only be restored by a re-run of the same pull request, so
+      # saving one there spends 265 MB of the repository's 10 GB budget on an
+      # entry nothing will ever read. Evictions are by least recent access, and
+      # the Docker layer cache is touched only on a release, so that churn
+      # would quietly evict the build cache between deployments. The date in
+      # the key bounds writes to one per branch per day.
+      - name: Save the Go module and build caches
+        if: >-
+          github.event_name != 'pull_request'
+          && steps.scope.outputs.api == 'true'
+          && steps.go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}
 
   terraform:
     runs-on: ubuntu-latest
@@ -124,8 +181,8 @@ jobs:
           terraform_version: 1.16.0
           terraform_wrapper: false
 
-      # The google and cloudflare providers are large and otherwise downloaded
-      # from the registry on every init, in this workflow and two others.
+      # Keyed on the lock file alone, so this only writes when the providers
+      # actually change rather than on every run.
       - name: Restore the Terraform provider cache
         uses: actions/cache@v4
         with:
