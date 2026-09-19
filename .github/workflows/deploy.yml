@@ -214,15 +214,6 @@ jobs:
             "${args[@]}" -out=maintenance.tfplan
           terraform apply -input=false -lock-timeout=5m -no-color maintenance.tfplan
 
-      - name: Remove the legacy preview worker
-        shell: bash
-        run: |
-          if gcloud run services describe preview-worker \
-            --project="$PROJECT_ID" --region="$RUN_REGION" >/dev/null 2>&1; then
-            gcloud run services delete preview-worker \
-              --project="$PROJECT_ID" --region="$RUN_REGION" --quiet
-          fi
-
       # No schema change may start until the backup that covers it exists.
       #
       # `gcloud sql operations wait` documents a timeout and nothing about what

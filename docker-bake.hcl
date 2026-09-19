@@ -1,8 +1,9 @@
 # Bake definition for the three images built from apps/api/Dockerfile.
 #
-# The API, worker, and migrate images all derive from one `build` stage. Baking
-# them together lets BuildKit run that stage once and share its result, instead
-# of re-entering the builder for three sequential build-push-action steps.
+# Each image copies one prebuilt binary from dist/ onto scratch, so a bake is
+# three trivial builds sharing a certificate stage. Baking them together still
+# beats three sequential build-push-action steps, which re-entered the builder
+# each time.
 
 variable "REGISTRY" {
 	default = "asia-south1-docker.pkg.dev"
