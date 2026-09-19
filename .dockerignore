@@ -1,0 +1,5 @@
+# The images copy prebuilt binaries and nothing else, so the build context is
+# only dist/. Without this the whole repository is uploaded to the builder,
+# including .git and node_modules, for a build that reads three files.
+*
+!dist

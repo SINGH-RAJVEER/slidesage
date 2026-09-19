@@ -1,27 +1,21 @@
-# build
-from --platform=$BUILDPLATFORM docker.io/library/golang:1.27-alpine as build
+# Runtime images only. The binaries are compiled on the CI runner, where the Go
+# build cache persists cheaply through actions/cache, and are copied in from
+# dist/. Compiling inside the image meant either recompiling every dependency on
+# every release, or paying more to shuttle BuildKit's cache mounts in and out
+# than the incremental compile saved. Build the binaries first with
+# `just binaries`, then `just image`.
 
-workdir /src/apps/api
+# certificates
+from docker.io/library/alpine:3.24 as certs
 
 run apk add --no-cache ca-certificates
-
-copy apps/api/go.mod apps/api/go.sum ./
-
-run go mod download
-
-copy apps/api ./
-
-run export CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} && \
-	go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o /out/api ./cmd/api && \
-	go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o /out/worker ./cmd/worker && \
-	go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
 
 from scratch as base
 
 workdir /app
 
-copy --from=build \
+copy --from=certs \
 	/etc/ssl/certs/ca-certificates.crt \
 	/etc/ssl/certs/ca-certificates.crt
 
@@ -31,7 +25,7 @@ user 65532:65532
 # api
 from base as api
 
-copy --from=build /out/api /app/api
+copy dist/api /app/api
 
 expose 8000
 
@@ -41,13 +35,13 @@ entrypoint ["/app/api"]
 # worker
 from base as worker
 
-copy --from=build /out/worker /app/worker
+copy dist/worker /app/worker
 
 entrypoint ["/app/worker"]
 
 # migrate
 from base as migrate
 
-copy --from=build /out/migrate /app/migrate
+copy dist/migrate /app/migrate
 
 entrypoint ["/app/migrate"]
