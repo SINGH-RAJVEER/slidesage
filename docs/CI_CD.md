@@ -24,21 +24,35 @@ A small change does not rebuild the whole stack. Four caches carry unchanged wor
 
 | Cache | Where | Key |
 | ----- | ----- | --- |
-| Go module and build cache, for tests and vet | `checks.yml` | `go.sum` hash plus the commit SHA |
-| Go module and build cache, for the image build | `deploy.yml` | `apps/api/go.sum` hash plus the commit SHA |
-| Docker layer cache | `deploy.yml`, `type=gha` | one scope per image |
+| Go module and build cache, for tests and vet | `checks.yml` | `go.sum` hash plus the UTC date |
+| Go module and build cache, for the image build | `deploy.yml` | `apps/api/go.sum` hash plus the UTC date |
+| Docker layer cache | `deploy.yml`, `type=gha` | one scope, `slidesage-api` |
 | Terraform providers | all three Terraform workflows | `infra/prod/.terraform.lock.hcl` hash |
 
 Two things are easy to get wrong here and both were:
 
-- **`actions/setup-go` caching is off on purpose.** It keys its cache on `go.sum`, so the build cache is only ever rewritten when a dependency moves, and every run in between recompiles more of the module from scratch. `cache: false` plus an explicit `actions/cache` whose key ends in the commit SHA means the key never hits exactly, a fresh entry is saved every run, and `restore-keys` falls back to the most recent one. The same pattern keys the image build's cache.
+- **`actions/setup-go` caching is off on purpose.** It restores on an exact key match only, so a `go.sum` bump starts from nothing: the release that merged PR #43 spent 65s in `go test` and another 25s saving. `cache: false` plus an explicit `actions/cache` with `restore-keys` means a dependency bump falls back to the previous entry instead. On commits that do not touch `go.sum` the old behaviour was already fine, at roughly 3s, so this is insurance for the bump, not a saving on every run.
 - **BuildKit cache mounts are not covered by `type=gha`.** Layer cache and cache-mount contents are separate mechanisms, and `cache-to: type=gha` exports only the former. The `--mount=type=cache` directories in `apps/api/Dockerfile` would start empty on every run, recompiling every dependency, so `reproducible-containers/buildkit-cache-dance` round-trips them through `actions/cache` around the bake step.
 
-Each image writes to its own `type=gha` scope. An unscoped backend gives every build the same entry to overwrite, leaving only the last one. Only the `api` scope is written with `mode=max`, because that is where the shared `build` stage lives; `worker` and `migrate` read from it and write back their own trivial scratch layers.
+### Why the keys carry a date
 
-The pull request checks also filter on changed paths. A change confined to `apps/web` skips the Go test, vet, and build steps, and a change confined to `apps/api` skips the type check, the TypeScript tests, and the web build. The filtering happens inside the one `test-and-build` job rather than splitting it, so the check name branch protection requires is always reported. A release gate runs everything regardless.
+The Actions cache is 10 GB per repository and evicts by least recent access. The Go entry is about 265 MB. Keying it on the commit would write a new one on every run, and since the Docker layer cache is only touched by a release, that churn would evict the build cache between deployments. A UTC date in the key bounds writes to one per branch per day while `restore-keys` still falls back to the newest existing entry.
 
-Cloudflare Pages has its own build cache enabled through `build_caching` in `infra/prod/edge.tf`, and `BUN_VERSION` is pinned there so a deployment builds on the same Bun the checks ran on rather than the older Pages default.
+The save is also skipped entirely on a pull request. A cache written by a `pull_request` run is scoped to that run's merge ref and can only be restored by a re-run of the same pull request, so it would never be read. Pull requests still restore from the base branch normally.
+
+Cache scope is per branch throughout: a run reads its own branch, the default branch, and for a pull request its base. Entries written on `dev` are invisible to `main` and the reverse, so the `checks` job called by `deploy.yml` restores from previous `main` runs only.
+
+Only one Docker cache scope is used. An unscoped `type=gha` gives every image the same entry to overwrite, leaving only the last, but separate scopes per image are equally wrong here: all three images are the shared `build` stage plus a `COPY` of one binary onto `scratch`, so scopes for `worker` and `migrate` would only hold entries nothing reads back.
+
+### Path filtering
+
+A change confined to `apps/web` skips the Go test, vet, and build steps; a change confined to `apps/api` skips the type check, the TypeScript tests, and the web build; a change touching neither, such as documentation, skips both sets.
+
+This applies to pushes as well as pull requests. A pull request is diffed through the API against its base; a push is diffed against the commit the branch moved from, which requires that commit to be in the checkout, hence `fetch-depth: 50` on a push.
+
+Every way of failing to resolve a base runs the whole suite: a first push to a new branch, a force push, a range deeper than the checkout, or an error inside the filter. A check that silently narrows itself is worse than one that occasionally does too much. The filtering also stays inside the single `test-and-build` job rather than splitting it, so the check name branch protection requires is always reported.
+
+Cloudflare Pages has its own build cache enabled through `build_caching` in `infra/prod/edge.tf`, and `BUN_VERSION` is pinned there so a deployment builds on the same Bun the checks ran on rather than the older Pages default. Preview deployments are not pinned.
 
 ## Artifact Registry layout
 
@@ -276,7 +290,7 @@ PROJECT_ID=slidesage-504414 IMAGE_VERSION=dev docker buildx bake -f docker-bake.
 
 ## Migration cutover
 
-Every production release takes an on-demand Cloud SQL backup before running migrations. The backup starts as soon as the release job authenticates and runs alongside the Terraform planning, because nothing before the migration depends on it; the workflow blocks on its completion immediately before the schema changes, where the guarantee has to hold. Terraform then sets the existing API and queue services to manual scaling with zero instances, preserving their previous images for this phase. This stops new submissions and queue processing while schema changes run. The API is temporarily unavailable during the cutover.
+Every production release takes an on-demand Cloud SQL backup before running migrations. The backup starts as soon as the release job authenticates and runs alongside the Terraform planning, because nothing before the migration depends on it; the workflow blocks on its completion immediately before the schema changes, where the guarantee has to hold. It does not trust the exit status of `gcloud sql operations wait`, which documents a timeout and nothing about what it returns for an operation that finished with an error. The operation is read back and its status and error fields are checked, so a failed backup stops the release rather than letting it migrate without a recovery point. Terraform then sets the existing API and queue services to manual scaling with zero instances, preserving their previous images for this phase. This stops new submissions and queue processing while schema changes run. The API is temporarily unavailable during the cutover.
 
 The cutover deletes the retired `preview-worker` service before migration 27 removes its claim columns. The full release apply restores automatic scaling with the new API and generation-worker images. If migration or release apply fails, services remain paused; inspect the failure before retrying rather than restarting an old binary against a changed schema.
 
