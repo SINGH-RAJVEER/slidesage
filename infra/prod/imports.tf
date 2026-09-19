@@ -22,8 +22,10 @@ import {
 }
 
 
+# Only the services the project already had. Cloud Tasks and Cloud Scheduler are
+# enabled by the first apply that introduces the worker wake signal.
 import {
-  for_each = local.required_services
+  for_each = local.preexisting_services
   to       = google_project_service.required[each.value]
   id       = "${var.gcp_project_id}/${each.value}"
 }

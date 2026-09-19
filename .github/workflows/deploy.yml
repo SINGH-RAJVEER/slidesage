@@ -210,6 +210,9 @@ jobs:
             args+=("-var=${component}_image=$image")
             args+=("-target=google_cloud_run_v2_service.$resource")
           done
+          # The sweep runs on its own schedule now, so pausing the services is
+          # not enough to keep a worker away from a half-migrated schema.
+          args+=(-target=google_cloud_scheduler_job.maintenance)
           terraform plan -input=false -lock-timeout=5m -no-color \
             "${args[@]}" -out=maintenance.tfplan
           terraform apply -input=false -lock-timeout=5m -no-color maintenance.tfplan
@@ -267,5 +270,9 @@ jobs:
             --format='value(bindings.members)')
 
           test "$API_INGRESS" = internal-and-cloud-load-balancing
-          test "$WORKER_INGRESS" = internal
+          # The worker accepts public ingress because Cloud Tasks dispatches the
+          # wake signal from outside the project network. IAM is what keeps it
+          # closed, so the absence of an allUsers invoker is the assertion that
+          # matters now.
+          test "$WORKER_INGRESS" = all
           test -z "$WORKER_PUBLIC_BINDING"
