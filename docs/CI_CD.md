@@ -20,14 +20,13 @@ A complete plan runs before the targeted migration update. Missing secrets, miss
 
 ## Build caching
 
-A small change does not rebuild the whole stack. Four caches carry unchanged work between runs, and each one exists because a default was quietly not working.
+A small change does not rebuild the whole stack. Three caches carry unchanged work between runs, and each one exists because a default was quietly not working.
 
 | Cache | Where | Key |
 | ----- | ----- | --- |
 | Go module and build cache, for tests and vet | `checks.yml` | `go.sum` hash plus the UTC date |
 | Go module and build cache, for the image build | `deploy.yml` | `apps/api/go.sum` hash plus the UTC date |
 | Docker layer cache | `deploy.yml`, `type=gha` | one scope, `slidesage-api` |
-| Terraform providers | all three Terraform workflows | `infra/prod/.terraform.lock.hcl` hash |
 
 Two things are easy to get wrong here and both were:
 
@@ -38,11 +37,19 @@ Two things are easy to get wrong here and both were:
 
 The Actions cache is 10 GB per repository and evicts by least recent access. The Go entry is about 265 MB. Keying it on the commit would write a new one on every run, and since the Docker layer cache is only touched by a release, that churn would evict the build cache between deployments. A UTC date in the key bounds writes to one per branch per day while `restore-keys` still falls back to the newest existing entry.
 
-The save is also skipped entirely on a pull request, for the Go caches and the Terraform provider cache alike. A cache written by a `pull_request` run is scoped to that run's merge ref and can only be restored by a re-run of the same pull request, so it would never be read. Pull requests still restore from the base branch normally.
+The save is also skipped entirely on a pull request. A cache written by a `pull_request` run is scoped to that run's merge ref and can only be restored by a re-run of the same pull request, so it would never be read. Pull requests still restore from the base branch normally.
 
 Cache scope is per branch throughout: a run reads its own branch, the default branch, and for a pull request its base. Entries written on `dev` are invisible to `main` and the reverse, so the `checks` job called by `deploy.yml` restores from previous `main` runs only.
 
 Only one Docker cache scope is used. An unscoped `type=gha` gives every image the same entry to overwrite, leaving only the last, but separate scopes per image are equally wrong here: all three images are the shared `build` stage plus a `COPY` of one binary onto `scratch`, so scopes for `worker` and `migrate` would only hold entries nothing reads back.
+
+### What is deliberately not cached
+
+Terraform providers are downloaded on every `init` and that is intentional. `TF_PLUGIN_CACHE_DIR` backed by `actions/cache` was tried and measured at net zero: fetching `hashicorp/google` and `cloudflare/cloudflare` from the registry took 2.45s, serving them from a restored cache took 0.5s, and restoring the 39 MB cache entry cost the 2s difference back.
+
+The documented purpose of the plugin cache is to share one download across multiple configurations, or to help on slow or metered connections. This repository has two providers, one working directory, and a runner with fast egress, so none of that applies. The cache is also explicitly not concurrency safe, which would become a real hazard if the Terraform jobs are ever parallelised over a shared workspace.
+
+Revisit it if the provider count grows past roughly five, more Terraform configurations are added, or CI moves to self-hosted runners. If the goal is ever independence from the registry rather than speed, use a provider mirror, which is deterministic, rather than a best-effort cache.
 
 ### Path filtering
 

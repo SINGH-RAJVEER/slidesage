@@ -133,7 +133,6 @@ jobs:
       TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.DATADOG_OTLP_ENDPOINT }}
       TF_VAR_otel_logs_exporter: ${{ vars.OTEL_LOGS_EXPORTER || 'otlp' }}
       TF_VAR_otel_service_version: ${{ github.sha }}
-      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform-plugin-cache
     steps:
       - uses: actions/checkout@v4
 
@@ -149,19 +148,6 @@ jobs:
         with:
           terraform_version: 1.16.0
           terraform_wrapper: false
-
-      # The google and cloudflare providers are large and otherwise downloaded
-      # from the registry on every init, in this workflow and two others.
-      - name: Restore the Terraform provider cache
-        id: tf-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
-          key: ${{ runner.os }}-terraform-${{ hashFiles('infra/prod/.terraform.lock.hcl') }}
-          restore-keys: ${{ runner.os }}-terraform-
-
-      - name: Create the provider cache directory
-        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
 
       # Nothing between here and the migration depends on the backup, and it is
       # the longest single step in the release, so start it now and only block
@@ -195,16 +181,6 @@ jobs:
             -backend-config="bucket=$TF_STATE_BUCKET" \
             -backend-config="prefix=prod"
           terraform validate -no-color
-
-      # An entry written by a pull request run is scoped to that run's merge
-      # ref and can only be read back by a re-run of the same pull request.
-      # Restore from the base branch, but leave the writing to pushes.
-      - name: Save the Terraform provider cache
-        if: github.event_name != 'pull_request' && steps.tf-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
-          key: ${{ runner.os }}-terraform-${{ hashFiles('infra/prod/.terraform.lock.hcl') }}
 
       # Check the whole configuration before the targeted migration update.
       # Missing secrets, DNS permissions, or invalid imports stop here.
