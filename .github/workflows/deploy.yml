@@ -42,6 +42,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/api/go.mod
+          cache: false
+
+      - name: Stamp the Go cache key
+        run: echo "GO_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+
+      # The checks job saved this entry minutes ago, on this same commit, so
+      # the release binaries compile incrementally. Read only: checks owns the
+      # writing, and two jobs racing the same key would be undefined.
+      - name: Restore the Go module and build caches
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}
+          restore-keys: |
+            ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-
+            ${{ runner.os }}-go-
+
+      # Compiled here rather than inside the image. The binaries are static and
+      # the images are FROM scratch, so the container never needed a toolchain,
+      # and a runner build reuses the cache the checks job just warmed.
+      - name: Build the release binaries
+        working-directory: apps/api
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          for component in api worker migrate; do
+            go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" \
+              -o "$GITHUB_WORKSPACE/dist/$component" "./cmd/$component"
+            test -x "$GITHUB_WORKSPACE/dist/$component"
+          done
+
       - id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -53,60 +93,17 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "$REGISTRY_LOCATION-docker.pkg.dev" --quiet
 
-      - id: buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      # BuildKit keeps layer cache and cache-mount contents in two separate
-      # places, and type=gha only carries the former. Without this the Go module
-      # and build caches mounted in apps/api/Dockerfile start empty every run,
-      # so every dependency is recompiled from scratch.
-      - name: Stamp the Go cache key
-        run: echo "GO_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
-
-      - name: Restore the Go caches mounted during the build
-        id: go-mount-cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            go-mod-cache
-            go-build-cache
-          # Keying on go.sum alone would freeze the build cache until a
-          # dependency moved; keying on the commit would write a 265 MB entry
-          # every run and churn the repository's 10 GB budget, evicting the
-          # Docker layer cache above. A date refreshes it once a day.
-          key: ${{ runner.os }}-docker-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}
-          restore-keys: |
-            ${{ runner.os }}-docker-go-${{ hashFiles('apps/api/go.sum') }}-
-            ${{ runner.os }}-docker-go-
-
-      - name: Inject the Go caches into the builder
-        uses: reproducible-containers/buildkit-cache-dance@v3
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          cache-map: |
-            {
-              "go-mod-cache": "/go/pkg/mod",
-              "go-build-cache": "/root/.cache/go-build"
-            }
-
-      # One bake builds all three images. They share a single `build` stage, so
-      # BuildKit compiles it once rather than re-entering the builder per image.
-      #
-      # An unscoped type=gha gives every image the same cache entry to
-      # overwrite, leaving only the last one, so the cache is named explicitly.
-      # One scope is enough here: all three images are the shared build stage
-      # plus a COPY of one binary onto scratch. Writing worker and migrate to
-      # scopes of their own only spends budget on entries nothing reads back,
-      # because their whole build cost lives in the stage the api scope holds.
+      # Each image is now a COPY of one binary onto scratch, sharing only the
+      # certificate stage, so there is nothing left worth a layer cache. One
+      # bake still builds and pushes all three in a single invocation.
       - name: Build and push the API, worker, and migrate images
         uses: docker/bake-action@v7
         with:
           source: .
           files: docker-bake.hcl
           push: true
-          set: |
-            *.cache-from=type=gha,scope=slidesage-api
-            api.cache-to=type=gha,mode=max,scope=slidesage-api
         env:
           PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           REGISTRY: ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev
@@ -216,15 +213,6 @@ jobs:
           terraform plan -input=false -lock-timeout=5m -no-color \
             "${args[@]}" -out=maintenance.tfplan
           terraform apply -input=false -lock-timeout=5m -no-color maintenance.tfplan
-
-      - name: Remove the legacy preview worker
-        shell: bash
-        run: |
-          if gcloud run services describe preview-worker \
-            --project="$PROJECT_ID" --region="$RUN_REGION" >/dev/null 2>&1; then
-            gcloud run services delete preview-worker \
-              --project="$PROJECT_ID" --region="$RUN_REGION" --quiet
-          fi
 
       # No schema change may start until the backup that covers it exists.
       #

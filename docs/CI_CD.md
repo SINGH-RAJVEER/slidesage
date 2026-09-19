@@ -4,7 +4,7 @@ The repository deploys its Go API and generation worker to Google Cloud Run. Eve
 
 ## Flow
 
-1. GitHub Actions builds three image targets from `apps/api/Dockerfile` with a single `docker buildx bake` over `docker-bake.hcl`. All three share one `build` stage, so BuildKit compiles it once instead of re-entering the builder per image. The Dockerfile also provides Linux/amd64 defaults for `BUILDPLATFORM`, `TARGETOS`, and `TARGETARCH`, so plain Docker builds (including Google Cloud Build's Docker builder) do not expand the platform to an empty value:
+1. GitHub Actions compiles the three release binaries on the runner, then builds three image targets from `apps/api/Dockerfile` with a single `docker buildx bake` over `docker-bake.hcl`. The images are `FROM scratch` and copy one binary each out of `dist/`, so the container carries no toolchain and the build is a `COPY`:
    - `api` (web server, port 8000) -> Cloud Run **service** `api`
    - `worker` (River queue consumer with a health server, port 8080) -> Cloud Run **service** `worker`
    - `migrate` (Goose + River migrations, one-shot) -> Cloud Run **job** `slidesage-migrate`
@@ -20,36 +20,34 @@ A complete plan runs before the targeted migration update. Missing secrets, miss
 
 ## Build caching
 
-A small change does not rebuild the whole stack. Three caches carry unchanged work between runs, and each one exists because a default was quietly not working.
+A small change does not rebuild the whole stack. Two caches carry unchanged work between runs.
 
 | Cache | Where | Key |
 | ----- | ----- | --- |
-| Go module and build cache, for tests and vet | `checks.yml` | `go.sum` hash plus the UTC date |
-| Go module and build cache, for the image build | `deploy.yml` | `apps/api/go.sum` hash plus the UTC date |
-| Docker layer cache | `deploy.yml`, `type=gha` | one scope, `slidesage-api` |
+| Go module and build cache, written | `checks.yml` | `apps/api/go.sum` hash plus the UTC date |
+| Go module and build cache, read | `deploy.yml` build job | the same key, restore only |
 
-Two things are easy to get wrong here and both were:
+`actions/setup-go` caching is off on purpose. It restores on an exact key match only, so a `go.sum` bump starts from nothing: the release that merged PR #43 spent 65s in `go test` and another 25s saving. `cache: false` plus an explicit `actions/cache` with `restore-keys` means a dependency bump falls back to the previous entry instead. On commits that do not touch `go.sum` the old behaviour was already fine, at roughly 3s, so this is insurance for the bump, not a saving on every run.
 
-- **`actions/setup-go` caching is off on purpose.** It restores on an exact key match only, so a `go.sum` bump starts from nothing: the release that merged PR #43 spent 65s in `go test` and another 25s saving. `cache: false` plus an explicit `actions/cache` with `restore-keys` means a dependency bump falls back to the previous entry instead. On commits that do not touch `go.sum` the old behaviour was already fine, at roughly 3s, so this is insurance for the bump, not a saving on every run.
-- **BuildKit cache mounts are not covered by `type=gha`.** Layer cache and cache-mount contents are separate mechanisms, and `cache-to: type=gha` exports only the former. The `--mount=type=cache` directories in `apps/api/Dockerfile` would start empty on every run, recompiling every dependency, so `reproducible-containers/buildkit-cache-dance` round-trips them through `actions/cache` around the bake step.
+The release compiles against the entry the checks job wrote minutes earlier on the same commit, so the binaries build incrementally. Only `checks` writes; two jobs racing one key would be undefined.
 
 ### Why the keys carry a date
 
-The Actions cache is 10 GB per repository and evicts by least recent access. The Go entry is about 265 MB. Keying it on the commit would write a new one on every run, and since the Docker layer cache is only touched by a release, that churn would evict the build cache between deployments. A UTC date in the key bounds writes to one per branch per day while `restore-keys` still falls back to the newest existing entry.
+The Actions cache is 10 GB per repository and evicts by least recent access. The Go entry is about 265 MB, so keying it on the commit would write a new one on every run and churn the budget. A UTC date bounds writes to one per branch per day while `restore-keys` still falls back to the newest existing entry.
 
-The save is also skipped entirely on a pull request. A cache written by a `pull_request` run is scoped to that run's merge ref and can only be restored by a re-run of the same pull request, so it would never be read. Pull requests still restore from the base branch normally.
+The save is skipped entirely on a pull request. A cache written by a `pull_request` run is scoped to that run's merge ref and can only be restored by a re-run of the same pull request, so it would never be read. Pull requests still restore from the base branch normally.
 
 Cache scope is per branch throughout: a run reads its own branch, the default branch, and for a pull request its base. Entries written on `dev` are invisible to `main` and the reverse, so the `checks` job called by `deploy.yml` restores from previous `main` runs only.
 
-Only one Docker cache scope is used. An unscoped `type=gha` gives every image the same entry to overwrite, leaving only the last, but separate scopes per image are equally wrong here: all three images are the shared `build` stage plus a `COPY` of one binary onto `scratch`, so scopes for `worker` and `migrate` would only hold entries nothing reads back.
-
 ### What is deliberately not cached
 
-Terraform providers are downloaded on every `init` and that is intentional. `TF_PLUGIN_CACHE_DIR` backed by `actions/cache` was tried and measured at net zero: fetching `hashicorp/google` and `cloudflare/cloudflare` from the registry took 2.45s, serving them from a restored cache took 0.5s, and restoring the 39 MB cache entry cost the 2s difference back.
+**Docker layers.** Each image is a `COPY` of one binary onto `scratch`, sharing only the certificate stage, so there is nothing left that a layer cache would save. A `.dockerignore` keeps the build context to `dist/`; without it the whole repository, `.git` and `node_modules` included, is uploaded to the builder for a build that reads three files.
 
-The documented purpose of the plugin cache is to share one download across multiple configurations, or to help on slow or metered connections. This repository has two providers, one working directory, and a runner with fast egress, so none of that applies. The cache is also explicitly not concurrency safe, which would become a real hazard if the Terraform jobs are ever parallelised over a shared workspace.
+**BuildKit cache mounts.** The binaries were once compiled inside the image behind `--mount=type=cache`. Layer cache and cache-mount contents are separate mechanisms and `type=gha` carries only the former, so those mounts started empty on every run. `buildkit-cache-dance` fixed that and was measured over two releases: a warm cache took the bake from 88s to 37s, but injecting and extracting cost 17s and 52s, so 69s of overhead bought 51s of compile. Compiling on the runner removes the problem instead of paying for it.
 
-Revisit it if the provider count grows past roughly five, more Terraform configurations are added, or CI moves to self-hosted runners. If the goal is ever independence from the registry rather than speed, use a provider mirror, which is deterministic, rather than a best-effort cache.
+**Terraform providers.** `TF_PLUGIN_CACHE_DIR` backed by `actions/cache` was tried and measured at net zero: fetching `hashicorp/google` and `cloudflare/cloudflare` from the registry took 2.45s, serving them from a restored cache took 0.5s, and restoring the 39 MB entry cost the 2s difference back. The plugin cache exists to share one download across several configurations, or to help on a slow or metered connection, and this repository has two providers, one working directory, and a runner with fast egress. It is also explicitly not concurrency safe, which would matter if the Terraform jobs were ever parallelised over a shared workspace.
+
+Revisit that last one if the provider count grows past roughly five, more Terraform configurations are added, or CI moves to self-hosted runners. If the goal is ever independence from the registry rather than speed, use a provider mirror, which is deterministic, rather than a best-effort cache.
 
 ### Path filtering
 
@@ -282,6 +280,9 @@ or atomically in the console: Cloud Run -> service -> Revisions -> select revisi
 ```bash
 gcloud auth configure-docker asia-south1-docker.pkg.dev
 
+# The images copy prebuilt binaries, so compile them first:
+just binaries
+
 # One image:
 docker build --target api --file apps/api/Dockerfile --tag asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev .
 docker push asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev
@@ -301,6 +302,6 @@ PROJECT_ID=slidesage-504414 IMAGE_VERSION=dev docker buildx bake -f docker-bake.
 
 Every production release takes an on-demand Cloud SQL backup before running migrations. The backup starts as soon as the release job authenticates and runs alongside the Terraform planning, because nothing before the migration depends on it; the workflow blocks on its completion immediately before the schema changes, where the guarantee has to hold. It does not trust the exit status of `gcloud sql operations wait`, which documents a timeout and nothing about what it returns for an operation that finished with an error. The operation is read back and its status and error fields are checked, so a failed backup stops the release rather than letting it migrate without a recovery point. Terraform then sets the existing API and queue services to manual scaling with zero instances, preserving their previous images for this phase. This stops new submissions and queue processing while schema changes run. The API is temporarily unavailable during the cutover.
 
-The cutover deletes the retired `preview-worker` service before migration 27 removes its claim columns. The full release apply restores automatic scaling with the new API and generation-worker images. If migration or release apply fails, services remain paused; inspect the failure before retrying rather than restarting an old binary against a changed schema.
+The full release apply restores automatic scaling with the new API and generation-worker images. If migration or release apply fails, services remain paused; inspect the failure before retrying rather than restarting an old binary against a changed schema.
 
 Migration 25 deletes presentations without a committed PPTX revision, as required by the canonical-only transition. The backup preserves the pre-release database for recovery; it does not make the deletion reversible through a schema downgrade.

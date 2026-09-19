@@ -49,6 +49,15 @@ lint-fix:
 format:
     bun run format
 
-# Build a container image from the repo root context
-image target="api":
+# Compile the release binaries the container images copy in
+binaries:
+	mkdir -p dist
+	for component in api worker migrate; do \
+		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C apps/api build \
+			-mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" \
+			-o "$PWD/dist/$component" "./cmd/$component"; \
+	done
+
+# Build a container image from the repo root context. Run `just binaries` first.
+image target="api": binaries
 	docker build --target {{target}} --file apps/api/Dockerfile --tag slidesage-{{target}} .
