@@ -106,6 +106,65 @@ describe("PresentationErrorPage", () => {
 		}
 	});
 
+	it("retries from the id in the URL after a reload drops history state", async () => {
+		const { default: PresentationErrorPage } = await import(
+			"../../../routes/presentations/PresentationErrorPage"
+		);
+		const originalFetch = globalThis.fetch;
+		const retryRequest = mock(async (input: RequestInfo | URL) => {
+			expect(String(input)).toContain("/presentations/presentation_42");
+
+			return Response.json({
+				presentation: {
+					id: "presentation_42",
+					title: "Failed deck",
+					prompt: "Retry this deck",
+					slides_data: {
+						title: "Failed deck",
+						slides: [],
+						status: "failed",
+						template: { id: "soft-skills-training", version: 1 },
+						failure: {
+							message: "Generation failed",
+							retry: {
+								prompt: "Retry this deck",
+								slide_count: 7,
+								detail_level: "detailed",
+								tonality: "professional",
+								research_enabled: false,
+								template: { id: "soft-skills-training", version: 1 },
+							},
+						},
+					},
+					created_at: "2026-07-14T10:00:00.000Z",
+					updated_at: "2026-07-14T10:00:00.000Z",
+				},
+			});
+		});
+		globalThis.fetch = retryRequest as unknown as typeof fetch;
+
+		try {
+			const view = render(
+				<MemoryRouter initialEntries={["/presentation-error?id=presentation_42"]}>
+					<Routes>
+						<Route path="/presentation-error" element={<PresentationErrorPage />} />
+						<Route path="/generate" element={<RouteStateProbe />} />
+					</Routes>
+				</MemoryRouter>,
+			);
+
+			fireEvent.click(view.getByRole("button", { name: "Retry presentation" }));
+
+			await waitFor(() => {
+				expect(retryRequest).toHaveBeenCalledTimes(1);
+				expect(view.getByText(/"prompt":"Retry this deck"/)).toBeInTheDocument();
+			});
+			expect(view.getByText(/"id":"soft-skills-training"/)).toBeInTheDocument();
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
 	it("handles an HTML deployment error without exposing a JSON parser failure", async () => {
 		const { default: PresentationErrorPage } = await import(
 			"../../../routes/presentations/PresentationErrorPage"

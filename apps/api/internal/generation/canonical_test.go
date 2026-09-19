@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/pptxcompiler"
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatepublish"
 )
 
 func revisionSource(t *testing.T) []byte {
@@ -153,5 +155,89 @@ func TestRevisePPTXStructuralPlanAndRepair(t *testing.T) {
 				t.Fatal("expansion changed the retained slide or lost the clone edit")
 			}
 		})
+	}
+}
+
+// A deck longer than one batch must be drafted in several shorter calls and
+// reassembled by position, so one long completion is never the only path.
+func TestGenerateSlotsDraftsInBatches(t *testing.T) {
+	previousBatch := slotBatchSize
+	slotBatchSize = 2
+	defer func() { slotBatchSize = previousBatch }()
+
+	assignments := make([]pptxcompiler.Assignment, 5)
+	for i := range assignments {
+		assignments[i] = pptxcompiler.Assignment{
+			Position: i + 1,
+			Archetype: templatepublish.Archetype{
+				ID:    "content",
+				Slots: []templatepublish.Slot{{ID: "body", Kind: templatepublish.SlotText, Required: true, MaxCharacters: 200}},
+			},
+		}
+	}
+
+	requested := [][]int{}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		body, _ := io.ReadAll(request.Body)
+		var payload struct {
+			Messages []struct {
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		_ = json.Unmarshal(body, &payload)
+		user := payload.Messages[len(payload.Messages)-1].Content
+
+		positions := []int{}
+		slides := []map[string]any{}
+		for _, a := range assignments {
+			if !strings.Contains(user, fmt.Sprintf(`"Position":%d`, a.Position)) {
+				continue
+			}
+			positions = append(positions, a.Position)
+			slides = append(slides, map[string]any{"position": a.Position, "slots": map[string]any{"body": "Slide copy"}})
+		}
+		requested = append(requested, positions)
+
+		document, _ := json.Marshal(map[string]any{"title": "Batched deck", "slides": slides})
+		writer.Header().Set("Content-Type", "text/event-stream")
+		chunk, _ := json.Marshal(map[string]any{
+			"choices": []map[string]any{{"delta": map[string]string{"content": string(document)}}},
+			"usage":   map[string]int{"total_tokens": 10},
+		})
+		_, _ = writer.Write([]byte("data: " + string(chunk) + "\n\n"))
+		_, _ = writer.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer server.Close()
+
+	t.Setenv("OPEN_ROUTER_API_BASE", server.URL)
+	t.Setenv("OPEN_ROUTER_MODEL", "test-model")
+	t.Setenv("OPEN_ROUTER_API_KEY", "test-key")
+
+	handler := &handler{client: server.Client()}
+	title, content, tokens, err := handler.generateSlots(context.Background(), streamJob{slideCount: len(assignments), prompt: "Batching"}, assignments)
+	if err != nil {
+		t.Fatalf("generateSlots: %v", err)
+	}
+	if len(requested) != 3 {
+		t.Fatalf("drafting calls = %d (%v), want 3 batches of at most 2", len(requested), requested)
+	}
+	for _, batch := range requested {
+		if len(batch) > 2 {
+			t.Fatalf("batch %v exceeds the batch size", batch)
+		}
+	}
+	if len(content) != len(assignments) {
+		t.Fatalf("slides = %d, want %d", len(content), len(assignments))
+	}
+	for i, slide := range content {
+		if slide.Position != i+1 {
+			t.Fatalf("slide %d landed at position %d", i+1, slide.Position)
+		}
+	}
+	if title != "Batched deck" {
+		t.Fatalf("title = %q", title)
+	}
+	if tokens != 30 {
+		t.Fatalf("tokens = %d, want the sum across batches", tokens)
 	}
 }

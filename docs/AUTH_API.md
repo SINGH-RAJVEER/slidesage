@@ -55,7 +55,7 @@ Sign-out invalidates pending auth refreshes before clearing the JWT cookie. This
 | `POST` | `/auth/email-otp/send-verification-otp`  | Send or replace an email OTP                  |
 | `POST` | `/auth/email-otp/verify-email`           | Verify an email OTP                           |
 | `POST` | `/auth/sign-in/email`                    | Sign in with email and password               |
-| `POST` | `/auth/email-otp/request-password-reset` | Send or replace a reset OTP                   |
+| `POST` | `/auth/email-otp/request-password-reset` | Send or replace a reset OTP for a known email  |
 | `POST` | `/auth/email-otp/reset-password`         | Set a password using the OTP                  |
 | `GET`  | `/auth/get-session`                      | Validate the JWT and return the current user  |
 | `POST` | `/auth/sign-out`                         | Clear the JWT cookie                          |
@@ -97,6 +97,7 @@ OTP, sign-in, and sign-up routes are rate limited by normalized email and client
 - Email/password accounts must verify their email before normal use.
 - Sign-in with a correct password and repeated sign-up for an existing unverified address both send a fresh OTP and continue on the verification page. A verified address still receives the normal `Email already in use` response during sign-up. Coded authentication failures use a top-level `code` and `message` response shape so the browser can distinguish `EMAIL_NOT_VERIFIED`.
 - Verification OTPs expire after 15 minutes.
+- A password reset request for an address with no account returns `404` with code `ACCOUNT_NOT_FOUND` and does not create or send an OTP. The forgot-password page answers that code in place, pointing the visitor at sign-up rather than advancing to the code screen. This deliberately confirms whether an address owns an account; the per-email and per-IP limits in [RATE_LIMITING.md](RATE_LIMITING.md) are what bound address probing.
 - Unverified credential-only accounts are retained for 24 hours. Cleanup runs at API startup and hourly, deleting expired accounts only when they have no active verification code or linked OAuth provider. Associated email verification and password-reset records are removed with the account.
 - Resending a verification OTP disables the resend action during its cooldown; the cooldown text is the resend confirmation.
 - Successful verification signs the user in.

@@ -9,6 +9,13 @@ export interface ViewerLocationState {
 	presentationId?: string;
 }
 
+// History state is dropped by a reload, so the failed presentation is named in
+// the URL as well. Without it the error page has no id to retry with.
+function errorRoute(presentationId?: string) {
+	if (!presentationId) return "/presentation-error";
+	return `/presentation-error?id=${encodeURIComponent(presentationId)}`;
+}
+
 interface StreamingLikeState {
 	isStreaming: boolean;
 	isComplete: boolean;
@@ -191,7 +198,7 @@ export function usePresentationData({
 				});
 
 				if (!response.ok) {
-					navigate("/presentation-error", {
+					navigate(errorRoute(idToFetch), {
 						replace: true,
 						state: {
 							presentationId: idToFetch,
@@ -214,7 +221,7 @@ export function usePresentationData({
 
 				const pres = data?.presentation;
 				if (!pres) {
-					navigate("/presentation-error", {
+					navigate(errorRoute(idToFetch), {
 						replace: true,
 						state: {
 							presentationId: idToFetch,
@@ -233,7 +240,7 @@ export function usePresentationData({
 				setPresentationId(pres.id);
 			} catch (error) {
 				console.error("Error fetching presentation:", error);
-				navigate("/presentation-error", {
+				navigate(errorRoute(idToFetch), {
 					replace: true,
 					state: {
 						presentationId: idToFetch,
@@ -291,7 +298,7 @@ export function usePresentationData({
 	useEffect(() => {
 		if (!isStreamingMode || !streamingState.error) return;
 
-		navigate("/presentation-error", {
+		navigate(errorRoute(streamingState.presentationId), {
 			replace: true,
 			state: {
 				error: streamingState.error,

@@ -169,34 +169,57 @@ func settleTx(ctx context.Context, tx *sql.Tx, job streamJob, data []byte, title
 	return balance, nil
 }
 
+// generationFailureDocument mirrors generationPlaceholder so a failed deck
+// carries back every setting the submission was made with. Retry reads these
+// fields to repopulate the generate page, so a field missing here is a setting
+// the user has to type again.
+func generationFailureDocument(job streamJob, message string) map[string]any {
+	retry := map[string]any{
+		"prompt":           job.prompt,
+		"slide_count":      job.slideCount,
+		"detail_level":     job.detailLevel,
+		"tonality":         job.tonality,
+		"research_enabled": job.research != nil || job.researchPayload != nil,
+		"research_payload": job.researchPayload,
+		"ai":               job.selection,
+	}
+	failed := map[string]any{
+		"title":   "Generation failed",
+		"slides":  []any{},
+		"status":  "failed",
+		"failure": map[string]any{"message": message, "retry": retry},
+	}
+	if job.template != nil {
+		retry["template"] = job.template
+		failed["template"] = job.template
+	}
+	return failed
+}
+
 func failTx(ctx context.Context, tx *sql.Tx, job streamJob, message string) error {
-	refunded, err := refundReservationTx(ctx, tx, job.operationID, job.userID, message)
-	if err != nil || !refunded {
+	// A reservation that was already released still has to record the failure,
+	// so the presentation write below is not conditional on a refund happening.
+	if _, err := refundReservationTx(ctx, tx, job.operationID, job.userID, message); err != nil {
 		return err
 	}
 
 	if job.kind == "generation" {
-		failed := map[string]any{
-			"title":  "Generation failed",
-			"slides": []any{},
-			"status": "failed",
-			"failure": map[string]any{
-				"message": message,
-				"retry": map[string]any{
-					"prompt":           job.prompt,
-					"slide_count":      job.slideCount,
-					"detail_level":     job.detailLevel,
-					"tonality":         job.tonality,
-					"research_enabled": job.research != nil || job.researchPayload != nil,
-					"research_payload": job.researchPayload,
-					"ai":               job.selection,
-				},
-			},
-		}
+		failed := generationFailureDocument(job, message)
+		failure, _ := json.Marshal(failed["failure"])
 		data, _ := json.Marshal(failed)
 		// Presentation state is secondary to the financial finalization. A user
 		// edit or deletion must never retain a reserved balance.
-		_, _ = tx.ExecContext(ctx, `UPDATE presentations SET title = $1, prompt = $2, slides_data = $3::jsonb, revision = revision + 1, updated_at = NOW() WHERE id = $4 AND user_id = $5 AND revision = $6`, "Generation failed", job.prompt, data, job.presentationID, job.userID, job.expectedRevision)
+		result, execErr := tx.ExecContext(ctx, `UPDATE presentations SET title = $1, prompt = $2, slides_data = $3::jsonb, revision = revision + 1, updated_at = NOW() WHERE id = $4 AND user_id = $5 AND revision = $6`, "Generation failed", job.prompt, data, job.presentationID, job.userID, job.expectedRevision)
+		written := int64(0)
+		if execErr == nil && result != nil {
+			written, _ = result.RowsAffected()
+		}
+		// A revision that moved on leaves the deck stranded in "generating" with
+		// no retry settings, so fall back to recording the failure in place. The
+		// status guard keeps this from touching a deck that already finished.
+		if written == 0 {
+			_, _ = tx.ExecContext(ctx, `UPDATE presentations SET title = $1, slides_data = jsonb_set(jsonb_set(slides_data, '{status}', '"failed"'::jsonb, true), '{failure}', $2::jsonb, true), revision = revision + 1, updated_at = NOW() WHERE id = $3 AND user_id = $4 AND slides_data->>'status' = 'generating'`, "Generation failed", failure, job.presentationID, job.userID)
+		}
 	}
 	return nil
 }

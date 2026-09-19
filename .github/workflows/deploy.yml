@@ -46,44 +46,65 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "$REGISTRY_LOCATION-docker.pkg.dev" --quiet
 
-      - uses: docker/setup-buildx-action@v3
+      - id: buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build and push API image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/api/Dockerfile
-          target: api
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: |
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/api:${{ env.IMAGE_VERSION }}
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/api:latest
+      # BuildKit keeps layer cache and cache-mount contents in two separate
+      # places, and type=gha only carries the former. Without this the Go module
+      # and build caches mounted in apps/api/Dockerfile start empty every run,
+      # so every dependency is recompiled from scratch.
+      - name: Stamp the Go cache key
+        run: echo "GO_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
 
-      - name: Build and push worker image
-        uses: docker/build-push-action@v6
+      - name: Restore the Go caches mounted during the build
+        id: go-mount-cache
+        uses: actions/cache@v4
         with:
-          context: .
-          file: apps/api/Dockerfile
-          target: worker
-          push: true
-          cache-from: type=gha
-          tags: |
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/worker:${{ env.IMAGE_VERSION }}
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/worker:latest
+          path: |
+            go-mod-cache
+            go-build-cache
+          # Keying on go.sum alone would freeze the build cache until a
+          # dependency moved; keying on the commit would write a 265 MB entry
+          # every run and churn the repository's 10 GB budget, evicting the
+          # Docker layer cache above. A date refreshes it once a day.
+          key: ${{ runner.os }}-docker-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}
+          restore-keys: |
+            ${{ runner.os }}-docker-go-${{ hashFiles('apps/api/go.sum') }}-
+            ${{ runner.os }}-docker-go-
 
-      - name: Build and push migrate image
-        uses: docker/build-push-action@v6
+      - name: Inject the Go caches into the builder
+        uses: reproducible-containers/buildkit-cache-dance@v3
         with:
-          context: .
-          file: apps/api/Dockerfile
-          target: migrate
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-map: |
+            {
+              "go-mod-cache": "/go/pkg/mod",
+              "go-build-cache": "/root/.cache/go-build"
+            }
+
+      # One bake builds all three images. They share a single `build` stage, so
+      # BuildKit compiles it once rather than re-entering the builder per image.
+      #
+      # An unscoped type=gha gives every image the same cache entry to
+      # overwrite, leaving only the last one, so the cache is named explicitly.
+      # One scope is enough here: all three images are the shared build stage
+      # plus a COPY of one binary onto scratch. Writing worker and migrate to
+      # scopes of their own only spends budget on entries nothing reads back,
+      # because their whole build cost lives in the stage the api scope holds.
+      - name: Build and push the API, worker, and migrate images
+        uses: docker/bake-action@v7
+        with:
+          source: .
+          files: docker-bake.hcl
           push: true
-          cache-from: type=gha
-          tags: |
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/migrate:${{ env.IMAGE_VERSION }}
-            ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REGISTRY_REPOSITORY }}/migrate:latest
+          set: |
+            *.cache-from=type=gha,scope=slidesage-api
+            api.cache-to=type=gha,mode=max,scope=slidesage-api
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          REGISTRY: ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev
+          REPOSITORY: ${{ env.REGISTRY_REPOSITORY }}
+          IMAGE_VERSION: ${{ env.IMAGE_VERSION }}
 
   deploy:
     needs: build
@@ -105,6 +126,7 @@ jobs:
       TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.DATADOG_OTLP_ENDPOINT }}
       TF_VAR_otel_logs_exporter: ${{ vars.OTEL_LOGS_EXPORTER || 'otlp' }}
       TF_VAR_otel_service_version: ${{ github.sha }}
+      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform-plugin-cache
     steps:
       - uses: actions/checkout@v4
 
@@ -120,6 +142,31 @@ jobs:
         with:
           terraform_version: 1.16.0
           terraform_wrapper: false
+
+      # The google and cloudflare providers are large and otherwise downloaded
+      # from the registry on every init, in this workflow and two others.
+      - name: Restore the Terraform provider cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: ${{ runner.os }}-terraform-${{ hashFiles('infra/prod/.terraform.lock.hcl') }}
+          restore-keys: ${{ runner.os }}-terraform-
+
+      - name: Create the provider cache directory
+        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
+
+      # Nothing between here and the migration depends on the backup, and it is
+      # the longest single step in the release, so start it now and only block
+      # on it immediately before the schema changes.
+      - name: Start the pre-migration database backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          operation=$(gcloud sql backups create --instance=slidesage-postgres \
+            --project="$PROJECT_ID" --description="Before release $IMAGE_VERSION" \
+            --async --format='value(name)')
+          test -n "$operation"
+          echo "BACKUP_OPERATION=$operation" >> "$GITHUB_ENV"
 
       - name: Configure Terraform inputs
         shell: bash
@@ -154,11 +201,6 @@ jobs:
             -target=google_cloud_run_v2_job.migrate -out=migrate.tfplan
           terraform apply -input=false -lock-timeout=5m -no-color migrate.tfplan
 
-      - name: Back up the database before migration
-        run: |
-          gcloud sql backups create --instance=slidesage-postgres \
-            --project="$PROJECT_ID" --description="Before release $IMAGE_VERSION"
-
       # Stop requests and polling before destructive schema changes. Keep the
       # previous images in this phase so new binaries never see the old schema.
       - name: Pause services for database migration
@@ -188,6 +230,29 @@ jobs:
             --project="$PROJECT_ID" --region="$RUN_REGION" >/dev/null 2>&1; then
             gcloud run services delete preview-worker \
               --project="$PROJECT_ID" --region="$RUN_REGION" --quiet
+          fi
+
+      # No schema change may start until the backup that covers it exists.
+      #
+      # `gcloud sql operations wait` documents a timeout and nothing about what
+      # it returns for an operation that finished with an error, so its exit
+      # status is not trusted here. Read the operation back and assert on the
+      # status and error fields, which are unambiguous.
+      - name: Wait for the pre-migration database backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${BACKUP_OPERATION:?The backup was never started}"
+          gcloud sql operations wait "$BACKUP_OPERATION" \
+            --project="$PROJECT_ID" --timeout=1800 || true
+          operation=$(gcloud sql operations describe "$BACKUP_OPERATION" \
+            --project="$PROJECT_ID" --format=json)
+          status=$(jq -r '.status // empty' <<<"$operation")
+          error=$(jq -r '.error // empty' <<<"$operation")
+          if [ "$status" != "DONE" ] || [ -n "$error" ]; then
+            echo "The pre-migration backup did not complete cleanly:" >&2
+            jq . <<<"$operation" >&2
+            exit 1
           fi
 
       - name: Run migrations

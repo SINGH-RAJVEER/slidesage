@@ -5,12 +5,19 @@ import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 
+function getErrorCode(value: unknown): string | undefined {
+	if (typeof value !== "object" || value === null) return undefined;
+	const code = (value as { code?: unknown }).code;
+	return typeof code === "string" ? code : undefined;
+}
+
 export default function ForgotPasswordPage() {
 	const navigate = useNavigate();
 	const { isSignedIn } = useAuth();
 	const [email, setEmail] = useState("");
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [missingAccount, setMissingAccount] = useState(false);
 
 	useEffect(() => {
 		if (isSignedIn) {
@@ -21,6 +28,7 @@ export default function ForgotPasswordPage() {
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setError(null);
+		setMissingAccount(false);
 		setSubmitting(true);
 
 		const normalizedEmail = email.trim().toLowerCase();
@@ -31,7 +39,13 @@ export default function ForgotPasswordPage() {
 			});
 			navigate(`/reset-password?email=${encodeURIComponent(normalizedEmail)}&sent=1`);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : "Failed to send reset code.");
+			// The API only sends a code to an address that owns an account; an
+			// unknown address is answered here instead of on the code screen.
+			if (getErrorCode(err) === "ACCOUNT_NOT_FOUND") {
+				setMissingAccount(true);
+			} else {
+				setError(err instanceof Error ? err.message : "Failed to send reset code.");
+			}
 		} finally {
 			setSubmitting(false);
 		}
@@ -59,7 +73,10 @@ export default function ForgotPasswordPage() {
 									type="email"
 									autoComplete="email"
 									value={email}
-									onChange={(event) => setEmail(event.target.value)}
+									onChange={(event) => {
+										setEmail(event.target.value);
+										setMissingAccount(false);
+									}}
 									className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
 									placeholder="you@example.com"
 									required
@@ -74,6 +91,16 @@ export default function ForgotPasswordPage() {
 								{submitting ? "Sending code..." : "Send reset code"}
 							</button>
 						</form>
+
+						{missingAccount ? (
+							<p className="mt-4 text-sm text-white/75">
+								No account exists for that email address.{" "}
+								<Link to="/sign-up" className="text-white hover:underline font-semibold">
+									Create an account
+								</Link>{" "}
+								to get started.
+							</p>
+						) : null}
 
 						<p className="mt-6 text-center text-sm text-white/55">
 							Remember your password?{" "}
