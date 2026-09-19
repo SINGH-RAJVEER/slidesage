@@ -7,13 +7,11 @@ run apk add --no-cache ca-certificates
 
 copy apps/api/go.mod apps/api/go.sum ./
 
-run --mount=type=cache,target=/go/pkg/mod go mod download
+run go mod download
 
 copy apps/api ./
 
-run --mount=type=cache,target=/go/pkg/mod \
-	--mount=type=cache,target=/root/.cache/go-build \
-	export CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} && \
+run export CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} && \
 	go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o /out/api ./cmd/api && \
 	go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o /out/worker ./cmd/worker && \
 	go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" -o /out/migrate ./cmd/migrate

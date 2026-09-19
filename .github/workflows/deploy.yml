@@ -56,39 +56,6 @@ jobs:
       - id: buildx
         uses: docker/setup-buildx-action@v3
 
-      # BuildKit keeps layer cache and cache-mount contents in two separate
-      # places, and type=gha only carries the former. Without this the Go module
-      # and build caches mounted in apps/api/Dockerfile start empty every run,
-      # so every dependency is recompiled from scratch.
-      - name: Stamp the Go cache key
-        run: echo "GO_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
-
-      - name: Restore the Go caches mounted during the build
-        id: go-mount-cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            go-mod-cache
-            go-build-cache
-          # Keying on go.sum alone would freeze the build cache until a
-          # dependency moved; keying on the commit would write a 265 MB entry
-          # every run and churn the repository's 10 GB budget, evicting the
-          # Docker layer cache above. A date refreshes it once a day.
-          key: ${{ runner.os }}-docker-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}
-          restore-keys: |
-            ${{ runner.os }}-docker-go-${{ hashFiles('apps/api/go.sum') }}-
-            ${{ runner.os }}-docker-go-
-
-      - name: Inject the Go caches into the builder
-        uses: reproducible-containers/buildkit-cache-dance@v3
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          cache-map: |
-            {
-              "go-mod-cache": "/go/pkg/mod",
-              "go-build-cache": "/root/.cache/go-build"
-            }
-
       # One bake builds all three images. They share a single `build` stage, so
       # BuildKit compiles it once rather than re-entering the builder per image.
       #
