@@ -67,6 +67,8 @@ jobs:
               - 'apps/api/**'
               - 'libs/types/**'
               - '.github/workflows/checks.yml'
+              - '.github/workflows/deploy.yml'
+              - 'docker-bake.hcl'
             web:
               - 'apps/web/**'
               - 'libs/**'
@@ -75,6 +77,8 @@ jobs:
               - 'tsconfig.json'
               - 'biome.json'
               - '.github/workflows/checks.yml'
+              - '.github/workflows/deploy.yml'
+              - 'docker-bake.hcl'
 
       # Fail open. A skipped filter, an unresolvable base, or a filter that
       # errored all mean the whole suite runs, because a check that silently
@@ -181,10 +185,11 @@ jobs:
           terraform_version: 1.16.0
           terraform_wrapper: false
 
-      # Keyed on the lock file alone, so this only writes when the providers
-      # actually change rather than on every run.
+      # The google and cloudflare providers are otherwise downloaded from the
+      # registry on every init, here and in two other workflows.
       - name: Restore the Terraform provider cache
-        uses: actions/cache@v4
+        id: tf-cache
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.TF_PLUGIN_CACHE_DIR }}
           key: ${{ runner.os }}-terraform-${{ hashFiles('infra/prod/.terraform.lock.hcl') }}
@@ -202,3 +207,13 @@ jobs:
         run: |
           terraform init -backend=false -input=false -lockfile=readonly
           terraform validate -no-color
+
+      # An entry written by a pull request run is scoped to that run's merge
+      # ref and can only be read back by a re-run of the same pull request.
+      # Restore from the base branch, but leave the writing to pushes.
+      - name: Save the Terraform provider cache
+        if: github.event_name != 'pull_request' && steps.tf-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
+          key: ${{ runner.os }}-terraform-${{ hashFiles('infra/prod/.terraform.lock.hcl') }}

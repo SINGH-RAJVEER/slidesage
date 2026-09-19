@@ -38,7 +38,7 @@ Two things are easy to get wrong here and both were:
 
 The Actions cache is 10 GB per repository and evicts by least recent access. The Go entry is about 265 MB. Keying it on the commit would write a new one on every run, and since the Docker layer cache is only touched by a release, that churn would evict the build cache between deployments. A UTC date in the key bounds writes to one per branch per day while `restore-keys` still falls back to the newest existing entry.
 
-The save is also skipped entirely on a pull request. A cache written by a `pull_request` run is scoped to that run's merge ref and can only be restored by a re-run of the same pull request, so it would never be read. Pull requests still restore from the base branch normally.
+The save is also skipped entirely on a pull request, for the Go caches and the Terraform provider cache alike. A cache written by a `pull_request` run is scoped to that run's merge ref and can only be restored by a re-run of the same pull request, so it would never be read. Pull requests still restore from the base branch normally.
 
 Cache scope is per branch throughout: a run reads its own branch, the default branch, and for a pull request its base. Entries written on `dev` are invisible to `main` and the reverse, so the `checks` job called by `deploy.yml` restores from previous `main` runs only.
 
@@ -47,6 +47,8 @@ Only one Docker cache scope is used. An unscoped `type=gha` gives every image th
 ### Path filtering
 
 A change confined to `apps/web` skips the Go test, vet, and build steps; a change confined to `apps/api` skips the type check, the TypeScript tests, and the web build; a change touching neither, such as documentation, skips both sets.
+
+Anything that changes how a release is built or shipped is in both filters, not neither: `checks.yml`, `deploy.yml`, and `docker-bake.hcl`. A release whose only change is to the pipeline would otherwise report a green gate having run nothing, which is how the first run of this arrangement reached production.
 
 This applies to pushes as well as pull requests. A pull request is diffed through the API against its base; a push is diffed against the commit the branch moved from, which requires that commit to be in the checkout, hence `fetch-depth: 50` on a push.
 
