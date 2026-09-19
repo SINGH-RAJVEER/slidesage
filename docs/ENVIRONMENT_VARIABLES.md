@@ -43,13 +43,30 @@ Set `RATE_LIMIT_HASH_SECRET` to a separate random deployment secret. Falling bac
 | `WORKER_CONCURRENCY`   | No       | `2`     | Maximum concurrent River generation jobs in one worker process   |
 | `WORKER_DATABASE_POOL_MAX` | No       | `WORKER_CONCURRENCY + 3` | Maximum open and idle connections in the worker database pool    |
 | `WORKER_DRAIN_TIMEOUT` | No       | `8`     | Graceful shutdown timeout in seconds after `SIGINT` or `SIGTERM` |
-| `WORKER_HEALTH_PORT`   | No       | `8080`  | Worker `/live` and `/ready` health server port                   |
+| `WORKER_HEALTH_PORT`   | No       | `8080`  | Worker `/live`, `/ready`, and `/drain` health server port        |
+| `WORKER_DRAIN_POLL_SECONDS` | No  | `2`     | Interval at which `POST /drain` recounts outstanding queue rows  |
+| `WORKER_DRAIN_IDLE_SECONDS` | No  | `30`    | How long the queue must stay empty before `POST /drain` returns  |
+| `WORKER_DRAIN_MAX_SECONDS`  | No  | `1800`  | Ceiling on one drain request, after which it returns `204`       |
 
 The worker also requires `DATABASE_URL` and uses `DATABASE_CONNECT_TIMEOUT` and `DATABASE_IDLE_TIMEOUT`. It must receive the same generation provider and BYOK encryption configuration as the API because provider execution occurs in `cmd/worker`, not in the submission request.
 
-`GET /live` returns `204` while the worker health server is running. `GET /ready` returns `204` only when the worker accepts work and PostgreSQL is reachable. It returns `503` during draining. The health server is for platform probes; application coordination between the API and worker occurs through PostgreSQL.
+`GET /live` returns `204` while the worker health server is running. `GET /ready` returns `204` only when the worker accepts work and PostgreSQL is reachable. It returns `503` during draining. `POST /drain` blocks until the generation queue has been empty for `WORKER_DRAIN_IDLE_SECONDS` and then returns `204`; a drain that reaches `WORKER_DRAIN_MAX_SECONDS` also returns `204`, because a queue that is still busy is not a failed request. Work is still discovered by polling PostgreSQL: the wake signal carries no payload.
 
-For Cloud Run Worker Pools, start with one instance and change the fixed/manual instance count deliberately. Account for both the instance count and `WORKER_CONCURRENCY` when sizing PostgreSQL connection limits and provider capacity. See [GENERATION_WORKER.md](GENERATION_WORKER.md). When deployed as a Cloud Run service rather than a Worker Pool, the worker must use instance-based billing with CPU throttling disabled so River and maintenance continue between HTTP requests.
+## Worker wake signal
+
+The API sets these so a scaled-to-zero worker learns that committed work exists. Leave `WORKER_WAKE_URL` unset in development, where the worker runs continuously and nothing needs waking.
+
+| Variable                       | Required | Default | Purpose                                                              |
+| ------------------------------ | -------- | ------- | -------------------------------------------------------------------- |
+| `WORKER_WAKE_URL`              | No       | unset   | Worker `/drain` URL. Unset disables waking entirely                  |
+| `WORKER_WAKE_QUEUE`            | With URL | none    | Cloud Tasks queue path that carries the signal                        |
+| `WORKER_WAKE_SERVICE_ACCOUNT`  | No       | unset   | Service account minted into the task's OIDC token                    |
+| `WORKER_WAKE_DEADLINE_SECONDS` | No       | `1800`  | How long Cloud Tasks holds the drain request open                    |
+| `WORKER_WAKE_COALESCE_SECONDS` | No       | `10`    | Window within which submissions share one wake task                  |
+
+`cmd/worker --maintenance` reads the same variables: the scheduled sweep re-wakes the worker when it finds queue rows nothing is polling for.
+
+Account for both the instance ceiling and `WORKER_CONCURRENCY` when sizing PostgreSQL connection limits and provider capacity. See [GENERATION_WORKER.md](GENERATION_WORKER.md). The worker must keep instance-based billing with CPU throttling disabled so River keeps running between HTTP requests.
 
 ## Office editor
 

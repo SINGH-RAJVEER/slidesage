@@ -14,7 +14,9 @@ The API, worker, and migration job connect through the Cloud SQL Unix socket at 
 
 - Artifact Registry repository `slidesage` in `asia-south1`
 - Cloud Run service `api`, public only through the external HTTPS load balancer
-- Cloud Run service `worker`, private, scaling from zero to ten instances, with CPU kept allocated while an instance is running
+- Cloud Run service `worker`, scaling from zero to ten instances, with CPU kept allocated while an instance is running. Public ingress with no `allUsers` binding: Cloud Tasks dispatches the wake signal from outside the project network, so IAM is what keeps the service closed
+- Cloud Tasks queue `worker-wake`, carrying the signal that starts a worker after a submission commits
+- Cloud Run job `slidesage-maintenance`, running `cmd/worker --maintenance` on a Cloud Scheduler trigger for recovery and cleanup
 - Cloud Run job `slidesage-migrate`, invoked by deployment automation after an image update
 - A single-zone Enterprise `db-f1-micro` Cloud SQL PostgreSQL 18 instance with 10 GB SSD storage, no automated backups, and no point-in-time recovery
 - Global external HTTPS load balancer and serverless NEG for `api`, with an HTTP listener that redirects to HTTPS
