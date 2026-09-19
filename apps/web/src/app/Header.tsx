@@ -33,3 +33,5 @@ export default function Header({ sticky = false }: { sticky?: boolean }) {
 		/>
 	);
 }
+
+// benchmark probe, reverted immediately
