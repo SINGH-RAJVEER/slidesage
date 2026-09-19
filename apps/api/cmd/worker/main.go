@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"flag"
 	"log"
 	"log/slog"
 	"net"
@@ -25,6 +26,9 @@ import (
 )
 
 func main() {
+	maintenance := flag.Bool("maintenance", false, "run the recovery and cleanup sweep once, then exit")
+	flag.Parse()
+
 	telemetry, err := observability.Setup(context.Background(), observability.WorkerConfigFromEnv())
 	if err != nil {
 		log.Fatal(err)
@@ -56,6 +60,23 @@ func main() {
 		fatal(logger, err)
 	}
 
+	authService, err := auth.NewService(auth.Config{Database: database})
+	if err != nil {
+		fatal(logger, err)
+	}
+
+	// The sweep runs as a scheduled Cloud Run job rather than a ticker inside
+	// the worker. A scaled-to-zero worker is not running to hold a ticker, and
+	// pinging it often enough to be one would keep an instance alive, which is
+	// the cost this whole design removes.
+	if *maintenance {
+		runRecovery(signalContext, database)
+		runCleanup(signalContext, database, authService)
+		wakeStrandedWork(signalContext, database)
+		slog.Info("maintenance sweep finished")
+		return
+	}
+
 	client, err := generation.NewWorkerClient(database, ai.ConnectionService{DB: database}, maxWorkers)
 	if err != nil {
 		fatal(logger, err)
@@ -65,21 +86,11 @@ func main() {
 	if err := client.Start(workerContext); err != nil {
 		fatal(logger, err)
 	}
-	authService, err := auth.NewService(auth.Config{Database: database})
-	if err != nil {
-		fatal(logger, err)
-	}
 	ready := &atomic.Bool{}
 	healthServer, healthErrors, err := startHealthServer(database, ready)
 	if err != nil {
 		fatal(logger, err)
 	}
-	maintenanceContext, cancelMaintenance := context.WithCancel(context.Background())
-	maintenanceDone := make(chan struct{})
-	go func() {
-		defer close(maintenanceDone)
-		runMaintenance(maintenanceContext, database, authService)
-	}()
 	ready.Store(true)
 	slog.Info("generation worker started", slog.Int("concurrency", maxWorkers))
 	select {
@@ -91,12 +102,6 @@ func main() {
 	}
 
 	ready.Store(false)
-	cancelMaintenance()
-	select {
-	case <-maintenanceDone:
-	case <-time.After(500 * time.Millisecond):
-		slog.Warn("worker maintenance did not stop within 500 milliseconds")
-	}
 	healthDone := make(chan error, 1)
 	go func() {
 		healthContext, cancelHealth := context.WithTimeout(context.Background(), time.Second)
@@ -139,6 +144,30 @@ func startHealthServer(database *sql.DB, ready *atomic.Bool) (*http.Server, <-ch
 		}
 		writer.WriteHeader(http.StatusNoContent)
 	})
+	mux.HandleFunc("POST /drain", func(writer http.ResponseWriter, request *http.Request) {
+		if !ready.Load() {
+			http.Error(writer, "worker is not ready", http.StatusServiceUnavailable)
+			return
+		}
+		ctx, cancel := context.WithTimeout(request.Context(), time.Duration(envInt("WORKER_DRAIN_MAX_SECONDS", 1800))*time.Second)
+		defer cancel()
+		outstanding := func(ctx context.Context) (int, error) {
+			return generation.OutstandingGenerationJobs(ctx, database)
+		}
+		err := drainQueue(ctx, outstanding, drainSettings{
+			poll: time.Duration(envInt("WORKER_DRAIN_POLL_SECONDS", 2)) * time.Second,
+			idle: time.Duration(envInt("WORKER_DRAIN_IDLE_SECONDS", 30)) * time.Second,
+		})
+		// A drain that runs out of time has not failed: the queue is simply
+		// still busy. Reporting an error would make the caller retry a wake
+		// signal the worker is already acting on.
+		if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+			slog.Error("drain failed", slog.Any("error", err))
+			http.Error(writer, "drain failed", http.StatusInternalServerError)
+			return
+		}
+		writer.WriteHeader(http.StatusNoContent)
+	})
 	server := &http.Server{
 		Addr:              net.JoinHostPort("0.0.0.0", env("WORKER_HEALTH_PORT", "8080")),
 		Handler:           mux,
@@ -160,23 +189,72 @@ func startHealthServer(database *sql.DB, ready *atomic.Bool) (*http.Server, <-ch
 	return server, errorChannel, nil
 }
 
-func runMaintenance(ctx context.Context, database *sql.DB, authService *auth.Service) {
-	recoveryTicker := time.NewTicker(time.Minute)
-	cleanupTicker := time.NewTicker(time.Hour)
-	defer recoveryTicker.Stop()
-	defer cleanupTicker.Stop()
-	runRecovery(ctx, database)
-	runCleanup(ctx, database, authService)
+type drainSettings struct {
+	poll time.Duration
+	idle time.Duration
+}
+
+// drainQueue blocks while the generation queue has work, and that blocking is
+// the point. Cloud Run decides whether an instance is busy by counting requests
+// in flight, so an instance whose only activity is a River job looks idle and
+// becomes a scale-down candidate mid-generation. Holding the wake request open
+// for the length of the work is what makes the work visible to the autoscaler.
+//
+// The queue must stay empty for a settle window before the drain returns, so a
+// job enqueued moments after the last one finishes does not lose its worker to
+// a race between the poller and this check.
+func drainQueue(ctx context.Context, count func(context.Context) (int, error), settings drainSettings) error {
+	ticker := time.NewTicker(settings.poll)
+	defer ticker.Stop()
+	var idleSince time.Time
 	for {
+		outstanding, err := count(ctx)
+		if err != nil {
+			return err
+		}
+		switch {
+		case outstanding > 0:
+			idleSince = time.Time{}
+		case idleSince.IsZero():
+			idleSince = time.Now()
+		case time.Since(idleSince) >= settings.idle:
+			return nil
+		}
 		select {
 		case <-ctx.Done():
-			return
-		case <-recoveryTicker.C:
-			runRecovery(ctx, database)
-		case <-cleanupTicker.C:
-			runCleanup(ctx, database, authService)
+			return ctx.Err()
+		case <-ticker.C:
 		}
 	}
+}
+
+// wakeStrandedWork restarts a queue that has work but no worker. River schedules
+// a retry for a future time, and a wake signal can be lost while the service is
+// paused for a migration; in both cases the row is waiting and nothing is
+// polling for it. The sweep is the only thing that runs on a timer now, so it
+// is also the only thing that can notice.
+func wakeStrandedWork(ctx context.Context, database *sql.DB) {
+	outstanding, err := generation.OutstandingGenerationJobs(ctx, database)
+	if err != nil {
+		slog.Warn("stranded work check failed", slog.Any("error", err))
+		return
+	}
+	if outstanding == 0 {
+		return
+	}
+	waker, err := generation.WakerFromEnv(ctx)
+	if err != nil {
+		slog.Warn("stranded work waker unavailable", slog.Any("error", err))
+		return
+	}
+	if waker == nil {
+		return
+	}
+	if err := waker.Wake(ctx); err != nil {
+		slog.Warn("stranded work wake failed", slog.Any("error", err))
+		return
+	}
+	slog.Info("woke the worker for stranded queue work", slog.Int("outstanding", outstanding))
 }
 
 func runRecovery(ctx context.Context, database *sql.DB) {
