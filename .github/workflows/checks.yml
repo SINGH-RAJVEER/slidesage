@@ -67,6 +67,8 @@ jobs:
               - 'apps/api/**'
               - 'libs/types/**'
               - '.github/workflows/checks.yml'
+              - '.github/workflows/deploy.yml'
+              - 'docker-bake.hcl'
             web:
               - 'apps/web/**'
               - 'libs/**'
@@ -75,6 +77,8 @@ jobs:
               - 'tsconfig.json'
               - 'biome.json'
               - '.github/workflows/checks.yml'
+              - '.github/workflows/deploy.yml'
+              - 'docker-bake.hcl'
 
       # Fail open. A skipped filter, an unresolvable base, or a filter that
       # errored all mean the whole suite runs, because a check that silently
@@ -171,8 +175,6 @@ jobs:
 
   terraform:
     runs-on: ubuntu-latest
-    env:
-      TF_PLUGIN_CACHE_DIR: ${{ github.workspace }}/.terraform-plugin-cache
     steps:
       - uses: actions/checkout@v4
 
@@ -180,18 +182,6 @@ jobs:
         with:
           terraform_version: 1.16.0
           terraform_wrapper: false
-
-      # Keyed on the lock file alone, so this only writes when the providers
-      # actually change rather than on every run.
-      - name: Restore the Terraform provider cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TF_PLUGIN_CACHE_DIR }}
-          key: ${{ runner.os }}-terraform-${{ hashFiles('infra/prod/.terraform.lock.hcl') }}
-          restore-keys: ${{ runner.os }}-terraform-
-
-      - name: Create the provider cache directory
-        run: mkdir -p "$TF_PLUGIN_CACHE_DIR"
 
       - name: Check Terraform formatting
         working-directory: infra/prod

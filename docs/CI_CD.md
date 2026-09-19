@@ -20,14 +20,13 @@ A complete plan runs before the targeted migration update. Missing secrets, miss
 
 ## Build caching
 
-A small change does not rebuild the whole stack. Four caches carry unchanged work between runs, and each one exists because a default was quietly not working.
+A small change does not rebuild the whole stack. Three caches carry unchanged work between runs, and each one exists because a default was quietly not working.
 
 | Cache | Where | Key |
 | ----- | ----- | --- |
 | Go module and build cache, for tests and vet | `checks.yml` | `go.sum` hash plus the UTC date |
 | Go module and build cache, for the image build | `deploy.yml` | `apps/api/go.sum` hash plus the UTC date |
 | Docker layer cache | `deploy.yml`, `type=gha` | one scope, `slidesage-api` |
-| Terraform providers | all three Terraform workflows | `infra/prod/.terraform.lock.hcl` hash |
 
 Two things are easy to get wrong here and both were:
 
@@ -44,9 +43,19 @@ Cache scope is per branch throughout: a run reads its own branch, the default br
 
 Only one Docker cache scope is used. An unscoped `type=gha` gives every image the same entry to overwrite, leaving only the last, but separate scopes per image are equally wrong here: all three images are the shared `build` stage plus a `COPY` of one binary onto `scratch`, so scopes for `worker` and `migrate` would only hold entries nothing reads back.
 
+### What is deliberately not cached
+
+Terraform providers are downloaded on every `init` and that is intentional. `TF_PLUGIN_CACHE_DIR` backed by `actions/cache` was tried and measured at net zero: fetching `hashicorp/google` and `cloudflare/cloudflare` from the registry took 2.45s, serving them from a restored cache took 0.5s, and restoring the 39 MB cache entry cost the 2s difference back.
+
+The documented purpose of the plugin cache is to share one download across multiple configurations, or to help on slow or metered connections. This repository has two providers, one working directory, and a runner with fast egress, so none of that applies. The cache is also explicitly not concurrency safe, which would become a real hazard if the Terraform jobs are ever parallelised over a shared workspace.
+
+Revisit it if the provider count grows past roughly five, more Terraform configurations are added, or CI moves to self-hosted runners. If the goal is ever independence from the registry rather than speed, use a provider mirror, which is deterministic, rather than a best-effort cache.
+
 ### Path filtering
 
 A change confined to `apps/web` skips the Go test, vet, and build steps; a change confined to `apps/api` skips the type check, the TypeScript tests, and the web build; a change touching neither, such as documentation, skips both sets.
+
+Anything that changes how a release is built or shipped is in both filters, not neither: `checks.yml`, `deploy.yml`, and `docker-bake.hcl`. A release whose only change is to the pipeline would otherwise report a green gate having run nothing, which is how the first run of this arrangement reached production.
 
 This applies to pushes as well as pull requests. A pull request is diffed through the API against its base; a push is diffed against the commit the branch moved from, which requires that commit to be in the checkout, hence `fetch-depth: 50` on a push.
 
