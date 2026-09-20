@@ -1,9 +1,5 @@
 name: Published template check
 
-# Template packages, covers, and previews live in the bucket, not the
-# repository, so nothing in the test suite can notice when one goes missing. A
-# template whose previews were never published is listed by the marketplace and
-# fails only when a visitor opens it.
 on:
   schedule:
     - cron: "0 6 * * *"

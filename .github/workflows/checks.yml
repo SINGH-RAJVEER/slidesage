@@ -6,21 +6,14 @@ on:
   push:
     branches: [dev]
   workflow_dispatch:
-  # Called by deploy.yml so a push to main cannot reach Cloud Run without
-  # these checks passing first.
   workflow_call:
 
 permissions:
   contents: read
-  # Required by dorny/paths-filter to list a pull request's changed files.
   pull-requests: read
 
 concurrency:
-  # In a called run github.workflow is the caller's name, so gating runs get
-  # their own group and never cancel the standalone PR checks.
   group: checks-${{ github.workflow }}-${{ github.ref }}
-  # A superseded PR push is worth cancelling; a deploy waiting on its gate is
-  # not, because cancelling it fails the deploy rather than replacing it.
   cancel-in-progress: ${{ github.workflow == 'Pull request checks' }}
 
 jobs:
@@ -31,14 +24,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # A push is compared against its previous head, which has to be in
-          # the checkout. Fifty commits covers any realistic push range; beyond
-          # that the filter below falls open and the whole suite runs.
           fetch-depth: ${{ github.event_name == 'push' && 50 || 1 }}
 
-      # A pull request is diffed through the API against its base. A push has
-      # no base to infer, so use the commit the branch moved from, and only
-      # when it is a real commit that is actually present.
       - name: Resolve the comparison base for a push
         if: github.event_name == 'push'
         id: base
@@ -52,10 +39,6 @@ jobs:
             echo "ref=$before" >> "$GITHUB_OUTPUT"
           fi
 
-      # A web-only change has no reason to compile and test the Go module, and
-      # the reverse holds too. This stays inside the one job rather than
-      # splitting into two, so the check name branch protection requires is
-      # always reported.
       - id: changes
         if: github.event_name == 'pull_request' || steps.base.outputs.ref != ''
         continue-on-error: true
@@ -80,9 +63,6 @@ jobs:
               - '.github/workflows/deploy.yml'
               - 'docker-bake.hcl'
 
-      # Fail open. A skipped filter, an unresolvable base, or a filter that
-      # errored all mean the whole suite runs, because a check that silently
-      # narrows itself is worse than one that occasionally does too much.
       - id: scope
         shell: bash
         run: |
@@ -99,9 +79,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/api/go.mod
-          # setup-go keys its cache on go.sum and restores on an exact match
-          # only, so a dependency bump starts from nothing. The cache below
-          # keeps a restore-keys fallback for that case.
           cache: false
 
       - name: Stamp the Go cache key
@@ -154,13 +131,6 @@ jobs:
       - if: steps.scope.outputs.api == 'true'
         run: bun run build:api
 
-      # A cache written by a pull request run is scoped to that run's merge ref
-      # and can only be restored by a re-run of the same pull request, so
-      # saving one there spends 265 MB of the repository's 10 GB budget on an
-      # entry nothing will ever read. Evictions are by least recent access, and
-      # the Docker layer cache is touched only on a release, so that churn
-      # would quietly evict the build cache between deployments. The date in
-      # the key bounds writes to one per branch per day.
       - name: Save the Go module and build caches
         if: >-
           github.event_name != 'pull_request'
