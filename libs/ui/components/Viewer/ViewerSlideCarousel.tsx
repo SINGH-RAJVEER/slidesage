@@ -1,8 +1,16 @@
+import type { PresentationGenerationStage } from "@slidesage/types";
 import { Card } from "@slidesage/ui/components/card";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import type React from "react";
 import type { ViewerDocument } from "../../lib/viewer-document";
+import { GenerationProgress } from "./GenerationProgress";
 import { PreviewSlide } from "./PreviewSlide";
+
+export interface CarouselGenerationStatus {
+	stage?: PresentationGenerationStage;
+	message?: string;
+	isResearching?: boolean;
+}
 
 interface ViewerSlideCarouselProps {
 	document: ViewerDocument | null;
@@ -10,6 +18,8 @@ interface ViewerSlideCarouselProps {
 	containerRef: React.RefObject<HTMLDivElement | null>;
 	onSelectSlide: (index: number) => void;
 	isWaitingForFirstSlide?: boolean;
+	/** Set while a deck is generating, so the placeholder can report progress. */
+	generation?: CarouselGenerationStatus;
 }
 
 export const ViewerSlideCarousel: React.FC<ViewerSlideCarouselProps> = ({
@@ -18,6 +28,7 @@ export const ViewerSlideCarousel: React.FC<ViewerSlideCarouselProps> = ({
 	containerRef,
 	onSelectSlide,
 	isWaitingForFirstSlide = false,
+	generation,
 }) => {
 	const slideCount = document?.slideCount ?? 0;
 
@@ -43,8 +54,15 @@ export const ViewerSlideCarousel: React.FC<ViewerSlideCarouselProps> = ({
 					>
 						<div className="h-full w-full">
 							<Card className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-[hsl(222,27%,12%)] shadow-2xl">
-								<div className="flex items-center justify-center">
+								<div className="flex flex-col items-center justify-center gap-6">
 									<ThinkingOrb size={64} aria-label="Loading" />
+									{generation && (
+										<GenerationProgress
+											stage={generation.stage}
+											message={generation.message}
+											isResearching={generation.isResearching}
+										/>
+									)}
 								</div>
 							</Card>
 						</div>

@@ -358,6 +358,15 @@ export default function PresentationViewerPage() {
 						visibleSlide={navigation.visibleSlide}
 						containerRef={slideContainerRef}
 						isWaitingForFirstSlide={isWaitingForDeck}
+						generation={
+							shouldShowGenerating
+								? {
+										stage: streamingState.generationStage,
+										message: streamingState.generationMessage,
+										isResearching: streamingState.researchStatus === "searching",
+									}
+								: undefined
+						}
 						onSelectSlide={(idx) => {
 							if (idx !== navigation.currentSlide) {
 								playback.stop();
