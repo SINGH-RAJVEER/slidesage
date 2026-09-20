@@ -42,11 +42,31 @@ The worker polls River's `generation` queue and processes application jobs with 
 | `failed`   | Processing reached a terminal error and the reservation was released |
 | `cancelled` | A cancellation request was observed and finalized                    |
 
-River permits up to three attempts for the generation job. Each attempt has a seven-minute timeout for the sequential planning and drafting calls, whose HTTP client timeout is three minutes per call. Provider calls reserve a fixed reasoning allowance on top of the requested output bound for reasoning-capable models, so internal thinking never truncates the structured JSON answer. Within a single attempt, provider requests retry transient failures in process: `429` and `5xx` responses are retried up to four total attempts with exponential backoff starting at two seconds and capped at fifteen seconds, and the provider's `Retry-After` header overrides the computed delay when it is longer. Context cancellation stops the backoff immediately. River rescues jobs left running for eight minutes. On shutdown the worker marks itself unready, cancels maintenance, and asks River to drain active jobs. River cancels remaining work after its six-second soft-stop timeout so queue state can finalize within the Cloud Run termination window. The worker retries network errors, provider `429` responses, provider `5xx` responses, and failures the provider reports inside a stream it has already accepted. That last case carries no HTTP status of its own, so it is marked retryable explicitly; treating it as permanent would finalize a job on its first attempt over a transient upstream stall.
+River permits up to three attempts for the generation job. Each attempt has a seven-minute timeout for the sequential planning and drafting calls, whose HTTP client timeout is three minutes per call. Provider calls reserve a fixed reasoning allowance on top of the requested output bound for reasoning-capable models, so internal thinking never truncates the structured JSON answer. Within a single attempt, provider requests retry transient failures in process: `429` and `5xx` responses are retried up to four total attempts with exponential backoff starting at two seconds and capped at fifteen seconds, and the provider's `Retry-After` header overrides the computed delay when it is longer. Context cancellation stops the backoff immediately. River rescues jobs left running for eight minutes. On process shutdown the continuously running local worker uses a six-second River soft stop so queue state can finalize within the termination window. A production request-owned worker instead reserves up to eight minutes for its claimed attempt before renewing the HTTP lease. The worker retries network errors, provider `429` responses, provider `5xx` responses, and failures the provider reports inside a stream it has already accepted. That last case carries no HTTP status of its own, so it is marked retryable explicitly; treating it as permanent would finalize a job on its first attempt over a transient upstream stall.
 
 A stream that goes silent for 45 seconds is closed and reported as a retryable provider failure rather than being left to the three-minute request timeout. Drafting is split into calls of at most four slides, reassembled by position, so no single completion has to run long enough to be a likely stall target. The split repeats the system prompt and research sources once per batch, which raises input tokens for research-backed decks; charges stay capped at the quoted amount. Events such as `created`, `theme`, `stage`, `retry`, `plan`, `slide`, `complete`, `saved`, and `error` are stored before the API delivers them. `saved` and `error` are terminal stream events.
 
 Cancellation is transactional. `POST /generation-jobs/{id}/cancel` locks the application job, cancels its River job, releases the active reservation, records the terminal event, and marks the application job cancelled in one transaction. River also cancels the context of an in-flight provider request. The provider may still finish work, but the locked terminal state prevents late success settlement.
+
+## Waking a scaled-to-zero worker
+
+The target configuration has no minimum instance. The first rollout deliberately retains one minimum instance until production dispatch and drain behavior have been observed. Cloud Run starts an instance from zero only for an inbound HTTP request, and a committed `river_job` row is not something its autoscaler can observe, so the API sends a wake signal after the submission transaction commits. Signalling before the commit would wake a worker that finds an empty queue and hands its instance straight back. An idempotent resubmission sends the wake signal again, which gives a committed job another prompt start after a transient Cloud Tasks failure.
+
+The signal carries no payload. The job is already durable in PostgreSQL, and the woken worker still discovers it by polling. The request only has to exist.
+
+Cloud Tasks carries the signal rather than the API calling the worker directly, for two reasons. It retries if the worker was never reached, and it owns the connection for the life of the drain. That second property is what keeps the instance alive: Cloud Run decides whether an instance is busy by counting requests in flight, not by watching CPU or database work, so an instance whose only activity is a River job reads as idle and becomes a scale-down candidate mid-generation. An API instance cannot hold that connection reliably because it is scaled to zero on the same terms.
+
+`POST /drain` owns the River client on its instance. No production River client starts before a drain request exists, so the instance Cloud Run protects is also the instance that can claim the work. Each request stops claiming jobs after 20 minutes and gives its local attempt up to eight more minutes to finish. If pending work remains, including a retry in River backoff, the handler returns `500` before Cloud Tasks' 30-minute deadline, which keeps the task alive for another attempt. It returns `204` only after the pending queue has stayed empty for a settle window and its local client has stopped. Unexpected request cancellation hard-stops that client's work so River can retry it under another lease.
+
+Same-project Cloud Tasks requests to the default `run.app` URL qualify as internal Cloud Run traffic. The worker keeps internal ingress, grants `roles/run.invoker` only to the runtime service account, and has no `allUsers` binding. The release pipeline asserts both restrictions.
+
+Each submission creates its own task so a burst can scale horizontally up to the configured worker limit. Production uses one River execution slot per request-owned instance. River and application state remain the authority; the task carries no job payload.
+
+## Recovery and cleanup
+
+Generation recovery, expired-reservation recovery, unverified-account cleanup, and rate-limit counter cleanup run as the `slidesage-maintenance` Cloud Run job on a Cloud Scheduler trigger, invoked as `cmd/worker --maintenance`. They previously ran on a ticker inside the worker process, which only worked while an instance was pinned. Scheduling pings frequent enough to replace that ticker would keep an instance alive and undo the saving; a job bills only for the seconds it runs.
+
+The sweep also re-wakes the worker when it finds outstanding queue rows that are runnable now. Future `scheduled` and `retryable` rows do not wake an idle service before their `scheduled_at` time. A wake signal can be lost while the service is paused for a migration, and the sweep is the timer-backed reconciliation path that notices. Cloud Scheduler is paused while `maintenance_mode` is set, so a sweep cannot start a worker against a half-migrated schema.
 
 ## Job API
 
@@ -95,18 +115,21 @@ The worker reads the same `DATABASE_URL`, provider, and BYOK encryption settings
 | `WORKER_DATABASE_POOL_MAX` | `WORKER_CONCURRENCY + 3` | Maximum open and idle worker database connections                                                                  |
 | `WORKER_DRAIN_TIMEOUT` | `8`     | Seconds allowed for graceful River shutdown after `SIGINT` or `SIGTERM`; kept below Cloud Run's termination window |
 | `WORKER_HEALTH_PORT`   | `8080`  | Port for worker health probes                                                                                      |
+| `WORKER_REQUEST_LEASED` | `false` | Start River only while a `/drain` request is active                                                                |
+| `WORKER_DRAIN_ACCEPT_SECONDS` | `1200` | Stop fetching new jobs before the Cloud Tasks deadline                                                         |
+| `WORKER_DRAIN_HANDOFF_SECONDS` | `480` | Let locally claimed work finish before requesting another task attempt                                          |
 
 `GET /live` returns `204` while the health server is running. `GET /ready` returns `204` only while the worker accepts work and PostgreSQL responds to a one-second ping. It returns `503` as soon as shutdown starts.
 
-The worker runs generation recovery every minute. It processes at most 100 terminated jobs and 100 affected users per sweep, with at most two recovery transactions running concurrently. Hourly maintenance deletes bounded batches of expired rate-limit counters and unverified accounts. Maintenance stops before River drains.
+The scheduled maintenance job runs recovery and cleanup every 15 minutes. It processes at most 100 terminated jobs and 100 affected users per sweep, with at most two recovery transactions running concurrently, deletes bounded batches of expired rate-limit counters and unverified accounts, and wakes due queue work that lost its original signal.
 
 The API discovers model catalogs for independent BYOK connections concurrently, with at most three catalog requests per configuration response and one active catalog request per provider in each API process.
 
 ## Deployment
 
-Production uses Cloud Run services for the API and generation worker. Terraform configures instance-based billing (`cpu_idle = false`) and at least one running generation-worker instance. API-to-worker coordination uses PostgreSQL only; there is no HTTP or RPC call to wake a worker from zero instances. The worker makes outbound calls to PostgreSQL and the selected AI provider.
+Production uses Cloud Run services for the API and generation worker. Terraform configures instance-based billing (`cpu_idle = false`). The API commits work to PostgreSQL and then creates an authenticated Cloud Task whose request owns the worker's River client. The first rollout keeps one minimum instance; changing `worker_min_instances` to zero is a later production action after live drain verification.
 
-Cloud Run does not scale on PostgreSQL queue depth. Monitor queue latency, provider limits, PostgreSQL connections, and job duration, then adjust the minimum instance count in Terraform as needed. Total potential job concurrency is the worker instance count multiplied by `WORKER_CONCURRENCY`; size the database pool and provider limits accordingly.
+Cloud Run does not scale on PostgreSQL queue depth. Cloud Tasks request count drives instance creation, while River still owns durable scheduling and exclusive claims. Production uses one River worker per request-owned instance; size the database pool, task concurrency, and provider limits together.
 
 `apps/api/Dockerfile` exposes three targets from the same source.
 

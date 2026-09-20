@@ -34,7 +34,7 @@ The API entry point is `apps/api/cmd/api/main.go`. It exposes:
 - `/generation-jobs/{id}/cancel`
 - `/billing`
 
-The worker entry point is `apps/api/cmd/worker/main.go`. It consumes River v0.43 jobs from PostgreSQL, executes generation and iteration, and exposes `/live` and `/ready` on its health port. API-to-worker communication is PostgreSQL-only.
+The worker entry point is `apps/api/cmd/worker/main.go`. It consumes River v0.43 jobs from PostgreSQL, executes generation and iteration, and exposes `/live`, `/ready`, and the authenticated `/drain` lease endpoint. The durable job payload stays in PostgreSQL; Cloud Tasks carries only the request that wakes and protects a scaled-to-zero instance.
 
 The API and worker use `database/sql` with PostgreSQL and pgvector. The migration entry point, `apps/api/cmd/migrate/main.go`, applies embedded Goose migrations from `apps/api/migrations` and then River's migrations. Migrations must complete before either runtime starts.
 
@@ -70,4 +70,4 @@ Generation SSE handlers copy event rows and close the query before writing to a 
 
 ## Deployment
 
-`apps/api/Dockerfile` has `api`, `worker`, and `migrate` targets. Production is intended to run the API as a Cloud Run service and the worker as a Cloud Run Worker Pool. Worker Pools have fixed/manual scaling rather than request-driven autoscaling; deploy one worker instance initially and increase it deliberately. Run the `migrate` target before deploying either runtime.
+`apps/api/Dockerfile` has `api`, `worker`, and `migrate` targets. Production runs the API and worker as Cloud Run services. A Cloud Tasks request owns each production River client, which lets request-driven scaling protect the instance doing the background work. The first rollout keeps one worker instance warm; scale-to-zero is enabled only after live task delivery and lease handoff are verified. Run the `migrate` target before deploying either runtime.

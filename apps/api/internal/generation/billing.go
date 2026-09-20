@@ -124,6 +124,10 @@ func (h *handler) enqueue(ctx context.Context, job streamJob, requestHash string
 	if err := tx.Commit(); err != nil {
 		return 0, 0, err
 	}
+	// Only now is the queue row visible to another connection. Signalling
+	// before the commit would wake a worker that finds an empty queue and hands
+	// its instance straight back.
+	h.wakeCommitted(ctx)
 	return balance, revision, nil
 }
 

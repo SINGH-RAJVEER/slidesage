@@ -129,3 +129,26 @@ variable "maintenance_mode" {
   type        = bool
   default     = false
 }
+
+variable "worker_min_instances" {
+  description = "Floor for worker instances. Keep one during the first request-lease rollout, then set zero after production drain delivery is verified."
+  type        = number
+  default     = 1
+}
+
+variable "worker_wake_deadline_seconds" {
+  description = "How long Cloud Tasks holds a drain request open. The in-flight request is what stops Cloud Run reclaiming an instance that is generating, so this must exceed the seven-minute River job timeout."
+  type        = number
+  default     = 1800
+
+  validation {
+    condition     = var.worker_wake_deadline_seconds > 420 && var.worker_wake_deadline_seconds <= 1800
+    error_message = "worker_wake_deadline_seconds must exceed the 420 second job timeout and stay within the 1800 second Cloud Tasks maximum."
+  }
+}
+
+variable "maintenance_schedule" {
+  description = "Cron schedule for the recovery and cleanup sweep that used to run as a ticker inside the always-on worker."
+  type        = string
+  default     = "*/15 * * * *"
+}

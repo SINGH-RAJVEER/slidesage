@@ -55,12 +55,17 @@ func RegisterRoutes(mux *http.ServeMux, database *sql.DB, identity Identity, con
 	if err != nil {
 		panic(fmt.Sprintf("create generation queue client: %v", err))
 	}
+	waker, err := WakerFromEnv(config.StreamContext)
+	if err != nil {
+		panic(fmt.Sprintf("create generation worker waker: %v", err))
+	}
 	handler := &handler{
 		database:      database,
 		identity:      identity,
 		connections:   connections,
 		client:        &http.Client{Timeout: 3 * time.Minute, Transport: observability.HTTPTransport(nil)},
 		queue:         queue,
+		waker:         waker,
 		streamContext: config.StreamContext,
 		streams:       newStreamLimiter(config.MaxStreams, config.MaxStreamsPerUser),
 		research:      config.Research,
@@ -109,6 +114,7 @@ type handler struct {
 	client        *http.Client
 	connections   ai.ConnectionService
 	queue         *queueClient
+	waker         Waker
 	streamContext context.Context
 	streams       *streamLimiter
 	research      *presentation.ExaResearchService
