@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -24,6 +25,14 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/middleware"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/observability"
 )
+
+type drainWorker interface {
+	Start(context.Context) error
+	Stop(context.Context) error
+	StopAndCancel(context.Context) error
+}
+
+type drainWorkerFactory func() (drainWorker, error)
 
 func main() {
 	maintenance := flag.Bool("maintenance", false, "run the recovery and cleanup sweep once, then exit")
@@ -77,22 +86,29 @@ func main() {
 		return
 	}
 
-	client, err := generation.NewWorkerClient(database, ai.ConnectionService{DB: database}, maxWorkers)
-	if err != nil {
-		fatal(logger, err)
-	}
-	workerContext, cancelWorker := context.WithCancel(context.Background())
-	defer cancelWorker()
-	if err := client.Start(workerContext); err != nil {
-		fatal(logger, err)
+	requestLeased := strings.EqualFold(strings.TrimSpace(os.Getenv("WORKER_REQUEST_LEASED")), "true")
+	var continuousWorker drainWorker
+	var leasedWorker drainWorkerFactory
+	if !requestLeased {
+		continuousWorker, err = generation.NewWorkerClient(database, ai.ConnectionService{DB: database}, maxWorkers)
+		if err != nil {
+			fatal(logger, err)
+		}
+		if err := continuousWorker.Start(context.Background()); err != nil {
+			fatal(logger, err)
+		}
+	} else {
+		leasedWorker = func() (drainWorker, error) {
+			return generation.NewLeasedWorkerClient(database, ai.ConnectionService{DB: database}, maxWorkers)
+		}
 	}
 	ready := &atomic.Bool{}
-	healthServer, healthErrors, err := startHealthServer(database, ready)
+	healthServer, healthErrors, err := startHealthServer(signalContext, database, ready, leasedWorker)
 	if err != nil {
 		fatal(logger, err)
 	}
 	ready.Store(true)
-	slog.Info("generation worker started", slog.Int("concurrency", maxWorkers))
+	slog.Info("generation worker started", slog.Int("concurrency", maxWorkers), slog.Bool("request_leased", requestLeased))
 	select {
 	case <-signalContext.Done():
 	case err := <-healthErrors:
@@ -108,25 +124,25 @@ func main() {
 		defer cancelHealth()
 		healthDone <- healthServer.Shutdown(healthContext)
 	}()
-	drainContext, cancelDrain := context.WithTimeout(context.Background(), time.Duration(envInt("WORKER_DRAIN_TIMEOUT", 8))*time.Second)
-	stopErr := client.Stop(drainContext)
-	cancelDrain()
-	if stopErr != nil {
-		slog.Error("generation worker graceful shutdown failed", slog.Any("error", stopErr))
-		cancelWorker()
-		forceContext, cancelForce := context.WithTimeout(context.Background(), time.Second)
-		if err := client.StopAndCancel(forceContext); err != nil {
-			slog.Error("generation worker forced shutdown failed", slog.Any("error", err))
+	if continuousWorker != nil {
+		drainContext, cancelDrain := context.WithTimeout(context.Background(), time.Duration(envInt("WORKER_DRAIN_TIMEOUT", 8))*time.Second)
+		stopErr := continuousWorker.Stop(drainContext)
+		cancelDrain()
+		if stopErr != nil {
+			slog.Error("generation worker graceful shutdown failed", slog.Any("error", stopErr))
+			forceContext, cancelForce := context.WithTimeout(context.Background(), time.Second)
+			if err := continuousWorker.StopAndCancel(forceContext); err != nil {
+				slog.Error("generation worker forced shutdown failed", slog.Any("error", err))
+			}
+			cancelForce()
 		}
-		cancelForce()
 	}
-	cancelWorker()
 	if err := <-healthDone; err != nil {
 		slog.Error("worker health shutdown failed", slog.Any("error", err))
 	}
 }
 
-func startHealthServer(database *sql.DB, ready *atomic.Bool) (*http.Server, <-chan error, error) {
+func startHealthServer(processContext context.Context, database *sql.DB, ready *atomic.Bool, workerFactory drainWorkerFactory) (*http.Server, <-chan error, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /live", func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusNoContent)
@@ -149,19 +165,36 @@ func startHealthServer(database *sql.DB, ready *atomic.Bool) (*http.Server, <-ch
 			http.Error(writer, "worker is not ready", http.StatusServiceUnavailable)
 			return
 		}
-		ctx, cancel := context.WithTimeout(request.Context(), time.Duration(envInt("WORKER_DRAIN_MAX_SECONDS", 1800))*time.Second)
-		defer cancel()
+		if workerFactory == nil {
+			writer.WriteHeader(http.StatusNoContent)
+			return
+		}
+		worker, err := workerFactory()
+		if err != nil {
+			slog.Error("create request-owned worker", slog.Any("error", err))
+			http.Error(writer, "worker unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		ctx, cancel := context.WithCancel(request.Context())
+		stopProcessCancellation := context.AfterFunc(processContext, cancel)
+		defer func() {
+			stopProcessCancellation()
+			cancel()
+		}()
 		outstanding := func(ctx context.Context) (int, error) {
 			return generation.OutstandingGenerationJobs(ctx, database)
 		}
-		err := drainQueue(ctx, outstanding, drainSettings{
-			poll: time.Duration(envInt("WORKER_DRAIN_POLL_SECONDS", 2)) * time.Second,
-			idle: time.Duration(envInt("WORKER_DRAIN_IDLE_SECONDS", 30)) * time.Second,
+		err = drainQueue(ctx, worker, outstanding, drainSettings{
+			poll:    time.Duration(envInt("WORKER_DRAIN_POLL_SECONDS", 2)) * time.Second,
+			idle:    time.Duration(envInt("WORKER_DRAIN_IDLE_SECONDS", 30)) * time.Second,
+			accept:  time.Duration(envInt("WORKER_DRAIN_ACCEPT_SECONDS", 1200)) * time.Second,
+			handoff: time.Duration(envInt("WORKER_DRAIN_HANDOFF_SECONDS", 480)) * time.Second,
 		})
-		// A drain that runs out of time has not failed: the queue is simply
-		// still busy. Reporting an error would make the caller retry a wake
-		// signal the worker is already acting on.
-		if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+		if errors.Is(err, errDrainLeaseRenewalRequired) {
+			http.Error(writer, "queue still active", http.StatusInternalServerError)
+			return
+		}
+		if err != nil {
 			slog.Error("drain failed", slog.Any("error", err))
 			http.Error(writer, "drain failed", http.StatusInternalServerError)
 			return
@@ -190,9 +223,13 @@ func startHealthServer(database *sql.DB, ready *atomic.Bool) (*http.Server, <-ch
 }
 
 type drainSettings struct {
-	poll time.Duration
-	idle time.Duration
+	poll    time.Duration
+	idle    time.Duration
+	accept  time.Duration
+	handoff time.Duration
 }
+
+var errDrainLeaseRenewalRequired = errors.New("drain lease renewal required")
 
 // drainQueue blocks while the generation queue has work, and that blocking is
 // the point. Cloud Run decides whether an instance is busy by counting requests
@@ -203,10 +240,32 @@ type drainSettings struct {
 // The queue must stay empty for a settle window before the drain returns, so a
 // job enqueued moments after the last one finishes does not lose its worker to
 // a race between the poller and this check.
-func drainQueue(ctx context.Context, count func(context.Context) (int, error), settings drainSettings) error {
+func drainQueue(ctx context.Context, worker drainWorker, count func(context.Context) (int, error), settings drainSettings) error {
+	workerContext := context.Background()
+	if err := worker.Start(workerContext); err != nil {
+		return err
+	}
+	stopped := false
+	hardStop := func() {
+		forceContext, cancelForce := context.WithTimeout(context.Background(), time.Second)
+		defer cancelForce()
+		if err := worker.StopAndCancel(forceContext); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("request-owned worker forced shutdown failed", slog.Any("error", err))
+		}
+		stopped = true
+	}
+	defer func() {
+		if !stopped {
+			hardStop()
+		}
+	}()
+
 	ticker := time.NewTicker(settings.poll)
 	defer ticker.Stop()
+	acceptTimer := time.NewTimer(settings.accept)
+	defer acceptTimer.Stop()
 	var idleSince time.Time
+	shouldHandoff := false
 	for {
 		outstanding, err := count(ctx)
 		if err != nil {
@@ -218,23 +277,48 @@ func drainQueue(ctx context.Context, count func(context.Context) (int, error), s
 		case idleSince.IsZero():
 			idleSince = time.Now()
 		case time.Since(idleSince) >= settings.idle:
-			return nil
+			shouldHandoff = true
+		}
+		if shouldHandoff {
+			break
 		}
 		select {
 		case <-ctx.Done():
+			hardStop()
 			return ctx.Err()
+		case <-acceptTimer.C:
+			shouldHandoff = true
 		case <-ticker.C:
 		}
+		if shouldHandoff {
+			break
+		}
 	}
+
+	stopContext, cancelStop := context.WithTimeout(ctx, settings.handoff)
+	stopErr := worker.Stop(stopContext)
+	cancelStop()
+	if stopErr != nil {
+		hardStop()
+		return errDrainLeaseRenewalRequired
+	}
+	stopped = true
+
+	outstanding, err := count(ctx)
+	if err != nil {
+		return err
+	}
+	if outstanding == 0 {
+		return nil
+	}
+	return errDrainLeaseRenewalRequired
 }
 
-// wakeStrandedWork restarts a queue that has work but no worker. River schedules
-// a retry for a future time, and a wake signal can be lost while the service is
-// paused for a migration; in both cases the row is waiting and nothing is
-// polling for it. The sweep is the only thing that runs on a timer now, so it
-// is also the only thing that can notice.
+// wakeStrandedWork restarts a queue that has due work but no worker. A wake
+// signal can be lost while the service is paused for a migration; the sweep is
+// the timer-backed path that notices once a row is runnable.
 func wakeStrandedWork(ctx context.Context, database *sql.DB) {
-	outstanding, err := generation.OutstandingGenerationJobs(ctx, database)
+	outstanding, err := generation.RunnableGenerationJobs(ctx, database)
 	if err != nil {
 		slog.Warn("stranded work check failed", slog.Any("error", err))
 		return

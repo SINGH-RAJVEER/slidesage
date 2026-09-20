@@ -126,6 +126,7 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		var duplicate duplicateSubmit
 		if errors.As(err, &duplicate) {
+			h.wakeCommitted(request.Context())
 			writeJSON(writer, http.StatusOK, map[string]any{"job_id": duplicate.jobID, "presentation_id": duplicate.presentationID, "status": "existing"})
 			return
 		}
@@ -154,6 +155,7 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		var duplicate duplicateOperation
 		if errors.As(err, &duplicate) && duplicate.jobID != "" {
+			h.wakeCommitted(request.Context())
 			writeJSON(writer, http.StatusOK, map[string]any{"job_id": duplicate.jobID, "presentation_id": duplicate.presentationID, "status": "existing"})
 			return
 		}

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
 )
@@ -127,11 +126,8 @@ func (h *handler) enqueue(ctx context.Context, job streamJob, requestHash string
 	}
 	// Only now is the queue row visible to another connection. Signalling
 	// before the commit would wake a worker that finds an empty queue and hands
-	// its instance straight back. The context is detached from the request so a
-	// client that disconnects on submit still gets its deck started.
-	wakeContext, cancelWake := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-	defer cancelWake()
-	h.wake(wakeContext)
+	// its instance straight back.
+	h.wakeCommitted(ctx)
 	return balance, revision, nil
 }
 

@@ -2,7 +2,6 @@ package generation
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"google.golang.org/api/cloudtasks/v2"
-	"google.golang.org/api/googleapi"
 )
 
 // Waker asks the generation worker to start working the queue.
@@ -40,7 +38,6 @@ type cloudTasksWaker struct {
 	audience       string
 	serviceAccount string
 	deadline       time.Duration
-	coalesce       time.Duration
 }
 
 // WakerFromEnv builds the wake signal from the deployment environment. It
@@ -70,18 +67,11 @@ func WakerFromEnv(ctx context.Context) (Waker, error) {
 		audience:       parsed.Scheme + "://" + parsed.Host,
 		serviceAccount: strings.TrimSpace(os.Getenv("WORKER_WAKE_SERVICE_ACCOUNT")),
 		deadline:       time.Duration(positiveEnvInt("WORKER_WAKE_DEADLINE_SECONDS", 1800)) * time.Second,
-		coalesce:       time.Duration(positiveEnvInt("WORKER_WAKE_COALESCE_SECONDS", 10)) * time.Second,
 	}, nil
 }
 
-// Wake enqueues one drain task. Submissions that arrive within the same
-// coalescing window share a task name, so a burst of decks wakes the worker
-// once instead of paying Cloud Tasks' one-minute minimum several times over.
-// A name collision means the signal is already queued and is not an error.
-func (w *cloudTasksWaker) Wake(ctx context.Context) error {
-	bucket := time.Now().UTC().Truncate(w.coalesce).Unix()
+func (w *cloudTasksWaker) task() *cloudtasks.Task {
 	task := &cloudtasks.Task{
-		Name:             fmt.Sprintf("%s/tasks/wake-%d", w.queue, bucket),
 		DispatchDeadline: strconv.FormatInt(int64(w.deadline.Seconds()), 10) + "s",
 		HttpRequest: &cloudtasks.HttpRequest{
 			HttpMethod: "POST",
@@ -94,12 +84,16 @@ func (w *cloudTasksWaker) Wake(ctx context.Context) error {
 			ServiceAccountEmail: w.serviceAccount,
 		}
 	}
+	return task
+}
+
+// Wake enqueues one drain task per signal. Cloud Run allows one request per
+// worker instance, so preserving every signal lets a burst scale out instead
+// of collapsing onto one request-owned River client.
+func (w *cloudTasksWaker) Wake(ctx context.Context) error {
+	task := w.task()
 	request := &cloudtasks.CreateTaskRequest{Task: task}
 	if _, err := w.tasks.Projects.Locations.Queues.Tasks.Create(w.queue, request).Context(ctx).Do(); err != nil {
-		var apiErr *googleapi.Error
-		if errors.As(err, &apiErr) && apiErr.Code == 409 {
-			return nil
-		}
 		return err
 	}
 	return nil
@@ -108,11 +102,22 @@ func (w *cloudTasksWaker) Wake(ctx context.Context) error {
 // wake signals the worker without letting a signalling failure reach the user.
 // The submission is already committed at this point: the deck is durable, and
 // the scheduled maintenance sweep picks up anything a lost signal stranded.
-func (h *handler) wake(ctx context.Context) {
+func (h *handler) wake(ctx context.Context) error {
 	if h.waker == nil {
-		return
+		return nil
 	}
 	if err := h.waker.Wake(ctx); err != nil {
 		slog.Warn("worker wake signal failed", slog.Any("error", err))
+		return err
 	}
+	return nil
+}
+
+// wakeCommitted detaches signalling from the client connection while keeping
+// it bounded. Calling it for idempotent reattachments gives a stranded durable
+// job another prompt chance to start before the scheduled reconciliation job.
+func (h *handler) wakeCommitted(ctx context.Context) {
+	wakeContext, cancelWake := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancelWake()
+	_ = h.wake(wakeContext)
 }

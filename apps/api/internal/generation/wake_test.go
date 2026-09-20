@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 func TestWakerFromEnvStaysDisabledWithoutATarget(t *testing.T) {
@@ -39,15 +40,16 @@ func (s *stubWaker) Wake(context.Context) error {
 	return s.err
 }
 
-func TestWakeSwallowsSignallingFailures(t *testing.T) {
-	waker := &stubWaker{err: errors.New("cloud tasks unavailable")}
+func TestWakeReportsSignallingFailures(t *testing.T) {
+	failure := errors.New("cloud tasks unavailable")
+	waker := &stubWaker{err: failure}
 	h := &handler{waker: waker}
 
-	h.wake(context.Background())
+	err := h.wake(context.Background())
 
-	// The submission is already committed when the signal is sent. A failed
-	// signal costs the deck its prompt start, not its existence, so it must
-	// never surface as an error to the caller.
+	if !errors.Is(err, failure) {
+		t.Fatalf("wake returned %v, expected signalling failure", err)
+	}
 	if waker.calls != 1 {
 		t.Fatalf("wake calls = %d, expected 1", waker.calls)
 	}
@@ -56,5 +58,27 @@ func TestWakeSwallowsSignallingFailures(t *testing.T) {
 func TestWakeIsANoOpWhenDisabled(t *testing.T) {
 	h := &handler{}
 
-	h.wake(context.Background())
+	if err := h.wake(context.Background()); err != nil {
+		t.Fatalf("disabled wake returned %v", err)
+	}
+}
+
+func TestCloudTaskPreservesEachWakeForHorizontalScaling(t *testing.T) {
+	waker := &cloudTasksWaker{
+		target:         "https://worker.example.com/drain",
+		audience:       "https://worker.example.com",
+		serviceAccount: "worker@example.iam.gserviceaccount.com",
+		deadline:       30 * time.Minute,
+	}
+
+	task := waker.task()
+	if task.Name != "" {
+		t.Fatalf("task name = %q, expected Cloud Tasks to allocate a unique name", task.Name)
+	}
+	if task.DispatchDeadline != "1800s" {
+		t.Fatalf("dispatch deadline = %q", task.DispatchDeadline)
+	}
+	if task.HttpRequest.Url != waker.target || task.HttpRequest.OidcToken == nil {
+		t.Fatalf("task request = %#v", task.HttpRequest)
+	}
 }
