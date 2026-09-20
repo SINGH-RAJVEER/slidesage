@@ -284,11 +284,9 @@ resource "google_cloud_run_v2_service" "worker" {
   name     = local.worker_name
   location = var.gcp_region
 
-  # Cloud Tasks dispatches the wake signal from outside the project's network,
-  # so internal ingress would reject it. Reachability is therefore gated on IAM
-  # alone: only the wake service account below holds run.invoker, and the
-  # service has no allUsers binding.
-  ingress = "INGRESS_TRAFFIC_ALL"
+  # Same-project Cloud Tasks requests to the default run.app URL are internal.
+  # Keep both network ingress and IAM restricted to the wake path.
+  ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
   # A committed river_job row is invisible to the autoscaler, so the API sends a
   # wake signal after each submission instead of a warm instance waiting on it.
@@ -341,7 +339,19 @@ resource "google_cloud_run_v2_service" "worker" {
       }
       env {
         name  = "WORKER_CONCURRENCY"
-        value = "2"
+        value = "1"
+      }
+      env {
+        name  = "WORKER_REQUEST_LEASED"
+        value = "true"
+      }
+      env {
+        name  = "WORKER_DRAIN_ACCEPT_SECONDS"
+        value = "1200"
+      }
+      env {
+        name  = "WORKER_DRAIN_HANDOFF_SECONDS"
+        value = "480"
       }
       env {
         name  = "BASE_URL"
@@ -489,11 +499,11 @@ resource "google_cloud_run_v2_job" "migrate" {
 
 # Wake signalling ------------------------------------------------------------
 #
-# The worker has no minimum instance, so something has to tell Cloud Run that
-# committed queue work exists. Cloud Tasks carries that signal rather than the
-# API calling the worker directly: it holds the drain request open for the life
-# of the generation, and it retries if the worker was never reached. An API
-# instance can do neither, because it is scaled to zero on the same terms.
+# A committed queue row is invisible to Cloud Run. Cloud Tasks carries the
+# signal rather than the API calling the worker directly: it holds the drain
+# request open for the life of the generation, and it retries if the worker was
+# never reached. The staged first rollout keeps one minimum instance, but the
+# same wake path is required before that floor can safely become zero.
 
 resource "google_cloud_tasks_queue" "worker_wake" {
   project  = var.gcp_project_id
@@ -508,10 +518,12 @@ resource "google_cloud_tasks_queue" "worker_wake" {
   # A lost signal costs a deck its prompt start, never its existence, and the
   # scheduled sweep below is the backstop. Retrying a handful of times is enough.
   retry_config {
-    max_attempts       = 5
-    min_backoff        = "1s"
-    max_backoff        = "60s"
-    max_retry_duration = "600s"
+    max_attempts = 5
+    min_backoff  = "1s"
+    max_backoff  = "60s"
+    # The first request may run for 28 minutes before asking Cloud Tasks to
+    # retry it, so the retry window must extend beyond one complete lease.
+    max_retry_duration = "3600s"
   }
 
   depends_on = [google_project_service.required]
@@ -530,8 +542,8 @@ resource "google_project_iam_member" "runtime_task_enqueuer" {
   member  = "serviceAccount:${google_service_account.runtime.email}"
 }
 
-# The worker accepts public ingress, so this binding is the only thing that
-# makes it reachable. It is deliberately not allUsers.
+# Internal ingress admits same-project Cloud Tasks, and IAM still limits the
+# authenticated caller to this runtime identity.
 resource "google_cloud_run_v2_service_iam_member" "worker_wake_invoker" {
   project  = var.gcp_project_id
   location = google_cloud_run_v2_service.worker.location

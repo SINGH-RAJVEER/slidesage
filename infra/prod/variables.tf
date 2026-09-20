@@ -131,9 +131,9 @@ variable "maintenance_mode" {
 }
 
 variable "worker_min_instances" {
-  description = "Floor for worker instances. Zero lets the queue consumer scale away between decks; the API wakes it through Cloud Tasks. Raise to 1 to pin an always-warm worker."
+  description = "Floor for worker instances. Keep one during the first request-lease rollout, then set zero after production drain delivery is verified."
   type        = number
-  default     = 0
+  default     = 1
 }
 
 variable "worker_wake_deadline_seconds" {

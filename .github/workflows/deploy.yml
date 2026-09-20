@@ -270,9 +270,7 @@ jobs:
             --format='value(bindings.members)')
 
           test "$API_INGRESS" = internal-and-cloud-load-balancing
-          # The worker accepts public ingress because Cloud Tasks dispatches the
-          # wake signal from outside the project network. IAM is what keeps it
-          # closed, so the absence of an allUsers invoker is the assertion that
-          # matters now.
-          test "$WORKER_INGRESS" = all
+          # Same-project Cloud Tasks can reach the default run.app URL through
+          # internal ingress. IAM remains a second independent restriction.
+          test "$WORKER_INGRESS" = internal
           test -z "$WORKER_PUBLIC_BINDING"
