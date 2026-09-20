@@ -14,7 +14,7 @@ The API, worker, and migration job connect through the Cloud SQL Unix socket at 
 
 - Artifact Registry repository `slidesage` in `asia-south1`
 - Cloud Run service `api`, public only through the external HTTPS load balancer
-- Cloud Run service `worker`, scaling from zero to ten instances, with CPU kept allocated while an instance is running. Public ingress with no `allUsers` binding: Cloud Tasks dispatches the wake signal from outside the project network, so IAM is what keeps the service closed
+- Cloud Run service `worker`, retaining one minimum instance for the first request-lease rollout and capable of scaling from zero to ten after verification. Same-project Cloud Tasks reaches its default URL through internal ingress, and IAM grants invocation only to the runtime service account
 - Cloud Tasks queue `worker-wake`, carrying the signal that starts a worker after a submission commits
 - Cloud Run job `slidesage-maintenance`, running `cmd/worker --maintenance` on a Cloud Scheduler trigger for recovery and cleanup
 - Cloud Run job `slidesage-migrate`, invoked by deployment automation after an image update
