@@ -8,12 +8,8 @@ export type {
 } from "./template-catalog";
 export { BINARY_PPTX_TEMPLATE_CATALOG, BINARY_TEMPLATE_CATEGORIES } from "./template-catalog";
 
-export type PresentationGenerationStage =
-	| "researching"
-	| "assigning"
-	| "drafting"
-	| "compiling"
-	| "finalizing";
+/** Stages the generation worker reports over SSE, in the order they occur. */
+export type PresentationGenerationStage = "planning" | "drafting" | "finalizing";
 
 export interface Source {
 	url: string;
