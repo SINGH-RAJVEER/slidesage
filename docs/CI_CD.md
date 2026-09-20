@@ -121,12 +121,20 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
   --role=roles/artifactregistry.writer
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role=roles/run.admin
+	--member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
+	--role=roles/run.admin
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role=roles/iam.serviceAccountUser
+	--member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
+	--role=roles/cloudtasks.admin
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+	--member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
+	--role=roles/cloudscheduler.admin
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+	--member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
+	--role=roles/iam.serviceAccountUser
 
 gcloud iam service-accounts add-iam-policy-binding \
   slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com \
@@ -210,9 +218,9 @@ The Cloud SQL socket mount and the `roles/cloudsql.client` grant on the runtime 
 | Service | Port | Instances     | Concurrency | Notes                       |
 | ------- | ---- | ------------- | ----------- | --------------------------- |
 | `api`   | 8000 | min 0, max 10 | 80          | Scales from zero on traffic |
-| `worker` | 8080 | min 1, max 10 | 1           | Polls River and performs OpenRouter generation using `OPEN_ROUTER_API_KEY`. |
+| `worker` | 8080 | min 0, max 10 | 1           | An authenticated Cloud Task owns the River client while work is active. |
 
-The queue worker keeps at least one instance running with CPU available between requests (`cpu_idle = false`). API-to-worker coordination uses PostgreSQL only; queued work cannot wake a Cloud Run service from zero instances. River uses row-level `SKIP LOCKED`, so concurrent workers can claim jobs safely. Monitor queue latency and size worker capacity explicitly; Cloud Run does not scale on PostgreSQL queue depth.
+The queue worker has no minimum instance and keeps CPU available while an instance exists (`cpu_idle = false`). After committing a River job, the API creates an authenticated Cloud Task that starts a worker and holds `/drain` open. River uses row-level `SKIP LOCKED`, so concurrent request-owned clients can claim jobs safely. Monitor queue latency, task dispatch, provider limits, and database connections together.
 
 ### Ingress and invocation
 
@@ -221,7 +229,7 @@ The deployment workflow pins each service's ingress instead of inheriting a muta
 | Resource            | Ingress                             | Invocation policy                                                                                                                                                                                                     |
 | ------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `api`               | `internal-and-cloud-load-balancing` | Public at the Cloud Run IAM layer by default because browsers and external webhooks call it; application authentication protects private routes. Internet traffic must pass through the external HTTPS load balancer. |
-| `worker`            | `internal`                          | Private. It polls PostgreSQL and has no Pub/Sub, Cloud Tasks, Eventarc, or API invoker, so it needs no `roles/run.invoker` binding.                                                                                   |
+| `worker`            | `internal`                          | Private. Same-project Cloud Tasks invokes `/drain` as the runtime service account, which is the only identity with `roles/run.invoker`. There is no `allUsers` binding.                                              |
 | `slidesage-migrate` | Not applicable                      | Cloud Run Job executed by the authenticated CI/CD identity. Jobs do not have service ingress settings.                                                                                                                |
 
 The API ingress setting blocks direct internet requests to its `run.app` URL. It also makes the external load balancer the enforcement point for any attached Cloud Armor policy. Do not change the API to `ingress=all` while the load balancer is the documented production entry point.

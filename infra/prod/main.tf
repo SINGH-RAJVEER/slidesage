@@ -502,8 +502,8 @@ resource "google_cloud_run_v2_job" "migrate" {
 # A committed queue row is invisible to Cloud Run. Cloud Tasks carries the
 # signal rather than the API calling the worker directly: it holds the drain
 # request open for the life of the generation, and it retries if the worker was
-# never reached. The staged first rollout keeps one minimum instance, but the
-# same wake path is required before that floor can safely become zero.
+# never reached. Production uses no minimum instance after verifying that an
+# authenticated task can cold-start the worker and hold its drain lease.
 
 resource "google_cloud_tasks_queue" "worker_wake" {
   project  = var.gcp_project_id

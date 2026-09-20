@@ -131,9 +131,9 @@ variable "maintenance_mode" {
 }
 
 variable "worker_min_instances" {
-  description = "Floor for worker instances. Keep one during the first request-lease rollout, then set zero after production drain delivery is verified."
+  description = "Floor for worker instances. Zero lets authenticated Cloud Tasks requests start workers only while generation work exists."
   type        = number
-  default     = 1
+  default     = 0
 }
 
 variable "worker_wake_deadline_seconds" {
