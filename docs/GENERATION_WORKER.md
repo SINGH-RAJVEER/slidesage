@@ -50,7 +50,7 @@ Cancellation is transactional. `POST /generation-jobs/{id}/cancel` locks the app
 
 ## Waking a scaled-to-zero worker
 
-The target configuration has no minimum instance. The first rollout deliberately retains one minimum instance until production dispatch and drain behavior have been observed. Cloud Run starts an instance from zero only for an inbound HTTP request, and a committed `river_job` row is not something its autoscaler can observe, so the API sends a wake signal after the submission transaction commits. Signalling before the commit would wake a worker that finds an empty queue and hands its instance straight back. An idempotent resubmission sends the wake signal again, which gives a committed job another prompt start after a transient Cloud Tasks failure.
+Production has no minimum worker instance. Cloud Run starts an instance from zero only for an inbound HTTP request, and a committed `river_job` row is not something its autoscaler can observe, so the API sends a wake signal after the submission transaction commits. Signalling before the commit would wake a worker that finds an empty queue and hands its instance straight back. An idempotent resubmission sends the wake signal again, which gives a committed job another prompt start after a transient Cloud Tasks failure.
 
 The signal carries no payload. The job is already durable in PostgreSQL, and the woken worker still discovers it by polling. The request only has to exist.
 
@@ -127,7 +127,7 @@ The API discovers model catalogs for independent BYOK connections concurrently, 
 
 ## Deployment
 
-Production uses Cloud Run services for the API and generation worker. Terraform configures instance-based billing (`cpu_idle = false`). The API commits work to PostgreSQL and then creates an authenticated Cloud Task whose request owns the worker's River client. The first rollout keeps one minimum instance; changing `worker_min_instances` to zero is a later production action after live drain verification.
+Production uses Cloud Run services for the API and generation worker. Terraform configures instance-based billing (`cpu_idle = false`) and no minimum worker instance. The API commits work to PostgreSQL and then creates an authenticated Cloud Task whose request owns the worker's River client.
 
 Cloud Run does not scale on PostgreSQL queue depth. Cloud Tasks request count drives instance creation, while River still owns durable scheduling and exclusive claims. Production uses one River worker per request-owned instance; size the database pool, task concurrency, and provider limits together.
 

@@ -70,4 +70,4 @@ Generation SSE handlers copy event rows and close the query before writing to a 
 
 ## Deployment
 
-`apps/api/Dockerfile` has `api`, `worker`, and `migrate` targets. Production runs the API and worker as Cloud Run services. A Cloud Tasks request owns each production River client, which lets request-driven scaling protect the instance doing the background work. The first rollout keeps one worker instance warm; scale-to-zero is enabled only after live task delivery and lease handoff are verified. Run the `migrate` target before deploying either runtime.
+`apps/api/Dockerfile` has `api`, `worker`, and `migrate` targets. Production runs the API and worker as Cloud Run services. A Cloud Tasks request owns each production River client, which lets request-driven scaling protect the instance doing the background work while the worker keeps no minimum instance. Run the `migrate` target before deploying either runtime.
