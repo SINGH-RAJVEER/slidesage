@@ -326,7 +326,7 @@ func recordLedger(tx *sql.Tx, userID, operationID, entryType string, delta, bala
 	return err
 }
 
-func authorizationMillis(slideCount int, prompt string, current json.RawMessage, research any, payload *presentation.ResearchPayload, repairHeadroom int) int64 {
+func authorizationMillis(outputBudget int, prompt string, current json.RawMessage, research any, payload *presentation.ResearchPayload, repairHeadroom int) int64 {
 	encodedResearch, _ := json.Marshal(research)
 	encodedSources, _ := json.Marshal(payload)
 	inputBytes := len(slotSystemPrompt) + len(prompt) + len(current) + len(encodedResearch) + len(encodedSources) + 256
@@ -334,20 +334,29 @@ func authorizationMillis(slideCount int, prompt string, current json.RawMessage,
 	// prompt, so the headroom is reserved once as extra input and once as extra
 	// output rather than only against the reply.
 	inputTokens := (inputBytes+3)/4 + repairHeadroom
-	outputTokens := maxOutputTokens(slideCount) + repairHeadroom
+	outputTokens := outputBudget + repairHeadroom
 	// The provider may add protocol tokens beyond the serialized prompt. The
 	// buffer makes the authorization a real maximum while settlement charges the
 	// provider's exact aggregate usage.
 	return int64(outputTokens + (inputTokens*12+9)/10)
 }
 
+// maxOutputCeilingTokens caps every output bound this package sends, whether it
+// was derived from a manifest or from a slide count.
+const maxOutputCeilingTokens = 16000
+
+// maxOutputTokens bounds a completion that has no manifest to size it: revising
+// an existing deck, whose output is replacement text for shapes the template
+// catalog never described, and pricing a submission whose template has not
+// resolved yet. Slot drafting uses slotOutputTokens instead, which reads the
+// assigned archetypes rather than assuming a slide's worth of copy.
 func maxOutputTokens(slideCount int) int {
 	outputTokens := slideCount * 1200
 	if outputTokens < 2000 {
 		return 2000
 	}
-	if outputTokens > 16000 {
-		return 16000
+	if outputTokens > maxOutputCeilingTokens {
+		return maxOutputCeilingTokens
 	}
 	return outputTokens
 }

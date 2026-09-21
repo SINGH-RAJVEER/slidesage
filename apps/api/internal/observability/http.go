@@ -129,9 +129,8 @@ func RequestLogging(next http.Handler) http.Handler {
 				slog.Duration("duration_ms", time.Since(start)),
 				slog.String("remote_addr", request.RemoteAddr),
 			}
-			if span := trace.SpanContextFromContext(request.Context()); span.IsValid() {
-				attributes = append(attributes, slog.String("trace_id", span.TraceID().String()))
-			}
+			// trace_id and span_id are added by the trace context slog
+			// handler, which sees the same request context.
 			logger.LogAttrs(request.Context(), slog.LevelInfo, "request", attributes...)
 		}()
 		next.ServeHTTP(recorder, request)

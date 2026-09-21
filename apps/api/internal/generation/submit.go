@@ -256,7 +256,17 @@ func (h *handler) generationJob(ctx context.Context, userID string, input submit
 			return streamJob{}, nil, writeStatusError{http.StatusConflict, "Only failed presentations can be retried"}
 		}
 	}
-	quote := authorizationMillis(input.SlideCount, input.Topic, nil, input.Research, input.ResearchPayload, repairHeadroomTokens(input.SlideCount))
+	// The manifest states what the assigned archetypes can hold, which is a far
+	// tighter bound than a slide count. A template that does not resolve here is
+	// refused by the worker anyway; the reservation just falls back rather than
+	// failing the submission on a pricing detail.
+	outputBudget := maxOutputTokens(input.SlideCount)
+	if resolved, resolveErr := resolveGenerationTemplate(input.Template); resolveErr == nil {
+		if assignments, planErr := templateAssignments(resolved, input.SlideCount); planErr == nil {
+			outputBudget = slotOutputTokens(assignments)
+		}
+	}
+	quote := authorizationMillis(outputBudget, input.Topic, nil, input.Research, input.ResearchPayload, repairHeadroomTokens(input.SlideCount))
 	operationID, err := uuid()
 	if err != nil {
 		return streamJob{}, nil, err
@@ -324,7 +334,7 @@ func (h *handler) iterationJob(ctx context.Context, userID string, input submitI
 	// Reserve for the full indexed source and one complete plan repair, including
 	// reductions whose input is larger than their requested output.
 	budgetCount := max(count, currentCount)
-	quote := authorizationMillis(budgetCount, input.Topic, base.Data, input.Research, input.ResearchPayload, 2*maxOutputTokens(budgetCount))
+	quote := authorizationMillis(maxOutputTokens(budgetCount), input.Topic, base.Data, input.Research, input.ResearchPayload, 2*maxOutputTokens(budgetCount))
 	selection, _, err := h.connections.CredentialForGeneration(ctx, userID, input.AI)
 	if err != nil {
 		return streamJob{}, writeStatusError{http.StatusConflict, err.Error()}

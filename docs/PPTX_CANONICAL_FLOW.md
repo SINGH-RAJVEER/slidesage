@@ -82,6 +82,8 @@ The selected template ID and version are the only template input the client send
 
 The AI receives the ordered assignments and slot limits. A slide response contains values keyed by manifest slot ID. It does not contain layout names, regions, coordinates, themes, effects, CSS, or browser component names.
 
+The slot limits also size the request. The output bound for a call is the JSON the assigned archetypes permit at their stated `maxCharacters` and `maxListItems`, converted at three characters per token because slot IDs tokenize denser than prose, plus a quarter as margin for copy the repair pass will shorten. Archetypes in the published catalog range from roughly 350 to 2200 tokens of permitted content, so a bound read from the manifest is both tighter and safer than one assumed per slide.
+
 The worker validates every slot. It performs targeted repair for missing slides, malformed values, or content that exceeds a slot limit, retrying a failing slide up to three times. A limit error reports the measured length and, for a list slot, the offending item, and the repair turn asks the provider to shorten only the named slot and leave the rest of the slide byte-identical. It does not accept a shorter deck and does not silently discard invalid slides.
 
 Slot limits alone do not make a deck substantive, because most slots are optional. A slide that has any text or list slot must fill at least one of them, so an empty slot map fails validation and repair rather than compiling into a blank deck at the requested slide count.
