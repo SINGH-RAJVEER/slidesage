@@ -28,6 +28,56 @@ it("renders a blank loading slide before the deck is available", () => {
 		view.getByRole("option", { name: "Waiting for the rendered presentation" }),
 	).toBeInTheDocument();
 	expect(view.getByRole("img", { name: "Loading" })).toBeInTheDocument();
+	expect(view.queryByRole("progressbar")).not.toBeInTheDocument();
+});
+
+it("reports the generation stage under the loading orb", () => {
+	const view = render(
+		<ViewerSlideCarousel
+			document={null}
+			visibleSlide={0}
+			containerRef={createRef<HTMLDivElement>()}
+			onSelectSlide={mock()}
+			isWaitingForFirstSlide={true}
+			generation={{ stage: "drafting" }}
+		/>,
+	);
+
+	expect(view.getByRole("progressbar", { name: "Generation progress" })).toHaveAttribute(
+		"aria-valuenow",
+		"55",
+	);
+	expect(view.getByText("Writing slides")).toBeInTheDocument();
+});
+
+it("names the research stage before the worker reports one", () => {
+	const view = render(
+		<ViewerSlideCarousel
+			document={null}
+			visibleSlide={0}
+			containerRef={createRef<HTMLDivElement>()}
+			onSelectSlide={mock()}
+			isWaitingForFirstSlide={true}
+			generation={{ isResearching: true }}
+		/>,
+	);
+
+	expect(view.getByText("Researching sources")).toBeInTheDocument();
+});
+
+it("waits at the queued position until the first stage event", () => {
+	const view = render(
+		<ViewerSlideCarousel
+			document={null}
+			visibleSlide={0}
+			containerRef={createRef<HTMLDivElement>()}
+			onSelectSlide={mock()}
+			isWaitingForFirstSlide={true}
+			generation={{}}
+		/>,
+	);
+
+	expect(view.getByText("Queued")).toBeInTheDocument();
 });
 
 it("keeps empty-presentation controls visible and disabled", () => {

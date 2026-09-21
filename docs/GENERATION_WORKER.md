@@ -84,6 +84,8 @@ The event endpoint can be consumed through `fetch` stream parsing. Browser `Even
 
 When generation continues outside the presentation viewer, the web client shows a thinking-orb indicator below the header. Hovering or focusing it expands the indicator to show the submitted prompt. Selecting it returns to the running presentation.
 
+While the presentation viewer waits for a generating deck, the loading orb carries a progress bar and the name of the current stage beneath it. The bar reads the `stage` event from the stream and holds one position per stage, because the worker reports which stage is running and not how far through it is: queued before the first stage event, then planning, drafting, and finalizing. A research-backed generation shows `Researching sources` until the worker reports its own first stage. The readout is driven by the same resumable stream as the rest of the viewer, so it survives a reload mid-generation.
+
 One API instance accepts at most 40 generation event streams and at most three streams per user by default. Event rows are copied from PostgreSQL and the query is closed before bytes are written to the client, so a slow client does not hold a database connection. The API cancels active streams before graceful server shutdown. Configure the limits with `GENERATION_STREAM_LIMIT` and `GENERATION_STREAM_LIMIT_PER_USER`.
 
 Cancellation returns `202` with `{"status":"cancellation_requested"}` when the request is recorded. It returns `409` when the job is already terminal or is not otherwise cancellable.

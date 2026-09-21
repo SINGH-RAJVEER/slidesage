@@ -1,10 +1,12 @@
 export { CenteredStatusScreen } from "./CenteredStatusScreen";
 export type { PresentationExporter } from "./DownloadMenu";
 export { default as DownloadMenu } from "./DownloadMenu";
+export { GenerationProgress } from "./GenerationProgress";
 export { default as IterateModal } from "./IterateModal";
 export { PreviewSlide } from "./PreviewSlide";
 export { ViewerFullscreenOverlayControls } from "./ViewerFullscreenOverlayControls";
 export { ViewerHeaderControls } from "./ViewerHeaderControls";
 export { ViewerNavigationControls } from "./ViewerNavigationControls";
+export type { CarouselGenerationStatus } from "./ViewerSlideCarousel";
 export { ViewerSlideCarousel } from "./ViewerSlideCarousel";
 export { ViewerThumbnails } from "./ViewerThumbnails";
