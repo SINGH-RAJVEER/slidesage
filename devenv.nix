@@ -69,6 +69,49 @@
     };
 
 	processes = {
+		storage = {
+			exec = ''
+				mkdir -p "$DEVENV_STATE/gcs/$PRESENTATION_GCS_BUCKET"
+				exec fake-gcs-server \
+					-scheme http \
+					-host 127.0.0.1 \
+					-port 4443 \
+					-backend filesystem \
+					-filesystem-root "$DEVENV_STATE/gcs" \
+					-public-host 127.0.0.1:4443
+			'';
+			cwd = ".";
+			ready = {
+				http.get = {
+					host = "127.0.0.1";
+					port = 4443;
+					path = "/_internal/healthcheck";
+				};
+				initial_delay = 1;
+				period = 1;
+				probe_timeout = 3;
+				success_threshold = 1;
+				failure_threshold = 30;
+			};
+		};
+		api = {
+			exec = ''
+				DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" go run ./cmd/api
+			'';
+			cwd = "apps/api";
+			after = [ "db:migrate" ];
+			ready = {
+				http.get = {
+					port = 8000;
+					path = "/health";
+				};
+				initial_delay = 1;
+				period = 1;
+				probe_timeout = 3;
+				success_threshold = 1;
+				failure_threshold = 30;
+			};
+		};
 		worker = {
 			exec = ''
 				DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" \
