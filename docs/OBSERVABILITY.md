@@ -1,6 +1,6 @@
 # Observability
 
-The Go API and generation worker emit OpenTelemetry traces, metrics, and logs over OTLP. The exporter speaks HTTP/protobuf, the only transport Datadog's direct intake accepts. Everything is configured through standard `OTEL_*` environment variables and lives in `apps/api/internal/observability`. The worker can also send a second copy of traces to MLflow without changing the Datadog metrics or logs path. See [MLFLOW.md](MLFLOW.md).
+The Go API and generation worker emit OpenTelemetry traces, metrics, and logs over OTLP. The exporter speaks HTTP/protobuf, the only transport Datadog's direct intake accepts. Everything is configured through standard `OTEL_*` environment variables and lives in `apps/api/internal/observability`.
 
 ## Signals
 
@@ -8,7 +8,7 @@ The Go API and generation worker emit OpenTelemetry traces, metrics, and logs ov
 
 Every HTTP request handled by the API produces a server span. The API persists W3C trace context in each River job, the worker opens a child span per generation attempt, and outbound AI provider requests become client spans through the instrumented HTTP transport. A single trace can therefore cover submission, queued work, planning, drafting, and provider latency. Spans carry attributes such as `generation.job.id`, `generation.job.attempt`, `generation.job.outcome`, and `generation.tokens.used`.
 
-Each logical provider call also produces a `gen_ai.chat` span using OpenTelemetry GenAI attributes. It records the provider, model, prompt name and hash, output bound, token usage when the provider reports it, and the sanitized error status. `MLFLOW_CAPTURE_CONTENT=true` adds the provider-facing system prompt, user prompt, and structured response. Content capture defaults to false and omits any serialized value larger than 256 KiB.
+Each logical provider call also produces a `gen_ai.chat` span using OpenTelemetry GenAI attributes. It records the provider, model, prompt name and hash, output bound, token usage when the provider reports it, and the sanitized error status. `GEN_AI_CAPTURE_CONTENT=true` adds the provider-facing system prompt, user prompt, and structured response. Content capture defaults to false and omits any serialized value larger than 256 KiB.
 
 HTTP span names use the bounded `HTTP <method>` form. The resolved ServeMux pattern is stored in `http.route` and used by metrics and access logs. Unmatched requests use the fixed `unmatched` route. This prevents request paths from creating unbounded Datadog resources or metric tags.
 
