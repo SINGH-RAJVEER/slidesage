@@ -56,7 +56,7 @@ variable "migrate_image" {
 variable "open_router_model" {
   description = "Server-owned OpenRouter generation model."
   type        = string
-  default     = "openrouter/free"
+  default     = "google/gemini-3.8-flash"
 }
 
 variable "open_router_api_base" {
