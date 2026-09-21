@@ -6,11 +6,14 @@ Every transient error or confirmation the web app shows is rendered through a si
 
 | Prop | Type | Meaning |
 | --- | --- | --- |
-| `error` | `string \| null \| undefined` | Error message. Takes precedence over `success`. |
+| `error` | `string \| null \| undefined` | Error message. Takes precedence over the other two. |
+| `warning` | `string \| null \| undefined` | Warning message. Outranked by `error`, outranks `success`. |
 | `success` | `string \| null \| undefined` | Confirmation message. |
 | `onDismiss` | `() => void` | Called when the notice times out. Must clear the state that produced the message. |
 
-An error renders with `role="alert"`, a warning icon, and a red border; a success renders with `role="status"`, a check icon, and an emerald border. Both are `aria-live="polite"`. Rendering nothing when both messages are empty is the component's own responsibility, so callers pass state through unconditionally.
+An error renders with `role="alert"`, a warning icon, and red text on a red border; a warning renders with `role="status"`, the same icon, and amber text on an amber border; a success renders with `role="status"`, a check icon, and emerald text on an emerald border. All are `aria-live="polite"`. Rendering nothing when every message is empty is the component's own responsibility, so callers pass state through unconditionally.
+
+A warning is for a state the reader can correct before the action succeeds, rather than one that already failed. Asking for a deck on `/generate` without a template selected raises "Select a template before generating." there.
 
 ## Usage
 
@@ -42,3 +45,4 @@ The notice replaces feedback that follows a user action. Blocking states that ow
 - The "AI settings could not be loaded" state in `AISettings`, which replaces the whole panel. It is tracked separately from the panel's confirmations, which do go to the notice
 - The "Email verified" block on `VerifyEmailPage`, which replaces the form for the terminal state of the flow
 - The preview rendering status in the viewer, which carries its own retry link
+- The standing template problems on `GeneratePPTPage`: a retry naming a template this build no longer offers, and a selected template that is not ready for generation. Both describe a condition that persists until the reader changes the selection, so a self-dismissing pill would hide a message that is still true
