@@ -49,23 +49,18 @@ The SDK starts only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Without it, the p
 
 ## Local development
 
-The simplest local setup is the production one: point the endpoint at Datadog. Local runs resolve `deployment.environment` to `development` through the `NODE_ENV` fallback, so they stay out of the production views. The cost is that every local trace is billed at full sampling.
-
-To keep local traces out of Datadog entirely, point the endpoint at any collector that accepts OTLP over HTTP/protobuf, which is port `4318` by convention. The endpoint must be an absolute URL including the scheme; a bare `host:port` is rejected at startup.
-
-Jaeger's all-in-one image accepts traces only, so turn the other two signals off or their exporters will log failures on every interval:
-
-```shell
-docker run --rm -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one:latest
-```
+Point the endpoint at Datadog, the same destination production uses. Local runs resolve `deployment.environment` to `development` through the `NODE_ENV` fallback, so they stay out of the production views, and you debug with the same UI you reach for during an incident.
 
 ```
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-OTEL_METRICS_EXPORTER=none
-OTEL_LOGS_EXPORTER=none
+OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.us5.datadoghq.com
+OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>
 ```
 
-Then open the Jaeger UI at `http://localhost:16686` to browse traces from the API, worker, and AI provider calls in one view. Use an OpenTelemetry Collector instead if you want metrics and logs locally as well.
+The endpoint must be an absolute URL including the scheme. A bare `host:port` is rejected at startup.
+
+Filter on `env:development` in the Trace, Metrics, and Logs explorers to see only local runs. All three signals work, so a local trace looks exactly like a production one.
+
+Local traces are billed like any other. Leave `OTEL_EXPORTER_OTLP_ENDPOINT` empty when you are not working on telemetry, which disables the SDK entirely and falls back to local text logs, or lower `OTEL_TRACES_SAMPLING_RATIO` while iterating.
 
 ## Datadog on Cloud Run
 
