@@ -152,7 +152,7 @@ func TestMLflowOTLPIntegration(t *testing.T) {
 	telemetry, err := Setup(context.Background(), Config{
 		ServiceName:    "slidesage-integration-test",
 		Environment:    "test",
-		Protocol:       protocolGRPC,
+		Protocol:       protocolHTTPProtobuf,
 		SamplingRatio:  1,
 		MetricInterval: 60000,
 		MLflow: MLflowConfig{
