@@ -1,9 +1,9 @@
 /// <reference lib="dom" />
 
 import { describe, expect, it, mock } from "bun:test";
+import { StreamingProvider } from "@slidesage/ui";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
-import { StreamingProvider } from "@slidesage/ui";
 import GenerateResearchPage from "../../../routes/presentations/GenerateResearchPage";
 
 function AwayPage() {
@@ -167,6 +167,77 @@ describe("GenerateResearchPage", () => {
 				version: 1,
 			});
 		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	// The Enter shortcut was registered with the handler bound into it, so every
+	// render swapped the listener. Between research turning ready on screen and
+	// the effect running with the new handler, an Enter press was answered by the
+	// closure that still saw a loading page and dropped it. On a loaded machine
+	// that window is wide enough to lose the keystroke, which is how it surfaced
+	// as an intermittent CI failure.
+	it("binds the Enter shortcut once so a press cannot reach a stale handler", async () => {
+		const originalFetch = globalThis.fetch;
+		const originalAdd = window.addEventListener.bind(window);
+		let resolveResearch: ((response: Response) => void) | undefined;
+		let keydownRegistrations = 0;
+
+		globalThis.fetch = mock(
+			() =>
+				new Promise<Response>((resolve) => {
+					resolveResearch = resolve;
+				}),
+		) as unknown as typeof fetch;
+		window.addEventListener = ((type: string, ...rest: unknown[]) => {
+			if (type === "keydown") keydownRegistrations += 1;
+			return (originalAdd as unknown as (...args: unknown[]) => void)(type, ...rest);
+		}) as typeof window.addEventListener;
+
+		try {
+			const view = render(
+				<MemoryRouter
+					initialEntries={[
+						{
+							pathname: "/generate/research",
+							state: {
+								prompt: "Tidal power economics",
+								slideCount: 5,
+								detailLevel: "balanced",
+								tonality: "professional",
+								template: { id: "soft-skills-training", version: 1 },
+							},
+						},
+					]}
+				>
+					<StreamingProvider>
+						<Routes>
+							<Route path="/generate/research" element={<GenerateResearchPage />} />
+						</Routes>
+					</StreamingProvider>
+				</MemoryRouter>,
+			);
+
+			const registrationsWhileLoading = keydownRegistrations;
+			expect(registrationsWhileLoading).toBe(1);
+
+			resolveResearch?.(
+				new Response(
+					JSON.stringify({
+						sources: [{ url: "https://example.com/tidal", title: "Tidal power outlook" }],
+						estimated_tokens: 3.1,
+					}),
+					{ status: 200, headers: { "Content-Type": "application/json" } },
+				),
+			);
+
+			await waitFor(() => {
+				expect(view.getByText("Tidal power outlook")).toBeInTheDocument();
+			});
+
+			expect(keydownRegistrations).toBe(registrationsWhileLoading);
+		} finally {
+			window.addEventListener = originalAdd as typeof window.addEventListener;
 			globalThis.fetch = originalFetch;
 		}
 	});

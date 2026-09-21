@@ -151,6 +151,14 @@ export default function GenerateResearchPage() {
 		tonality,
 	]);
 
+	// Assigned during render so the listener below always reaches the current
+	// handler. Registering the handler itself leaves a window where research has
+	// become ready on screen but the listener still holds the closure that
+	// refuses to proceed, and an Enter pressed in that window is dropped for
+	// good.
+	const proceedRef = useRef(handleProceed);
+	proceedRef.current = handleProceed;
+
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (
@@ -173,12 +181,12 @@ export default function GenerateResearchPage() {
 			}
 
 			event.preventDefault();
-			void handleProceed();
+			void proceedRef.current();
 		};
 
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [handleProceed]);
+	}, []);
 
 	return (
 		<div className="flex h-dvh flex-col overflow-hidden bg-transparent">
