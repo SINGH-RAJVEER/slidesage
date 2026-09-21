@@ -18,7 +18,7 @@ func TestConfigFromEnvDefaultsToDisabledWithoutEndpoint(t *testing.T) {
 	if config.SamplingRatio != 1 || config.MetricInterval != 60000 {
 		t.Fatalf("defaults: %#v", config)
 	}
-	if config.Protocol != protocolGRPC {
+	if config.Protocol != protocolHTTPProtobuf {
 		t.Fatalf("default protocol: %q", config.Protocol)
 	}
 }
@@ -48,14 +48,13 @@ func TestConfigFromEnvDisablesIndividualSignals(t *testing.T) {
 
 func TestConfigFromEnvEnablesWithEndpoint(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "collector:4317")
-	t.Setenv("OTEL_EXPORTER_OTLP_INSECURE", "true")
 	t.Setenv("OTEL_SERVICE_NAME", "slidesage-test")
 	t.Setenv("OTEL_RESOURCE_ENVIRONMENT", "staging")
 	config := ConfigFromEnv()
 	if config.Disabled {
 		t.Fatal("telemetry should be enabled with an endpoint set")
 	}
-	if config.ServiceName != "slidesage-test" || config.Environment != "staging" || !config.Insecure {
+	if config.ServiceName != "slidesage-test" || config.Environment != "staging" {
 		t.Fatalf("config: %#v", config)
 	}
 }
@@ -88,7 +87,7 @@ func TestWorkerConfigEnablesMLflowWithoutPrimaryOTLP(t *testing.T) {
 func TestValidateRequiresMLflowExperimentAndAbsoluteURI(t *testing.T) {
 	config := Config{
 		ServiceName:    "worker",
-		Protocol:       protocolGRPC,
+		Protocol:       protocolHTTPProtobuf,
 		SamplingRatio:  1,
 		MetricInterval: 60000,
 		MLflow:         MLflowConfig{TrackingURI: "localhost:5000"},
@@ -113,24 +112,30 @@ func TestConfigFromEnvSurvivesInvalidNumbers(t *testing.T) {
 }
 
 func TestValidateRejectsBadSamplingAndInterval(t *testing.T) {
-	config := Config{ServiceName: "x", Protocol: protocolGRPC, SamplingRatio: 1.5, MetricInterval: 60000}
+	config := Config{ServiceName: "x", Protocol: protocolHTTPProtobuf, SamplingRatio: 1.5, MetricInterval: 60000}
 	if err := config.Validate(); err == nil {
 		t.Fatal("sampling ratio above one should be rejected")
 	}
-	config = Config{ServiceName: "x", Protocol: protocolGRPC, SamplingRatio: 1, MetricInterval: 100}
+	config = Config{ServiceName: "x", Protocol: protocolHTTPProtobuf, SamplingRatio: 1, MetricInterval: 100}
 	if err := config.Validate(); err == nil {
 		t.Fatal("metric interval below one second should be rejected")
 	}
 }
 
-func TestValidateRejectsUnsupportedProtocolAndRelativeHTTPEndpoint(t *testing.T) {
+func TestValidateRejectsUnsupportedProtocolAndRelativeEndpoint(t *testing.T) {
 	config := Config{ServiceName: "x", Endpoint: "collector:4317", Protocol: "http/json", SamplingRatio: 1, MetricInterval: 60000}
 	if err := config.Validate(); err == nil {
 		t.Fatal("unsupported protocol should be rejected")
 	}
+	// gRPC is rejected rather than silently ignored, so an operator following
+	// an older runbook gets an error instead of a dead exporter.
+	config.Protocol = "grpc"
+	if err := config.Validate(); err == nil {
+		t.Fatal("grpc should be rejected now that only HTTP/protobuf is built")
+	}
 	config.Protocol = protocolHTTPProtobuf
 	if err := config.Validate(); err == nil {
-		t.Fatal("HTTP/protobuf should require an absolute endpoint URL")
+		t.Fatal("an absolute endpoint URL should be required")
 	}
 }
 

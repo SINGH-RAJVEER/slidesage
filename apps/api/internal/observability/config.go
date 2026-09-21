@@ -1,8 +1,8 @@
 // Package observability wires OpenTelemetry signals (traces, metrics, and
 // logs) into the SlideSage API and generation worker processes. Everything
 // is configured through standard OTEL_* environment variables and exported
-// over OTLP/gRPC or OTLP HTTP/protobuf. When no endpoint is configured, the
-// SDK stays disabled and processes run with local-only logging.
+// over OTLP HTTP/protobuf. When no endpoint is configured, the SDK stays
+// disabled and processes run with local-only logging.
 package observability
 
 import (
@@ -13,10 +13,10 @@ import (
 	"strings"
 )
 
-const (
-	protocolGRPC         = "grpc"
-	protocolHTTPProtobuf = "http/protobuf"
-)
+// protocolHTTPProtobuf is the only OTLP transport this package speaks.
+// Datadog's direct intake does not accept gRPC, and the MLflow exporter is
+// HTTP-only, so nothing needed the gRPC exporters.
+const protocolHTTPProtobuf = "http/protobuf"
 
 // Config controls which telemetry providers Setup installs. The zero value
 // yields a fully disabled telemetry instance that still returns usable loggers.
@@ -26,7 +26,6 @@ type Config struct {
 	Environment     string  // OTEL_RESOURCE_ENVIRONMENT (deployment.environment)
 	Endpoint        string  // OTEL_EXPORTER_OTLP_ENDPOINT
 	Protocol        string  // OTEL_EXPORTER_OTLP_PROTOCOL
-	Insecure        bool    // OTEL_EXPORTER_OTLP_INSECURE
 	SamplingRatio   float64 // OTEL_TRACES_SAMPLING_RATIO
 	MetricInterval  int     // OTEL_METRIC_EXPORT_INTERVAL in milliseconds
 	TracesDisabled  bool    // OTEL_TRACES_EXPORTER=none
@@ -65,7 +64,6 @@ func configFromEnv(defaultServiceName string) Config {
 		Environment:     strings.TrimSpace(os.Getenv("OTEL_RESOURCE_ENVIRONMENT")),
 		Endpoint:        strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")),
 		Protocol:        strings.ToLower(strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"))),
-		Insecure:        boolFromEnv("OTEL_EXPORTER_OTLP_INSECURE", false),
 		SamplingRatio:   floatFromEnv("OTEL_TRACES_SAMPLING_RATIO", 1),
 		MetricInterval:  intFromEnv("OTEL_METRIC_EXPORT_INTERVAL", 60000),
 		TracesDisabled:  exporterDisabled("OTEL_TRACES_EXPORTER"),
@@ -85,7 +83,7 @@ func configFromEnv(defaultServiceName string) Config {
 		config.Environment = firstNonEmpty(os.Getenv("ENVIRONMENT"), os.Getenv("NODE_ENV"), "development")
 	}
 	if config.Protocol == "" {
-		config.Protocol = protocolGRPC
+		config.Protocol = protocolHTTPProtobuf
 	}
 	disabled := boolFromEnv("OTEL_SDK_DISABLED", false)
 	if disabled || (config.Endpoint == "" && config.MLflow.TrackingURI == "") {
@@ -107,13 +105,13 @@ func (config Config) Validate() error {
 	if !config.TracesDisabled && (config.SamplingRatio < 0 || config.SamplingRatio > 1) {
 		return fmt.Errorf("sampling ratio %g must be between 0 and 1", config.SamplingRatio)
 	}
-	if config.Endpoint != "" && config.Protocol != protocolGRPC && config.Protocol != protocolHTTPProtobuf {
-		return fmt.Errorf("OTLP protocol %q is not supported", config.Protocol)
+	if config.Endpoint != "" && config.Protocol != protocolHTTPProtobuf {
+		return fmt.Errorf("OTLP protocol %q is not supported, only %q is", config.Protocol, protocolHTTPProtobuf)
 	}
-	if config.Endpoint != "" && config.Protocol == protocolHTTPProtobuf {
+	if config.Endpoint != "" {
 		endpoint, err := url.Parse(config.Endpoint)
 		if err != nil || endpoint.Scheme == "" || endpoint.Host == "" {
-			return fmt.Errorf("HTTP/protobuf endpoint %q must be an absolute URL", config.Endpoint)
+			return fmt.Errorf("OTLP endpoint %q must be an absolute URL", config.Endpoint)
 		}
 	}
 	if !config.MetricsDisabled && config.MetricInterval < 1000 {

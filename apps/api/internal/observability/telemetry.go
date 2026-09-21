@@ -16,11 +16,8 @@ import (
 	"go.opentelemetry.io/contrib/detectors/gcp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
@@ -188,14 +185,7 @@ func (t *Telemetry) resource(ctx context.Context) (*resource.Resource, error) {
 }
 
 func (t *Telemetry) newTraceExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
-	if t.config.Protocol == protocolHTTPProtobuf {
-		return otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(signalEndpoint(t.config.Endpoint, "traces")))
-	}
-	options := []otlptracegrpc.Option{otlptracegrpc.WithEndpoint(t.config.Endpoint)}
-	if t.config.Insecure {
-		options = append(options, otlptracegrpc.WithInsecure())
-	}
-	return otlptracegrpc.New(ctx, options...)
+	return otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(signalEndpoint(t.config.Endpoint, "traces")))
 }
 
 func (t *Telemetry) newMLflowTraceExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
@@ -222,30 +212,19 @@ func (t *Telemetry) newMLflowTraceExporter(ctx context.Context) (sdktrace.SpanEx
 	return otlptracehttp.New(ctx, options...)
 }
 
+// newMetricExporter always selects delta temporality. Datadog rejects
+// cumulative OTLP metrics, and HTTP/protobuf is the only transport this
+// package speaks.
 func (t *Telemetry) newMetricExporter(ctx context.Context) (metric.Exporter, error) {
-	if t.config.Protocol == protocolHTTPProtobuf {
-		return otlpmetrichttp.New(
-			ctx,
-			otlpmetrichttp.WithEndpointURL(signalEndpoint(t.config.Endpoint, "metrics")),
-			otlpmetrichttp.WithTemporalitySelector(deltaTemporality),
-		)
-	}
-	options := []otlpmetricgrpc.Option{otlpmetricgrpc.WithEndpoint(t.config.Endpoint)}
-	if t.config.Insecure {
-		options = append(options, otlpmetricgrpc.WithInsecure())
-	}
-	return otlpmetricgrpc.New(ctx, options...)
+	return otlpmetrichttp.New(
+		ctx,
+		otlpmetrichttp.WithEndpointURL(signalEndpoint(t.config.Endpoint, "metrics")),
+		otlpmetrichttp.WithTemporalitySelector(deltaTemporality),
+	)
 }
 
 func (t *Telemetry) newLogExporter(ctx context.Context) (log.Exporter, error) {
-	if t.config.Protocol == protocolHTTPProtobuf {
-		return otlploghttp.New(ctx, otlploghttp.WithEndpointURL(signalEndpoint(t.config.Endpoint, "logs")))
-	}
-	options := []otlploggrpc.Option{otlploggrpc.WithEndpoint(t.config.Endpoint)}
-	if t.config.Insecure {
-		options = append(options, otlploggrpc.WithInsecure())
-	}
-	return otlploggrpc.New(ctx, options...)
+	return otlploghttp.New(ctx, otlploghttp.WithEndpointURL(signalEndpoint(t.config.Endpoint, "logs")))
 }
 
 func signalEndpoint(endpoint string, signal string) string {
