@@ -3,7 +3,9 @@
 import { describe, expect, it, mock } from "bun:test";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { StreamingProvider } from "@slidesage/ui";
 import { PRESENTATIONS_UPDATED_EVENT } from "@slidesage/ui/lib/presentation-events";
+import GenerateResearchPage from "../../../routes/presentations/GenerateResearchPage";
 import PresentationsGridPage from "../../../routes/presentations/PresentationsGridPage";
 
 function RouteStateProbe() {
@@ -145,6 +147,7 @@ describe("failed presentation retries", () => {
 									],
 									estimated_tokens: 9.2,
 								},
+								template: { id: "soft-skills-training", version: 1 },
 								ai: { provider: "google", model: "gemini-2.5-pro" },
 							},
 						},
@@ -158,10 +161,13 @@ describe("failed presentation retries", () => {
 		try {
 			const view = render(
 				<MemoryRouter initialEntries={["/presentations"]}>
-					<Routes>
-						<Route path="/presentations" element={<PresentationsGridPage />} />
-						<Route path="/generate/research" element={<RouteStateProbe />} />
-					</Routes>
+					<StreamingProvider>
+						<Routes>
+							<Route path="/presentations" element={<PresentationsGridPage />} />
+							<Route path="/generate" element={<span>Generate form</span>} />
+							<Route path="/generate/research" element={<GenerateResearchPage />} />
+						</Routes>
+					</StreamingProvider>
 				</MemoryRouter>,
 			);
 
@@ -169,9 +175,9 @@ describe("failed presentation retries", () => {
 			expect(view.getByText("Ready to retry")).toBeInTheDocument();
 			fireEvent.click(view.getAllByText("Research retry")[0] as HTMLElement);
 
-			await waitFor(() => expect(view.getByText(/Saved source/)).toBeInTheDocument());
-			expect(view.getByText(/"slideCount":8/)).toBeInTheDocument();
-			expect(view.getByText(/"provider":"google","model":"gemini-2.5-pro"/)).toBeInTheDocument();
+			await waitFor(() => expect(view.getByText("Saved source")).toBeInTheDocument());
+			expect(view.queryByText("Generate form")).not.toBeInTheDocument();
+			expect(view.getByText("Proceed to Generate").closest("button")).not.toBeDisabled();
 			expect(requestCount).toBe(2);
 		} finally {
 			globalThis.fetch = originalFetch;
