@@ -49,3 +49,6 @@ apps/api/publish-templates
 
 # Release binaries compiled for the container images
 /dist
+
+# Python environments are recreated from uv.lock.
+.venv/

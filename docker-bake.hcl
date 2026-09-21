@@ -1,4 +1,4 @@
-# Bake definition for the three images built from apps/api/Dockerfile.
+# Bake definition for the runtime images.
 #
 # Each image copies one prebuilt binary from dist/ onto scratch, so a bake is
 # three trivial builds sharing a certificate stage. Baking them together still
@@ -28,7 +28,7 @@ function "image" {
 }
 
 group "default" {
-	targets = ["api", "worker", "migrate"]
+	targets = ["api", "worker", "migrate", "mlflow"]
 }
 
 target "common" {
@@ -60,5 +60,14 @@ target "migrate" {
 	tags = [
 		"${image("migrate")}:${IMAGE_VERSION}",
 		"${image("migrate")}:latest",
+	]
+}
+
+target "mlflow" {
+	context    = "."
+	dockerfile = "infra/mlflow/Dockerfile"
+	tags = [
+		"${image("mlflow")}:${IMAGE_VERSION}",
+		"${image("mlflow")}:latest",
 	]
 }

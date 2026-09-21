@@ -3,3 +3,7 @@
 # including .git and node_modules, for a build that reads three files.
 *
 !dist
+!infra
+infra/*
+!infra/mlflow
+!infra/mlflow/**
