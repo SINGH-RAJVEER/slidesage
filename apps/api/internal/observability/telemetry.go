@@ -3,7 +3,9 @@ package observability
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -28,6 +30,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	"golang.org/x/oauth2"
+	"google.golang.org/api/idtoken"
 )
 
 // Telemetry owns the lifecycle of the three OTLP signal providers. Processes
@@ -64,15 +68,25 @@ func Setup(ctx context.Context, config Config) (*Telemetry, error) {
 			sdktrace.WithResource(telemetryResource),
 			sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(config.SamplingRatio))),
 		}
-		traceExporter, err := telemetry.newTraceExporter(ctx)
-		if err != nil {
-			return nil, err
+		if config.Endpoint != "" {
+			traceExporter, err := telemetry.newTraceExporter(ctx)
+			if err != nil {
+				return nil, err
+			}
+			providerOptions = append(providerOptions, sdktrace.WithBatcher(traceExporter))
 		}
-		telemetry.tracerProvider = sdktrace.NewTracerProvider(append(providerOptions, sdktrace.WithBatcher(traceExporter))...)
+		if config.MLflow.TrackingURI != "" {
+			mlflowExporter, err := telemetry.newMLflowTraceExporter(ctx)
+			if err != nil {
+				return nil, err
+			}
+			providerOptions = append(providerOptions, sdktrace.WithBatcher(mlflowExporter))
+		}
+		telemetry.tracerProvider = sdktrace.NewTracerProvider(providerOptions...)
 		otel.SetTracerProvider(telemetry.tracerProvider)
 	}
 
-	if !config.MetricsDisabled {
+	if config.Endpoint != "" && !config.MetricsDisabled {
 		meterExporter, err := telemetry.newMetricExporter(ctx)
 		if err != nil {
 			_ = telemetry.Shutdown(context.Background())
@@ -86,7 +100,7 @@ func Setup(ctx context.Context, config Config) (*Telemetry, error) {
 		otel.SetMeterProvider(telemetry.meterProvider)
 	}
 
-	if !config.LogsDisabled {
+	if config.Endpoint != "" && !config.LogsDisabled {
 		logExporter, err := telemetry.newLogExporter(ctx)
 		if err != nil {
 			_ = telemetry.Shutdown(context.Background())
@@ -182,6 +196,30 @@ func (t *Telemetry) newTraceExporter(ctx context.Context) (sdktrace.SpanExporter
 		options = append(options, otlptracegrpc.WithInsecure())
 	}
 	return otlptracegrpc.New(ctx, options...)
+}
+
+func (t *Telemetry) newMLflowTraceExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
+	headers := map[string]string{"x-mlflow-experiment-id": t.config.MLflow.ExperimentID}
+	if t.config.MLflow.Workspace != "" {
+		headers["X-MLFLOW-WORKSPACE"] = t.config.MLflow.Workspace
+	}
+	options := []otlptracehttp.Option{
+		otlptracehttp.WithEndpointURL(signalEndpoint(t.config.MLflow.TrackingURI, "traces")),
+		otlptracehttp.WithHeaders(headers),
+		otlptracehttp.WithCompression(otlptracehttp.GzipCompression),
+	}
+	if t.config.MLflow.GCPAudience != "" {
+		tokenSource, err := idtoken.NewTokenSource(ctx, t.config.MLflow.GCPAudience)
+		if err != nil {
+			return nil, fmt.Errorf("create MLflow identity token source: %w", err)
+		}
+		client := oauth2.NewClient(ctx, tokenSource)
+		client.Timeout = 15 * time.Second
+		options = append(options, otlptracehttp.WithHTTPClient(client))
+	} else {
+		options = append(options, otlptracehttp.WithHTTPClient(&http.Client{Timeout: 15 * time.Second}))
+	}
+	return otlptracehttp.New(ctx, options...)
 }
 
 func (t *Telemetry) newMetricExporter(ctx context.Context) (metric.Exporter, error) {

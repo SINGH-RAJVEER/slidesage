@@ -103,7 +103,7 @@ func TestGenerateJSONReportsLengthCappedStream(t *testing.T) {
 	t.Setenv("OPEN_ROUTER_API_KEY", "test-key")
 
 	handler := &handler{client: server.Client()}
-	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 5}, "system", "user", 1000)
+	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 5}, "test", "system", "user", 1000)
 	if err == nil {
 		t.Fatal("a length-capped truncated response must not decode as success")
 	}
@@ -131,7 +131,7 @@ func TestGenerateJSONTreatsMidStreamProviderErrorAsRetryable(t *testing.T) {
 	t.Setenv("OPEN_ROUTER_API_KEY", "test-key")
 
 	handler := &handler{client: server.Client()}
-	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 5}, "system", "user", 1000)
+	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 5}, "test", "system", "user", 1000)
 	if err == nil {
 		t.Fatal("a mid-stream provider error must not decode as success")
 	}
@@ -179,7 +179,7 @@ func TestGenerateJSONFailsFastOnAStalledStream(t *testing.T) {
 
 	handler := &handler{client: server.Client()}
 	started := time.Now()
-	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 5}, "system", "user", 1000)
+	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 5}, "test", "system", "user", 1000)
 	if err == nil {
 		t.Fatal("a stalled stream must not decode as success")
 	}
@@ -233,7 +233,7 @@ func TestGenerateJSONReplacesAnOutOfCreditProviderBody(t *testing.T) {
 	t.Setenv("OPEN_ROUTER_API_KEY", "test-key")
 
 	handler := &handler{client: server.Client()}
-	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 12}, "system", "user", 4800)
+	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 12}, "test", "system", "user", 4800)
 	if err == nil {
 		t.Fatal("a payment-required response must fail the generation")
 	}
