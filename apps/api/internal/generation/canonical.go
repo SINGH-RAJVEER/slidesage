@@ -139,7 +139,7 @@ func (h *handler) generateSlots(ctx context.Context, job streamJob, assignments 
 			batchPlan, _ := json.Marshal(batch)
 			batchUser = generationUserPrompt(job) + "\nOrdered manifest assignments and limits: " + string(batchPlan) + slotBatchPrompt
 		}
-		document, used, err := h.generateJSON(ctx, job, slotSystemPrompt, batchUser, slotOutputTokens(batch))
+		document, used, err := h.generateJSON(ctx, job, "slot-draft", slotSystemPrompt, batchUser, slotOutputTokens(batch))
 		tokens += used
 		if err != nil {
 			return "", nil, tokens, err
@@ -170,7 +170,7 @@ func (h *handler) generateSlots(ctx context.Context, job streamJob, assignments 
 		for attempt := 0; issue != nil && attempt < 3; attempt++ {
 			assignment, _ := json.Marshal(a)
 			previous, _ := json.Marshal(content)
-			repair, used, e := h.generateJSON(ctx, job, slotSystemPrompt, user+"\nRepair only this slide: "+string(assignment)+"\nPrevious: "+string(previous)+"\nValidation error: "+issue.Error()+"\n"+slotRepairPrompt, slotOutputTokens([]pptxcompiler.Assignment{a}))
+			repair, used, e := h.generateJSON(ctx, job, "slot-repair", slotSystemPrompt, user+"\nRepair only this slide: "+string(assignment)+"\nPrevious: "+string(previous)+"\nValidation error: "+issue.Error()+"\n"+slotRepairPrompt, slotOutputTokens([]pptxcompiler.Assignment{a}))
 			tokens += used
 			if e != nil {
 				return "", nil, tokens, e
@@ -278,7 +278,11 @@ func (h *handler) revisePPTX(ctx context.Context, job streamJob, source []byte) 
 	user := generationUserPrompt(job) + "\nUse a " + job.detailLevel + " level of detail and a " + job.tonality + " tone.\nCurrent revision index: " + string(encoded)
 	var tokens int
 	for attempt := 0; attempt < 2; attempt++ {
-		response, used, e := h.generateJSON(ctx, job, system, user, outputBudget)
+		promptName := "text-revision"
+		if structural {
+			promptName = "structural-revision"
+		}
+		response, used, e := h.generateJSON(ctx, job, promptName, system, user, outputBudget)
 		tokens += used
 		if e != nil {
 			return nil, "", tokens, e

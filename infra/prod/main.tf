@@ -381,6 +381,22 @@ resource "google_cloud_run_v2_service" "worker" {
         name  = "CDN_SIGNED_URL_TTL_SECONDS"
         value = tostring(var.cdn_signed_url_ttl_seconds)
       }
+      env {
+        name  = "MLFLOW_TRACKING_URI"
+        value = google_cloud_run_v2_service.mlflow.uri
+      }
+      env {
+        name  = "MLFLOW_EXPERIMENT_ID"
+        value = var.mlflow_experiment_id
+      }
+      env {
+        name  = "MLFLOW_GCP_AUDIENCE"
+        value = google_cloud_run_v2_service.mlflow.uri
+      }
+      env {
+        name  = "MLFLOW_CAPTURE_CONTENT"
+        value = "false"
+      }
 
       dynamic "env" {
         for_each = local.observability_environment

@@ -2,9 +2,15 @@ package generation
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -12,6 +18,8 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
+
+const providerTraceContentLimit = 256 * 1024
 
 // The generation pipeline reports spans and metrics through the global
 // OpenTelemetry providers installed by the observability package during
@@ -125,5 +133,96 @@ func recordTokenUsage(ctx context.Context, kind string, tokens int) {
 	trace.SpanFromContext(ctx).SetAttributes(attribute.Int("generation.tokens.used", tokens))
 	if metrics := metricsFor(); metrics.tokens != nil {
 		metrics.tokens.Add(ctx, int64(tokens), metric.WithAttributes(attribute.String("generation.kind", kind)))
+	}
+}
+
+func startProviderSpan(ctx context.Context, provider ai.Provider, model, promptName, system, user string, maxOutput int) (context.Context, trace.Span) {
+	hash := sha256.Sum256([]byte(promptVersionMaterial(promptName, system)))
+	ctx, span := tracer.Start(ctx, "gen_ai.chat",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			attribute.String("gen_ai.operation.name", "chat"),
+			attribute.String("gen_ai.provider.name", providerSemanticName(provider)),
+			attribute.String("gen_ai.request.model", model),
+			attribute.Int("gen_ai.request.max_tokens", maxOutput),
+			attribute.String("gen_ai.output.type", "json"),
+			attribute.String("gen_ai.prompt.name", promptName),
+			attribute.String("slidesage.prompt.sha256", hex.EncodeToString(hash[:])),
+		),
+	)
+	if captureProviderContent() {
+		setTraceJSON(span, "gen_ai.input.messages", []map[string]any{
+			{"role": "system", "parts": []map[string]string{{"type": "text", "content": system}}},
+			{"role": "user", "parts": []map[string]string{{"type": "text", "content": user}}},
+		})
+	}
+	return ctx, span
+}
+
+func promptVersionMaterial(name, system string) string {
+	switch name {
+	case "slot-draft":
+		return system + slotBatchPrompt
+	case "slot-repair":
+		return system + slotRepairPrompt
+	default:
+		return system
+	}
+}
+
+func finishProviderSpan(span trace.Span, document map[string]any, tokens int, err error) {
+	if tokens > 0 {
+		span.SetAttributes(attribute.Int("slidesage.tokens.total", tokens))
+	}
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	} else if captureProviderContent() {
+		content, _ := json.Marshal(document)
+		setTraceJSON(span, "gen_ai.output.messages", []map[string]any{
+			{"role": "assistant", "parts": []map[string]string{{"type": "text", "content": string(content)}}},
+		})
+	}
+	span.End()
+}
+
+func recordProviderUsage(ctx context.Context, input, output int) {
+	attributes := make([]attribute.KeyValue, 0, 2)
+	if input > 0 {
+		attributes = append(attributes, attribute.Int("gen_ai.usage.input_tokens", input))
+	}
+	if output > 0 {
+		attributes = append(attributes, attribute.Int("gen_ai.usage.output_tokens", output))
+	}
+	trace.SpanFromContext(ctx).SetAttributes(attributes...)
+}
+
+func captureProviderContent() bool {
+	enabled, err := strconv.ParseBool(os.Getenv("MLFLOW_CAPTURE_CONTENT"))
+	return err == nil && enabled
+}
+
+func setTraceJSON(span trace.Span, name string, value any) {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return
+	}
+	if len(encoded) > providerTraceContentLimit {
+		span.SetAttributes(attribute.Bool("slidesage.trace.content_omitted", true))
+		return
+	}
+	span.SetAttributes(attribute.String(name, string(encoded)))
+}
+
+func providerSemanticName(provider ai.Provider) string {
+	switch provider {
+	case ai.OpenAI:
+		return "openai"
+	case ai.Google:
+		return "gcp.gen_ai"
+	case ai.Anthropic:
+		return "anthropic"
+	default:
+		return string(provider)
 	}
 }

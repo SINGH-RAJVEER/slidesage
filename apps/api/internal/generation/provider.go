@@ -87,7 +87,7 @@ func parseRetryAfter(value string) time.Duration {
 	return 0
 }
 
-func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user string, maxOutput int) (map[string]any, int, error) {
+func (h *handler) generateJSON(ctx context.Context, job streamJob, promptName, system, user string, maxOutput int) (document map[string]any, tokens int, err error) {
 	key := strings.TrimSpace(os.Getenv("OPEN_ROUTER_API_KEY"))
 	if key == "" {
 		key = strings.TrimSpace(os.Getenv("OPENROUTER_API_KEY"))
@@ -100,6 +100,8 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 	if job.selection != nil {
 		provider, model, key = job.selection.Provider, job.selection.Model, job.credential
 	}
+	ctx, span := startProviderSpan(ctx, provider, model, promptName, system, user, maxOutput)
+	defer func() { finishProviderSpan(span, document, tokens, err) }()
 	if key == "" {
 		return nil, 0, errors.New("AI provider is not configured")
 	}
@@ -141,7 +143,8 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 		}
 	}
 	var content strings.Builder
-	tokens := 0
+	inputTokens := 0
+	outputTokens := 0
 	finishReason := ""
 	sawDone := false
 	scanner := bufio.NewScanner(response.Body)
@@ -178,7 +181,9 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 				FinishReason *string `json:"finish_reason"`
 			} `json:"choices"`
 			Usage struct {
-				TotalTokens int `json:"total_tokens"`
+				TotalTokens      int `json:"total_tokens"`
+				PromptTokens     int `json:"prompt_tokens"`
+				CompletionTokens int `json:"completion_tokens"`
 			} `json:"usage"`
 			Error *struct {
 				Message string `json:"message"`
@@ -213,6 +218,12 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 		if chunk.Usage.TotalTokens > 0 {
 			tokens = chunk.Usage.TotalTokens
 		}
+		if chunk.Usage.PromptTokens > 0 {
+			inputTokens = chunk.Usage.PromptTokens
+		}
+		if chunk.Usage.CompletionTokens > 0 {
+			outputTokens = chunk.Usage.CompletionTokens
+		}
 	}
 	// Checked before scanner.Err() because a stall that lands on a buffer
 	// boundary can end the scan without surfacing any read error at all.
@@ -225,13 +236,14 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 	if err := scanner.Err(); err != nil {
 		return nil, 0, err
 	}
-	document, err := decodeGeneratedDocument(content.String())
+	document, err = decodeGeneratedDocument(content.String())
 	if err != nil {
 		if finishReason == "length" || !sawDone {
 			return nil, 0, fmt.Errorf("%w (%d bytes received before the stream ended)", truncatedOutputError(finishReason, sawDone), content.Len())
 		}
 		return nil, 0, fmt.Errorf("%w (%d bytes received)", err, content.Len())
 	}
+	recordProviderUsage(ctx, inputTokens, outputTokens)
 	return document, tokens, nil
 }
 
@@ -404,7 +416,9 @@ func (h *handler) directProvider(ctx context.Context, provider ai.Provider, mode
 			OutputTokens int `json:"output_tokens"`
 		} `json:"usage"`
 		UsageMetadata struct {
-			TotalTokens int `json:"totalTokenCount"`
+			TotalTokens  int `json:"totalTokenCount"`
+			InputTokens  int `json:"promptTokenCount"`
+			OutputTokens int `json:"candidatesTokenCount"`
 		} `json:"usageMetadata"`
 	}
 	if err := json.Unmarshal(body, &envelope); err != nil {
@@ -445,6 +459,15 @@ func (h *handler) directProvider(ctx context.Context, provider ai.Provider, mode
 	if tokens == 0 {
 		tokens = envelope.UsageMetadata.TotalTokens
 	}
+	inputTokens := envelope.Usage.InputTokens
+	outputTokens := envelope.Usage.OutputTokens
+	if inputTokens == 0 {
+		inputTokens = envelope.UsageMetadata.InputTokens
+	}
+	if outputTokens == 0 {
+		outputTokens = envelope.UsageMetadata.OutputTokens
+	}
+	recordProviderUsage(ctx, inputTokens, outputTokens)
 	return document, tokens, nil
 }
 
