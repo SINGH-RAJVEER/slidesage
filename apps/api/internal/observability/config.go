@@ -14,8 +14,7 @@ import (
 )
 
 // protocolHTTPProtobuf is the only OTLP transport this package speaks.
-// Datadog's direct intake does not accept gRPC, and the MLflow exporter is
-// HTTP-only, so nothing needed the gRPC exporters.
+// Datadog's direct intake does not accept gRPC.
 const protocolHTTPProtobuf = "http/protobuf"
 
 // Config controls which telemetry providers Setup installs. The zero value
@@ -31,17 +30,7 @@ type Config struct {
 	TracesDisabled  bool    // OTEL_TRACES_EXPORTER=none
 	MetricsDisabled bool    // OTEL_METRICS_EXPORTER=none
 	LogsDisabled    bool    // OTEL_LOGS_EXPORTER=none
-	Disabled        bool    // true when OTEL_SDK_DISABLED or no trace destination is set
-	MLflow          MLflowConfig
-}
-
-// MLflowConfig controls the optional second trace exporter. Metrics and logs
-// continue to use the primary OTLP endpoint because MLflow ingests traces only.
-type MLflowConfig struct {
-	TrackingURI  string // MLFLOW_TRACKING_URI
-	ExperimentID string // MLFLOW_EXPERIMENT_ID
-	Workspace    string // MLFLOW_WORKSPACE
-	GCPAudience  string // MLFLOW_GCP_AUDIENCE
+	Disabled        bool    // true when OTEL_SDK_DISABLED or the endpoint is unset
 }
 
 // ConfigFromEnv reads standard OpenTelemetry environment variables. It never
@@ -69,12 +58,6 @@ func configFromEnv(defaultServiceName string) Config {
 		TracesDisabled:  exporterDisabled("OTEL_TRACES_EXPORTER"),
 		MetricsDisabled: exporterDisabled("OTEL_METRICS_EXPORTER"),
 		LogsDisabled:    exporterDisabled("OTEL_LOGS_EXPORTER"),
-		MLflow: MLflowConfig{
-			TrackingURI:  strings.TrimRight(strings.TrimSpace(os.Getenv("MLFLOW_TRACKING_URI")), "/"),
-			ExperimentID: strings.TrimSpace(os.Getenv("MLFLOW_EXPERIMENT_ID")),
-			Workspace:    strings.TrimSpace(os.Getenv("MLFLOW_WORKSPACE")),
-			GCPAudience:  strings.TrimSpace(os.Getenv("MLFLOW_GCP_AUDIENCE")),
-		},
 	}
 	if config.ServiceName == "" {
 		config.ServiceName = defaultServiceName
@@ -86,7 +69,7 @@ func configFromEnv(defaultServiceName string) Config {
 		config.Protocol = protocolHTTPProtobuf
 	}
 	disabled := boolFromEnv("OTEL_SDK_DISABLED", false)
-	if disabled || (config.Endpoint == "" && config.MLflow.TrackingURI == "") {
+	if disabled || config.Endpoint == "" {
 		config.Disabled = true
 	}
 	return config
@@ -116,15 +99,6 @@ func (config Config) Validate() error {
 	}
 	if !config.MetricsDisabled && config.MetricInterval < 1000 {
 		return fmt.Errorf("metric export interval %dms must be at least 1000ms", config.MetricInterval)
-	}
-	if config.MLflow.TrackingURI != "" {
-		endpoint, err := url.Parse(config.MLflow.TrackingURI)
-		if err != nil || endpoint.Scheme == "" || endpoint.Host == "" {
-			return fmt.Errorf("MLflow tracking URI %q must be an absolute URL", config.MLflow.TrackingURI)
-		}
-		if config.MLflow.ExperimentID == "" {
-			return fmt.Errorf("MLflow experiment ID must not be empty when MLflow export is enabled")
-		}
 	}
 	return nil
 }

@@ -68,39 +68,6 @@ func TestWorkerConfigDefaultsServiceName(t *testing.T) {
 	}
 }
 
-func TestWorkerConfigEnablesMLflowWithoutPrimaryOTLP(t *testing.T) {
-	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-	t.Setenv("MLFLOW_TRACKING_URI", "http://localhost:5000/")
-	t.Setenv("MLFLOW_EXPERIMENT_ID", "7")
-	config := WorkerConfigFromEnv()
-	if config.Disabled {
-		t.Fatal("MLflow should enable worker tracing without a primary OTLP endpoint")
-	}
-	if config.MLflow.TrackingURI != "http://localhost:5000" || config.MLflow.ExperimentID != "7" {
-		t.Fatalf("MLflow config: %#v", config.MLflow)
-	}
-	if err := config.Validate(); err != nil {
-		t.Fatalf("validate MLflow-only config: %v", err)
-	}
-}
-
-func TestValidateRequiresMLflowExperimentAndAbsoluteURI(t *testing.T) {
-	config := Config{
-		ServiceName:    "worker",
-		Protocol:       protocolHTTPProtobuf,
-		SamplingRatio:  1,
-		MetricInterval: 60000,
-		MLflow:         MLflowConfig{TrackingURI: "localhost:5000"},
-	}
-	if err := config.Validate(); err == nil {
-		t.Fatal("relative MLflow URI should fail validation")
-	}
-	config.MLflow.TrackingURI = "http://localhost:5000"
-	if err := config.Validate(); err == nil {
-		t.Fatal("missing MLflow experiment ID should fail validation")
-	}
-}
-
 func TestConfigFromEnvSurvivesInvalidNumbers(t *testing.T) {
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "collector:4317")
 	t.Setenv("OTEL_TRACES_SAMPLING_RATIO", "not-a-number")
