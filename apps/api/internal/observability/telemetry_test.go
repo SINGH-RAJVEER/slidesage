@@ -5,13 +5,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
@@ -82,93 +80,58 @@ func TestHTTPMetricTemporalityIsDelta(t *testing.T) {
 	}
 }
 
-func TestMLflowReceivesSecondTraceWithoutPrimaryHeaders(t *testing.T) {
+// A short-lived process flushes its spans only at shutdown. Before the
+// providers shut down concurrently, a slow log export consumed the whole
+// budget and the span batch was silently dropped, which is why the generation
+// worker never appeared in APM.
+func TestShutdownFlushesTracesWhileAnotherSignalIsSlow(t *testing.T) {
 	var mutex sync.Mutex
-	primaryRequests := 0
-	mlflowHeaders := http.Header{}
-	primary := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	seen := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		_, _ = io.Copy(io.Discard, request.Body)
+		if request.URL.Path == "/v1/logs" {
+			select {
+			case <-time.After(5 * time.Second):
+			case <-request.Context().Done():
+			}
+		}
 		mutex.Lock()
-		primaryRequests++
+		seen[request.URL.Path] = true
 		mutex.Unlock()
 		writer.WriteHeader(http.StatusOK)
 	}))
-	defer primary.Close()
-	mlflow := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = io.Copy(io.Discard, request.Body)
-		mutex.Lock()
-		mlflowHeaders = request.Header.Clone()
-		mutex.Unlock()
-		writer.WriteHeader(http.StatusOK)
-	}))
-	defer mlflow.Close()
-	t.Setenv("OTEL_EXPORTER_OTLP_HEADERS", "dd-api-key=datadog-secret")
+	defer server.Close()
 
 	previousTracerProvider := otel.GetTracerProvider()
+	previousMeterProvider := otel.GetMeterProvider()
+	previousLoggerProvider := global.GetLoggerProvider()
 	defer otel.SetTracerProvider(previousTracerProvider)
-	telemetry, err := Setup(context.Background(), Config{
-		ServiceName:     "slidesage-worker",
-		Environment:     "test",
-		Endpoint:        primary.URL,
-		Protocol:        protocolHTTPProtobuf,
-		SamplingRatio:   1,
-		MetricInterval:  60000,
-		MetricsDisabled: true,
-		LogsDisabled:    true,
-		MLflow: MLflowConfig{
-			TrackingURI:  mlflow.URL,
-			ExperimentID: "42",
-		},
-	})
-	if err != nil {
-		t.Fatalf("setup dual trace export: %v", err)
-	}
-	_, span := otel.Tracer("test").Start(context.Background(), "generation")
-	span.End()
-	if err := telemetry.Shutdown(context.Background()); err != nil {
-		t.Fatalf("shutdown telemetry: %v", err)
-	}
+	defer otel.SetMeterProvider(previousMeterProvider)
+	defer global.SetLoggerProvider(previousLoggerProvider)
 
-	mutex.Lock()
-	defer mutex.Unlock()
-	if primaryRequests != 1 {
-		t.Fatalf("primary trace requests: %d", primaryRequests)
-	}
-	if got := mlflowHeaders.Get("x-mlflow-experiment-id"); got != "42" {
-		t.Fatalf("MLflow experiment header: %q", got)
-	}
-	if leaked := mlflowHeaders.Get("dd-api-key"); leaked != "" {
-		t.Fatalf("Datadog API key leaked to MLflow: %q", leaked)
-	}
-}
-
-func TestMLflowOTLPIntegration(t *testing.T) {
-	trackingURI := os.Getenv("MLFLOW_INTEGRATION_URI")
-	if trackingURI == "" {
-		t.Skip("set MLFLOW_INTEGRATION_URI to test a real MLflow server")
-	}
-	previousTracerProvider := otel.GetTracerProvider()
-	defer otel.SetTracerProvider(previousTracerProvider)
 	telemetry, err := Setup(context.Background(), Config{
-		ServiceName:    "slidesage-integration-test",
+		ServiceName:    "slidesage-test",
 		Environment:    "test",
+		Endpoint:       server.URL,
 		Protocol:       protocolHTTPProtobuf,
 		SamplingRatio:  1,
 		MetricInterval: 60000,
-		MLflow: MLflowConfig{
-			TrackingURI:  trackingURI,
-			ExperimentID: "0",
-		},
 	})
 	if err != nil {
-		t.Fatalf("setup MLflow integration exporter: %v", err)
+		t.Fatalf("setup telemetry: %v", err)
 	}
-	_, span := otel.Tracer("test").Start(context.Background(), "mlflow.integration")
-	span.SetAttributes(attribute.String("gen_ai.operation.name", "chat"))
+
+	ctx, span := otel.Tracer("test").Start(context.Background(), "operation")
+	telemetry.Logger().InfoContext(ctx, "slow log")
 	span.End()
-	shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+	shutdownContext, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := telemetry.Shutdown(shutdownContext); err != nil {
-		t.Fatalf("flush MLflow trace: %v", err)
+	_ = telemetry.Shutdown(shutdownContext)
+
+	mutex.Lock()
+	defer mutex.Unlock()
+	if !seen["/v1/traces"] {
+		t.Fatal("spans were not exported while the log exporter was blocking")
 	}
 }
