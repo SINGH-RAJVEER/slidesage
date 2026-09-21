@@ -1,9 +1,8 @@
 // Package observability wires OpenTelemetry signals (traces, metrics, and
-// logs) into the SlideSage API, generation worker, and preview renderer
-// processes. Everything is configured through standard OTEL_* environment
-// variables and exported over OTLP/gRPC or OTLP HTTP/protobuf. When no
-// endpoint is configured, the SDK stays disabled and processes run with
-// local-only logging.
+// logs) into the SlideSage API and generation worker processes. Everything
+// is configured through standard OTEL_* environment variables and exported
+// over OTLP/gRPC or OTLP HTTP/protobuf. When no endpoint is configured, the
+// SDK stays disabled and processes run with local-only logging.
 package observability
 
 import (
@@ -47,12 +46,6 @@ func ConfigFromEnv() Config {
 // worker service name so API and worker traces stay distinguishable.
 func WorkerConfigFromEnv() Config {
 	return configFromEnv("slidesage-worker")
-}
-
-// PreviewConfigFromEnv behaves like ConfigFromEnv but tags records with the
-// preview renderer service name.
-func PreviewConfigFromEnv() Config {
-	return configFromEnv("slidesage-preview")
 }
 
 func configFromEnv(defaultServiceName string) Config {

@@ -24,7 +24,7 @@ HTTP span names use the bounded `HTTP <method>` form. The resolved ServeMux patt
 
 ### Logs
 
-All three processes log through `log/slog`. Each record goes to stdout as text and mirrors into the OTLP logs pipeline. Records produced inside an active span include `trace_id` and `span_id`, so log lines, spans, and metrics can be correlated. Panics recovered by the API middleware are logged as errors, recorded on the active span as exceptions, and counted.
+Both processes log through `log/slog`. Each record goes to stdout as text and mirrors into the OTLP logs pipeline. Records produced inside an active span include `trace_id` and `span_id`, so log lines, spans, and metrics can be correlated. Panics recovered by the API middleware are logged as errors, recorded on the active span as exceptions, and counted.
 
 ## Configuration
 
@@ -34,7 +34,7 @@ All three processes log through `log/slog`. Each record goes to stdout as text a
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc`                                             | `grpc` or `http/protobuf`                                                                                   |
 | `OTEL_EXPORTER_OTLP_HEADERS`  | Empty                                              | Comma-separated request headers in `key=value` form                                                         |
 | `OTEL_EXPORTER_OTLP_INSECURE` | `false`                                            | Use plaintext gRPC, for example a local collector without TLS                                              |
-| `OTEL_SERVICE_NAME`           | `slidesage-api`, `-worker`, or `-preview`          | Resource service name                                                                                      |
+| `OTEL_SERVICE_NAME`           | `slidesage-api` or `slidesage-worker`              | Resource service name                                                                                      |
 | `OTEL_SERVICE_VERSION`        | Empty                                              | Resource service version                                                                                   |
 | `OTEL_RESOURCE_ENVIRONMENT`   | `ENVIRONMENT`, then `NODE_ENV`, then `development` | Deployment environment label                                                                               |
 | `OTEL_RESOURCE_ATTRIBUTES`    | Empty                                              | Extra comma-separated resource attributes                                                                  |
@@ -61,10 +61,10 @@ Then open the Jaeger UI at `http://localhost:16686` to browse traces from the AP
 
 Cloud Run cannot host a per-node Datadog Agent, so direct OTLP intake is the practical setup for this deployment. Datadog direct intake accepts HTTP/protobuf, not gRPC. The application also enables delta temporality for metrics sent over HTTP because Datadog rejects cumulative OTLP metrics.
 
-Find the OTLP endpoint for your Datadog site in Datadog's [serverless OTLP intake documentation](https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest/serverless/). For the US1 site, the common endpoint is `https://otlp.datadoghq.com`. Configure each Cloud Run service with:
+Find the OTLP endpoint for your Datadog site in Datadog's [serverless OTLP intake documentation](https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest/serverless/). This deployment uses the US5 site, whose common endpoint is `https://otlp.us5.datadoghq.com`. Configure each Cloud Run service with:
 
 ```shell
-OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.datadoghq.com
+OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp.us5.datadoghq.com
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>,dd-otlp-source=serverless,compute_stats=true
 OTEL_SERVICE_VERSION=<deployed-git-sha>
@@ -84,12 +84,12 @@ printf '%s' 'dd-api-key=<api-key>,dd-otlp-source=serverless,compute_stats=true' 
 Set these Terraform variables and apply `infra/prod`:
 
 ```hcl
-otel_exporter_otlp_endpoint = "https://otlp.datadoghq.com"
+otel_exporter_otlp_endpoint = "https://otlp.us5.datadoghq.com"
 otel_service_version        = "<git-sha>"
 otel_logs_exporter          = "otlp"
 ```
 
-Terraform configures all three Cloud Run services and grants the runtime service account access to the secret. If Datadog already ingests Cloud Run stdout through its GCP integration, set `otel_logs_exporter = "none"` to avoid duplicate logs. Duplicate ingestion increases cost and makes trace correlation harder to inspect.
+Terraform configures both Cloud Run services and grants the runtime service account access to the secret. If Datadog already ingests Cloud Run stdout through its GCP integration, set `otel_logs_exporter = "none"` to avoid duplicate logs. Duplicate ingestion increases cost and makes trace correlation harder to inspect.
 
 Production deploys apply `infra/prod` from `main`, so the workflow only forwards these values to Terraform. Add a repository variable named `DATADOG_OTLP_ENDPOINT` with your site endpoint; the deploy job passes it as `TF_VAR_otel_exporter_otlp_endpoint`. Set the `OTEL_LOGS_EXPORTER` repository variable to `none` only when the GCP integration already sends Cloud Run logs. The service version is always the deployed commit SHA. Leaving `DATADOG_OTLP_ENDPOINT` unset disables export on the next apply, because Terraform then drops the telemetry environment from every service.
 
@@ -97,9 +97,9 @@ Production deploys apply `infra/prod` from `main`, so the workflow only forwards
 
 Generate one API request and one presentation job after deployment. Then check each signal:
 
-1. Open **APM > Trace Explorer**. Filter with `service:slidesage-api env:production`, then open a request trace. A generation trace should include `generation.job` and outbound HTTP client spans. Filter the worker and the renderer separately with `service:slidesage-worker` and `service:slidesage-preview`.
+1. Open **APM > Trace Explorer**. Filter with `service:slidesage-api env:production`, then open a request trace. A generation trace should include `generation.job` and outbound HTTP client spans. Filter the worker separately with `service:slidesage-worker`.
 2. Open **Metrics > Explorer** and search for `http.server.request.duration`, `http.server.requests`, `generation.job.duration`, and `generation.tokens.used`. Datadog may normalize dots in OTLP metric names, so use the metric picker instead of typing a dashboard query before the first points arrive.
-3. Open **Logs > Explorer** and filter with `service:slidesage-api`, `service:slidesage-worker`, or `service:slidesage-preview`. Open a log emitted during a request and use its trace link to confirm trace-log correlation.
+3. Open **Logs > Explorer** and filter with `service:slidesage-api` or `service:slidesage-worker`. Open a log emitted during a request and use its trace link to confirm trace-log correlation.
 4. Open **APM > Service Catalog** and confirm every service reports `env:production` and the current `version`.
 
 Start a dashboard with request rate, error rate, p95 request duration, generation attempt outcomes, generation p95 duration, and token use. Build the first three widgets from APM trace metrics when possible. Use the custom OTLP metrics for generation-specific widgets.
