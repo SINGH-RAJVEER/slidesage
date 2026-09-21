@@ -179,8 +179,7 @@ prompts, and the browser mutation client have all been deleted.
 - client-side OOXML export and download-time compilation;
 - DOM-to-image PDF export;
 - fixed 1280 by 720 viewer geometry;
-- the browser preview theme, its request field, its stored document field, and
-  the `theme` stream event.
+- the browser preview theme, its request field, its stored document field, and the `theme` stream event.
 
 Presentations produced by the semantic pipeline are deleted, not migrated. Migration 25 removes
 every presentation without a committed PPTX revision and drops the `document_kind` column along
@@ -197,3 +196,4 @@ slides, and AI iteration on it is refused until generation completes.
 - Compare browser-rendered slides with approved images for fonts, charts, tables, groups, SmartArt, media, portrait slides, and embedded fonts.
 - Exercise callback retries, duplicate saves, stale revisions, concurrent AI and editor saves, expired URLs, object-store failures, editor crashes, and unsupported browser-renderer features.
 - Reject ZIP bombs, path traversal, macros, external relationships other than ordinary hyperlinks, unapproved embedded objects, oversized media, and callbacks to untrusted result URLs.
+
