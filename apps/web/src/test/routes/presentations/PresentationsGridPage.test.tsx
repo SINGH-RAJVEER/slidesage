@@ -1,10 +1,10 @@
 /// <reference lib="dom" />
 
 import { describe, expect, it, mock } from "bun:test";
-import { act, fireEvent, render, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { StreamingProvider } from "@slidesage/ui";
 import { PRESENTATIONS_UPDATED_EVENT } from "@slidesage/ui/lib/presentation-events";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import GenerateResearchPage from "../../../routes/presentations/GenerateResearchPage";
 import PresentationsGridPage from "../../../routes/presentations/PresentationsGridPage";
 
