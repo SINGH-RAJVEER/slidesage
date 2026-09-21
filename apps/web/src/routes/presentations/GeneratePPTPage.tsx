@@ -4,6 +4,7 @@ import {
 	type PresentationTemplateReference,
 } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { GenerateForm, GenerateOptionsBar } from "@slidesage/ui/components/Generate";
 import type { InstalledTemplateOption } from "@slidesage/ui/components/Generate/TemplateSelector";
 import { useInstalledMarketplaceThemes } from "@slidesage/ui/hooks/useInstalledMarketplaceThemes";
@@ -55,7 +56,9 @@ export default function GeneratePPTPage() {
 	);
 	// Raised by pressing Generate with nothing selected. Nothing is preselected
 	// and nothing stands in for a choice, so the reader is told at the moment
-	// they ask for a deck rather than prompted before they have asked.
+	// they ask for a deck rather than prompted before they have asked. It is
+	// transient, so it goes to the floating notice rather than the inline one
+	// that describes a standing template problem.
 	const [templateWarning, setTemplateWarning] = useState(false);
 	const navigate = useNavigate();
 	const { streamingState, generate } = useStreaming();
@@ -67,9 +70,7 @@ export default function GeneratePPTPage() {
 			? "This presentation was generated with a template this build no longer offers. Choose a template to retry it."
 			: selectedTemplate && !templateSelectable
 				? "The selected template is not ready for generation yet."
-				: templateWarning
-					? "Select a template before generating."
-					: "";
+				: "";
 
 	const handleTemplateChange = (template: PresentationTemplateReference) => {
 		setTemplateWarning(false);
@@ -210,6 +211,10 @@ export default function GeneratePPTPage() {
 	return (
 		<div className="flex min-h-dvh w-full flex-col overflow-x-hidden bg-transparent">
 			<Header />
+			<FloatingNotice
+				warning={templateWarning ? "Select a template before generating." : null}
+				onDismiss={() => setTemplateWarning(false)}
+			/>
 
 			<div
 				data-horizon-reveal

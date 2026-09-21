@@ -77,6 +77,11 @@ it("warns instead of generating when Generate is pressed with no template", asyn
 		await waitFor(() =>
 			expect(view.getByText("Select a template before generating.")).toBeInTheDocument(),
 		);
+		// The warning belongs on the floating notice below the header, in amber,
+		// not inline under the options bar.
+		const notice = view.getByText("Select a template before generating.").closest("div");
+		expect(notice).toHaveClass("fixed", "top-[4.5rem]", "right-4", "text-amber-200");
+		expect(notice).toHaveAttribute("role", "status");
 		expect(
 			fetchMock.mock.calls.some(([input]) => String(input).includes("/presentation-jobs")),
 		).toBe(false);
