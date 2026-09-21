@@ -28,7 +28,7 @@ function "image" {
 }
 
 group "default" {
-	targets = ["api", "worker", "migrate", "mlflow"]
+	targets = ["api", "worker", "migrate"]
 }
 
 target "common" {
@@ -60,14 +60,5 @@ target "migrate" {
 	tags = [
 		"${image("migrate")}:${IMAGE_VERSION}",
 		"${image("migrate")}:latest",
-	]
-}
-
-target "mlflow" {
-	context    = "."
-	dockerfile = "infra/mlflow/Dockerfile"
-	tags = [
-		"${image("mlflow")}:${IMAGE_VERSION}",
-		"${image("mlflow")}:latest",
 	]
 }

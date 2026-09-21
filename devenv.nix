@@ -69,82 +69,13 @@
     };
 
 	processes = {
-		mlflow = {
-			exec = ''
-				mkdir -p "$DEVENV_STATE/mlflow-artifacts"
-				exec env \
-					UV_PROJECT_ENVIRONMENT="$DEVENV_STATE/mlflow-venv" \
-					uv run --frozen --project infra/mlflow mlflow server \
-						--backend-store-uri "sqlite:///$DEVENV_STATE/mlflow.db" \
-						--artifacts-destination "$DEVENV_STATE/mlflow-artifacts" \
-						--host 127.0.0.1 --port 5000
-			'';
-			cwd = ".";
-			ready = {
-				http.get = {
-					host = "127.0.0.1";
-					port = 5000;
-					path = "/health";
-				};
-				initial_delay = 2;
-				period = 2;
-				probe_timeout = 3;
-				success_threshold = 1;
-				failure_threshold = 60;
-			};
-		};
-        storage = {
-            exec = ''
-                mkdir -p "$DEVENV_STATE/gcs/$PRESENTATION_GCS_BUCKET"
-                exec fake-gcs-server \
-                    -scheme http \
-                    -host 127.0.0.1 \
-                    -port 4443 \
-                    -backend filesystem \
-                    -filesystem-root "$DEVENV_STATE/gcs" \
-                    -public-host 127.0.0.1:4443
-            '';
-            cwd = ".";
-            ready = {
-                http.get = {
-                    host = "127.0.0.1";
-                    port = 4443;
-                    path = "/_internal/healthcheck";
-                };
-                initial_delay = 1;
-                period = 1;
-                probe_timeout = 3;
-                success_threshold = 1;
-                failure_threshold = 30;
-            };
-        };
-        api = {
-            exec = ''
-                DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" go run ./cmd/api
-            '';
-            cwd = "apps/api";
-            after = [ "db:migrate" ];
-            ready = {
-                http.get = {
-                    port = 8000;
-                    path = "/health";
-                };
-                initial_delay = 1;
-                period = 1;
-                probe_timeout = 3;
-                success_threshold = 1;
-                failure_threshold = 30;
-            };
-        };
 		worker = {
 			exec = ''
 				DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" \
-					MLFLOW_TRACKING_URI="http://127.0.0.1:5000" \
-					MLFLOW_EXPERIMENT_ID="0" \
 					go run ./cmd/worker
 			'';
 			cwd = "apps/api";
-			after = [ "db:migrate" "devenv:processes:mlflow" ];
+			after = [ "db:migrate" ];
 			ready = {
 				http.get = {
 					port = 8080;
