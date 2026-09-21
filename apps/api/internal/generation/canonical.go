@@ -9,9 +9,11 @@ import (
 	"os"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/pptxcompiler"
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentationrevision"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templateasset"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatemanifest"
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatepublish"
 )
 
 const slotSystemPrompt = `Return one JSON object with title and slides. Every slide has position (one-based) and slots (values keyed by the exact manifest slot ID). Follow the supplied ordered assignments exactly. A text slot takes a string; a list slot takes an array of strings. maxCharacters applies per string and maxListItems limits array length. Required slots cannot be empty. Use null for optional images unless a supplied image asset provides verified base64 and mimeType; never invent image bytes or URLs. Omit optional slots only when the slide does not need them; omitted sample objects are cleared. No styling, coordinates, layouts, regions, CSS, or semantic slide blocks. Use research sources accurately and do not invent citations.`
@@ -33,14 +35,22 @@ func assignmentForJob(job streamJob) ([]pptxcompiler.Assignment, error) {
 	if resolved != *job.template {
 		return nil, fmt.Errorf("template %s is no longer published at the digest this job was queued with", job.template.ID)
 	}
-	m, err := templatemanifest.Lookup(resolved.ID, resolved.Version)
+	return templateAssignments(resolved, job.slideCount)
+}
+
+// templateAssignments plans the slides for a reference the catalog has already
+// resolved. Submission prices the reservation off the same plan the worker will
+// draft from, so the points held and the bound sent to the provider describe one
+// deck rather than two estimates of it.
+func templateAssignments(reference presentation.TemplateReference, slideCount int) ([]pptxcompiler.Assignment, error) {
+	m, err := templatemanifest.Lookup(reference.ID, reference.Version)
 	if err != nil {
 		return nil, err
 	}
-	if m.SHA256 != resolved.SHA256 {
+	if m.SHA256 != reference.SHA256 {
 		return nil, fmt.Errorf("template manifest digest mismatch")
 	}
-	a, err := pptxcompiler.Assign(m, job.slideCount)
+	a, err := pptxcompiler.Assign(m, slideCount)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +67,59 @@ var slotBatchSize = 4
 // slotBatchPrompt tells the model the assignments it can see are a slice of a
 // larger deck, so it returns those positions instead of renumbering from one.
 const slotBatchPrompt = "\nThese assignments are one part of a larger deck. Return only the positions listed above, using their given position numbers."
+
+// slotBytesPerToken converts a manifest character budget into a token bound.
+// Slot IDs are opaque strings like "google-shape49p11-49" that tokenize close
+// to three characters per token, well under the four a token of prose carries,
+// so the denser figure is the safe one for a body that is largely keys.
+const slotBytesPerToken = 3
+
+// slotBudgetMarginPercent is applied to the manifest ceiling before it becomes a
+// request bound. Copy over maxCharacters is rejected by ValidateSlide and
+// rewritten by the repair pass, but only when the JSON carrying it arrived
+// whole, so the bound sits above the ceiling rather than exactly on it.
+const slotBudgetMarginPercent = 125
+
+// slotOutputFloorTokens keeps a sparse assignment from being handed a bound too
+// tight to restate the slide it is repairing.
+const slotOutputFloorTokens = 512
+
+// slotBudgetBytes is the largest JSON body the manifest permits for one slide:
+// every slot filled to maxCharacters, every list run out to maxListItems, and
+// the slot IDs and punctuation carrying them.
+func slotBudgetBytes(archetype templatepublish.Archetype) int {
+	// {"position":12,"slots":{}} and the separators around the entry.
+	total := 40
+	for _, slot := range archetype.Slots {
+		items := slot.MaxListItems
+		if items < 1 {
+			items = 1
+		}
+		// The quoted key and colon, then the quotes and comma each value sits in.
+		total += len(slot.ID) + 6 + items*(slot.MaxCharacters+4)
+	}
+	return total
+}
+
+// slotOutputTokens bounds a drafting or repair completion from the archetypes
+// the slides are assigned to. A flat per-slide constant has to clear the densest
+// template in the catalog and so overshoots a lean one several times over, and
+// that bound is what a provider's affordability check refuses on and what a
+// reservation holds, neither of which is refunded by the request being cheap.
+func slotOutputTokens(assignments []pptxcompiler.Assignment) int {
+	budget := 0
+	for _, assignment := range assignments {
+		budget += slotBudgetBytes(assignment.Archetype)
+	}
+	tokens := (budget*slotBudgetMarginPercent/100 + slotBytesPerToken - 1) / slotBytesPerToken
+	if tokens < slotOutputFloorTokens {
+		return slotOutputFloorTokens
+	}
+	if tokens > maxOutputCeilingTokens {
+		return maxOutputCeilingTokens
+	}
+	return tokens
+}
 
 func (h *handler) generateSlots(ctx context.Context, job streamJob, assignments []pptxcompiler.Assignment) (string, []pptxcompiler.SlideContent, int, error) {
 	plan, _ := json.Marshal(assignments)
@@ -76,7 +139,7 @@ func (h *handler) generateSlots(ctx context.Context, job streamJob, assignments 
 			batchPlan, _ := json.Marshal(batch)
 			batchUser = generationUserPrompt(job) + "\nOrdered manifest assignments and limits: " + string(batchPlan) + slotBatchPrompt
 		}
-		document, used, err := h.generateJSON(ctx, job, slotSystemPrompt, batchUser, maxOutputTokens(len(batch)))
+		document, used, err := h.generateJSON(ctx, job, slotSystemPrompt, batchUser, slotOutputTokens(batch))
 		tokens += used
 		if err != nil {
 			return "", nil, tokens, err
@@ -107,7 +170,7 @@ func (h *handler) generateSlots(ctx context.Context, job streamJob, assignments 
 		for attempt := 0; issue != nil && attempt < 3; attempt++ {
 			assignment, _ := json.Marshal(a)
 			previous, _ := json.Marshal(content)
-			repair, used, e := h.generateJSON(ctx, job, slotSystemPrompt, user+"\nRepair only this slide: "+string(assignment)+"\nPrevious: "+string(previous)+"\nValidation error: "+issue.Error()+"\n"+slotRepairPrompt, maxOutputTokens(1))
+			repair, used, e := h.generateJSON(ctx, job, slotSystemPrompt, user+"\nRepair only this slide: "+string(assignment)+"\nPrevious: "+string(previous)+"\nValidation error: "+issue.Error()+"\n"+slotRepairPrompt, slotOutputTokens([]pptxcompiler.Assignment{a}))
 			tokens += used
 			if e != nil {
 				return "", nil, tokens, e

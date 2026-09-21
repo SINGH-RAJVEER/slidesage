@@ -14,6 +14,7 @@ import (
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/pptxcompiler"
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatemanifest"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatepublish"
 )
 
@@ -239,5 +240,57 @@ func TestGenerateSlotsDraftsInBatches(t *testing.T) {
 	}
 	if tokens != 30 {
 		t.Fatalf("tokens = %d, want the sum across batches", tokens)
+	}
+}
+
+// A drafting bound below what the manifest permits would truncate a slide that
+// filled its slots to the limit, so the bound is checked against the ceiling it
+// is derived from rather than against a remembered number.
+func TestSlotOutputTokensClearsTheManifestCeiling(t *testing.T) {
+	dense := templatepublish.Archetype{ID: "dense", Slots: []templatepublish.Slot{
+		{ID: "google-shape49p11-49", Kind: templatepublish.SlotText, MaxCharacters: 600},
+		{ID: "google-shape50p11-50", Kind: templatepublish.SlotList, MaxCharacters: 150, MaxListItems: 8},
+	}}
+	sparse := templatepublish.Archetype{ID: "sparse", Slots: []templatepublish.Slot{
+		{ID: "title", Kind: templatepublish.SlotText, MaxCharacters: 40},
+	}}
+
+	bound := slotOutputTokens([]pptxcompiler.Assignment{{Position: 1, Archetype: dense}})
+	if ceiling := slotBudgetBytes(dense) / slotBytesPerToken; bound <= ceiling {
+		t.Fatalf("bound %d does not clear the %d token ceiling the manifest permits", bound, ceiling)
+	}
+
+	batch := slotOutputTokens([]pptxcompiler.Assignment{{Position: 1, Archetype: dense}, {Position: 2, Archetype: dense}})
+	if batch <= bound {
+		t.Fatalf("a two slide batch was bounded at %d, no more than one slide at %d", batch, bound)
+	}
+
+	if got := slotOutputTokens([]pptxcompiler.Assignment{{Position: 1, Archetype: sparse}}); got != slotOutputFloorTokens {
+		t.Fatalf("sparse assignment bound = %d, want the %d token floor", got, slotOutputFloorTokens)
+	}
+}
+
+// The ceiling silently truncates rather than erroring, so a template dense
+// enough to reach it would fail generation with no explanation. Every published
+// manifest is checked at the batch size drafting actually sends.
+func TestPublishedManifestsFitTheOutputCeiling(t *testing.T) {
+	ids, err := templatemanifest.IDs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range ids {
+		manifest, err := templatemanifest.Lookup(id, 1)
+		if err != nil {
+			continue
+		}
+		for _, archetype := range manifest.Archetypes {
+			batch := make([]pptxcompiler.Assignment, 0, slotBatchSize)
+			for position := 1; position <= slotBatchSize; position++ {
+				batch = append(batch, pptxcompiler.Assignment{Position: position, Archetype: archetype})
+			}
+			if slotOutputTokens(batch) >= maxOutputCeilingTokens {
+				t.Errorf("%s/%s reaches the output ceiling in a batch of %d", id, archetype.ID, slotBatchSize)
+			}
+		}
 	}
 }
