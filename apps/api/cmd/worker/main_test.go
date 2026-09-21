@@ -72,11 +72,15 @@ func TestDrainQueueResetsTheSettleWindowWhenWorkArrives(t *testing.T) {
 		return 0, nil
 	}
 
+	// The settle window has to span many poll ticks. At two ticks a single
+	// delayed wake-up on a loaded runner ends the drain before the arriving
+	// job is ever counted, and the post-handoff count then sees it and asks
+	// for a lease renewal.
 	err := drainQueue(context.Background(), worker, count, drainSettings{
 		poll:    time.Millisecond,
-		idle:    2 * time.Millisecond,
-		accept:  100 * time.Millisecond,
-		handoff: 10 * time.Millisecond,
+		idle:    50 * time.Millisecond,
+		accept:  5 * time.Second,
+		handoff: time.Second,
 	})
 	if err != nil {
 		t.Fatalf("drainQueue returned %v", err)
