@@ -251,10 +251,14 @@ func truncatedOutputError(finishReason string, sawDone bool) error {
 
 // reasoningBudget is the per-call reasoning allowance reserved on top of the
 // requested answer bound for every provider whose thinking tokens compete with
-// output tokens. It fits every reasoning-capable family (the smallest
-// supported nonzero budgets are 128 for Gemini Pro, 512 for Gemini Flash Lite,
-// and 1024 for Anthropic extended thinking).
-const reasoningBudget = 4096
+// output tokens. It sits at the largest of the smallest supported nonzero
+// budgets (128 for Gemini Pro, 512 for Gemini Flash Lite, 1024 for Anthropic
+// extended thinking), so it stays valid for every reasoning-capable family
+// while asking for what slot filling actually needs: the work is transcription
+// into a fixed schema, not deduction, and the measured reasoning spend on it is
+// zero. A bound is also what a provider's affordability check refuses on, and
+// this one was reserving more than the slides it accompanied.
+const reasoningBudget = 1024
 
 func googleGeneratePayload(model, system, user string, maxOutput int) map[string]any {
 	config := map[string]any{"responseMimeType": "application/json", "maxOutputTokens": maxOutput}
