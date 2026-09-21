@@ -7,7 +7,14 @@ export function getPresentationRetryDestination(
 	const retry = presentation.status === "failed" ? presentation.failure?.retry : undefined;
 	if (!retry) return null;
 
-	if (retry.research_payload?.sources.length) {
+	// Decks that failed before the template was recorded on the retry options
+	// still carry the selection at the top level of the document.
+	const template = retry.template ?? presentation.template;
+
+	// The research page refuses to generate without a template, so sending a
+	// retry there without one bounces the reader to an empty generate form and
+	// loses the saved sources. Prefilling that form instead keeps the settings.
+	if (retry.research_payload?.sources.length && template) {
 		return {
 			to: "/generate/research",
 			state: {
@@ -18,12 +25,16 @@ export function getPresentationRetryDestination(
 				researchPayload: retry.research_payload,
 				retryPresentationId: presentationId,
 				...(retry.ai ? { ai: retry.ai } : {}),
+				template,
 			},
 		};
 	}
 
 	return {
 		to: "/generate",
-		state: { retry, retryPresentationId: presentationId },
+		state: {
+			retry: template ? { ...retry, template } : retry,
+			retryPresentationId: presentationId,
+		},
 	};
 }
