@@ -64,7 +64,7 @@ it("requests a verification OTP after creating an email account", async () => {
 	fireEvent.change(view.getByLabelText("Confirm password"), {
 		target: { value: "correct-password" },
 	});
-	fireEvent.click(view.getByRole("button", { name: "Sign up with email" }));
+	fireEvent.click(view.getByRole("button", { name: "Sign Up" }));
 
 	await waitFor(() => {
 		expect(view.getByText("user@example.com|")).toBeInTheDocument();
@@ -97,7 +97,7 @@ it("resends verification when the email belongs to an unverified account", async
 	fireEvent.change(view.getByLabelText("Confirm password"), {
 		target: { value: "correct-password" },
 	});
-	fireEvent.click(view.getByRole("button", { name: "Sign up with email" }));
+	fireEvent.click(view.getByRole("button", { name: "Sign Up" }));
 
 	await waitFor(() => {
 		expect(view.getByText("user@example.com|")).toBeInTheDocument();

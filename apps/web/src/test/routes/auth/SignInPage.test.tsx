@@ -58,7 +58,7 @@ it("resends verification when an unverified user signs in", async () => {
 
 	fireEvent.change(view.getByLabelText("Email"), { target: { value: "User@Example.com" } });
 	fireEvent.change(view.getByLabelText("Password"), { target: { value: "correct-password" } });
-	fireEvent.click(view.getByRole("button", { name: "Sign in with email" }));
+	fireEvent.click(view.getByRole("button", { name: "Sign In" }));
 
 	await waitFor(() => {
 		expect(view.getByText("user@example.com")).toBeInTheDocument();

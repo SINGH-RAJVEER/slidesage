@@ -163,5 +163,7 @@
 
 		STORAGE_EMULATOR_HOST = "http://127.0.0.1:4443";
 		PRESENTATION_GCS_BUCKET = "slidesage-dev-revisions";
+		EDITOR_WHITE_LABEL = "true";
+		EDITOR_CONNECTOR = "true";
     };
 }

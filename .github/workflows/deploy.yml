@@ -17,15 +17,8 @@ env:
   IMAGE_VERSION: ${{ github.sha }}
 
 jobs:
-  # The same suite that guards a pull request, run again on the merge commit
-  # itself. Nothing is built or published unless it passes.
   checks:
-    # workflow_dispatch can select a branch; only main may publish or deploy.
     if: github.ref == 'refs/heads/main'
-    # A called workflow cannot request more than its caller holds, and this
-    # repository's default token is contents and packages only. checks.yml
-    # declares pull-requests read for the path filter, so grant it here or the
-    # whole run is rejected before any job starts.
     permissions:
       contents: read
       pull-requests: read
@@ -33,7 +26,6 @@ jobs:
 
   build:
     needs: checks
-    # workflow_dispatch can select a branch; only main may publish or deploy.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -50,9 +42,6 @@ jobs:
       - name: Stamp the Go cache key
         run: echo "GO_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
 
-      # The checks job saved this entry minutes ago, on this same commit, so
-      # the release binaries compile incrementally. Read only: checks owns the
-      # writing, and two jobs racing the same key would be undefined.
       - name: Restore the Go module and build caches
         uses: actions/cache/restore@v4
         with:
@@ -64,9 +53,6 @@ jobs:
             ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-
             ${{ runner.os }}-go-
 
-      # Compiled here rather than inside the image. The binaries are static and
-      # the images are FROM scratch, so the container never needed a toolchain,
-      # and a runner build reuses the cache the checks job just warmed.
       - name: Build the release binaries
         working-directory: apps/api
         env:
@@ -95,9 +81,6 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      # Each image is now a COPY of one binary onto scratch, sharing only the
-      # certificate stage, so there is nothing left worth a layer cache. One
-      # bake still builds and pushes all three in a single invocation.
       - name: Build and push the API, worker, and migrate images
         uses: docker/bake-action@v7
         with:
@@ -125,8 +108,6 @@ jobs:
       TF_VAR_gcp_region: asia-south1
       TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      # Telemetry export stays off until DATADOG_OTLP_ENDPOINT is set, and the
-      # DATADOG_OTLP_HEADERS secret exists in Secret Manager.
       TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.DATADOG_OTLP_ENDPOINT }}
       TF_VAR_otel_logs_exporter: ${{ vars.OTEL_LOGS_EXPORTER || 'otlp' }}
       TF_VAR_otel_service_version: ${{ github.sha }}
@@ -146,9 +127,6 @@ jobs:
           terraform_version: 1.16.0
           terraform_wrapper: false
 
-      # Nothing between here and the migration depends on the backup, and it is
-      # the longest single step in the release, so start it now and only block
-      # on it immediately before the schema changes.
       - name: Start the pre-migration database backup
         shell: bash
         run: |
@@ -179,8 +157,6 @@ jobs:
             -backend-config="prefix=prod"
           terraform validate -no-color
 
-      # Check the whole configuration before the targeted migration update.
-      # Missing secrets, DNS permissions, or invalid imports stop here.
       - name: Plan the release
         working-directory: infra/prod
         run: terraform plan -input=false -lock-timeout=5m -no-color
@@ -192,8 +168,6 @@ jobs:
             -target=google_cloud_run_v2_job.migrate -out=migrate.tfplan
           terraform apply -input=false -lock-timeout=5m -no-color migrate.tfplan
 
-      # Stop requests and polling before destructive schema changes. Keep the
-      # previous images in this phase so new binaries never see the old schema.
       - name: Pause services for database migration
         working-directory: infra/prod
         shell: bash
@@ -217,12 +191,6 @@ jobs:
             "${args[@]}" -out=maintenance.tfplan
           terraform apply -input=false -lock-timeout=5m -no-color maintenance.tfplan
 
-      # No schema change may start until the backup that covers it exists.
-      #
-      # `gcloud sql operations wait` documents a timeout and nothing about what
-      # it returns for an operation that finished with an error, so its exit
-      # status is not trusted here. Read the operation back and assert on the
-      # status and error fields, which are unambiguous.
       - name: Wait for the pre-migration database backup
         shell: bash
         run: |
@@ -245,7 +213,6 @@ jobs:
           gcloud run jobs execute slidesage-migrate \
             --project="$PROJECT_ID" --region="$RUN_REGION" --wait
 
-      # Re-plan after the targeted apply, which changed Terraform state.
       - name: Apply the release
         working-directory: infra/prod
         run: |
