@@ -1,6 +1,6 @@
 # Observability
 
-The Go API and generation worker emit OpenTelemetry traces, metrics, and logs over OTLP. The exporter supports gRPC for collectors and HTTP/protobuf for direct intake services. Everything is configured through standard `OTEL_*` environment variables and lives in `apps/api/internal/observability`. The worker can also send a second copy of traces to MLflow without changing the Datadog metrics or logs path. See [MLFLOW.md](MLFLOW.md).
+The Go API and generation worker emit OpenTelemetry traces, metrics, and logs over OTLP. The exporter speaks HTTP/protobuf, the only transport Datadog's direct intake accepts. Everything is configured through standard `OTEL_*` environment variables and lives in `apps/api/internal/observability`. The worker can also send a second copy of traces to MLflow without changing the Datadog metrics or logs path. See [MLFLOW.md](MLFLOW.md).
 
 ## Signals
 
@@ -33,9 +33,8 @@ Both processes log through `log/slog`. Each record goes to stdout as text and mi
 | Variable                      | Default                                            | Purpose                                                                                                   |
 | ----------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Empty                                              | Common OTLP endpoint. Leave empty or set `OTEL_SDK_DISABLED=true` to disable export                         |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc`                                             | `grpc` or `http/protobuf`                                                                                   |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf`                                    | Only `http/protobuf` is accepted. Any other value is rejected at startup                                    |
 | `OTEL_EXPORTER_OTLP_HEADERS`  | Empty                                              | Comma-separated request headers in `key=value` form                                                         |
-| `OTEL_EXPORTER_OTLP_INSECURE` | `false`                                            | Use plaintext gRPC, for example a local collector without TLS                                              |
 | `OTEL_SERVICE_NAME`           | `slidesage-api` or `slidesage-worker`              | Resource service name                                                                                      |
 | `OTEL_SERVICE_VERSION`        | Empty                                              | Resource service version                                                                                   |
 | `OTEL_RESOURCE_ENVIRONMENT`   | `ENVIRONMENT`, then `NODE_ENV`, then `development` | Deployment environment label                                                                               |
@@ -50,18 +49,27 @@ The SDK starts only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set. Without it, the p
 
 ## Local development
 
-Point the endpoint at any OTLP/gRPC collector. For example, run Jaeger's all-in-one image and set:
+The simplest local setup is the production one: point the endpoint at Datadog. Local runs resolve `deployment.environment` to `development` through the `NODE_ENV` fallback, so they stay out of the production views. The cost is that every local trace is billed at full sampling.
+
+To keep local traces out of Datadog entirely, point the endpoint at any collector that accepts OTLP over HTTP/protobuf, which is port `4318` by convention. The endpoint must be an absolute URL including the scheme; a bare `host:port` is rejected at startup.
+
+Jaeger's all-in-one image accepts traces only, so turn the other two signals off or their exporters will log failures on every interval:
+
+```shell
+docker run --rm -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one:latest
+```
 
 ```
-OTEL_EXPORTER_OTLP_ENDPOINT=localhost:4317
-OTEL_EXPORTER_OTLP_INSECURE=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_METRICS_EXPORTER=none
+OTEL_LOGS_EXPORTER=none
 ```
 
-Then open the Jaeger UI at `http://localhost:16686` to browse traces from the API, worker, and AI provider calls in one view.
+Then open the Jaeger UI at `http://localhost:16686` to browse traces from the API, worker, and AI provider calls in one view. Use an OpenTelemetry Collector instead if you want metrics and logs locally as well.
 
 ## Datadog on Cloud Run
 
-Cloud Run cannot host a per-node Datadog Agent, so direct OTLP intake is the practical setup for this deployment. Datadog direct intake accepts HTTP/protobuf, not gRPC. The application also enables delta temporality for metrics sent over HTTP because Datadog rejects cumulative OTLP metrics.
+Cloud Run cannot host a per-node Datadog Agent, so direct OTLP intake is the practical setup for this deployment. The application always exports delta temporality for metrics because Datadog rejects cumulative OTLP metrics.
 
 Find the OTLP endpoint for your Datadog site in Datadog's [serverless OTLP intake documentation](https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest/serverless/). This deployment uses the US5 site, whose common endpoint is `https://otlp.us5.datadoghq.com`. Configure each Cloud Run service with:
 
@@ -106,7 +114,7 @@ Generate one API request and one presentation job after deployment. Then check e
 
 Start a dashboard with request rate, error rate, p95 request duration, generation attempt outcomes, generation p95 duration, and token use. Build the first three widgets from APM trace metrics when possible. Use the custom OTLP metrics for generation-specific widgets.
 
-If no data appears, check Cloud Run logs for exporter errors. A `403` usually means the API key or site-specific endpoint is wrong. A connection or protocol error usually means `OTEL_EXPORTER_OTLP_PROTOCOL` is still `grpc`. Datadog's Go trace intake may return `202 Accepted`; current OpenTelemetry Go exporters can log that response as an error even though Datadog accepted the trace.
+If no data appears, check Cloud Run logs for exporter errors. A `403` usually means the API key or site-specific endpoint is wrong. A startup failure naming the protocol means `OTEL_EXPORTER_OTLP_PROTOCOL` is set to something other than `http/protobuf`. Datadog's Go trace intake may return `202 Accepted`; current OpenTelemetry Go exporters can log that response as an error even though Datadog accepted the trace.
 
 ## Lifecycle
 
