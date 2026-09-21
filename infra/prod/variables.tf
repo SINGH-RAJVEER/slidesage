@@ -53,24 +53,6 @@ variable "migrate_image" {
   type        = string
 }
 
-variable "mlflow_image" {
-  description = "Artifact Registry image for the MLflow tracking server."
-  type        = string
-}
-
-variable "mlflow_experiment_id" {
-  description = "MLflow experiment that receives generation worker traces."
-  type        = string
-  default     = "0"
-}
-
-variable "mlflow_artifacts_bucket" {
-  description = "Private GCS bucket for MLflow artifacts. Defaults to <project-id>-mlflow-artifacts."
-  type        = string
-  default     = null
-  nullable    = true
-}
-
 variable "open_router_model" {
   description = "Server-owned OpenRouter generation model."
   type        = string

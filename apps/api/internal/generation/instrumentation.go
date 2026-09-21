@@ -198,7 +198,7 @@ func recordProviderUsage(ctx context.Context, input, output int) {
 }
 
 func captureProviderContent() bool {
-	enabled, err := strconv.ParseBool(os.Getenv("MLFLOW_CAPTURE_CONTENT"))
+	enabled, err := strconv.ParseBool(os.Getenv("GEN_AI_CAPTURE_CONTENT"))
 	return err == nil && enabled
 }
 

@@ -62,7 +62,7 @@ func TestProviderSpanUsesGenAISemanticAttributes(t *testing.T) {
 	tracer = tracerProvider.Tracer("test")
 	defer otel.SetTracerProvider(previousProvider)
 	defer func() { tracer = previousTracer }()
-	t.Setenv("MLFLOW_CAPTURE_CONTENT", "true")
+	t.Setenv("GEN_AI_CAPTURE_CONTENT", "true")
 
 	ctx, span := startProviderSpan(context.Background(), ai.OpenAI, "gpt-5", "slot-draft", "system", "user", 1200)
 	recordProviderUsage(ctx, 100, 40)
@@ -104,7 +104,7 @@ func TestProviderSpanOmitsContentByDefault(t *testing.T) {
 	tracer = tracerProvider.Tracer("test")
 	defer otel.SetTracerProvider(previousProvider)
 	defer func() { tracer = previousTracer }()
-	t.Setenv("MLFLOW_CAPTURE_CONTENT", "")
+	t.Setenv("GEN_AI_CAPTURE_CONTENT", "")
 
 	_, span := startProviderSpan(context.Background(), ai.Anthropic, "claude", "slot-draft", "private system", "private user", 100)
 	finishProviderSpan(span, map[string]any{"private": "output"}, 10, nil)

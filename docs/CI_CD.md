@@ -8,7 +8,6 @@ The repository deploys its Go API and generation worker to Google Cloud Run. Eve
    - `api` (web server, port 8000) -> Cloud Run **service** `api`
    - `worker` (River queue consumer with a health server, port 8080) -> Cloud Run **service** `worker`
    - `migrate` (Goose + River migrations, one-shot) -> Cloud Run **job** `slidesage-migrate`
-   - `mlflow` (generation trace and evaluation store) -> IAM-protected Cloud Run **service** `mlflow`
 2. Each image is tagged with the full git commit SHA (e.g. `api:a1b2c3d...`) plus `latest` and pushed to Artifact Registry.
 3. `terraform apply -target=google_cloud_run_v2_job.migrate` updates the migration job to the new image, then `gcloud run jobs execute` runs it against the database and waits.
 4. A fresh full plan and `terraform apply` point the `api` and `worker` Cloud Run services at the SHA-tagged image. Cloud Run creates a new revision and routes 100% of traffic to it, which is the "latest iteration" seen by users. Previous revisions remain available by SHA for rollback.

@@ -3,9 +3,7 @@ package observability
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -27,8 +25,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
-	"golang.org/x/oauth2"
-	"google.golang.org/api/idtoken"
 )
 
 // Telemetry owns the lifecycle of the three OTLP signal providers. Processes
@@ -71,13 +67,6 @@ func Setup(ctx context.Context, config Config) (*Telemetry, error) {
 				return nil, err
 			}
 			providerOptions = append(providerOptions, sdktrace.WithBatcher(traceExporter))
-		}
-		if config.MLflow.TrackingURI != "" {
-			mlflowExporter, err := telemetry.newMLflowTraceExporter(ctx)
-			if err != nil {
-				return nil, err
-			}
-			providerOptions = append(providerOptions, sdktrace.WithBatcher(mlflowExporter))
 		}
 		telemetry.tracerProvider = sdktrace.NewTracerProvider(providerOptions...)
 		otel.SetTracerProvider(telemetry.tracerProvider)
@@ -130,21 +119,36 @@ func (t *Telemetry) Logger() *slog.Logger {
 // Shutdown flushes and stops all providers. It is safe to call multiple times;
 // only the first call performs work. Shutdown errors are joined because a
 // failed metrics flush should not hide a trace export failure.
+//
+// The providers shut down concurrently so a slow export on one signal cannot
+// spend the caller's whole budget and leave another unflushed. The generation
+// worker depends on this: it is short-lived, so shutdown is the only point at
+// which its spans reach the exporter.
 func (t *Telemetry) Shutdown(ctx context.Context) error {
 	var shutdownErrors []error
 	t.shutdownOnce.Do(func() {
+		shutdowns := make([]func(context.Context) error, 0, 3)
 		if t.loggerProvider != nil {
-			if err := t.loggerProvider.Shutdown(ctx); err != nil {
-				shutdownErrors = append(shutdownErrors, err)
-			}
+			shutdowns = append(shutdowns, t.loggerProvider.Shutdown)
 		}
 		if t.meterProvider != nil {
-			if err := t.meterProvider.Shutdown(ctx); err != nil {
-				shutdownErrors = append(shutdownErrors, err)
-			}
+			shutdowns = append(shutdowns, t.meterProvider.Shutdown)
 		}
 		if t.tracerProvider != nil {
-			if err := t.tracerProvider.Shutdown(ctx); err != nil {
+			shutdowns = append(shutdowns, t.tracerProvider.Shutdown)
+		}
+		errs := make([]error, len(shutdowns))
+		var group sync.WaitGroup
+		for index, shutdown := range shutdowns {
+			group.Add(1)
+			go func(index int, shutdown func(context.Context) error) {
+				defer group.Done()
+				errs[index] = shutdown(ctx)
+			}(index, shutdown)
+		}
+		group.Wait()
+		for _, err := range errs {
+			if err != nil {
 				shutdownErrors = append(shutdownErrors, err)
 			}
 		}
@@ -188,33 +192,6 @@ func (t *Telemetry) newTraceExporter(ctx context.Context) (sdktrace.SpanExporter
 	return otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(signalEndpoint(t.config.Endpoint, "traces")))
 }
 
-func (t *Telemetry) newMLflowTraceExporter(ctx context.Context) (sdktrace.SpanExporter, error) {
-	headers := map[string]string{"x-mlflow-experiment-id": t.config.MLflow.ExperimentID}
-	if t.config.MLflow.Workspace != "" {
-		headers["X-MLFLOW-WORKSPACE"] = t.config.MLflow.Workspace
-	}
-	options := []otlptracehttp.Option{
-		otlptracehttp.WithEndpointURL(signalEndpoint(t.config.MLflow.TrackingURI, "traces")),
-		otlptracehttp.WithHeaders(headers),
-		otlptracehttp.WithCompression(otlptracehttp.GzipCompression),
-	}
-	if t.config.MLflow.GCPAudience != "" {
-		tokenSource, err := idtoken.NewTokenSource(ctx, t.config.MLflow.GCPAudience)
-		if err != nil {
-			return nil, fmt.Errorf("create MLflow identity token source: %w", err)
-		}
-		client := oauth2.NewClient(ctx, tokenSource)
-		client.Timeout = 15 * time.Second
-		options = append(options, otlptracehttp.WithHTTPClient(client))
-	} else {
-		options = append(options, otlptracehttp.WithHTTPClient(&http.Client{Timeout: 15 * time.Second}))
-	}
-	return otlptracehttp.New(ctx, options...)
-}
-
-// newMetricExporter always selects delta temporality. Datadog rejects
-// cumulative OTLP metrics, and HTTP/protobuf is the only transport this
-// package speaks.
 func (t *Telemetry) newMetricExporter(ctx context.Context) (metric.Exporter, error) {
 	return otlpmetrichttp.New(
 		ctx,

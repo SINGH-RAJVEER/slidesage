@@ -27,13 +27,3 @@ output "template_gcs_bucket" {
   description = "Existing GCS bucket used by the Cloud CDN template origin."
   value       = data.google_storage_bucket.template_origin.name
 }
-
-output "mlflow_service_uri" {
-  description = "IAM-protected MLflow tracking server URI."
-  value       = google_cloud_run_v2_service.mlflow.uri
-}
-
-output "mlflow_artifacts_bucket" {
-  description = "Private bucket for MLflow run and trace artifacts."
-  value       = google_storage_bucket.mlflow_artifacts.name
-}
