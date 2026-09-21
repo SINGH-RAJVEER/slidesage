@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -134,7 +135,10 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 16*1024))
-		return nil, 0, &providerRequestError{Status: response.StatusCode, Message: fmt.Sprintf("OpenRouter request failed: %s", summarizeProviderError(body))}
+		return nil, 0, &providerRequestError{
+			Status:  response.StatusCode,
+			Message: providerFailureMessage("OpenRouter request failed", response.StatusCode, body, job.selection != nil),
+		}
 	}
 	var content strings.Builder
 	tokens := 0
@@ -187,9 +191,12 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, system, user 
 			// OpenRouter accepted the request and then reported an upstream
 			// failure mid-stream. It carries no status of its own, so it is
 			// marked retryable explicitly rather than read as a clean refusal.
+			message := []byte(chunk.Error.Message)
 			return nil, 0, &providerRequestError{
-				Message:   fmt.Sprintf("OpenRouter request failed: %s", chunk.Error.Message),
-				Retryable: true,
+				Message: providerFailureMessage("OpenRouter request failed", 0, message, job.selection != nil),
+				// An exhausted account is not cleared by trying again, so it is
+				// the one mid-stream failure that is not marked retryable.
+				Retryable: !outOfProviderCredit(0, message),
 			}
 		}
 		for _, choice := range chunk.Choices {
@@ -359,10 +366,13 @@ func (h *handler) directProvider(ctx context.Context, provider ai.Provider, mode
 		return nil, 0, errors.New("AI provider response is too large")
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		// A direct provider is only ever reached through a key the reader
+		// connected themselves, so an exhausted account is theirs to top up.
 		return nil, 0, &providerRequestError{
 			Status: response.StatusCode,
-			Message: fmt.Sprintf("AI provider request failed with status %d: %s",
-				response.StatusCode, summarizeProviderError(body)),
+			Message: providerFailureMessage(
+				fmt.Sprintf("AI provider request failed with status %d", response.StatusCode),
+				response.StatusCode, body, true),
 		}
 	}
 	var envelope struct {
@@ -437,12 +447,55 @@ func (h *handler) directProvider(ctx context.Context, provider ai.Provider, mode
 // summarizeProviderError condenses an upstream error body into a bounded,
 // single-line snippet so failure surfaces carry the provider's actual reason
 // (invalid API keys, rejected parameters, quota text) instead of a bare status.
+// providerLinkPattern matches the URLs providers embed in their error text.
+// OpenRouter's credit message links to the key's own management page, which
+// names the key, and a failed presentation is shown to the user, so no
+// provider link is passed through.
+var providerLinkPattern = regexp.MustCompile(`https?://[^\s"'\\]+`)
+
 func summarizeProviderError(body []byte) string {
 	snippet := strings.TrimSpace(string(body))
 	if idx := strings.IndexByte(snippet, '\n'); idx >= 0 {
 		snippet = snippet[:idx]
 	}
-	return truncate(snippet, 300)
+	return truncate(providerLinkPattern.ReplaceAllString(snippet, "[link removed]"), 300)
+}
+
+// outOfProviderCredit reports the provider responses that mean the account
+// behind the key cannot pay for the request, rather than anything about the
+// presentation being generated. Retrying the same request cannot clear it, so
+// these never reach retryableProviderError.
+func outOfProviderCredit(status int, body []byte) bool {
+	if status == http.StatusPaymentRequired {
+		return true
+	}
+	text := strings.ToLower(string(body))
+	for _, marker := range []string{
+		"requires more credits",
+		"insufficient_quota",
+		"insufficient credit",
+		"insufficient balance",
+		"exceeded your current quota",
+	} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// providerFailureMessage is what a failed presentation carries back to the
+// reader. A provider's own wording for an exhausted account describes the key
+// and its billing page, which is SlideSage's business on the shared key and
+// unreachable advice on the reader's, so that case is stated directly instead.
+func providerFailureMessage(prefix string, status int, body []byte, ownKey bool) string {
+	if outOfProviderCredit(status, body) {
+		if ownKey {
+			return "Your AI provider account does not have enough credit for this presentation. Add credit to it, or generate fewer slides, and retry."
+		}
+		return "SlideSage is temporarily out of AI provider credit. The points for this generation were refunded. Try again shortly, or connect your own provider key in settings."
+	}
+	return fmt.Sprintf("%s: %s", prefix, summarizeProviderError(body))
 }
 
 func decodeGeneratedDocument(content string) (map[string]any, error) {

@@ -216,3 +216,66 @@ type roundTripperFunc func(*http.Request) (*http.Response, error)
 func (function roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return function(request)
 }
+
+// The provider's own wording for an exhausted account names the key and links
+// to its billing page. A failed presentation is shown to the reader, so that
+// body must not reach it, and retrying cannot pay the bill.
+func TestGenerateJSONReplacesAnOutOfCreditProviderBody(t *testing.T) {
+	const body = `{"error":{"message":"This request requires more credits, or fewer max_tokens. You requested up to 8896 tokens, but can only afford 7124. To increase, visit https://openrouter.ai/workspaces/default/keys/c9b08eaadfca5808a4a0080227e2df14 and adjust the key's total limit"}}`
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusPaymentRequired)
+		_, _ = writer.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	t.Setenv("OPEN_ROUTER_API_BASE", server.URL)
+	t.Setenv("OPEN_ROUTER_MODEL", "test-model")
+	t.Setenv("OPEN_ROUTER_API_KEY", "test-key")
+
+	handler := &handler{client: server.Client()}
+	_, _, err := handler.generateJSON(context.Background(), streamJob{slideCount: 12}, "system", "user", 4800)
+	if err == nil {
+		t.Fatal("a payment-required response must fail the generation")
+	}
+	if strings.Contains(err.Error(), "openrouter.ai/workspaces") || strings.Contains(err.Error(), "c9b08eaa") {
+		t.Fatalf("error %v leaks the provider key's management link", err)
+	}
+	if !strings.Contains(err.Error(), "out of AI provider credit") {
+		t.Fatalf("error %v should say the account is out of credit", err)
+	}
+	if retryableProviderError(err) {
+		t.Fatalf("error %v must not spend the job's attempts on a bill that cannot be paid", err)
+	}
+}
+
+// A connected key is the reader's own, so the same condition has to point at
+// their account rather than SlideSage's. The direct providers are reached at
+// their real endpoints, so the message is checked where it is built.
+func TestProviderFailureMessageBlamesTheAccountThatOwnsTheKey(t *testing.T) {
+	const quota = `{"error":{"message":"You exceeded your current quota, please check your plan and billing details","type":"insufficient_quota"}}`
+
+	own := providerFailureMessage("AI provider request failed with status 429", http.StatusTooManyRequests, []byte(quota), true)
+	if !strings.Contains(own, "Your AI provider account") {
+		t.Fatalf("message %q should name the reader's own account", own)
+	}
+
+	shared := providerFailureMessage("OpenRouter request failed", http.StatusTooManyRequests, []byte(quota), false)
+	if !strings.Contains(shared, "SlideSage is temporarily out of AI provider credit") {
+		t.Fatalf("message %q should own the shared key's balance", shared)
+	}
+	if !strings.Contains(shared, "refunded") {
+		t.Fatalf("message %q should say the points came back", shared)
+	}
+}
+
+// Any other provider failure keeps its wording, minus the links, so an
+// operator can still tell what the provider objected to.
+func TestSummarizeProviderErrorStripsLinks(t *testing.T) {
+	summary := summarizeProviderError([]byte(`{"error":{"message":"Bad model id, see https://openrouter.ai/docs/models for the list"}}`))
+	if strings.Contains(summary, "https://") {
+		t.Fatalf("summary %q keeps a provider link", summary)
+	}
+	if !strings.Contains(summary, "Bad model id") {
+		t.Fatalf("summary %q dropped the provider's wording", summary)
+	}
+}
