@@ -53,6 +53,7 @@ jobs:
             --format='value(spec.template.spec.template.spec.containers[0].image)')
           test -n "$image"
           echo "TF_VAR_migrate_image=$image" >> "$GITHUB_ENV"
+          echo "TF_VAR_mlflow_image=asia-south1-docker.pkg.dev/$TF_VAR_gcp_project_id/slidesage/mlflow:plan" >> "$GITHUB_ENV"
       - name: Validate and plan with the deployment identity
         working-directory: infra/prod
         run: |

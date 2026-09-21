@@ -81,7 +81,7 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build and push the API, worker, and migrate images
+      - name: Build and push the runtime images
         uses: docker/bake-action@v7
         with:
           source: .
@@ -111,6 +111,7 @@ jobs:
       TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.DATADOG_OTLP_ENDPOINT }}
       TF_VAR_otel_logs_exporter: ${{ vars.OTEL_LOGS_EXPORTER || 'otlp' }}
       TF_VAR_otel_service_version: ${{ github.sha }}
+      TF_VAR_mlflow_experiment_id: ${{ vars.MLFLOW_EXPERIMENT_ID || '0' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -148,6 +149,7 @@ jobs:
           for component in api worker migrate; do
             echo "TF_VAR_${component}_image=$REGISTRY_LOCATION-docker.pkg.dev/$PROJECT_ID/$REGISTRY_REPOSITORY/$component:$IMAGE_VERSION" >> "$GITHUB_ENV"
           done
+          echo "TF_VAR_mlflow_image=$REGISTRY_LOCATION-docker.pkg.dev/$PROJECT_ID/$REGISTRY_REPOSITORY/mlflow:$IMAGE_VERSION" >> "$GITHUB_ENV"
 
       - name: Initialize Terraform
         working-directory: infra/prod
