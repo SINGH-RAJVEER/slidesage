@@ -6,10 +6,9 @@ SlideSage is a presentation builder with AI-assisted research and generation. Th
 
 ## Features
 
-- Streaming presentation generation and revision
+- Durable presentation generation jobs with resumable progress
 - Web research with cited sources
 - Reviewed web sources attached to generated decks
-- PPTX export
 
 ## Repository
 
@@ -32,6 +31,7 @@ Justfile        Common development commands
 - [CI/CD: Artifact Registry and Cloud Run](docs/CI_CD.md)
 - [Production infrastructure](docs/PRODUCTION_INFRASTRUCTURE.md)
 - [Architecture](docs/API_ARCHITECTURE.md)
+- [Card document proposal](docs/GAMMA_ARCHITECTURE.md)
 - [API reference](docs/API_OVERVIEW.md)
 - [Authentication](docs/AUTH_API.md)
 - [Web research](docs/WEB_RESEARCH.md)

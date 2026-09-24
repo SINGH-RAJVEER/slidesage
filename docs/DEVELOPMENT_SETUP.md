@@ -26,11 +26,9 @@ Set `AUTH_SECRET` and `OPEN_ROUTER_API_KEY` in `.env`. Add `EXA_API_KEY` for res
 5. Starts the durable generation worker and waits for `/ready` on port `8080`.
 6. Starts the Vite development server on port `5173`, with React Fast Refresh, Tailwind processing, and static assets from `apps/web/public`.
 
-Templates and marketplace covers are read from the production Cloud CDN during local development. Signing is server-side, so the API and worker on `localhost` fetch real packages as long as `CDN_URL`, `CDN_SIGNING_KEY_NAME`, and `CDN_SIGNING_KEY_SECRET` are present in `.env`, which `devenv` loads into every process. The ignored `templates/` directory is the curated publication source, not something the stack serves.
-
 Vite exposes only `VITE_*` variables to browser bundles. If `VITE_API_URL` is absent during local development, browser API requests fall back to port `8000` on the same loopback hostname.
 
-The web entry stylesheet is `apps/web/styles.css`. It imports the shared UI stylesheet, which is split into global styles in `libs/ui/styles/base.css` and viewer styles in `libs/ui/styles/viewer.css`. The web workspace declares both `tailwindcss` and `@tailwindcss/vite`; both are required because the shared stylesheet imports Tailwind's CSS entrypoint and Vite's plugin resolves it at build time.
+The web entry stylesheet is `apps/web/styles.css`. It imports the shared UI stylesheet, whose global styles live in `libs/ui/styles/base.css`. The web workspace declares both `tailwindcss` and `@tailwindcss/vite`; both are required because the shared stylesheet imports Tailwind's CSS entrypoint and Vite's plugin resolves it at build time.
 
 Stop the foreground process with `Ctrl+C`. Devenv stops managed services with the development stack.
 
@@ -65,7 +63,7 @@ The active application is split into four workspace areas:
 - `libs/types`: Shared presentation, scene, and research types.
 - `libs/ui`: Shared React components, hooks, UI contexts, and client-side helpers.
 
-Web routes are grouped by domain under `apps/web/src/routes`: `auth`, `presentations`, `marketplace`, `settings`, and `billing`. Application startup and router infrastructure live under `apps/web/src/app`.
+Web routes are grouped by domain under `apps/web/src/routes`: `auth`, `landing`, `presentations`, `settings`, and `billing`. Application startup and router infrastructure live under `apps/web/src/app`.
 
 The former TypeScript API has been removed. `apps/api` is the only API implementation and contains the application migration history and River migration runner.
 
@@ -98,7 +96,7 @@ Devenv may move PostgreSQL from `5432` when the port is occupied. Use the active
 
 ## Mobile Layouts
 
-The primary generation, research, presentation, marketplace, billing, and viewer flows support phone-sized portrait viewports. Verify changes at 320px and 375px wide in both normal and fullscreen viewer modes. Mobile controls reflow rather than relying on horizontal page scrolling; fullscreen and iterate actions remain reachable with touch input and safe-area padding.
+The primary generation, research, presentation library, and billing flows support phone-sized portrait viewports. Verify changes at 320px and 375px wide. Mobile controls reflow rather than relying on horizontal page scrolling and remain reachable with touch input and safe-area padding.
 
 ## Reset PostgreSQL
 
@@ -119,5 +117,4 @@ just dev
 - Failed AI requests: confirm `OPEN_ROUTER_API_KEY` and `OPEN_ROUTER_MODEL`.
 - Failed research: confirm `EXA_API_KEY`.
 - Failed email: confirm `RESEND_API_KEY` and that `RESEND_FROM_EMAIL` is a valid address on a domain verified in Resend. Provider validation details are written to the API log, while clients receive a stable `503` response.
-- Missing marketplace covers: confirm `CDN_URL` is `https://api.slidesage.app`, and that the API log does not report that template thumbnails are disabled. An unrouted CDN host fails DNS resolution and surfaces as a `502` from `/template-thumbnails/`.
 - Unexpected rate-limit responses: confirm migration `00012` is applied and inspect the API logs for `rate_limit_store_failed`.
