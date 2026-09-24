@@ -2,8 +2,6 @@ import type {
 	AIModelSelection,
 	PresentationData,
 	PresentationGenerationStage,
-	PresentationRevision,
-	PresentationTemplateReference,
 	ResearchPayload,
 	Source,
 } from "@slidesage/types";
@@ -22,7 +20,6 @@ interface StoredGeneration {
 	operation: "generation" | "iteration";
 	prompt?: string;
 	requestedSlides: number;
-	template?: PresentationTemplateReference;
 	lastEventId: number;
 }
 
@@ -50,17 +47,6 @@ function readStoredGeneration(): StoredGeneration | null {
 		) {
 			inMemoryGeneration = null;
 			window.localStorage.removeItem(ACTIVE_GENERATION_KEY);
-			return null;
-		}
-		// New generations need a stored template; iterations can inherit deck metadata.
-		const template = value.template;
-		if (
-			(template === undefined && value.operation !== "iteration") ||
-			(template !== undefined &&
-				(!template || typeof template.id !== "string" || typeof template.version !== "number"))
-		) {
-			window.localStorage.removeItem(ACTIVE_GENERATION_KEY);
-			inMemoryGeneration = null;
 			return null;
 		}
 		inMemoryGeneration = value as StoredGeneration;
@@ -101,9 +87,8 @@ function updateStoredCursor(jobId: string, lastEventId: number) {
 
 export interface StreamingState {
 	isStreaming: boolean;
-	/** Slides finished so far. The deck itself is the committed revision. */
+	/** Slides finished so far. */
 	slideCount: number;
-	template?: PresentationTemplateReference;
 	title: string;
 	totalSlides: number;
 	requestedSlides: number;
@@ -118,7 +103,6 @@ export interface StreamingState {
 	generationStage?: PresentationGenerationStage;
 	generationMessage?: string;
 	generationProgress?: { completed: number; total: number };
-	revision?: PresentationRevision;
 	completedDocument?: PresentationData;
 }
 
@@ -130,10 +114,8 @@ export interface GenerateOptions {
 	researchEnabled?: boolean;
 	researchPayload?: ResearchPayload;
 	parentPresentationId?: string;
-	baseRevision?: number;
 	retryPresentationId?: string;
 	ai?: AIModelSelection;
-	template?: PresentationTemplateReference;
 }
 
 type ResearchPreviewStatus = "idle" | "loading" | "ready" | "error";
@@ -375,33 +357,17 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				setStreamingState((prev) => ({
 					...prev,
 					slideCount: 0,
-					revision: undefined,
 					isComplete: false,
 					error: undefined,
 				}));
 				break;
-
-			case "revision": {
-				// The worker committed a revision; its slide count is the deck's
-				// real length, not a running total of streamed slides.
-				const revision = data as PresentationRevision;
-				setStreamingState((prev) => ({
-					...prev,
-					revision,
-					slideCount: revision.slideCount,
-					totalSlides: revision.slideCount,
-				}));
-				break;
-			}
 
 			case "complete": {
 				const document = data as PresentationData;
 				setStreamingState((prev) => ({
 					...prev,
 					completedDocument: document,
-					template: document.template,
 					title: document.title || prev.title,
-					revision: document.currentRevision ?? prev.revision,
 					slideCount: document.totalSlides || prev.slideCount,
 					totalSlides: document.totalSlides || prev.totalSlides,
 				}));
@@ -542,10 +508,6 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 	const generate = useCallback(
 		async (options: GenerateOptions): Promise<boolean> => {
 			if (activeStreamRef.current) return false;
-			if (!options.parentPresentationId && !options.template) return false;
-			const template = options.template
-				? { id: options.template.id, version: options.template.version }
-				: undefined;
 			activeStreamRef.current = true;
 			const jobId = crypto.randomUUID();
 			const operation = options.parentPresentationId ? "iteration" : "generation";
@@ -556,7 +518,6 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				isStreaming: true,
 				jobId,
 				requestedSlides: options.slideCount,
-				template,
 				operation,
 				prompt: options.prompt,
 				presentationId: targetPresentationId || undefined,
@@ -568,7 +529,6 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				operation,
 				prompt: options.prompt,
 				requestedSlides: options.slideCount,
-				template,
 				lastEventId: 0,
 			};
 			storeGeneration(stored);
@@ -610,10 +570,8 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 						research: { enabled: Boolean(options.researchEnabled) },
 						research_payload: options.researchPayload,
 						parent_presentation_id: options.parentPresentationId,
-						base_revision: options.parentPresentationId ? options.baseRevision : undefined,
 						retry_presentation_id: options.retryPresentationId,
 						ai: options.ai,
-						template,
 					}),
 					signal: controller.signal,
 				});
@@ -827,9 +785,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 		if (!completed) return null;
 		return {
 			...completed,
-			template: completed.template,
 			title: streamingState.title,
-			currentRevision: streamingState.revision ?? completed.currentRevision,
 			totalSlides: streamingState.slideCount || completed.totalSlides,
 		};
 	}, [streamingState]);
@@ -850,7 +806,6 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 			operation: initialStored.operation,
 			prompt: initialStored.prompt,
 			requestedSlides: initialStored.requestedSlides,
-			template: initialStored.template,
 		});
 
 		void consumeJobEvents(

@@ -7,7 +7,6 @@
 		".": "./src/index.ts"
 	},
 	"scripts": {
-		"test": "bun test --isolate",
 		"lint": "bunx --bun biome check .",
 		"lint:fix": "bunx --bun biome check --write .",
 		"format": "bunx --bun biome format --write ."

@@ -108,10 +108,6 @@ jobs:
         run: bun run type-check
 
       - if: steps.scope.outputs.web == 'true'
-        run: bun test
-        working-directory: libs/types
-
-      - if: steps.scope.outputs.web == 'true'
         run: bun run test:ui
 
       - if: steps.scope.outputs.web == 'true'

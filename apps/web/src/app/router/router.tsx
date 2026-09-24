@@ -50,25 +50,8 @@ export const router = createBrowserRouter([
 						lazy: lazyRoute(() => import("../../routes/presentations/GenerateResearchPage")),
 					},
 					{
-						path: "marketplace",
-						lazy: lazyRoute(() => import("../../routes/marketplace/MarketplacePage")),
-					},
-					{
-						path: "marketplace/:marketplaceId/preview",
-						lazy: lazyRoute(() => import("../../routes/marketplace/MarketplaceThemePreviewPage")),
-					},
-					{
 						path: "presentations",
 						lazy: lazyRoute(() => import("../../routes/presentations/PresentationsGridPage")),
-					},
-					{
-						path: "presentations/:presentationId",
-						lazy: lazyRoute(() => import("../../routes/presentations/PresentationViewer")),
-					},
-					// Streaming / legacy route (kept because generation navigates here before an id exists)
-					{
-						path: "presentation",
-						lazy: lazyRoute(() => import("../../routes/presentations/PresentationViewer")),
 					},
 					{
 						path: "presentation-error",

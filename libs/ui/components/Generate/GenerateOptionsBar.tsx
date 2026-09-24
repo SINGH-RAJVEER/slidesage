@@ -1,10 +1,8 @@
-import type { PresentationTemplateReference } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
 import { Globe } from "lucide-react";
 import type React from "react";
 import { DetailLevelSelector } from "./DetailLevelSelector";
 import { SlideCountSelector } from "./SlideCountSelector";
-import TemplateSelector, { type InstalledTemplateOption } from "./TemplateSelector";
 import { TonalitySelector } from "./TonalitySelector";
 
 interface GenerateOptionsBarProps {
@@ -12,15 +10,10 @@ interface GenerateOptionsBarProps {
 	tonality: string;
 	useWebResearch: boolean;
 	slideCount: string;
-	/** Undefined until the reader picks one; there is no default to assume. */
-	selectedTemplate?: PresentationTemplateReference;
-	installedThemes?: InstalledTemplateOption[];
 	onDetailLevelChange: (level: string) => void;
 	onTonalityChange: (tonality: string) => void;
 	onUseWebResearchChange: (enabled: boolean) => void;
 	onSlideCountChange: (count: string) => void;
-	onTemplateChange: (template: PresentationTemplateReference) => void;
-	onTemplateRemove?: (theme: InstalledTemplateOption) => void;
 }
 
 export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
@@ -28,14 +21,10 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 	tonality,
 	useWebResearch,
 	slideCount,
-	selectedTemplate,
-	installedThemes = [],
 	onDetailLevelChange,
 	onTonalityChange,
 	onUseWebResearchChange,
 	onSlideCountChange,
-	onTemplateChange,
-	onTemplateRemove,
 }) => {
 	return (
 		<div className="mb-2 w-full flex items-center justify-center">
@@ -58,12 +47,6 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 					</Button>
 				</div>
 
-				<TemplateSelector
-					selectedTemplate={selectedTemplate}
-					onTemplateChange={onTemplateChange}
-					onTemplateRemove={onTemplateRemove}
-					installedThemes={installedThemes}
-				/>
 				<DetailLevelSelector detailLevel={detailLevel} onDetailLevelChange={onDetailLevelChange} />
 				<TonalitySelector tonality={tonality} onTonalityChange={onTonalityChange} />
 				<SlideCountSelector slideCount={slideCount} onSlideCountChange={onSlideCountChange} />

@@ -1,10 +1,7 @@
-import type {
-	AIModelSelection,
-	PresentationTemplateReference,
-	ResearchPayload,
-} from "@slidesage/types";
+import type { AIModelSelection, ResearchPayload } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { requestGenerationNotificationPermission } from "@slidesage/ui/lib/generation-notifications";
 import { ArrowLeft, ExternalLink, RefreshCw, Sparkles } from "lucide-react";
@@ -21,7 +18,6 @@ interface ResearchRouteState {
 	researchPayload?: ResearchPayload;
 	retryPresentationId?: string;
 	ai?: AIModelSelection;
-	template: PresentationTemplateReference;
 }
 
 type ResearchStatus = "loading" | "ready" | "error";
@@ -39,12 +35,12 @@ export default function GenerateResearchPage() {
 	const savedResearch = routeState?.researchPayload;
 	const retryPresentationId = routeState?.retryPresentationId;
 	const ai = routeState?.ai;
-	// Falling back to a default here would generate a deck in a template the
-	// user never chose, so a lost route state sends them back to pick one.
-	const template = routeState?.template;
 
 	const [isProceeding, setIsProceeding] = useState(false);
 	const [researchAttempt, setResearchAttempt] = useState(0);
+	// Generation stays on this page until the card document viewer exists, so
+	// a refused or failed submission is reported here.
+	const [generationError, setGenerationError] = useState<string | null>(null);
 	const isProceedingRef = useRef(false);
 
 	const researchRequest = useMemo(
@@ -78,29 +74,24 @@ export default function GenerateResearchPage() {
 	};
 
 	useEffect(() => {
-		if (!prompt || !slideCount || !template) {
+		if (!prompt || !slideCount) {
 			navigate(ROUTES.generate);
 		}
-	}, [navigate, prompt, slideCount, template]);
+	}, [navigate, prompt, slideCount]);
 
 	useEffect(() => {
-		if (!prompt || !slideCount || !template) return;
+		if (streamingState.error) setGenerationError(streamingState.error);
+	}, [streamingState.error]);
+
+	useEffect(() => {
+		if (!prompt || !slideCount) return;
 		void previewResearch(researchRequest, savedResearch, researchAttempt > 0);
-	}, [
-		prompt,
-		slideCount,
-		template,
-		researchAttempt,
-		researchRequest,
-		savedResearch,
-		previewResearch,
-	]);
+	}, [prompt, slideCount, researchAttempt, researchRequest, savedResearch, previewResearch]);
 
 	const handleProceed = useCallback(async () => {
 		if (
 			!prompt ||
 			!slideCount ||
-			!template ||
 			researchStatus !== "ready" ||
 			streamingState.isStreaming ||
 			isProceedingRef.current
@@ -117,7 +108,7 @@ export default function GenerateResearchPage() {
 			...(estimatedTokens === null ? {} : { estimated_tokens: estimatedTokens }),
 		};
 
-		const streamingRequest = generate({
+		const success = await generate({
 			prompt,
 			slideCount,
 			detailLevel,
@@ -126,11 +117,7 @@ export default function GenerateResearchPage() {
 			researchPayload: payload,
 			retryPresentationId,
 			ai,
-			template,
 		});
-		navigate(ROUTES.presentation, { state: { isStreaming: true } });
-
-		const success = await streamingRequest;
 		if (!success) {
 			isProceedingRef.current = false;
 			setIsProceeding(false);
@@ -142,8 +129,6 @@ export default function GenerateResearchPage() {
 		prompt,
 		researchStatus,
 		retryPresentationId,
-		template,
-		navigate,
 		slideCount,
 		sources,
 		generate,
@@ -191,6 +176,7 @@ export default function GenerateResearchPage() {
 	return (
 		<div className="flex h-dvh flex-col overflow-hidden bg-transparent">
 			<Header />
+			<FloatingNotice error={generationError} onDismiss={() => setGenerationError(null)} />
 			<div className="relative min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
 				<button
 					type="button"

@@ -22,7 +22,6 @@ export interface HeaderRoutes {
 	generate: string;
 	research: string;
 	presentations: string;
-	marketplace: string;
 	purchase: string;
 	profile: string;
 	settings: string;
@@ -114,7 +113,6 @@ export function Header({
 								{[
 									[routes.generate, "Generate"],
 									[routes.presentations, "Presentations"],
-									[routes.marketplace, "Marketplace"],
 								].map(([path, label]) => (
 									<LinkComponent
 										key={path}

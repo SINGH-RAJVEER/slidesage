@@ -14,10 +14,9 @@
 		"dev:api": "CGO_ENABLED=0 go -C apps/api run ./cmd/api",
 		"dev:worker": "CGO_ENABLED=0 go -C apps/api run ./cmd/worker",
 		"dev:web": "bun --cwd apps/web dev",
-		"test": "bun run test:api && bun run test:types && bun run test:ui && bun run test:web",
+		"test": "bun run test:api && bun run test:ui && bun run test:web",
 		"test:api": "CGO_ENABLED=0 go -C apps/api test ./...",
 		"test:web": "bun --cwd apps/web test",
-		"test:types": "bun --cwd libs/types test",
 		"test:ui": "bun --cwd libs/ui test",
 		"type-check": "bun run type-check:web && bun run type-check:types && bun run type-check:ui",
 		"type-check:web": "bun node_modules/typescript/bin/tsc -p apps/web/tsconfig.json --tsBuildInfoFile node_modules/.cache/slidesage-web.tsbuildinfo",
@@ -33,9 +32,7 @@
 		"format:web": "bun --cwd apps/web format"
 	},
 	"devDependencies": {
-		"@aiden0z/pptx-renderer": "^1.2.4",
 		"@types/bun": "1.3.14",
-		"playwright": "^1.62.1",
 		"typescript": "^7.0.2"
 	},
 	"trustedDependencies": [],

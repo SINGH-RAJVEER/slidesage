@@ -9,11 +9,7 @@ export const ROUTES = {
 	settings: "/settings",
 	generate: "/generate",
 	research: "/generate/research",
-	marketplace: "/marketplace",
-	marketplacePreview: (marketplaceId: string) => `/marketplace/${marketplaceId}/preview`,
 	presentations: "/presentations",
-	presentationById: (presentationId: number | string) => `/presentations/${presentationId}`,
-	presentation: "/presentation",
 	presentationError: "/presentation-error",
 	purchase: "/purchase",
 } as const;

@@ -1,13 +1,3 @@
-export type {
-	BinaryPptxTemplate,
-	BinaryTemplateAspectRatio,
-	BinaryTemplateAssetStatus,
-	BinaryTemplateCategory,
-	BinaryTemplateDimensions,
-	PresentationTemplateReference,
-} from "./template-catalog";
-export { BINARY_PPTX_TEMPLATE_CATALOG, BINARY_TEMPLATE_CATEGORIES } from "./template-catalog";
-
 /** Stages the generation worker reports over SSE, in the order they occur. */
 export type PresentationGenerationStage = "planning" | "drafting" | "finalizing";
 
@@ -93,19 +83,8 @@ export interface ResearchOptions {
 	maxAgeHours?: number;
 }
 
-/** One immutable PPTX revision used by the viewer and downloads. */
-export interface PresentationRevision {
-	revision: number;
-	slideCount: number;
-	byteSize: number;
-	sha256: string;
-	createdAt: string;
-}
-
 export interface PresentationData {
 	title: string;
-	template: import("./template-catalog").PresentationTemplateReference;
-	currentRevision?: PresentationRevision;
 	totalSlides: number;
 	sources?: Source[];
 	tokens_used?: number;
@@ -122,7 +101,6 @@ export interface PresentationRetryOptions {
 	research_enabled: boolean;
 	research_payload?: ResearchPayload;
 	ai?: AIModelSelection;
-	template?: import("./template-catalog").PresentationTemplateReference;
 }
 
 export interface PresentationFailure {
@@ -132,8 +110,6 @@ export interface PresentationFailure {
 
 export interface PresentationJSON {
 	title: string;
-	template?: import("./template-catalog").PresentationTemplateReference;
-	currentRevision?: PresentationRevision;
 	status?: PresentationStatus;
 	failure?: PresentationFailure;
 	totalSlides?: number;
@@ -191,11 +167,6 @@ export interface StreamStageEvent {
 	};
 }
 
-export interface StreamRevisionEvent {
-	event: "revision";
-	data: PresentationRevision;
-}
-
 export interface StreamRetryEvent {
 	event: "retry";
 	data: {
@@ -237,7 +208,6 @@ export type PresentationStreamEvent =
 	| StreamResearchEvent
 	| StreamStageEvent
 	| StreamRetryEvent
-	| StreamRevisionEvent
 	| StreamCompleteEvent
 	| StreamSavedEvent
 	| StreamErrorEvent;
