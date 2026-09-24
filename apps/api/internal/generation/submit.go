@@ -20,13 +20,11 @@ type submitInput struct {
 	ParentID        string
 	RetryID         string
 	SlideCount      int
-	BaseRevision    int `json:",omitempty"`
 	DetailLevel     string
 	Tonality        string
 	Research        any
 	ResearchPayload *presentation.ResearchPayload
 	AI              *ai.Selection
-	Template        *presentation.TemplateReference
 }
 
 type persistedPresentation struct {
@@ -114,6 +112,11 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
+	if h.drafter == nil {
+		writeError(writer, http.StatusServiceUnavailable, "Presentation generation is not available yet")
+		return
+	}
+
 	var job streamJob
 	var placeholder []byte
 	create := false
@@ -138,19 +141,6 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 		h.reservationError(writer, err)
 		return
 	}
-	if job.kind == "generation" {
-		resolvedTemplate, err := resolveGenerationTemplate(job.template)
-		if err != nil {
-			writeError(writer, http.StatusBadRequest, err.Error())
-			return
-		}
-		job.template = &resolvedTemplate
-		if _, err := assignmentForJob(job); err != nil {
-			writeError(writer, http.StatusBadRequest, err.Error())
-			return
-		}
-	}
-
 	balance, _, err := h.enqueue(request.Context(), job, requestHashValue, create, input.Topic, placeholder)
 	if err != nil {
 		var duplicate duplicateOperation
@@ -183,14 +173,6 @@ func parseSubmitInput(body map[string]any) (submitInput, error) {
 	if input.ParentID != "" && input.RetryID != "" {
 		return submitInput{}, errors.New("parent_presentation_id and retry_presentation_id are mutually exclusive")
 	}
-	if value, found := body["base_revision"]; found {
-		number, ok := value.(json.Number)
-		parsed, err := number.Int64()
-		if input.ParentID == "" || !ok || err != nil || parsed <= 0 || int64(int(parsed)) != parsed {
-			return submitInput{}, errors.New("base_revision must be a positive integer and is only allowed for iterations")
-		}
-		input.BaseRevision = int(parsed)
-	}
 	slides, err := slideCount(body, input.ParentID == "")
 	if err != nil {
 		return submitInput{}, err
@@ -218,13 +200,6 @@ func parseSubmitInput(body map[string]any) (submitInput, error) {
 		return submitInput{}, err
 	}
 	input.AI = selection
-	if value, found := body["template"]; found {
-		template, err := presentation.ParseTemplateReference(value)
-		if err != nil {
-			return submitInput{}, err
-		}
-		input.Template = &template
-	}
 	return input, nil
 }
 
@@ -237,14 +212,6 @@ func (h *handler) generationJob(ctx context.Context, userID string, input submit
 		}
 		var document map[string]any
 		_ = json.Unmarshal(existing.Data, &document)
-		// A retry is submitted from the generate page with the template
-		// selector in hand, so the selection on the request wins. The stored
-		// reference is the fallback for a retry that names none.
-		if input.Template == nil {
-			if template, parseErr := presentation.ParseTemplateReference(document["template"]); parseErr == nil {
-				input.Template = &template
-			}
-		}
 		if document["status"] != "failed" {
 			duplicate, err := h.existingSubmission(ctx, userID, jobID, hash)
 			if err == nil && duplicate.jobID != "" {
@@ -256,17 +223,7 @@ func (h *handler) generationJob(ctx context.Context, userID string, input submit
 			return streamJob{}, nil, writeStatusError{http.StatusConflict, "Only failed presentations can be retried"}
 		}
 	}
-	// The manifest states what the assigned archetypes can hold, which is a far
-	// tighter bound than a slide count. A template that does not resolve here is
-	// refused by the worker anyway; the reservation just falls back rather than
-	// failing the submission on a pricing detail.
-	outputBudget := maxOutputTokens(input.SlideCount)
-	if resolved, resolveErr := resolveGenerationTemplate(input.Template); resolveErr == nil {
-		if assignments, planErr := templateAssignments(resolved, input.SlideCount); planErr == nil {
-			outputBudget = slotOutputTokens(assignments)
-		}
-	}
-	quote := authorizationMillis(outputBudget, input.Topic, nil, input.Research, input.ResearchPayload, repairHeadroomTokens(input.SlideCount))
+	quote := authorizationMillis(maxOutputTokens(input.SlideCount), input.Topic, nil, input.Research, input.ResearchPayload, repairHeadroomTokens(input.SlideCount))
 	operationID, err := uuid()
 	if err != nil {
 		return streamJob{}, nil, err
@@ -286,18 +243,13 @@ func (h *handler) generationJob(ctx context.Context, userID string, input submit
 	}
 	initial := generationPlaceholder(input)
 	placeholder, _ := json.Marshal(initial)
-	job := streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: presentationID, quote: quote, prompt: input.Topic, slideCount: input.SlideCount, detailLevel: input.DetailLevel, tonality: input.Tonality, research: input.Research, researchPayload: input.ResearchPayload, selection: selection, template: input.Template, kind: "generation"}
+	job := streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: presentationID, quote: quote, prompt: input.Topic, slideCount: input.SlideCount, detailLevel: input.DetailLevel, tonality: input.Tonality, research: input.Research, researchPayload: input.ResearchPayload, selection: selection, kind: "generation"}
 	return job, placeholder, nil
 }
 
 func generationPlaceholder(input submitInput) map[string]any {
 	retry := map[string]any{"prompt": input.Topic, "slide_count": input.SlideCount, "detail_level": input.DetailLevel, "tonality": input.Tonality, "research_enabled": input.Research != nil || input.ResearchPayload != nil, "research_payload": input.ResearchPayload, "ai": input.AI}
-	initial := map[string]any{"title": "Generating...", "slides": []any{}, "status": "generating", "failure": map[string]any{"retry": retry}}
-	if input.Template != nil {
-		retry["template"] = input.Template
-		initial["template"] = input.Template
-	}
-	return initial
+	return map[string]any{"title": "Generating...", "slides": []any{}, "status": "generating", "failure": map[string]any{"retry": retry}}
 }
 
 func (h *handler) iterationJob(ctx context.Context, userID string, input submitInput, jobID string) (streamJob, error) {
@@ -312,28 +264,25 @@ func (h *handler) iterationJob(ctx context.Context, userID string, input submitI
 	if err != nil {
 		return streamJob{}, writeStatusError{http.StatusNotFound, "Presentation not found"}
 	}
-	if err := requireRecordedTemplate(base.Data); err != nil {
-		return streamJob{}, err
+	var current struct {
+		Status      string `json:"status"`
+		TotalSlides int    `json:"totalSlides"`
 	}
-	var revision, currentCount int
-	if err := h.database.QueryRowContext(ctx, `SELECT r.revision,r.slide_count FROM presentations p JOIN presentation_revisions r ON r.presentation_id=p.id AND r.revision=p.current_pptx_revision WHERE p.id=$1 AND p.user_id=$2`, base.ID, userID).Scan(&revision, &currentCount); err != nil {
-		return streamJob{}, writeStatusError{http.StatusConflict, "This presentation has no completed revision to edit yet"}
-	}
-	if input.BaseRevision != 0 && input.BaseRevision != revision {
-		return streamJob{}, writeStatusError{http.StatusConflict, "This presentation has changed. Reload the current revision before revising it."}
+	if json.Unmarshal(base.Data, &current) != nil || current.Status != "ready" {
+		return streamJob{}, writeStatusError{http.StatusConflict, "This presentation has no completed document to revise yet"}
 	}
 	count := input.SlideCount
 	if count == 0 {
-		count = currentCount
+		count = current.TotalSlides
 	}
 
 	operationID, err := uuid()
 	if err != nil {
 		return streamJob{}, err
 	}
-	// Reserve for the full indexed source and one complete plan repair, including
+	// Reserve for the full current document and one complete repair, including
 	// reductions whose input is larger than their requested output.
-	budgetCount := max(count, currentCount)
+	budgetCount := max(count, current.TotalSlides)
 	quote := authorizationMillis(maxOutputTokens(budgetCount), input.Topic, base.Data, input.Research, input.ResearchPayload, 2*maxOutputTokens(budgetCount))
 	selection, _, err := h.connections.CredentialForGeneration(ctx, userID, input.AI)
 	if err != nil {
@@ -342,17 +291,14 @@ func (h *handler) iterationJob(ctx context.Context, userID string, input submitI
 	if selection != nil {
 		quote = 0
 	}
-	job := buildIterationJob(jobID, userID, operationID, base, input, count, quote, selection)
-	job.pptxRevision = revision
-	return job, nil
+	return buildIterationJob(jobID, userID, operationID, base, input, count, quote, selection), nil
 }
 
 func buildIterationJob(jobID, userID, operationID string, base persistedPresentation, input submitInput, count int, quote int64, selection *ai.Selection) streamJob {
-	return streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: base.ID, expectedRevision: base.Revision, quote: quote, prompt: input.Topic, slideCount: count, detailLevel: input.DetailLevel, tonality: input.Tonality, research: input.Research, researchPayload: input.ResearchPayload, selection: selection, template: templateFromDocument(base.Data), current: base.Data, kind: "iteration"}
+	return streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: base.ID, expectedRevision: base.Revision, quote: quote, prompt: input.Topic, slideCount: count, detailLevel: input.DetailLevel, tonality: input.Tonality, research: input.Research, researchPayload: input.ResearchPayload, selection: selection, current: base.Data, kind: "iteration"}
 }
 
 type streamJob struct {
-	pptxRevision                               int
 	jobID, userID, operationID, presentationID string
 	expectedRevision                           int
 	quote                                      int64
@@ -362,24 +308,9 @@ type streamJob struct {
 	research                                   any
 	researchPayload                            *presentation.ResearchPayload
 	selection                                  *ai.Selection
-	template                                   *presentation.TemplateReference
 	credential                                 string
 	current                                    json.RawMessage
 	requestHash                                string
-}
-
-func templateFromDocument(data []byte) *presentation.TemplateReference {
-	var document map[string]any
-	decoder := json.NewDecoder(strings.NewReader(string(data)))
-	decoder.UseNumber()
-	if decoder.Decode(&document) != nil {
-		return nil
-	}
-	template, err := presentation.ParseTemplateReference(document["template"])
-	if err != nil {
-		return nil
-	}
-	return &template
 }
 
 func generationUserPrompt(job streamJob) string {

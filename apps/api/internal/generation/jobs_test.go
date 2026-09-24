@@ -1,40 +1,17 @@
 package generation
 
 import (
-	"encoding/json"
 	"errors"
 	"net"
 	"net/http"
 	"net/url"
 	"testing"
-
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
 )
 
 func TestEventCursorPrefersLastEventID(t *testing.T) {
 	request := &http.Request{Header: http.Header{"Last-Event-Id": []string{"42"}}, URL: &url.URL{RawQuery: "after=11"}}
 	if cursor := eventCursor(request); cursor != 42 {
 		t.Fatalf("expected cursor 42, got %d", cursor)
-	}
-}
-
-func TestFinalDocumentPreservesJobTemplate(t *testing.T) {
-	document := map[string]any{"template": map[string]any{"id": "unknown"}}
-	job := streamJob{template: &presentation.TemplateReference{ID: "soft-skills-training", Version: 1}}
-
-	preserveJobTemplate(document, job)
-
-	encoded, _ := json.Marshal(document["template"])
-	if string(encoded) != `{"id":"soft-skills-training","version":1}` {
-		t.Fatalf("template = %s", encoded)
-	}
-}
-
-func TestIterationJobRetainsExistingTemplate(t *testing.T) {
-	base := persistedPresentation{Data: json.RawMessage(`{"template":{"id":"soft-skills-training","version":1}}`)}
-	job := buildIterationJob("job", "user", "operation", base, submitInput{}, 5, 0, nil)
-	if job.template == nil || job.template.ID != "soft-skills-training" {
-		t.Fatalf("template = %#v", job.template)
 	}
 }
 

@@ -9,9 +9,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatecatalog"
 )
 
 func decodeSubmitBody(t *testing.T, raw string) map[string]any {
@@ -48,38 +45,23 @@ func TestSubmitInputReadsTopicAndDisabledResearch(t *testing.T) {
 	}
 }
 
-func TestSubmitIterationCountAndBaseRevision(t *testing.T) {
+func TestSubmitIterationCount(t *testing.T) {
 	for _, test := range []struct {
 		name, fields string
 		valid        bool
 	}{
 		{"omitted", `"parent_presentation_id":"p"`, true},
-		{"one", `"parent_presentation_id":"p","slide_count":1,"base_revision":7`, true},
+		{"one", `"parent_presentation_id":"p","slide_count":1`, true},
 		{"forty", `"parent_presentation_id":"p","slide_count":40`, true},
 		{"zero count", `"parent_presentation_id":"p","slide_count":0`, false},
 		{"large count", `"parent_presentation_id":"p","slide_count":41`, false},
 		{"fraction count", `"parent_presentation_id":"p","slide_count":1.5`, false},
 		{"generation minimum", `"slide_count":1`, false},
-		{"generation pin", `"slide_count":5,"base_revision":1`, false},
-		{"retry pin", `"retry_presentation_id":"p","slide_count":5,"base_revision":1`, false},
-		{"zero pin", `"parent_presentation_id":"p","base_revision":0`, false},
-		{"negative pin", `"parent_presentation_id":"p","base_revision":-1`, false},
-		{"fraction pin", `"parent_presentation_id":"p","base_revision":1.5`, false},
-		{"string pin", `"parent_presentation_id":"p","base_revision":"1"`, false},
-		{"null pin", `"parent_presentation_id":"p","base_revision":null`, false},
-		{"overflow pin", `"parent_presentation_id":"p","base_revision":9223372036854775808`, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			input, err := parseSubmitInput(decodeSubmitBody(t, `{"topic":"Revise",`+test.fields+`}`))
 			if (err == nil) != test.valid {
 				t.Fatalf("input=%+v error=%v", input, err)
-			}
-			if input.BaseRevision != 0 {
-				other := input
-				other.BaseRevision++
-				if requestHash(input) == requestHash(other) {
-					t.Fatal("base revision missing from request hash")
-				}
 			}
 		})
 	}
@@ -97,52 +79,6 @@ func TestSubmitInputKeepsEnabledResearch(t *testing.T) {
 	}
 	if input.Research == nil {
 		t.Fatal("enabled research was discarded")
-	}
-}
-
-func TestSubmitInputParsesBinaryTemplate(t *testing.T) {
-	body := decodeSubmitBody(t, `{
-		"topic":"Grid storage",
-		"slide_count":5,
-		"template":{"id":"soft-skills-training","version":1}
-	}`)
-	input, err := parseSubmitInput(body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if input.Template == nil || input.Template.ID != "soft-skills-training" {
-		t.Fatalf("template = %#v", input.Template)
-	}
-
-	body["template"] = map[string]any{"id": "Invalid Template", "version": json.Number("1")}
-	if _, err := parseSubmitInput(body); err == nil {
-		t.Fatal("invalid template ID was accepted")
-	}
-}
-
-func TestGenerationPlaceholderCarriesTemplateIntoRetryState(t *testing.T) {
-	body := decodeSubmitBody(t, `{
-		"topic":"Grid storage",
-		"slide_count":5,
-		"template":{"id":"soft-skills-training","version":1}
-	}`)
-	input, err := parseSubmitInput(body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	placeholder := generationPlaceholder(input)
-	retry := placeholder["failure"].(map[string]any)["retry"].(map[string]any)
-	encoded, _ := json.Marshal(retry["template"])
-	if string(encoded) != `{"id":"soft-skills-training","version":1}` {
-		t.Fatalf("retry template = %s", encoded)
-	}
-}
-
-func TestRequestHashIncludesTemplate(t *testing.T) {
-	first := submitInput{Topic: "Grid storage", Template: &presentation.TemplateReference{ID: "simple-business-proposal", Version: 1}}
-	second := submitInput{Topic: "Grid storage", Template: &presentation.TemplateReference{ID: "soft-skills-training", Version: 1}}
-	if requestHash(first) == requestHash(second) {
-		t.Fatal("template did not affect request hash")
 	}
 }
 
@@ -487,24 +423,6 @@ func TestRunBoundedLimitsConcurrentWork(t *testing.T) {
 	}
 }
 
-func TestResolveGenerationTemplatePinsThePublishedDigest(t *testing.T) {
-	entry, found := templatecatalog.Lookup("soft-skills-training", 1)
-	if !found {
-		t.Fatal("soft-skills-training is not published")
-	}
-	resolved, err := resolveGenerationTemplate(&presentation.TemplateReference{ID: entry.ID, Version: 1})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resolved.SHA256 != entry.SHA256 {
-		t.Fatalf("resolved digest %s, want %s", resolved.SHA256, entry.SHA256)
-	}
-	mismatched := presentation.TemplateReference{ID: entry.ID, Version: 1, SHA256: strings.Repeat("a", 64)}
-	if _, err := resolveGenerationTemplate(&mismatched); err == nil {
-		t.Fatal("a digest the catalog does not publish was accepted")
-	}
-}
-
 func TestGenerationFailureDocumentCarriesSubmittedSettingsIntoRetryState(t *testing.T) {
 	job := streamJob{
 		kind:        "generation",
@@ -512,7 +430,6 @@ func TestGenerationFailureDocumentCarriesSubmittedSettingsIntoRetryState(t *test
 		slideCount:  12,
 		detailLevel: "detailed",
 		tonality:    "persuasive",
-		template:    &presentation.TemplateReference{ID: "soft-skills-training", Version: 1},
 	}
 	failed := generationFailureDocument(job, "provider was unreachable")
 
@@ -522,13 +439,5 @@ func TestGenerationFailureDocumentCarriesSubmittedSettingsIntoRetryState(t *test
 	}
 	if retry["detail_level"] != "detailed" || retry["tonality"] != "persuasive" {
 		t.Fatalf("retry detail level and tonality = %#v", retry)
-	}
-	encoded, _ := json.Marshal(retry["template"])
-	if string(encoded) != `{"id":"soft-skills-training","version":1}` {
-		t.Fatalf("retry template = %s", encoded)
-	}
-	topLevel, _ := json.Marshal(failed["template"])
-	if string(topLevel) != `{"id":"soft-skills-training","version":1}` {
-		t.Fatalf("document template = %s", topLevel)
 	}
 }

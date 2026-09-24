@@ -15,7 +15,6 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/observability"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentationrevision"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 )
@@ -46,31 +45,29 @@ func (JobArgs) InsertOpts() river.InsertOpts {
 }
 
 type jobPayload struct {
-	PPTXRevision     int                             `json:"pptx_revision"`
-	UserID           string                          `json:"user_id"`
-	OperationID      string                          `json:"operation_id"`
-	PresentationID   string                          `json:"presentation_id"`
-	Kind             string                          `json:"kind"`
-	Prompt           string                          `json:"prompt"`
-	SlideCount       int                             `json:"slide_count"`
-	DetailLevel      string                          `json:"detail_level"`
-	Tonality         string                          `json:"tonality"`
-	Research         any                             `json:"research,omitempty"`
-	ResearchPayload  *presentation.ResearchPayload   `json:"research_payload,omitempty"`
-	Selection        *ai.Selection                   `json:"ai,omitempty"`
-	Template         *presentation.TemplateReference `json:"template,omitempty"`
-	Current          json.RawMessage                 `json:"current,omitempty"`
-	ExpectedRevision int                             `json:"expected_revision"`
-	QuotedMillis     int64                           `json:"quoted_millis"`
-	RequestHash      string                          `json:"request_hash,omitempty"`
+	UserID           string                        `json:"user_id"`
+	OperationID      string                        `json:"operation_id"`
+	PresentationID   string                        `json:"presentation_id"`
+	Kind             string                        `json:"kind"`
+	Prompt           string                        `json:"prompt"`
+	SlideCount       int                           `json:"slide_count"`
+	DetailLevel      string                        `json:"detail_level"`
+	Tonality         string                        `json:"tonality"`
+	Research         any                           `json:"research,omitempty"`
+	ResearchPayload  *presentation.ResearchPayload `json:"research_payload,omitempty"`
+	Selection        *ai.Selection                 `json:"ai,omitempty"`
+	Current          json.RawMessage               `json:"current,omitempty"`
+	ExpectedRevision int                           `json:"expected_revision"`
+	QuotedMillis     int64                         `json:"quoted_millis"`
+	RequestHash      string                        `json:"request_hash,omitempty"`
 }
 
 func payloadFromJob(job streamJob) jobPayload {
 	return jobPayload{
-		PPTXRevision: job.pptxRevision, UserID: job.userID, OperationID: job.operationID, PresentationID: job.presentationID,
+		UserID: job.userID, OperationID: job.operationID, PresentationID: job.presentationID,
 		Kind: job.kind, Prompt: job.prompt, SlideCount: job.slideCount,
 		DetailLevel: job.detailLevel, Tonality: job.tonality,
-		Research: job.research, ResearchPayload: job.researchPayload, Selection: job.selection, Template: job.template,
+		Research: job.research, ResearchPayload: job.researchPayload, Selection: job.selection,
 		Current: job.current, ExpectedRevision: job.expectedRevision, QuotedMillis: job.quote,
 		RequestHash: job.requestHash,
 	}
@@ -78,11 +75,11 @@ func payloadFromJob(job streamJob) jobPayload {
 
 func (payload jobPayload) streamJob() streamJob {
 	return streamJob{
-		pptxRevision: payload.PPTXRevision, userID: payload.UserID, operationID: payload.OperationID, presentationID: payload.PresentationID,
+		userID: payload.UserID, operationID: payload.OperationID, presentationID: payload.PresentationID,
 		expectedRevision: payload.ExpectedRevision, quote: payload.QuotedMillis,
 		prompt: payload.Prompt, slideCount: payload.SlideCount, detailLevel: payload.DetailLevel,
 		tonality: payload.Tonality, research: payload.Research,
-		researchPayload: payload.ResearchPayload, selection: payload.Selection, template: payload.Template, current: payload.Current,
+		researchPayload: payload.ResearchPayload, selection: payload.Selection, current: payload.Current,
 		kind: payload.Kind, requestHash: payload.RequestHash,
 	}
 }
@@ -122,9 +119,6 @@ func newWorkerClient(database *sql.DB, connections ai.ConnectionService, maxWork
 	}
 	workers := river.NewWorkers()
 	h := &handler{database: database, client: &http.Client{Timeout: 3 * time.Minute, Transport: observability.HTTPTransport(nil)}, connections: connections}
-	if err := h.configureDocuments(context.Background()); err != nil {
-		return nil, fmt.Errorf("configure canonical generation: %w", err)
-	}
 	river.AddWorker(workers, &generationWorker{handler: h})
 	return river.NewClient(riverdatabasesql.New(database), &river.Config{
 		FetchPollInterval:    time.Second,
@@ -270,22 +264,28 @@ func (h *handler) processQueuedJob(ctx context.Context, riverJob *river.Job[JobA
 	}
 	job.selection, job.credential = selection, credential
 
-	_ = h.updateStage(ctx, record.ID, "drafting", "Writing revision content", 2, 4)
-	revision, document, tokens, err := h.compileJob(ctx, job)
+	if h.drafter == nil {
+		return h.finalizeQueuedFailure(ctx, record, riverJob, job, "drafting_unavailable", errDraftingUnavailable.Error())
+	}
+	_ = h.updateStage(ctx, record.ID, "drafting", "Writing presentation content", 2, 4)
+	document, tokens, err := h.drafter.Draft(ctx, job)
 	if err != nil {
 		if retryableProviderError(err) && riverJob.Attempt < riverJob.MaxAttempts {
 			return h.scheduleRetry(ctx, record, riverJob, err)
 		}
-		return h.finalizeQueuedFailure(ctx, record, riverJob, job, "compilation_failure", err.Error())
+		return h.finalizeQueuedFailure(ctx, record, riverJob, job, "drafting_failure", err.Error())
+	}
+	if job.quote > 0 && tokens <= 0 {
+		return h.finalizeQueuedFailure(ctx, record, riverJob, job, "usage_unavailable", "provider usage unavailable")
 	}
 	recordTokenUsage(ctx, job.kind, tokens)
 	completed, _ := json.Marshal(document)
 	charged := actualCharge(tokens, job.quote)
-	if err := h.completeQueuedJob(ctx, riverJob, record, job, completed, document, text(document["title"], "Untitled Presentation"), charged, tokens, revision); err != nil {
+	if err := h.completeQueuedJob(ctx, riverJob, record, job, completed, document, text(document["title"], "Untitled Presentation"), charged, tokens); err != nil {
 		if errors.Is(err, errGenerationCancelled) {
 			return nil
 		}
-		if errors.Is(err, errInactiveReservation) || errors.Is(err, errPresentationChanged) || errors.Is(err, presentationrevision.ErrRevisionConflict) {
+		if errors.Is(err, errInactiveReservation) || errors.Is(err, errPresentationChanged) {
 			return h.finalizeQueuedFailure(ctx, record, riverJob, job, "persistence_failure", err.Error())
 		}
 		return err
@@ -294,14 +294,6 @@ func (h *handler) processQueuedJob(ctx context.Context, riverJob *river.Job[JobA
 		_ = h.connections.MarkUsed(ctx, job.userID, job.selection.Provider)
 	}
 	return nil
-}
-
-func preserveJobTemplate(document map[string]any, job streamJob) {
-	if job.template == nil {
-		delete(document, "template")
-		return
-	}
-	document["template"] = job.template.Document()
 }
 
 func (h *handler) loadGenerationJob(ctx context.Context, jobID string) (generationJobRecord, error) {
@@ -424,7 +416,7 @@ func (h *handler) finalizeQueuedFailure(ctx context.Context, record generationJo
 	return tx.Commit()
 }
 
-func (h *handler) completeQueuedJob(ctx context.Context, riverJob *river.Job[JobArgs], record generationJobRecord, job streamJob, completed []byte, document map[string]any, title string, charged int64, providerTokens int, prepared ...presentationrevision.Revision) error {
+func (h *handler) completeQueuedJob(ctx context.Context, riverJob *river.Job[JobArgs], record generationJobRecord, job streamJob, completed []byte, document map[string]any, title string, charged int64, providerTokens int) error {
 	tx, err := h.database.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -461,14 +453,6 @@ func (h *handler) completeQueuedJob(ctx context.Context, riverJob *river.Job[Job
 	if err != nil {
 		return err
 	}
-	if len(prepared) != 1 {
-		return fmt.Errorf("canonical revision is required")
-	}
-	committed, err := presentationrevision.CommitRevisionTx(ctx, tx, presentationrevision.RevisionNumber(job.pptxRevision), prepared[0])
-	if err != nil {
-		return err
-	}
-	document["currentRevision"] = presentationrevision.Snapshot(committed.Revision)
 	total := 3
 	if job.kind == "generation" {
 		total = 4
