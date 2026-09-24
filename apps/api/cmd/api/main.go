@@ -101,9 +101,6 @@ func main() {
 	generation.RegisterRoutes(mux, database, func(_ context.Context, request *http.Request) (string, error) {
 		return identity(request)
 	}, ai.ConnectionService{DB: database}, generation.RouteConfig{StreamContext: streamContext, Research: researchService})
-	if err := registerDocumentRoutes(mux, database, service); err != nil {
-		fatal(logger, err)
-	}
 	if templateasset.CDNConfigured() {
 		thumbnails, err := templateasset.NewCDNFetcherFromEnv()
 		if err != nil {
