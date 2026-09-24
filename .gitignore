@@ -45,7 +45,6 @@ TODO.md
 apps/api/api
 apps/api/worker
 apps/api/migrate
-apps/api/publish-templates
 
 # Release binaries compiled for the container images
 /dist
