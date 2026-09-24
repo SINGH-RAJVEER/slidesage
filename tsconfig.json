@@ -9,6 +9,7 @@
 		"moduleResolution": "bundler",
 		"paths": {
 			"@slidesage/types": ["./libs/types/src/index.ts"],
+			"@slidesage/cards": ["./libs/cards/src/index.ts"],
 			"@slidesage/ui": ["./libs/ui/index.ts"],
 			"@slidesage/ui/components/*": ["./libs/ui/components/*"],
 			"@slidesage/ui/hooks/*": ["./libs/ui/hooks/*"],
