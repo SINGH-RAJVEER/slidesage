@@ -94,6 +94,22 @@
 				failure_threshold = 30;
 			};
 		};
+		converter = {
+			exec = "bun src/main.ts";
+			cwd = "apps/converter";
+			ready = {
+				http.get = {
+					host = "127.0.0.1";
+					port = 8090;
+					path = "/health";
+				};
+				initial_delay = 1;
+				period = 1;
+				probe_timeout = 3;
+				success_threshold = 1;
+				failure_threshold = 30;
+			};
+		};
 		api = {
 			exec = ''
 				DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" go run ./cmd/api
@@ -118,7 +134,7 @@
 					go run ./cmd/worker
 			'';
 			cwd = "apps/api";
-			after = [ "db:migrate" ];
+			after = [ "db:migrate" "devenv:processes:converter" ];
 			ready = {
 				http.get = {
 					port = 8080;
@@ -165,6 +181,7 @@
 
 		STORAGE_EMULATOR_HOST = "http://127.0.0.1:4443";
 		PRESENTATION_GCS_BUCKET = "slidesage-dev-revisions";
+		CARD_CONVERTER_URL = "http://127.0.0.1:8090";
 		EDITOR_WHITE_LABEL = "true";
 		EDITOR_CONNECTOR = "true";
     };

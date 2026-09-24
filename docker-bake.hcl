@@ -62,3 +62,15 @@ target "migrate" {
 		"${image("migrate")}:latest",
 	]
 }
+
+# The card converter is not in the default group yet: production has no
+# service to deploy it to. Build it explicitly with `docker buildx bake converter`.
+target "converter" {
+	context    = "."
+	dockerfile = "apps/converter/Dockerfile"
+	target     = "converter"
+	tags = [
+		"${image("converter")}:${IMAGE_VERSION}",
+		"${image("converter")}:latest",
+	]
+}

@@ -58,6 +58,15 @@ binaries:
 			-o "$PWD/dist/$component" "./cmd/$component"; \
 	done
 
+# Bundle the card converter into the file its container image copies in
+converter-bundle:
+	mkdir -p dist
+	bun build apps/converter/src/main.ts --target bun --outfile dist/converter.js
+
+# Run the card converter only
+converter:
+	bun run dev:converter
+
 # Build a container image from the repo root context. Run `just binaries` first.
 image target="api": binaries
 	docker build --target {{target}} --file apps/api/Dockerfile --tag slidesage-{{target}} .
