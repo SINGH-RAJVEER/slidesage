@@ -13,6 +13,10 @@ export const DRAFT_NODE_SHAPES = {
 	stat: { type: "stat", value: "string, e.g. 42% or $3.1B", label: "string" },
 	steps: { type: "steps", items: [{ title: "string", detail: "optional string" }] },
 	columns: { type: "columns", columns: [{ heading: "string", items: ["string"] }] },
+	image: {
+		type: "image",
+		note: "Never write image nodes. For a layout that holds an image, the image node is added for you; draft only the text nodes.",
+	},
 } as const;
 
 export const DRAFT_CARD_SHAPE = {

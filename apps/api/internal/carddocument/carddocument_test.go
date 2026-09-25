@@ -55,7 +55,7 @@ func (store *memoryStore) OpenObject(_ context.Context, key string) (io.ReadClos
 	return io.NopCloser(bytes.NewReader(contents)), nil
 }
 
-const sampleDocument = `{"schemaVersion": 1, "title": "Grid storage", "theme": "slate",
+const sampleDocument = `{"schemaVersion": 2, "title": "Grid storage", "theme": "slate",
 	"cardOrder": ["c_aaaaaaaa"], "cards": {"c_aaaaaaaa": {}}}`
 
 func prepareInput() PrepareInput {
@@ -75,7 +75,7 @@ func TestPrepareStoresACompactContentAddressedObject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if revision.CardCount != 1 || revision.SchemaVersion != 1 {
+	if revision.CardCount != 1 || revision.SchemaVersion != 2 {
 		t.Fatalf("revision = %+v", revision)
 	}
 	if revision.ObjectKey != "presentations/presentation-1/cards/"+revision.SHA256+".json" {
@@ -97,8 +97,8 @@ func TestPrepareStoresACompactContentAddressedObject(t *testing.T) {
 
 func TestPrepareRefusesOtherSchemaVersionsAndEmptyDocuments(t *testing.T) {
 	for _, document := range []string{
-		`{"schemaVersion": 2, "cardOrder": ["c_aaaaaaaa"]}`,
-		`{"schemaVersion": 1, "cardOrder": []}`,
+		`{"schemaVersion": 3, "cardOrder": ["c_aaaaaaaa"]}`,
+		`{"schemaVersion": 2, "cardOrder": []}`,
 		`not json`,
 	} {
 		input := prepareInput()
@@ -140,7 +140,7 @@ func TestConverterClassifiesFailures(t *testing.T) {
 	ctx := context.Background()
 
 	results, err := converter.ConvertCards(ctx, "op", nil, []DraftInput{{Position: 1, Takeaway: "t", Role: "evidence", Draft: json.RawMessage(`{}`)}})
-	if err != nil || results[0].Issue == nil || results[0].Issue.Path != "card.layout" || header != "1" {
+	if err != nil || results[0].Issue == nil || results[0].Issue.Path != "card.layout" || header != "2" {
 		t.Fatalf("results = %+v, err = %v, header = %q", results, err, header)
 	}
 

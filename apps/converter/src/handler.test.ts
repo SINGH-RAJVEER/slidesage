@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { handle, SCHEMA_VERSION_HEADER } from "./handler";
 
-function post(path: string, body: unknown, version = "1") {
+function post(path: string, body: unknown, version = "2") {
 	return handle(
 		new Request(`http://converter${path}`, {
 			method: "POST",
@@ -19,18 +19,18 @@ const draft = {
 describe("converter", () => {
 	it("reports health with its schema version", async () => {
 		const response = await handle(new Request("http://converter/health"));
-		expect(await response.json()).toEqual({ status: "ok", schemaVersion: 1 });
+		expect(await response.json()).toEqual({ status: "ok", schemaVersion: 2 });
 	});
 
 	it("serves the drafting schema its caller builds prompts from", async () => {
 		const response = await handle(new Request("http://converter/v1/schema"));
 		const body = (await response.json()) as { schemaVersion: number; layouts: object };
-		expect(body.schemaVersion).toBe(1);
+		expect(body.schemaVersion).toBe(2);
 		expect(Object.keys(body.layouts)).toContain("comparison");
 	});
 
 	it("refuses a caller built against another schema version", async () => {
-		const response = await post("/v1/cards", {}, "2");
+		const response = await post("/v1/cards", {}, "1");
 		expect(response.status).toBe(409);
 	});
 

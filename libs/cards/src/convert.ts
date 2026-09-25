@@ -24,6 +24,8 @@ export interface ConvertCardsRequest {
 	operationId: string;
 	/** Research source IDs the cards may cite. */
 	sourceIds: string[];
+	/** Stored image assets the cards may show. */
+	assetIds?: string[];
 	cards: CardDraftInput[];
 }
 
@@ -186,6 +188,19 @@ class DraftReader {
 				});
 				return { id, type, columns };
 			}
+			case "image": {
+				// Image nodes are placed by the drafter, not the model, so the asset
+				// ID is taken verbatim and checked against the known assets on parse.
+				const node: Record<string, unknown> = {
+					id: this.nextID("n"),
+					type,
+					assetId: raw["assetId"],
+					alt: typeof raw["alt"] === "string" ? cleanText(raw["alt"]) : raw["alt"],
+					fit: raw["fit"] ?? "cover",
+				};
+				if (raw["focus"] !== undefined) node["focus"] = raw["focus"];
+				return node;
+			}
 			default:
 				throw new SchemaError({
 					path: `${path}.type`,
@@ -199,6 +214,7 @@ function convertOne(
 	input: CardDraftInput,
 	operationId: string,
 	knownSources: ReadonlySet<string>,
+	knownAssets: ReadonlySet<string>,
 ): Card {
 	const reader = new DraftReader(operationId, input.position);
 	const draft = reader.object(input.draft, "card");
@@ -215,7 +231,7 @@ function convertOne(
 	if (typeof draft["notes"] === "string" && cleanText(draft["notes"]) !== "") {
 		candidate["notes"] = cleanText(draft["notes"]);
 	}
-	return parseCard(candidate, "card", { seen: new Set(), knownSources });
+	return parseCard(candidate, "card", { seen: new Set(), knownSources, knownAssets });
 }
 
 /**
@@ -224,11 +240,12 @@ function convertOne(
  */
 export function convertCards(request: ConvertCardsRequest): CardResult[] {
 	const knownSources = new Set(request.sourceIds);
+	const knownAssets = new Set(request.assetIds ?? []);
 	return request.cards.map((input) => {
 		try {
 			return {
 				position: input.position,
-				card: convertOne(input, request.operationId, knownSources),
+				card: convertOne(input, request.operationId, knownSources, knownAssets),
 			};
 		} catch (error) {
 			if (error instanceof SchemaError) return { position: input.position, issue: error.issue };
@@ -241,15 +258,20 @@ export interface AssembleDocumentRequest {
 	title: string;
 	theme: ThemeId;
 	cards: Card[];
+	/** Stored image assets the document may show. */
+	assetIds?: string[];
 }
 
 /** Assembles converted cards in order and validates the whole document. */
 export function assembleDocument(request: AssembleDocumentRequest): CardDocument {
-	return parseCardDocument({
-		schemaVersion: CARD_SCHEMA_VERSION,
-		title: cleanText(request.title),
-		theme: request.theme,
-		cardOrder: request.cards.map((card) => card.id),
-		cards: Object.fromEntries(request.cards.map((card) => [card.id, card])),
-	});
+	return parseCardDocument(
+		{
+			schemaVersion: CARD_SCHEMA_VERSION,
+			title: cleanText(request.title),
+			theme: request.theme,
+			cardOrder: request.cards.map((card) => card.id),
+			cards: Object.fromEntries(request.cards.map((card) => [card.id, card])),
+		},
+		{ knownAssets: new Set(request.assetIds ?? []) },
+	);
 }

@@ -59,6 +59,12 @@ function requireArray(value: unknown, field: string): unknown[] {
 	return value;
 }
 
+function stringList(value: unknown, field: string): string[] {
+	return requireArray(value ?? [], field).map((item, index) =>
+		requireString(item, `${field}[${index}]`),
+	);
+}
+
 function draftInputs(value: unknown): CardDraftInput[] {
 	return requireArray(value, "cards").map((raw, index) => {
 		if (typeof raw !== "object" || raw === null) {
@@ -89,6 +95,7 @@ async function convert(request: Request): Promise<Response> {
 		sourceIds: requireArray(body["sourceIds"] ?? [], "sourceIds").map((id, index) =>
 			requireString(id, `sourceIds[${index}]`),
 		),
+		assetIds: stringList(body["assetIds"], "assetIds"),
 		cards: draftInputs(body["cards"]),
 	});
 	return json(200, { schemaVersion: CARD_SCHEMA_VERSION, results });
@@ -103,6 +110,7 @@ async function assemble(request: Request): Promise<Response> {
 			title: requireString(body["title"], "title"),
 			theme: theme as ThemeId,
 			cards: requireArray(body["cards"], "cards") as Card[],
+			assetIds: stringList(body["assetIds"], "assetIds"),
 		});
 		return json(200, { schemaVersion: CARD_SCHEMA_VERSION, document });
 	} catch (error) {

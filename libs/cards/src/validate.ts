@@ -9,6 +9,7 @@ import {
 	LIMITS,
 	type ListItem,
 	NARRATIVE_ROLES,
+	READABLE_SCHEMA_VERSIONS,
 	type RichText,
 	type Step,
 	type TextRun,
@@ -116,7 +117,21 @@ function listItems(value: unknown, path: string, seen: Set<string>): ListItem[] 
 	});
 }
 
-function node(value: unknown, path: string, seen: Set<string>): ContentNode {
+const ASSET_ID_PATTERN = /^[0-9a-f]{64}$/;
+
+function fraction(value: unknown, path: string): number {
+	if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
+		fail(path, "must be a number from 0 to 1");
+	}
+	return value;
+}
+
+function node(
+	value: unknown,
+	path: string,
+	seen: Set<string>,
+	knownAssets?: ReadonlySet<string>,
+): ContentNode {
 	const type = (value as { type?: unknown } | null)?.type;
 	switch (type) {
 		case "heading":
@@ -189,6 +204,31 @@ function node(value: unknown, path: string, seen: Set<string>): ContentNode {
 			});
 			return { id: nodeID, type, columns };
 		}
+		case "image": {
+			const raw = record(value, path, ["id", "type", "assetId", "alt", "fit", "focus"]);
+			const assetId = raw["assetId"];
+			if (typeof assetId !== "string" || !ASSET_ID_PATTERN.test(assetId)) {
+				fail(`${path}.assetId`, "is not an asset ID");
+			}
+			if (knownAssets && !knownAssets.has(assetId)) {
+				fail(`${path}.assetId`, `names an asset this presentation does not have`);
+			}
+			const result: ContentNode = {
+				id: id(raw["id"], `${path}.id`, seen),
+				type,
+				assetId,
+				alt: text(raw["alt"], `${path}.alt`, LIMITS.imageAlt),
+				fit: oneOf(raw["fit"], `${path}.fit`, ["cover", "contain"] as const),
+			};
+			if (raw["focus"] !== undefined) {
+				const focus = record(raw["focus"], `${path}.focus`, ["x", "y"]);
+				result.focus = {
+					x: fraction(focus["x"], `${path}.focus.x`),
+					y: fraction(focus["y"], `${path}.focus.y`),
+				};
+			}
+			return result;
+		}
 		default:
 			fail(`${path}.type`, `unsupported node type ${JSON.stringify(type)}`);
 	}
@@ -218,6 +258,8 @@ function sourceIds(value: unknown, path: string, known?: ReadonlySet<string>): s
 export interface CardContext {
 	/** Every ID already used in the document. The card's IDs are added to it. */
 	seen: Set<string>;
+	/** Asset IDs the card may show. Absent means any well-formed ID is accepted. */
+	knownAssets?: ReadonlySet<string>;
 	/** Source IDs the card may cite. Absent means any well-formed ID is accepted. */
 	knownSources?: ReadonlySet<string>;
 }
@@ -238,7 +280,7 @@ export function parseCard(value: unknown, path: string, context: CardContext): C
 		role: oneOf(raw["role"], `${path}.role`, NARRATIVE_ROLES),
 		layout: oneOf(raw["layout"], `${path}.layout`, LAYOUTS),
 		nodes: array(raw["nodes"], `${path}.nodes`).map((rawNode, index) =>
-			node(rawNode, `${path}.nodes[${index}]`, context.seen),
+			node(rawNode, `${path}.nodes[${index}]`, context.seen, context.knownAssets),
 		),
 		sourceIds: sourceIds(raw["sourceIds"], `${path}.sourceIds`, context.knownSources),
 	};
@@ -248,18 +290,29 @@ export function parseCard(value: unknown, path: string, context: CardContext): C
 	return card;
 }
 
-/** Checks an unknown value against the version 1 card document schema. */
-export function parseCardDocument(value: unknown): CardDocument {
+export interface DocumentOptions {
+	/** Asset IDs the document may show. Absent means any well-formed ID is accepted. */
+	knownAssets?: ReadonlySet<string>;
+}
+
+/**
+ * Checks an unknown value against the card document schema and returns it as
+ * the current version. A version 1 document is upgraded on read: version 2
+ * only added node types and layouts, so its content is already valid version 2.
+ * Stored bytes are never rewritten; the next save writes version 2.
+ */
+export function parseCardDocument(value: unknown, options: DocumentOptions = {}): CardDocument {
 	const raw = record(value, "document", ["schemaVersion", "title", "theme", "cardOrder", "cards"]);
-	if (raw["schemaVersion"] !== CARD_SCHEMA_VERSION) {
-		fail("document.schemaVersion", `must be ${CARD_SCHEMA_VERSION}`);
+	const version = raw["schemaVersion"];
+	if (!READABLE_SCHEMA_VERSIONS.includes(version as (typeof READABLE_SCHEMA_VERSIONS)[number])) {
+		fail("document.schemaVersion", `must be one of ${READABLE_SCHEMA_VERSIONS.join(", ")}`);
 	}
 	const order = array(raw["cardOrder"], "document.cardOrder");
 	if (order.length < LIMITS.cards.min || order.length > LIMITS.cards.max) {
 		fail("document.cardOrder", `must hold ${LIMITS.cards.min}-${LIMITS.cards.max} cards`);
 	}
 	const cardsRaw = record(raw["cards"], "document.cards", order.map(String));
-	const context: CardContext = { seen: new Set() };
+	const context: CardContext = { seen: new Set(), knownAssets: options.knownAssets };
 	const cards: Record<string, Card> = {};
 	const cardOrder: string[] = [];
 	for (const [index, cardID] of order.entries()) {
@@ -279,9 +332,12 @@ export function parseCardDocument(value: unknown): CardDocument {
 	};
 }
 
-export function validateCardDocument(value: unknown): Validated<CardDocument> {
+export function validateCardDocument(
+	value: unknown,
+	options: DocumentOptions = {},
+): Validated<CardDocument> {
 	try {
-		return { ok: true, value: parseCardDocument(value) };
+		return { ok: true, value: parseCardDocument(value, options) };
 	} catch (error) {
 		if (error instanceof SchemaError) return { ok: false, issue: error.issue };
 		throw error;

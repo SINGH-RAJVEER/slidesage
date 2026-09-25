@@ -16,7 +16,7 @@ import (
 
 // SchemaVersion is the card document schema this build reads and writes. The
 // converter refuses requests for any other version.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 const ContentType = "application/json"
 

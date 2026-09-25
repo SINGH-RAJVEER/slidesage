@@ -185,7 +185,7 @@ func TestCardDrafterPlansDraftsRepairsAndStores(t *testing.T) {
 		if err := json.Unmarshal(contents, &document); err != nil {
 			t.Fatal(err)
 		}
-		if document.SchemaVersion != 1 || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
+		if document.SchemaVersion != 2 || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
 			t.Fatalf("stored document = %s", contents)
 		}
 	}

@@ -1,11 +1,17 @@
 /**
- * Version 1 of the card document: the authoritative, editable presentation.
+ * Version 2 of the card document: the authoritative, editable presentation.
  *
  * Content nodes carry stable IDs so edits address them directly rather than
  * by array position. Layout and theme are named choices from fixed lists, so
  * nothing in a document can inject styling or script.
+ *
+ * Version 2 adds image nodes and the layouts that hold them. Version 1
+ * documents are still read and are upgraded on read; only version 2 is written.
  */
-export const CARD_SCHEMA_VERSION = 1;
+export const CARD_SCHEMA_VERSION = 2;
+
+/** Schema versions this build can read. */
+export const READABLE_SCHEMA_VERSIONS = [1, 2] as const;
 
 export const THEMES = ["slate", "paper", "ember"] as const;
 export type ThemeId = (typeof THEMES)[number];
@@ -30,6 +36,9 @@ export const LAYOUTS = [
 	"process",
 	"quote",
 	"stats",
+	"image-left",
+	"image-right",
+	"cover",
 ] as const;
 export type LayoutId = (typeof LAYOUTS)[number];
 
@@ -103,7 +112,25 @@ export interface ColumnsNode {
 	columns: Column[];
 }
 
+/**
+ * An image the server stored for this presentation. The document holds only
+ * the asset's digest; dimensions, format, and attribution live on the server,
+ * which also checks that every referenced asset belongs to the presentation.
+ */
+export interface ImageNode {
+	id: string;
+	type: "image";
+	/** SHA-256 of the stored image. */
+	assetId: string;
+	alt: string;
+	/** "cover" fills the frame and crops around the focus; "contain" letterboxes. */
+	fit: "cover" | "contain";
+	/** Crop focus as fractions of width and height, 0.5 each by default. */
+	focus?: { x: number; y: number };
+}
+
 export type ContentNode =
+	| ImageNode
 	| HeadingNode
 	| ParagraphNode
 	| BulletsNode
@@ -149,5 +176,6 @@ export const LIMITS = {
 	stepTitle: 60,
 	stepDetail: 200,
 	columnHeading: 40,
+	imageAlt: 200,
 	sourceIds: 8,
 } as const;

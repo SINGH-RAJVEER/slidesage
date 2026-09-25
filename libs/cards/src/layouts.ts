@@ -10,6 +10,10 @@ export interface LayoutRule {
 	nodes: Partial<Record<ContentNodeType, Bounds>>;
 	/** Item counts for list-like nodes, so a layout never receives more than it can show. */
 	items?: Bounds;
+	/** At least one node of these types must be present. */
+	requireOneOf?: ContentNodeType[];
+	/** Whether the layout shows an image, so drafting resolves one for it. */
+	image?: boolean;
 	description: string;
 }
 
@@ -60,6 +64,42 @@ export const LAYOUT_RULES: Record<LayoutId, LayoutRule> = {
 		},
 		description: "Heading, two to four headline figures with labels, and an optional paragraph.",
 	},
+	"image-left": {
+		nodes: {
+			image: { min: 1, max: 1 },
+			heading: { min: 1, max: 1 },
+			paragraph: { min: 0, max: 1 },
+			bullets: { min: 0, max: 1 },
+		},
+		items: { min: 2, max: 4 },
+		requireOneOf: ["paragraph", "bullets"],
+		image: true,
+		description:
+			"Photo on the left half; heading with a short paragraph or two to four bullets on the right.",
+	},
+	"image-right": {
+		nodes: {
+			image: { min: 1, max: 1 },
+			heading: { min: 1, max: 1 },
+			paragraph: { min: 0, max: 1 },
+			bullets: { min: 0, max: 1 },
+		},
+		items: { min: 2, max: 4 },
+		requireOneOf: ["paragraph", "bullets"],
+		image: true,
+		description:
+			"Heading with a short paragraph or two to four bullets on the left; photo on the right half.",
+	},
+	cover: {
+		nodes: {
+			image: { min: 1, max: 1 },
+			heading: { min: 1, max: 1 },
+			paragraph: { min: 0, max: 1 },
+		},
+		image: true,
+		description:
+			"Full-bleed photo behind a large heading and optional subtitle. For openings, section breaks, and closings.",
+	},
 };
 
 export const COMPARISON_COLUMNS = { min: 2, max: 3 } as const;
@@ -98,6 +138,9 @@ export function layoutMismatch(layout: LayoutId, nodes: ContentNode[]): string |
 			}
 		}
 	}
+	if (rule.requireOneOf && !rule.requireOneOf.some((type) => counts.has(type))) {
+		return `layout "${layout}" needs a ${rule.requireOneOf.join(" or ")} node`;
+	}
 	for (const [type, bounds] of Object.entries(rule.nodes) as [ContentNodeType, Bounds][]) {
 		const count = counts.get(type) ?? 0;
 		if (count < bounds.min || count > bounds.max) {
@@ -107,3 +150,8 @@ export function layoutMismatch(layout: LayoutId, nodes: ContentNode[]): string |
 	}
 	return null;
 }
+
+/** Layouts that hold an image. */
+export const IMAGE_LAYOUTS = (Object.keys(LAYOUT_RULES) as LayoutId[]).filter(
+	(layout) => LAYOUT_RULES[layout].image,
+);
