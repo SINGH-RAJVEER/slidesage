@@ -86,3 +86,85 @@ describe("CardDeck", () => {
 		expect(citation).toHaveAttribute("rel", "noreferrer noopener");
 	});
 });
+
+describe("image cards", () => {
+	const assetId = "b".repeat(64);
+	const results = convertCards({
+		operationId: "images",
+		sourceIds: [],
+		assetIds: [assetId],
+		cards: [
+			{
+				position: 1,
+				takeaway: "Storage at scale",
+				role: "evidence",
+				draft: {
+					layout: "image-right",
+					nodes: [
+						{ type: "image", assetId, alt: "Battery racks" },
+						{ type: "heading", text: "Storage at scale" },
+						{ type: "paragraph", text: "Warehouses of cells back up the grid." },
+					],
+				},
+			},
+			{
+				position: 2,
+				takeaway: "A new grid",
+				role: "closing",
+				draft: {
+					layout: "cover",
+					nodes: [
+						{ type: "image", assetId, alt: "City at night" },
+						{ type: "heading", text: "A new grid" },
+					],
+				},
+			},
+		],
+	});
+	const imageCards = results.map((result) => {
+		if (!("card" in result)) throw new Error(result.issue.message);
+		return result.card;
+	});
+
+	it("shows the stored photo with its credit", () => {
+		const document = assembleDocument({
+			title: "Grid storage",
+			theme: "slate",
+			cards: imageCards,
+			assetIds: [assetId],
+		});
+		const view = render(
+			<CardDeck
+				document={document}
+				assetUrl={(id) => `/assets/${id}`}
+				assets={{
+					[assetId]: {
+						mimeType: "image/jpeg",
+						width: 1600,
+						height: 900,
+						source: {
+							type: "stock",
+							provider: "pexels",
+							photographer: "Ada",
+							photographerUrl: "https://www.pexels.com/@ada",
+							pageUrl: "https://www.pexels.com/photo/1",
+						},
+					},
+				}}
+			/>,
+		);
+
+		const photo = view.getByRole("img", { name: "Battery racks" });
+		expect(photo).toHaveAttribute("src", `/assets/${assetId}`);
+		expect(photo).toHaveStyle({ objectFit: "cover" });
+		expect(view.getAllByRole("link", { name: "Pexels" })[0]).toHaveAttribute(
+			"href",
+			"https://www.pexels.com/photo/1",
+		);
+		const [split, cover] = view.getAllByRole("article");
+		expect(split).toHaveAttribute("data-layout", "image-right");
+		expect(
+			within(cover as HTMLElement).getByRole("img", { name: "City at night" }),
+		).toBeInTheDocument();
+	});
+});

@@ -3,6 +3,7 @@ import type {
 	Card,
 	ColumnsNode,
 	ContentNode,
+	ImageNode,
 	QuoteNode,
 	RichText,
 	StatNode,
@@ -218,6 +219,24 @@ function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 					))}
 				</div>
 			);
+		case "image-left":
+		case "image-right":
+			return (
+				<div className="flex flex-1 flex-col justify-center gap-[2.4cqw]">
+					<Heading card={card} theme={theme} />
+					{nodesOf(card, "bullets").map((node) => (
+						<Bullets key={node.id} node={node} theme={theme} />
+					))}
+					<Paragraphs card={card} theme={theme} />
+				</div>
+			);
+		case "cover":
+			return (
+				<div className="flex flex-1 flex-col justify-end gap-[1.6cqw]">
+					<Heading card={card} theme={theme} large />
+					<Paragraphs card={card} theme={theme} large />
+				</div>
+			);
 		case "stats":
 			return (
 				<div className="flex flex-1 flex-col justify-center gap-[3.4cqw]">
@@ -229,6 +248,20 @@ function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 	}
 }
 
+/** What the server knows about a stored image. */
+export interface CardAsset {
+	mimeType: string;
+	width: number;
+	height: number;
+	source?: {
+		type?: string;
+		provider?: string;
+		photographer?: string;
+		photographerUrl?: string;
+		pageUrl?: string;
+	};
+}
+
 export interface CardViewProps {
 	card: Card;
 	theme: CardTheme;
@@ -236,6 +269,72 @@ export interface CardViewProps {
 	position: number;
 	/** Maps a card's source IDs to their citation numbers and links. */
 	sources?: Record<string, { number: number; url: string; title?: string }>;
+	/** Stored images the document shows, keyed by asset ID. */
+	assets?: Record<string, CardAsset>;
+	/** Resolves an asset ID to the URL that serves it. */
+	assetUrl?: (assetId: string) => string;
+}
+
+/** The theme a cover card's text uses over its photo, whatever the deck theme. */
+const COVER_TEXT: CardTheme = {
+	surface: "",
+	heading: "text-white",
+	body: "text-white/85",
+	muted: "text-white/60",
+	accent: "text-white",
+	rule: "border-white/20",
+};
+
+function CardImage({
+	node,
+	assetUrl,
+	className,
+}: {
+	node: ImageNode;
+	assetUrl?: (assetId: string) => string;
+	className?: string;
+}) {
+	const focus = node.focus ?? { x: 0.5, y: 0.5 };
+	if (!assetUrl) return null;
+	return (
+		<img
+			data-node-id={node.id}
+			src={assetUrl(node.assetId)}
+			alt={node.alt}
+			loading="lazy"
+			decoding="async"
+			draggable={false}
+			className={cn("h-full w-full", className)}
+			style={{ objectFit: node.fit, objectPosition: `${focus.x * 100}% ${focus.y * 100}%` }}
+		/>
+	);
+}
+
+/** Photo credit in the form the stock provider asks for. */
+function Attribution({ asset, className }: { asset?: CardAsset; className?: string }) {
+	const source = asset?.source;
+	if (!source || source.type !== "stock" || !source.photographer) return null;
+	const provider = source.provider === "pexels" ? "Pexels" : source.provider;
+	return (
+		<span className={className}>
+			Photo by{" "}
+			{source.photographerUrl ? (
+				<a href={source.photographerUrl} target="_blank" rel="noreferrer noopener" className="underline-offset-2 hover:underline">
+					{source.photographer}
+				</a>
+			) : (
+				source.photographer
+			)}{" "}
+			on{" "}
+			{source.pageUrl ? (
+				<a href={source.pageUrl} target="_blank" rel="noreferrer noopener" className="underline-offset-2 hover:underline">
+					{provider}
+				</a>
+			) : (
+				provider
+			)}
+		</span>
+	);
 }
 
 /**
@@ -244,53 +343,92 @@ export interface CardViewProps {
  * cropped. `data-overflows-slide` marks a card taller than one slide, which
  * PPTX export must split or refuse rather than crop.
  */
-export function CardView({ card, theme, position, sources }: CardViewProps) {
+export function CardView({ card, theme, position, sources, assets, assetUrl }: CardViewProps) {
 	const cited = card.sourceIds.flatMap((id) => (sources?.[id] ? [sources[id]] : []));
 	const articleRef = useRef<HTMLElement>(null);
 	const [overflows, setOverflows] = useState(false);
+	const [image] = nodesOf(card, "image");
+	const asset = image ? assets?.[image.assetId] : undefined;
+	const split = card.layout === "image-left" || card.layout === "image-right";
+	const cover = card.layout === "cover";
+	const textTheme = cover ? COVER_TEXT : theme;
 
 	useLayoutEffect(() => {
 		const article = articleRef.current;
 		if (!article || typeof ResizeObserver === "undefined") return undefined;
-		const measure = () => setOverflows(article.offsetHeight > Math.ceil((article.offsetWidth * 9) / 16) + 1);
+		const measure = () =>
+			setOverflows(article.offsetHeight > Math.ceil((article.offsetWidth * 9) / 16) + 1);
 		const observer = new ResizeObserver(measure);
 		observer.observe(article);
 		measure();
 		return () => observer.disconnect();
 	}, []);
 
+	const footer = (
+		<footer className={cn("flex items-end justify-between gap-[2cqw] text-[1.1cqw]", textTheme.muted)}>
+			<span className="flex flex-wrap gap-[0.8cqw]">
+				{cited.map((source) => (
+					<a
+						key={source.number}
+						href={source.url}
+						target="_blank"
+						rel="noreferrer noopener"
+						title={source.title ?? source.url}
+						className="underline-offset-2 hover:underline"
+					>
+						[{source.number}]
+					</a>
+				))}
+				<Attribution asset={asset} />
+			</span>
+			<span className="tabular-nums">{position}</span>
+		</footer>
+	);
+
 	return (
 		<div className="@container w-full">
 			<article
 				ref={articleRef}
 				data-card-id={card.id}
+				data-layout={card.layout}
 				data-overflows-slide={overflows || undefined}
 				aria-label={`Card ${position}: ${card.takeaway}`}
 				className={cn(
-					"flex min-h-[56.25cqw] w-full flex-col rounded-[1.2cqw] px-[6cqw] pt-[5cqw] pb-[2.2cqw]",
+					"relative flex min-h-[56.25cqw] w-full overflow-hidden rounded-[1.2cqw]",
+					split ? (card.layout === "image-right" ? "flex-row-reverse" : "flex-row") : "flex-col",
+					!split && "px-[6cqw] pt-[5cqw] pb-[2.2cqw]",
 					theme.surface,
 				)}
 			>
-				<div className="flex flex-1 flex-col pb-[2.8cqw]">
-					<CardBody card={card} theme={theme} />
+				{cover && image && (
+					<>
+						<div className="absolute inset-0">
+							<CardImage node={image} assetUrl={assetUrl} />
+						</div>
+						<div
+							aria-hidden
+							className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/5"
+						/>
+					</>
+				)}
+				{split && image && (
+					<div className="relative w-1/2 shrink-0 self-stretch">
+						<div className="absolute inset-0">
+							<CardImage node={image} assetUrl={assetUrl} />
+						</div>
+					</div>
+				)}
+				<div
+					className={cn(
+						"relative flex flex-1 flex-col",
+						split && "px-[5cqw] pt-[5cqw] pb-[2.2cqw]",
+					)}
+				>
+					<div className="flex flex-1 flex-col pb-[2.8cqw]">
+						<CardBody card={card} theme={textTheme} />
+					</div>
+					{footer}
 				</div>
-				<footer className={cn("flex items-end justify-between text-[1.1cqw]", theme.muted)}>
-					<span className="flex gap-[0.8cqw]">
-						{cited.map((source) => (
-							<a
-								key={source.number}
-								href={source.url}
-								target="_blank"
-								rel="noreferrer noopener"
-								title={source.title ?? source.url}
-								className="underline-offset-2 hover:underline"
-							>
-								[{source.number}]
-							</a>
-						))}
-					</span>
-					<span className="tabular-nums">{position}</span>
-				</footer>
 			</article>
 		</div>
 	);

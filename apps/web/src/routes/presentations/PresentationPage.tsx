@@ -2,7 +2,7 @@ import { type CardDocument, validateCardDocument } from "@slidesage/cards";
 import type { ApiErrorResponse, PresentationResponse, Source } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
-import { CardDeck } from "@slidesage/ui/components/Cards";
+import { type CardAsset, CardDeck } from "@slidesage/ui/components/Cards";
 import { Progress } from "@slidesage/ui/components/progress";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { API_URL } from "@slidesage/ui/lib/api";
@@ -14,7 +14,12 @@ import { ROUTES } from "../../app/router/paths";
 type LoadState =
 	| { status: "loading" }
 	| { status: "generating" }
-	| { status: "ready"; document: CardDocument; sources: Source[] }
+	| {
+			status: "ready";
+			document: CardDocument;
+			sources: Source[];
+			assets: Record<string, CardAsset>;
+	  }
 	| { status: "error"; message: string };
 
 async function errorMessage(response: Response, fallback: string): Promise<string> {
@@ -59,15 +64,26 @@ export default function PresentationPage() {
 				});
 				return;
 			}
-			const body = (await documentResponse.json()) as { document: unknown };
+			const body = (await documentResponse.json()) as {
+				document: unknown;
+				assets?: Record<string, CardAsset>;
+			};
 			// The document is checked against the same schema the converter
 			// enforced, so a malformed object is reported rather than rendered.
-			const validated = validateCardDocument(body.document);
+			const assets = body.assets ?? {};
+			const validated = validateCardDocument(body.document, {
+				knownAssets: new Set(Object.keys(assets)),
+			});
 			if (!validated.ok) {
 				setState({ status: "error", message: "This presentation's saved document could not be read." });
 				return;
 			}
-			setState({ status: "ready", document: validated.value, sources: summary.sources ?? [] });
+			setState({
+				status: "ready",
+				document: validated.value,
+				sources: summary.sources ?? [],
+				assets,
+			});
 		} catch {
 			setState({ status: "error", message: "Unable to load the presentation. Check your connection." });
 		}
@@ -124,7 +140,14 @@ export default function PresentationPage() {
 				{state.status === "ready" && (
 					<>
 						<h1 className="text-2xl font-semibold text-white">{state.document.title}</h1>
-						<CardDeck document={state.document} sources={state.sources} />
+						<CardDeck
+							document={state.document}
+							sources={state.sources}
+							assets={state.assets}
+							assetUrl={(assetId) =>
+								`${API_URL}/presentations/${encodeURIComponent(presentationId)}/assets/${assetId}`
+							}
+						/>
 					</>
 				)}
 			</main>
