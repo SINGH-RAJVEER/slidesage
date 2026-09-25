@@ -133,6 +133,28 @@ func (converter *Converter) Assemble(ctx context.Context, title, theme string, c
 	return response.Document, nil, nil
 }
 
+// ValidateDocument checks an edited document and returns it normalized to the
+// current schema version. Only the listed assets may be shown. A document the
+// schema refuses is reported as an Issue rather than an error.
+func (converter *Converter) ValidateDocument(ctx context.Context, document json.RawMessage, assetIDs []string) (json.RawMessage, *Issue, error) {
+	if assetIDs == nil {
+		assetIDs = []string{}
+	}
+	var response struct {
+		Document json.RawMessage `json:"document"`
+		Issue    *Issue          `json:"issue"`
+	}
+	err := converter.do(ctx, http.MethodPost, "/v1/documents/validate", map[string]any{"document": document, "assetIds": assetIDs}, &response)
+	var converterErr *ConverterError
+	if errors.As(err, &converterErr) && converterErr.Status == http.StatusUnprocessableEntity {
+		return nil, response.Issue, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	return response.Document, nil, nil
+}
+
 func (converter *Converter) do(ctx context.Context, method, path string, body any, destination any) error {
 	var reader io.Reader
 	if body != nil {

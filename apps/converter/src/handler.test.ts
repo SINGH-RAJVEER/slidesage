@@ -79,4 +79,31 @@ describe("converter", () => {
 		const response = await post("/v1/cards", { operationId: "op", cards: [{ position: 0 }] });
 		expect(response.status).toBe(400);
 	});
+
+	it("validates an edited document against the presentation's assets", async () => {
+		const converted = await post("/v1/cards", {
+			operationId: "op-1",
+			cards: [{ position: 1, takeaway: "Opening", role: "opening", draft }],
+		});
+		const { results } = (await converted.json()) as { results: Array<{ card: unknown }> };
+		const assembled = await post("/v1/documents", {
+			title: "Grid storage",
+			theme: "slate",
+			cards: results.map((result) => result.card),
+		});
+		const { document } = (await assembled.json()) as { document: Record<string, unknown> };
+
+		const valid = await post("/v1/documents/validate", {
+			document: { ...document, theme: "paper" },
+		});
+		expect(valid.status).toBe(200);
+
+		const invalid = await post("/v1/documents/validate", {
+			document: { ...document, theme: "neon" },
+		});
+		expect(invalid.status).toBe(422);
+		expect(((await invalid.json()) as { issue: { path: string } }).issue.path).toBe(
+			"document.theme",
+		);
+	});
 });

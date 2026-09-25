@@ -115,7 +115,7 @@
 				DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" go run ./cmd/api
 			'';
 			cwd = "apps/api";
-			after = [ "db:migrate" ];
+			after = [ "db:migrate" "devenv:processes:converter" ];
 			ready = {
 				http.get = {
 					port = 8000;

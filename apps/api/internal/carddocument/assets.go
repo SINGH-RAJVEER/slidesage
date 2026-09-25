@@ -200,6 +200,24 @@ func AssetsFor(ctx context.Context, database rowsQuerier, presentationID string,
 	return assets, rows.Err()
 }
 
+// AssetIDsFor lists every asset recorded for a presentation.
+func AssetIDsFor(ctx context.Context, database rowsQuerier, presentationID string) ([]string, error) {
+	rows, err := database.QueryContext(ctx, `SELECT sha256 FROM card_assets WHERE presentation_id = $1 ORDER BY sha256`, presentationID)
+	if err != nil {
+		return nil, fmt.Errorf("list image assets: %w", err)
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // ReferencedAssets lists the asset IDs a document's image nodes show.
 func ReferencedAssets(document json.RawMessage) ([]string, error) {
 	var shape struct {

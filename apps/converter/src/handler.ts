@@ -7,6 +7,7 @@ import {
 	draftingSchema,
 	NARRATIVE_ROLES,
 	type NarrativeRole,
+	parseCardDocument,
 	SchemaError,
 	THEMES,
 	type ThemeId,
@@ -122,6 +123,25 @@ async function assemble(request: Request): Promise<Response> {
 }
 
 /**
+ * Validates a whole edited document and returns it normalized to the current
+ * schema version. Only assets the caller lists may be shown.
+ */
+async function validateDocument(request: Request): Promise<Response> {
+	const body = await readBody(request);
+	try {
+		const document = parseCardDocument(body["document"], {
+			knownAssets: new Set(stringList(body["assetIds"], "assetIds")),
+		});
+		return json(200, { schemaVersion: CARD_SCHEMA_VERSION, document });
+	} catch (error) {
+		if (error instanceof SchemaError) {
+			return json(422, { schemaVersion: CARD_SCHEMA_VERSION, issue: error.issue });
+		}
+		throw error;
+	}
+}
+
+/**
  * Routes one request. Every conversion request names the schema version its
  * caller was built against; a mismatch is refused rather than converted into
  * a document the caller cannot read.
@@ -136,8 +156,12 @@ export async function handle(request: Request): Promise<Response> {
 			return json(200, draftingSchema());
 		}
 		if (request.method !== "POST") return json(404, { error: "not found" });
-		const route =
-			url.pathname === "/v1/cards" ? convert : url.pathname === "/v1/documents" ? assemble : null;
+		const routes: Record<string, (request: Request) => Promise<Response>> = {
+			"/v1/cards": convert,
+			"/v1/documents": assemble,
+			"/v1/documents/validate": validateDocument,
+		};
+		const route = routes[url.pathname];
 		if (!route) return json(404, { error: "not found" });
 		const version = request.headers.get(SCHEMA_VERSION_HEADER);
 		if (version !== String(CARD_SCHEMA_VERSION)) {

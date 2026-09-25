@@ -14,14 +14,18 @@ import (
 
 // Handler serves card documents to their owners.
 type Handler struct {
-	DB       *sql.DB
-	Store    ObjectStore
-	Identity func(*http.Request) (string, error)
+	DB    *sql.DB
+	Store ObjectStore
+	// Converter validates edited documents; without it the save route
+	// reports that editing is unavailable.
+	Converter *Converter
+	Identity  func(*http.Request) (string, error)
 }
 
 func RegisterRoutes(mux *http.ServeMux, handler Handler) {
 	mux.HandleFunc("GET /presentations/{id}/document", handler.current)
 	mux.HandleFunc("GET /presentations/{id}/assets/{sha256}", handler.asset)
+	mux.HandleFunc("PUT /presentations/{id}/document", handler.save)
 }
 
 func writeJSON(writer http.ResponseWriter, status int, value any) {

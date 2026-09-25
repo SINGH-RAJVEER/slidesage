@@ -15,7 +15,7 @@ import (
 // optional so a local API still boots without a bucket; the route then
 // reports that storage is not configured.
 func registerDocumentRoutes(mux *http.ServeMux, database *sql.DB, identity func(*http.Request) (string, error)) error {
-	handler := carddocument.Handler{DB: database, Identity: identity}
+	handler := carddocument.Handler{DB: database, Identity: identity, Converter: carddocument.ConverterFromEnv()}
 	if bucket := strings.TrimSpace(os.Getenv("PRESENTATION_GCS_BUCKET")); bucket != "" {
 		store, err := carddocument.NewGCSBlobStore(context.Background(), bucket)
 		if err != nil {
