@@ -56,6 +56,10 @@ func Prepare(ctx context.Context, store ObjectStore, input PrepareInput) (Revisi
 	if err != nil || input.Provenance == nil {
 		provenance = []byte(`{}`)
 	}
+	assetIDs, err := ReferencedAssets(compact.Bytes())
+	if err != nil {
+		return Revision{}, err
+	}
 	sum := sha256.Sum256(compact.Bytes())
 	digest := hex.EncodeToString(sum[:])
 	key := objectKey(input.PresentationID, digest)
@@ -73,6 +77,7 @@ func Prepare(ctx context.Context, store ObjectStore, input PrepareInput) (Revisi
 		OperationKind:  input.OperationKind,
 		OperationID:    input.OperationID,
 		Provenance:     provenance,
+		AssetIDs:       assetIDs,
 	}, nil
 }
 

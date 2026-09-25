@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -19,6 +21,7 @@ type Handler struct {
 
 func RegisterRoutes(mux *http.ServeMux, handler Handler) {
 	mux.HandleFunc("GET /presentations/{id}/document", handler.current)
+	mux.HandleFunc("GET /presentations/{id}/assets/{sha256}", handler.asset)
 }
 
 func writeJSON(writer http.ResponseWriter, status int, value any) {
@@ -62,7 +65,76 @@ func (handler Handler) current(writer http.ResponseWriter, request *http.Request
 		handler.fail(ctx, writer, "load card document", err)
 		return
 	}
-	writeJSON(writer, http.StatusOK, map[string]any{"revision": revision, "document": document})
+	ids, err := ReferencedAssets(document)
+	if err != nil {
+		handler.fail(ctx, writer, "read card document assets", err)
+		return
+	}
+	assets, err := AssetsFor(ctx, handler.DB, revision.PresentationID, ids)
+	if err != nil {
+		handler.fail(ctx, writer, "load card document assets", err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{"revision": revision, "document": document, "assets": assets})
+}
+
+// asset serves one stored image to the presentation's owner. Assets are
+// content-addressed, so a response never changes and may be cached for good.
+func (handler Handler) asset(writer http.ResponseWriter, request *http.Request) {
+	userID, err := handler.Identity(request)
+	if err != nil || strings.TrimSpace(userID) == "" {
+		writeError(writer, http.StatusUnauthorized, "Authentication required")
+		return
+	}
+	if handler.Store == nil {
+		writeError(writer, http.StatusServiceUnavailable, "Presentation storage is not configured")
+		return
+	}
+	ctx := request.Context()
+	presentationID, digest := request.PathValue("id"), request.PathValue("sha256")
+	var owner string
+	err = handler.DB.QueryRowContext(ctx, `SELECT user_id FROM presentations WHERE id = $1`, presentationID).Scan(&owner)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && owner != userID) {
+		writeError(writer, http.StatusNotFound, "Image not found")
+		return
+	}
+	if err != nil {
+		handler.fail(ctx, writer, "load image owner", err)
+		return
+	}
+	handler.serveAsset(writer, request, presentationID, digest)
+}
+
+func (handler Handler) serveAsset(writer http.ResponseWriter, request *http.Request, presentationID, digest string) {
+	ctx := request.Context()
+	assets, err := AssetsFor(ctx, handler.DB, presentationID, []string{digest})
+	if err != nil {
+		handler.fail(ctx, writer, "load image asset", err)
+		return
+	}
+	asset, found := assets[digest]
+	if !found {
+		writeError(writer, http.StatusNotFound, "Image not found")
+		return
+	}
+	etag := `"` + asset.SHA256 + `"`
+	if request.Header.Get("If-None-Match") == etag {
+		writer.WriteHeader(http.StatusNotModified)
+		return
+	}
+	reader, err := handler.Store.OpenObject(ctx, asset.ObjectKey)
+	if err != nil {
+		handler.fail(ctx, writer, "open image asset", err)
+		return
+	}
+	defer reader.Close()
+	writer.Header().Set("Content-Type", asset.MIMEType)
+	writer.Header().Set("Content-Length", strconv.FormatInt(asset.ByteSize, 10))
+	writer.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
+	writer.Header().Set("ETag", etag)
+	writer.Header().Set("X-Content-Type-Options", "nosniff")
+	writer.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(writer, reader)
 }
 
 func (Handler) fail(ctx context.Context, writer http.ResponseWriter, action string, err error) {

@@ -57,7 +57,10 @@ type Revision struct {
 	OperationID    string          `json:"-"`
 	BaseRevision   *int            `json:"baseRevision,omitempty"`
 	Provenance     json.RawMessage `json:"-"`
-	CreatedAt      time.Time       `json:"createdAt"`
+	// AssetIDs are the images the document shows. The commit fails unless each
+	// is recorded for the presentation.
+	AssetIDs  []string  `json:"-"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // ObjectStore writes create-only objects and reads them back.

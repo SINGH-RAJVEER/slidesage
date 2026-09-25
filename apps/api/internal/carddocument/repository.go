@@ -45,6 +45,9 @@ func CommitTx(ctx context.Context, tx *sql.Tx, expected int, revision Revision) 
 	if expected != current {
 		return CommitResult{}, ErrRevisionConflict
 	}
+	if err := checkAssetsTx(ctx, tx, revision); err != nil {
+		return CommitResult{}, err
+	}
 	if expected > 0 {
 		base := expected
 		revision.BaseRevision = &base
