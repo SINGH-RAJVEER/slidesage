@@ -1,6 +1,7 @@
 import type { CardDocument } from "@slidesage/cards";
 import type { Source } from "@slidesage/types";
-import { type CardAsset, CardView } from "./CardView";
+import { CardToolbar } from "./CardToolbar";
+import { type CardAsset, CardView, type DocumentEdit } from "./CardView";
 import { CARD_THEMES } from "./themes";
 
 export interface CardDeckProps {
@@ -11,10 +12,12 @@ export interface CardDeckProps {
 	assets?: Record<string, CardAsset>;
 	/** Resolves an asset ID to the URL that serves it. */
 	assetUrl?: (assetId: string) => string;
+	/** Present while editing: text becomes editable and each card gets its actions. */
+	edit?: DocumentEdit;
 }
 
 /** Renders a saved card document in reading order. */
-export function CardDeck({ document, sources = [], assets, assetUrl }: CardDeckProps) {
+export function CardDeck({ document, sources = [], assets, assetUrl, edit }: CardDeckProps) {
 	const theme = CARD_THEMES[document.theme];
 	const citations = Object.fromEntries(
 		sources.map((source, index) => [
@@ -29,6 +32,7 @@ export function CardDeck({ document, sources = [], assets, assetUrl }: CardDeckP
 				if (!card) return null;
 				return (
 					<li key={cardID}>
+						{edit && <CardToolbar document={document} cardId={cardID} edit={edit} />}
 						<CardView
 							card={card}
 							theme={theme}
@@ -36,6 +40,7 @@ export function CardDeck({ document, sources = [], assets, assetUrl }: CardDeckP
 							sources={citations}
 							assets={assets}
 							assetUrl={assetUrl}
+							edit={edit}
 						/>
 					</li>
 				);

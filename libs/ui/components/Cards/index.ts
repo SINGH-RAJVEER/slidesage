@@ -1,3 +1,5 @@
 export { CardDeck } from "./CardDeck";
-export { type CardAsset, CardView, RichTextView } from "./CardView";
+export { CardToolbar } from "./CardToolbar";
+export { type CardAsset, CardView, type DocumentEdit, RichTextView } from "./CardView";
+export { htmlToRuns, RichTextEditable, runsToHtml } from "./RichTextEditable";
 export { CARD_THEMES, type CardTheme } from "./themes";

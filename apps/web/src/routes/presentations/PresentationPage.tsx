@@ -2,7 +2,7 @@ import { type CardDocument, validateCardDocument } from "@slidesage/cards";
 import type { ApiErrorResponse, PresentationResponse, Source } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
-import { type CardAsset, CardDeck } from "@slidesage/ui/components/Cards";
+import type { CardAsset } from "@slidesage/ui/components/Cards";
 import { Progress } from "@slidesage/ui/components/progress";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { API_URL } from "@slidesage/ui/lib/api";
@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+import { DeckWorkspace } from "./DeckWorkspace";
 
 type LoadState =
 	| { status: "loading" }
@@ -17,6 +18,7 @@ type LoadState =
 	| {
 			status: "ready";
 			document: CardDocument;
+			revision: number;
 			sources: Source[];
 			assets: Record<string, CardAsset>;
 	  }
@@ -66,6 +68,7 @@ export default function PresentationPage() {
 			}
 			const body = (await documentResponse.json()) as {
 				document: unknown;
+				revision: { revision: number };
 				assets?: Record<string, CardAsset>;
 			};
 			// The document is checked against the same schema the converter
@@ -81,6 +84,7 @@ export default function PresentationPage() {
 			setState({
 				status: "ready",
 				document: validated.value,
+				revision: body.revision.revision,
 				sources: summary.sources ?? [],
 				assets,
 			});
@@ -138,17 +142,15 @@ export default function PresentationPage() {
 					</section>
 				)}
 				{state.status === "ready" && (
-					<>
-						<h1 className="text-2xl font-semibold text-white">{state.document.title}</h1>
-						<CardDeck
-							document={state.document}
-							sources={state.sources}
-							assets={state.assets}
-							assetUrl={(assetId) =>
-								`${API_URL}/presentations/${encodeURIComponent(presentationId)}/assets/${assetId}`
-							}
-						/>
-					</>
+					<DeckWorkspace
+						key={state.revision}
+						presentationId={presentationId}
+						document={state.document}
+						revision={state.revision}
+						sources={state.sources}
+						assets={state.assets}
+						onReload={() => void load()}
+					/>
 				)}
 			</main>
 		</div>

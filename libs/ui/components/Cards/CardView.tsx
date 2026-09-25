@@ -1,17 +1,45 @@
-import type {
-	BulletsNode,
-	Card,
-	ColumnsNode,
-	ContentNode,
-	ImageNode,
-	QuoteNode,
-	RichText,
-	StatNode,
-	StepsNode,
+import {
+	addListItem,
+	type BulletsNode,
+	type Card,
+	type CardDocument,
+	type ColumnsNode,
+	type ContentNode,
+	type ImageNode,
+	LAYOUT_RULES,
+	normalizeRuns,
+	type QuoteNode,
+	type RichText,
+	removeListItem,
+	type StatNode,
+	type StepsNode,
+	setItemText,
+	setNodeField,
+	setNodeText,
+	setPartField,
+	syncTakeaway,
 } from "@slidesage/cards";
 import { cn } from "@slidesage/ui/lib/utils";
-import { useLayoutEffect, useRef, useState } from "react";
+import { Plus, X } from "lucide-react";
+import {
+	createContext,
+	type ReactNode,
+	useContext,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from "react";
+import { RichTextEditable } from "./RichTextEditable";
 import type { CardTheme } from "./themes";
+
+/** Applies an edit to the whole document. Present only while editing. */
+export type DocumentEdit = (update: (document: CardDocument) => CardDocument) => void;
+
+const EditContext = createContext<{ edit: DocumentEdit; card: Card } | null>(null);
+
+function useEditing() {
+	return useContext(EditContext);
+}
 
 export function RichTextView({ text }: { text: RichText }) {
 	return (
@@ -33,6 +61,113 @@ export function RichTextView({ text }: { text: RichText }) {
 	);
 }
 
+/** Rich text that becomes an inline editor while the deck is being edited. */
+function RichField({
+	value,
+	label,
+	update,
+}: {
+	value: RichText;
+	label: string;
+	update: (document: CardDocument, value: RichText, cardId: string) => CardDocument;
+}) {
+	const editing = useEditing();
+	if (!editing) return <RichTextView text={value} />;
+	const { edit, card } = editing;
+	return (
+		<RichTextEditable
+			value={value}
+			label={label}
+			onChange={(next) => {
+				// Leaving a field re-reads it; unchanged text is not an edit.
+				if (JSON.stringify(normalizeRuns(next)) === JSON.stringify(normalizeRuns(value))) return;
+				edit((document) => update(document, next, card.id));
+			}}
+		/>
+	);
+}
+
+/** Plain text that becomes an inline editor while the deck is being edited. */
+function PlainField({
+	value,
+	label,
+	update,
+}: {
+	value: string;
+	label: string;
+	update: (document: CardDocument, value: string, cardId: string) => CardDocument;
+}) {
+	const editing = useEditing();
+	if (!editing) return <>{value}</>;
+	const { edit, card } = editing;
+	return (
+		<RichTextEditable
+			plain
+			value={[{ text: value }]}
+			label={label}
+			onChange={(next) => {
+				const text = next.map((run) => run.text).join("");
+				if (text === value) return;
+				edit((document) => update(document, text, card.id));
+			}}
+		/>
+	);
+}
+
+/** The card's item bounds, so list controls never break the layout's rules. */
+function itemBounds(card: Card) {
+	return LAYOUT_RULES[card.layout].items ?? { min: 1, max: 8 };
+}
+
+function RemoveItem({
+	label,
+	onRemove,
+	visible,
+}: {
+	label: string;
+	onRemove: () => void;
+	visible: boolean;
+}) {
+	if (!visible) return null;
+	return (
+		<button
+			type="button"
+			aria-label={label}
+			onClick={onRemove}
+			className="ml-auto shrink-0 self-start rounded-full p-[0.3cqw] opacity-0 transition-opacity group-hover/item:opacity-60 hover:!opacity-100 focus-visible:opacity-100"
+		>
+			<X className="size-[1.6cqw]" />
+		</button>
+	);
+}
+
+function AddItem({
+	label,
+	onAdd,
+	visible,
+	theme,
+}: {
+	label: string;
+	onAdd: () => void;
+	visible: boolean;
+	theme: CardTheme;
+}) {
+	if (!visible) return null;
+	return (
+		<button
+			type="button"
+			onClick={onAdd}
+			className={cn(
+				"flex w-fit items-center gap-[0.6cqw] rounded-full px-[1cqw] py-[0.4cqw] text-[1.3cqw] opacity-60 transition-opacity hover:opacity-100",
+				theme.muted,
+			)}
+		>
+			<Plus className="size-[1.4cqw]" />
+			{label}
+		</button>
+	);
+}
+
 function nodesOf<T extends ContentNode["type"]>(card: Card, type: T) {
 	return card.nodes.filter((node): node is Extract<ContentNode, { type: T }> => node.type === type);
 }
@@ -49,7 +184,13 @@ function Heading({ card, theme, large }: { card: Card; theme: CardTheme; large?:
 				theme.heading,
 			)}
 		>
-			<RichTextView text={heading.text} />
+			<RichField
+				value={heading.text}
+				label="Card heading"
+				update={(document, value, cardId) =>
+					syncTakeaway(setNodeText(document, cardId, heading.id, value), cardId)
+				}
+			/>
 		</h2>
 	);
 }
@@ -61,9 +202,17 @@ function Paragraphs({ card, theme, large }: { card: Card; theme: CardTheme; larg
 				<p
 					key={paragraph.id}
 					data-node-id={paragraph.id}
-					className={cn("leading-snug text-pretty", large ? "text-[2.2cqw]" : "text-[1.8cqw]", theme.body)}
+					className={cn(
+						"leading-snug text-pretty",
+						large ? "text-[2.2cqw]" : "text-[1.8cqw]",
+						theme.body,
+					)}
 				>
-					<RichTextView text={paragraph.text} />
+					<RichField
+						value={paragraph.text}
+						label="Paragraph"
+						update={(document, value, cardId) => setNodeText(document, cardId, paragraph.id, value)}
+					/>
 				</p>
 			))}
 		</>
@@ -71,25 +220,58 @@ function Paragraphs({ card, theme, large }: { card: Card; theme: CardTheme; larg
 }
 
 function Bullets({ node, theme }: { node: BulletsNode; theme: CardTheme }) {
+	const editing = useEditing();
+	const bounds = editing ? itemBounds(editing.card) : undefined;
 	return (
-		<ul data-node-id={node.id} className="flex flex-col gap-[1.2cqw]">
-			{node.items.map((item) => (
-				<li
-					key={item.id}
-					data-node-id={item.id}
-					className={cn("flex gap-[1.4cqw] text-[1.9cqw] leading-snug", theme.body)}
-				>
-					<span aria-hidden className={cn("mt-[0.9cqw] size-[0.7cqw] shrink-0 rounded-full bg-current", theme.accent)} />
-					<span>
-						<RichTextView text={item.text} />
-					</span>
-				</li>
-			))}
-		</ul>
+		<div className="flex flex-col gap-[1.2cqw]">
+			<ul data-node-id={node.id} className="flex flex-col gap-[1.2cqw]">
+				{node.items.map((item) => (
+					<li
+						key={item.id}
+						data-node-id={item.id}
+						className={cn("group/item flex gap-[1.4cqw] text-[1.9cqw] leading-snug", theme.body)}
+					>
+						<span
+							aria-hidden
+							className={cn(
+								"mt-[0.9cqw] size-[0.7cqw] shrink-0 rounded-full bg-current",
+								theme.accent,
+							)}
+						/>
+						<span className="min-w-0 flex-1">
+							<RichField
+								value={item.text}
+								label="Bullet"
+								update={(document, value, cardId) =>
+									setItemText(document, cardId, node.id, item.id, value)
+								}
+							/>
+						</span>
+						<RemoveItem
+							label="Remove bullet"
+							visible={!!editing && !!bounds && node.items.length > bounds.min}
+							onRemove={() =>
+								editing?.edit((document) =>
+									removeListItem(document, editing.card.id, node.id, item.id),
+								)
+							}
+						/>
+					</li>
+				))}
+			</ul>
+			<AddItem
+				label="Add bullet"
+				theme={theme}
+				visible={!!editing && !!bounds && node.items.length < bounds.max}
+				onAdd={() => editing?.edit((document) => addListItem(document, editing.card.id, node.id))}
+			/>
+		</div>
 	);
 }
 
 function Columns({ node, theme }: { node: ColumnsNode; theme: CardTheme }) {
+	const editing = useEditing();
+	const bounds = editing ? itemBounds(editing.card) : undefined;
 	return (
 		<div
 			data-node-id={node.id}
@@ -100,16 +282,59 @@ function Columns({ node, theme }: { node: ColumnsNode; theme: CardTheme }) {
 				<div
 					key={column.id}
 					data-node-id={column.id}
-					className={cn("flex flex-col gap-[1.4cqw]", index > 0 && "border-l pl-[3cqw]", theme.rule)}
+					className={cn(
+						"flex flex-col gap-[1.4cqw]",
+						index > 0 && "border-l pl-[3cqw]",
+						theme.rule,
+					)}
 				>
-					<h3 className={cn("text-[2.1cqw] font-semibold", theme.accent)}>{column.heading}</h3>
+					<h3 className={cn("text-[2.1cqw] font-semibold", theme.accent)}>
+						<PlainField
+							value={column.heading}
+							label="Column heading"
+							update={(document, value, cardId) =>
+								setPartField(document, cardId, node.id, column.id, "heading", value)
+							}
+						/>
+					</h3>
 					<ul className="flex flex-col gap-[1cqw]">
 						{column.items.map((item) => (
-							<li key={item.id} data-node-id={item.id} className={cn("text-[1.7cqw] leading-snug", theme.body)}>
-								<RichTextView text={item.text} />
+							<li
+								key={item.id}
+								data-node-id={item.id}
+								className={cn("group/item flex gap-[1cqw] text-[1.7cqw] leading-snug", theme.body)}
+							>
+								<span className="min-w-0 flex-1">
+									<RichField
+										value={item.text}
+										label="Column item"
+										update={(document, value, cardId) =>
+											setItemText(document, cardId, node.id, item.id, value)
+										}
+									/>
+								</span>
+								<RemoveItem
+									label="Remove item"
+									visible={!!editing && !!bounds && column.items.length > bounds.min}
+									onRemove={() =>
+										editing?.edit((document) =>
+											removeListItem(document, editing.card.id, node.id, item.id),
+										)
+									}
+								/>
 							</li>
 						))}
 					</ul>
+					<AddItem
+						label="Add item"
+						theme={theme}
+						visible={!!editing && !!bounds && column.items.length < bounds.max}
+						onAdd={() =>
+							editing?.edit((document) =>
+								addListItem(document, editing.card.id, node.id, { columnId: column.id }),
+							)
+						}
+					/>
 				</div>
 			))}
 		</div>
@@ -117,36 +342,92 @@ function Columns({ node, theme }: { node: ColumnsNode; theme: CardTheme }) {
 }
 
 function Steps({ node, theme }: { node: StepsNode; theme: CardTheme }) {
+	const editing = useEditing();
+	const bounds = editing ? itemBounds(editing.card) : undefined;
 	return (
-		<ol
-			data-node-id={node.id}
-			className="grid flex-1 gap-[2.4cqw]"
-			style={{ gridTemplateColumns: `repeat(${node.items.length}, minmax(0, 1fr))` }}
-		>
-			{node.items.map((step, index) => (
-				<li key={step.id} data-node-id={step.id} className={cn("flex flex-col gap-[1cqw] border-t pt-[1.6cqw]", theme.rule)}>
-					<span className={cn("text-[1.6cqw] font-semibold tabular-nums", theme.accent)}>
-						{String(index + 1).padStart(2, "0")}
-					</span>
-					<span className={cn("text-[1.9cqw] font-semibold leading-tight", theme.heading)}>{step.title}</span>
-					{step.detail && (
-						<span className={cn("text-[1.5cqw] leading-snug", theme.body)}>
-							<RichTextView text={step.detail} />
+		<div className="flex flex-1 flex-col gap-[1.6cqw]">
+			<ol
+				data-node-id={node.id}
+				className="grid flex-1 gap-[2.4cqw]"
+				style={{ gridTemplateColumns: `repeat(${node.items.length}, minmax(0, 1fr))` }}
+			>
+				{node.items.map((step, index) => (
+					<li
+						key={step.id}
+						data-node-id={step.id}
+						className={cn("group/item flex flex-col gap-[1cqw] border-t pt-[1.6cqw]", theme.rule)}
+					>
+						<span className={cn("flex text-[1.6cqw] font-semibold tabular-nums", theme.accent)}>
+							{String(index + 1).padStart(2, "0")}
+							<RemoveItem
+								label="Remove step"
+								visible={!!editing && !!bounds && node.items.length > bounds.min}
+								onRemove={() =>
+									editing?.edit((document) =>
+										removeListItem(document, editing.card.id, node.id, step.id),
+									)
+								}
+							/>
 						</span>
-					)}
-				</li>
-			))}
-		</ol>
+						<span className={cn("text-[1.9cqw] font-semibold leading-tight", theme.heading)}>
+							<PlainField
+								value={step.title}
+								label="Step title"
+								update={(document, value, cardId) =>
+									setPartField(document, cardId, node.id, step.id, "title", value)
+								}
+							/>
+						</span>
+						{(step.detail || editing) && (
+							<span className={cn("text-[1.5cqw] leading-snug", theme.body)}>
+								<RichField
+									value={step.detail ?? []}
+									label="Step detail"
+									update={(document, value, cardId) =>
+										setPartField(document, cardId, node.id, step.id, "detail", value)
+									}
+								/>
+							</span>
+						)}
+					</li>
+				))}
+			</ol>
+			<AddItem
+				label="Add step"
+				theme={theme}
+				visible={!!editing && !!bounds && node.items.length < bounds.max}
+				onAdd={() => editing?.edit((document) => addListItem(document, editing.card.id, node.id))}
+			/>
+		</div>
 	);
 }
 
 function Stats({ nodes, theme }: { nodes: StatNode[]; theme: CardTheme }) {
 	return (
-		<div className="grid gap-[3cqw]" style={{ gridTemplateColumns: `repeat(${nodes.length}, minmax(0, 1fr))` }}>
+		<div
+			className="grid gap-[3cqw]"
+			style={{ gridTemplateColumns: `repeat(${nodes.length}, minmax(0, 1fr))` }}
+		>
 			{nodes.map((stat) => (
 				<div key={stat.id} data-node-id={stat.id} className="flex flex-col gap-[0.6cqw]">
-					<span className={cn("text-[5cqw] font-semibold leading-none tabular-nums", theme.accent)}>{stat.value}</span>
-					<span className={cn("text-[1.6cqw] leading-snug", theme.body)}>{stat.label}</span>
+					<span className={cn("text-[5cqw] font-semibold leading-none tabular-nums", theme.accent)}>
+						<PlainField
+							value={stat.value}
+							label="Figure"
+							update={(document, value, cardId) =>
+								setNodeField(document, cardId, stat.id, { type: "stat", field: "value" }, value)
+							}
+						/>
+					</span>
+					<span className={cn("text-[1.6cqw] leading-snug", theme.body)}>
+						<PlainField
+							value={stat.label}
+							label="Figure label"
+							update={(document, value, cardId) =>
+								setNodeField(document, cardId, stat.id, { type: "stat", field: "label" }, value)
+							}
+						/>
+					</span>
 				</div>
 			))}
 		</div>
@@ -154,16 +435,53 @@ function Stats({ nodes, theme }: { nodes: StatNode[]; theme: CardTheme }) {
 }
 
 function Quote({ node, theme }: { node: QuoteNode; theme: CardTheme }) {
+	const editing = useEditing();
 	return (
 		<figure data-node-id={node.id} className="flex flex-col gap-[2cqw]">
-			<blockquote className={cn("text-[3.2cqw] font-medium leading-[1.2] text-balance", theme.heading)}>
+			<blockquote
+				className={cn("text-[3.2cqw] font-medium leading-[1.2] text-balance", theme.heading)}
+			>
 				<span className={theme.accent}>“</span>
-				<RichTextView text={node.text} />
+				<RichField
+					value={node.text}
+					label="Quotation"
+					update={(document, value, cardId) => setNodeText(document, cardId, node.id, value)}
+				/>
 				<span className={theme.accent}>”</span>
 			</blockquote>
-			{node.attribution && <figcaption className={cn("text-[1.7cqw]", theme.muted)}>{node.attribution}</figcaption>}
+			{(node.attribution || editing) && (
+				<figcaption className={cn("text-[1.7cqw]", theme.muted)}>
+					<PlainField
+						value={node.attribution ?? ""}
+						label="Attribution"
+						update={(document, value, cardId) =>
+							setNodeField(
+								document,
+								cardId,
+								node.id,
+								{ type: "quote", field: "attribution" },
+								value,
+							)
+						}
+					/>
+				</figcaption>
+			)}
 		</figure>
 	);
+}
+
+/** Provides the editing context to one card's content. */
+export function CardEditScope({
+	edit,
+	card,
+	children,
+}: {
+	edit?: DocumentEdit;
+	card: Card;
+	children: ReactNode;
+}) {
+	if (!edit) return <>{children}</>;
+	return <EditContext.Provider value={{ edit, card }}>{children}</EditContext.Provider>;
 }
 
 function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
@@ -273,6 +591,8 @@ export interface CardViewProps {
 	assets?: Record<string, CardAsset>;
 	/** Resolves an asset ID to the URL that serves it. */
 	assetUrl?: (assetId: string) => string;
+	/** Present while the deck is being edited; makes every text field editable. */
+	edit?: DocumentEdit;
 }
 
 /** The theme a cover card's text uses over its photo, whatever the deck theme. */
@@ -313,13 +633,18 @@ function CardImage({
 /** Photo credit in the form the stock provider asks for. */
 function Attribution({ asset, className }: { asset?: CardAsset; className?: string }) {
 	const source = asset?.source;
-	if (!source || source.type !== "stock" || !source.photographer) return null;
+	if (source?.type !== "stock" || !source.photographer) return null;
 	const provider = source.provider === "pexels" ? "Pexels" : source.provider;
 	return (
 		<span className={className}>
 			Photo by{" "}
 			{source.photographerUrl ? (
-				<a href={source.photographerUrl} target="_blank" rel="noreferrer noopener" className="underline-offset-2 hover:underline">
+				<a
+					href={source.photographerUrl}
+					target="_blank"
+					rel="noreferrer noopener"
+					className="underline-offset-2 hover:underline"
+				>
 					{source.photographer}
 				</a>
 			) : (
@@ -327,7 +652,12 @@ function Attribution({ asset, className }: { asset?: CardAsset; className?: stri
 			)}{" "}
 			on{" "}
 			{source.pageUrl ? (
-				<a href={source.pageUrl} target="_blank" rel="noreferrer noopener" className="underline-offset-2 hover:underline">
+				<a
+					href={source.pageUrl}
+					target="_blank"
+					rel="noreferrer noopener"
+					className="underline-offset-2 hover:underline"
+				>
 					{provider}
 				</a>
 			) : (
@@ -343,7 +673,15 @@ function Attribution({ asset, className }: { asset?: CardAsset; className?: stri
  * cropped. `data-overflows-slide` marks a card taller than one slide, which
  * PPTX export must split or refuse rather than crop.
  */
-export function CardView({ card, theme, position, sources, assets, assetUrl }: CardViewProps) {
+export function CardView({
+	card,
+	theme,
+	position,
+	sources,
+	assets,
+	assetUrl,
+	edit,
+}: CardViewProps) {
 	const cited = card.sourceIds.flatMap((id) => (sources?.[id] ? [sources[id]] : []));
 	const articleRef = useRef<HTMLElement>(null);
 	const [overflows, setOverflows] = useState(false);
@@ -365,7 +703,9 @@ export function CardView({ card, theme, position, sources, assets, assetUrl }: C
 	}, []);
 
 	const footer = (
-		<footer className={cn("flex items-end justify-between gap-[2cqw] text-[1.1cqw]", textTheme.muted)}>
+		<footer
+			className={cn("flex items-end justify-between gap-[2cqw] text-[1.1cqw]", textTheme.muted)}
+		>
 			<span className="flex flex-wrap gap-[0.8cqw]">
 				{cited.map((source) => (
 					<a
@@ -425,7 +765,9 @@ export function CardView({ card, theme, position, sources, assets, assetUrl }: C
 					)}
 				>
 					<div className="flex flex-1 flex-col pb-[2.8cqw]">
-						<CardBody card={card} theme={textTheme} />
+						<CardEditScope edit={edit} card={card}>
+							<CardBody card={card} theme={textTheme} />
+						</CardEditScope>
 					</div>
 					{footer}
 				</div>
