@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/observability"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
@@ -119,6 +120,11 @@ func newWorkerClient(database *sql.DB, connections ai.ConnectionService, maxWork
 	}
 	workers := river.NewWorkers()
 	h := &handler{database: database, client: &http.Client{Timeout: 3 * time.Minute, Transport: observability.HTTPTransport(nil)}, connections: connections}
+	drafter, err := configureCardDrafter(h)
+	if err != nil {
+		return nil, fmt.Errorf("configure card drafting: %w", err)
+	}
+	h.drafter = drafter
 	river.AddWorker(workers, &generationWorker{handler: h})
 	return river.NewClient(riverdatabasesql.New(database), &river.Config{
 		FetchPollInterval:    time.Second,
@@ -268,7 +274,8 @@ func (h *handler) processQueuedJob(ctx context.Context, riverJob *river.Job[JobA
 		return h.finalizeQueuedFailure(ctx, record, riverJob, job, "drafting_unavailable", errDraftingUnavailable.Error())
 	}
 	_ = h.updateStage(ctx, record.ID, "drafting", "Writing presentation content", 2, 4)
-	document, tokens, err := h.drafter.Draft(ctx, job)
+	draft, err := h.drafter.Draft(ctx, job)
+	tokens := draft.tokens
 	if err != nil {
 		if retryableProviderError(err) && riverJob.Attempt < riverJob.MaxAttempts {
 			return h.scheduleRetry(ctx, record, riverJob, err)
@@ -279,13 +286,12 @@ func (h *handler) processQueuedJob(ctx context.Context, riverJob *river.Job[JobA
 		return h.finalizeQueuedFailure(ctx, record, riverJob, job, "usage_unavailable", "provider usage unavailable")
 	}
 	recordTokenUsage(ctx, job.kind, tokens)
-	completed, _ := json.Marshal(document)
 	charged := actualCharge(tokens, job.quote)
-	if err := h.completeQueuedJob(ctx, riverJob, record, job, completed, document, text(document["title"], "Untitled Presentation"), charged, tokens); err != nil {
+	if err := h.completeQueuedJob(ctx, riverJob, record, job, draft, charged); err != nil {
 		if errors.Is(err, errGenerationCancelled) {
 			return nil
 		}
-		if errors.Is(err, errInactiveReservation) || errors.Is(err, errPresentationChanged) {
+		if errors.Is(err, errInactiveReservation) || errors.Is(err, errPresentationChanged) || errors.Is(err, carddocument.ErrRevisionConflict) {
 			return h.finalizeQueuedFailure(ctx, record, riverJob, job, "persistence_failure", err.Error())
 		}
 		return err
@@ -416,7 +422,8 @@ func (h *handler) finalizeQueuedFailure(ctx context.Context, record generationJo
 	return tx.Commit()
 }
 
-func (h *handler) completeQueuedJob(ctx context.Context, riverJob *river.Job[JobArgs], record generationJobRecord, job streamJob, completed []byte, document map[string]any, title string, charged int64, providerTokens int) error {
+func (h *handler) completeQueuedJob(ctx context.Context, riverJob *river.Job[JobArgs], record generationJobRecord, job streamJob, draft draftResult, charged int64) error {
+	document := draft.document
 	tx, err := h.database.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -449,7 +456,15 @@ func (h *handler) completeQueuedJob(ctx context.Context, riverJob *river.Job[Job
 		}
 		return errGenerationCancelled
 	}
-	balance, err := settleTx(ctx, tx, job, completed, title, charged, providerTokens)
+	if draft.commit != nil {
+		revision, err := draft.commit(ctx, tx)
+		if err != nil {
+			return err
+		}
+		document["currentRevision"] = revision
+	}
+	completed, _ := json.Marshal(document)
+	balance, err := settleTx(ctx, tx, job, completed, text(document["title"], "Untitled Presentation"), charged, draft.tokens)
 	if err != nil {
 		return err
 	}
@@ -508,6 +523,10 @@ func retryableProviderError(err error) bool {
 	var provider *providerRequestError
 	if errors.As(err, &provider) {
 		return provider.Retryable || provider.Status == http.StatusTooManyRequests || provider.Status >= 500
+	}
+	var converter *carddocument.ConverterError
+	if errors.As(err, &converter) {
+		return converter.Temporary()
 	}
 	var network net.Error
 	return errors.As(err, &network)

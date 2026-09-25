@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/observability"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
@@ -58,15 +59,16 @@ func RegisterRoutes(mux *http.ServeMux, database *sql.DB, identity Identity, con
 		panic(fmt.Sprintf("create generation worker waker: %v", err))
 	}
 	handler := &handler{
-		database:      database,
-		identity:      identity,
-		connections:   connections,
-		client:        &http.Client{Timeout: 3 * time.Minute, Transport: observability.HTTPTransport(nil)},
-		queue:         queue,
-		waker:         waker,
-		streamContext: config.StreamContext,
-		streams:       newStreamLimiter(config.MaxStreams, config.MaxStreamsPerUser),
-		research:      config.Research,
+		database:        database,
+		identity:        identity,
+		connections:     connections,
+		client:          &http.Client{Timeout: 3 * time.Minute, Transport: observability.HTTPTransport(nil)},
+		queue:           queue,
+		waker:           waker,
+		streamContext:   config.StreamContext,
+		streams:         newStreamLimiter(config.MaxStreams, config.MaxStreamsPerUser),
+		research:        config.Research,
+		draftingEnabled: carddocument.Configured(),
 	}
 	mux.HandleFunc("POST /presentation-jobs", handler.submit)
 	mux.HandleFunc("GET /generation-jobs/{id}", handler.jobStatus)
@@ -103,17 +105,19 @@ func RecoverExpired(ctx context.Context, database *sql.DB) error {
 }
 
 type handler struct {
-	drafter       documentDrafter
-	database      *sql.DB
-	identity      Identity
-	client        *http.Client
-	connections   ai.ConnectionService
-	queue         *queueClient
-	waker         Waker
-	streamContext context.Context
-	streams       *streamLimiter
-	research      *presentation.ExaResearchService
-	sleep         func(context.Context, time.Duration) error
+	drafter documentDrafter
+	// draftingEnabled gates submission in the API process, which never drafts.
+	draftingEnabled bool
+	database        *sql.DB
+	identity        Identity
+	client          *http.Client
+	connections     ai.ConnectionService
+	queue           *queueClient
+	waker           Waker
+	streamContext   context.Context
+	streams         *streamLimiter
+	research        *presentation.ExaResearchService
+	sleep           func(context.Context, time.Duration) error
 }
 
 func (h *handler) body(writer http.ResponseWriter, request *http.Request, maximum int64) (string, map[string]any, bool) {

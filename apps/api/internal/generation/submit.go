@@ -112,8 +112,14 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	if h.drafter == nil {
+	// Only the worker drafts, so the API decides from the configuration both
+	// processes share rather than from a drafter it never holds.
+	if !h.draftingEnabled {
 		writeError(writer, http.StatusServiceUnavailable, "Presentation generation is not available yet")
+		return
+	}
+	if input.ParentID != "" {
+		writeError(writer, http.StatusConflict, "AI revisions of card presentations are not available yet")
 		return
 	}
 
@@ -223,7 +229,7 @@ func (h *handler) generationJob(ctx context.Context, userID string, input submit
 			return streamJob{}, nil, writeStatusError{http.StatusConflict, "Only failed presentations can be retried"}
 		}
 	}
-	quote := authorizationMillis(maxOutputTokens(input.SlideCount), input.Topic, nil, input.Research, input.ResearchPayload, repairHeadroomTokens(input.SlideCount))
+	quote := cardAuthorizationMillis(input.SlideCount, input.Topic, input.Research, input.ResearchPayload)
 	operationID, err := uuid()
 	if err != nil {
 		return streamJob{}, nil, err
