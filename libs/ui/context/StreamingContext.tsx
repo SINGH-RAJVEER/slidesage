@@ -87,6 +87,8 @@ function updateStoredCursor(jobId: string, lastEventId: number) {
 
 export interface StreamingState {
 	isStreaming: boolean;
+	/** True once the server has accepted the job, as opposed to while it is being submitted. */
+	accepted?: boolean;
 	/** Slides finished so far. */
 	slideCount: number;
 	title: string;
@@ -543,6 +545,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				setStreamingState((prev) => ({
 					...prev,
 					jobId,
+					accepted: true,
 					presentationId: attachedPresentationId || prev.presentationId,
 				}));
 				// Release the stream slot no matter how consumption ends, so later
@@ -801,6 +804,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 		setStreamingState({
 			...initialState,
 			isStreaming: true,
+			accepted: true,
 			jobId: initialStored.jobId,
 			presentationId: initialStored.presentationId || undefined,
 			operation: initialStored.operation,

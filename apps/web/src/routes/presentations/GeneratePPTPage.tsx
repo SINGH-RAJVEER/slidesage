@@ -28,11 +28,21 @@ export default function GeneratePPTPage() {
 	const [detailLevel, setDetailLevel] = useState(retry?.detail_level ?? "balanced");
 	const [tonality, setTonality] = useState(retry?.tonality ?? "professional");
 	const [useWebResearch, setUseWebResearch] = useState(retry?.research_enabled ?? false);
-	// Generation stays on this page until the card document viewer exists, so
-	// a refused or failed submission is reported here.
+	// A refused submission is reported here. Once the job is accepted the page
+	// moves to the presentation, which shows the rest of its progress.
 	const [generationError, setGenerationError] = useState<string | null>(null);
+	const submittedRef = useRef(false);
 	const navigate = useNavigate();
 	const { streamingState, generate } = useStreaming();
+
+	useEffect(() => {
+		// A retry knows its presentation before submitting, so navigation waits
+		// for the server to accept the job; a refused one stays here to report why.
+		if (submittedRef.current && streamingState.accepted && streamingState.presentationId) {
+			submittedRef.current = false;
+			navigate(ROUTES.presentationById(streamingState.presentationId));
+		}
+	}, [navigate, streamingState.accepted, streamingState.presentationId]);
 
 	useEffect(() => {
 		if (streamingState.error) {
@@ -86,6 +96,7 @@ export default function GeneratePPTPage() {
 			return;
 		}
 
+		submittedRef.current = true;
 		const success = await generate({
 			prompt: normalizedPrompt,
 			slideCount: count,
@@ -95,6 +106,7 @@ export default function GeneratePPTPage() {
 			ai: retry?.ai,
 		});
 		if (!success) {
+			submittedRef.current = false;
 			setLoading(false);
 		}
 	};

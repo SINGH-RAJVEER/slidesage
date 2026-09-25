@@ -23,6 +23,7 @@ import { getPresentationRetryDestination } from "@slidesage/ui/lib/presentation-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
+import { ROUTES } from "../../app/router/paths";
 import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
 
 interface PaginationState {
@@ -222,7 +223,7 @@ export default function PresentationsGridPage() {
 					return;
 				}
 
-				setError("Presentations cannot be opened until the card document viewer is available.");
+				navigate(ROUTES.presentationById(result.presentation.id));
 			}
 		} catch (err) {
 			setError(`Error: ${err instanceof Error ? err.message : err}`);

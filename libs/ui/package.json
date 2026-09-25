@@ -5,6 +5,7 @@
 	"main": "./index.ts",
 	"exports": {
 		".": "./index.ts",
+		"./components/Cards": "./components/Cards/index.ts",
 		"./components/Generate": "./components/Generate/index.ts",
 		"./components/Presentations": "./components/Presentations/index.ts",
 		"./components/*": "./components/*.tsx",
@@ -31,6 +32,7 @@
 		"@radix-ui/react-slot": "^1.2.3",
 		"@radix-ui/react-switch": "^1.3.7",
 		"@radix-ui/react-tooltip": "^1.2.16",
+		"@slidesage/cards": "workspace:*",
 		"@slidesage/types": "workspace:*",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",

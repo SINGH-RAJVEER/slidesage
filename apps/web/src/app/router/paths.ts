@@ -10,6 +10,7 @@ export const ROUTES = {
 	generate: "/generate",
 	research: "/generate/research",
 	presentations: "/presentations",
+	presentationById: (presentationId: string) => `/presentations/${encodeURIComponent(presentationId)}`,
 	presentationError: "/presentation-error",
 	purchase: "/purchase",
 } as const;

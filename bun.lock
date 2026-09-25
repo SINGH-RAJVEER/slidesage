@@ -24,6 +24,7 @@
       "name": "slidesage-web",
       "version": "0.2.0",
       "dependencies": {
+        "@slidesage/cards": "workspace:*",
         "@slidesage/types": "workspace:*",
         "@slidesage/ui": "workspace:*",
         "@tanstack/react-pacer": "^0.19.1",
@@ -75,6 +76,7 @@
         "@radix-ui/react-slot": "^1.2.3",
         "@radix-ui/react-switch": "^1.3.7",
         "@radix-ui/react-tooltip": "^1.2.16",
+        "@slidesage/cards": "workspace:*",
         "@slidesage/types": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",

@@ -210,6 +210,7 @@ it("starts generation on Enter even when focus sits on an options-bar control", 
 				<StreamingProvider>
 					<Routes>
 						<Route path="/generate" element={<GeneratePPTPage />} />
+						<Route path="/presentations/:presentationId" element={<div>Presentation page</div>} />
 					</Routes>
 				</StreamingProvider>
 			</MemoryRouter>,
@@ -232,6 +233,9 @@ it("starts generation on Enter even when focus sits on an options-bar control", 
 		await waitFor(() => expect(generationBody?.["topic"]).toBe("Enter submits from anywhere"), {
 			timeout: 5000,
 		});
+		// Once the job is accepted the page moves to the presentation, which
+		// shows the rest of the progress.
+		expect(await view.findByText("Presentation page")).toBeInTheDocument();
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
@@ -316,6 +320,58 @@ it("preserves retry AI selection when routing through research", async () => {
 			expect(view.getByText(/"retryPresentationId":"failed_1"/)).toBeInTheDocument(),
 		);
 		expect(view.getByText(/"provider":"openai","model":"gpt-4.1"/)).toBeInTheDocument();
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});
+
+it("keeps a refused retry on the generate page so its error is shown", async () => {
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = mock(async (input: string | URL | Request) =>
+		String(input).includes("/presentation-jobs")
+			? Response.json(
+					{
+						error: { message: "Insufficient points", code: "INSUFFICIENT_TOKENS" },
+						slide_tokens_remaining: 1,
+						slide_tokens_required: 9,
+					},
+					{ status: 402 },
+				)
+			: new Response(null, { status: 500 }),
+	) as unknown as typeof fetch;
+
+	try {
+		const view = render(
+			<MemoryRouter
+				initialEntries={[
+					{
+						pathname: "/generate",
+						state: {
+							retry: {
+								prompt: "Retry that cannot be paid for",
+								slide_count: 5,
+								detail_level: "balanced",
+								tonality: "professional",
+								research_enabled: false,
+							},
+							retryPresentationId: "failed_1",
+						},
+					},
+				]}
+			>
+				<StreamingProvider>
+					<Routes>
+						<Route path="/generate" element={<GeneratePPTPage />} />
+						<Route path="/presentations/:presentationId" element={<div>Presentation page</div>} />
+					</Routes>
+				</StreamingProvider>
+			</MemoryRouter>,
+		);
+
+		fireEvent.click(view.getByRole("button", { name: "Generate" }));
+
+		expect(await view.findByText(/Insufficient points\. You have 1\.0 points/)).toBeInTheDocument();
+		expect(view.queryByText("Presentation page")).not.toBeInTheDocument();
 	} finally {
 		globalThis.fetch = originalFetch;
 	}

@@ -108,9 +108,16 @@ export interface PresentationFailure {
 	retry: PresentationRetryOptions;
 }
 
+/** The card revision a finished presentation currently points at. */
+export interface PresentationRevisionSummary {
+	revision: number;
+	cardCount: number;
+}
+
 export interface PresentationJSON {
 	title: string;
 	status?: PresentationStatus;
+	currentRevision?: PresentationRevisionSummary;
 	failure?: PresentationFailure;
 	totalSlides?: number;
 	tokens_used?: number;

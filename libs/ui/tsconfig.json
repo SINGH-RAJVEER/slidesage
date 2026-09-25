@@ -6,6 +6,7 @@
 		"types": ["react", "bun"],
 		"paths": {
 			"@slidesage/types": ["../types/src/index.ts"],
+			"@slidesage/cards": ["../cards/src/index.ts"],
 			"@slidesage/ui": ["./index.ts"],
 			"@slidesage/ui/components": ["./components"],
 			"@slidesage/ui/components/*": ["./components/*"],
@@ -24,7 +25,8 @@
 		"lib/**/*.ts",
 		"test/**/*.ts",
 		"test/**/*.tsx",
-		"../types/src/**/*.ts"
+		"../types/src/**/*.ts",
+		"../cards/src/**/*.ts"
 	],
-	"exclude": ["../types/src/**/*.test.ts"]
+	"exclude": ["../types/src/**/*.test.ts", "../cards/src/**/*.test.ts"]
 }

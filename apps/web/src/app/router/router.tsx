@@ -54,6 +54,10 @@ export const router = createBrowserRouter([
 						lazy: lazyRoute(() => import("../../routes/presentations/PresentationsGridPage")),
 					},
 					{
+						path: "presentations/:presentationId",
+						lazy: lazyRoute(() => import("../../routes/presentations/PresentationPage")),
+					},
+					{
 						path: "presentation-error",
 						lazy: lazyRoute(() => import("../../routes/presentations/PresentationErrorPage")),
 					},
