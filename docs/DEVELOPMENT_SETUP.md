@@ -23,8 +23,9 @@ Set `AUTH_SECRET` and `OPEN_ROUTER_API_KEY` in `.env`. Add `EXA_API_KEY` for res
 2. Ensures the local role, database, and vector extension exist.
 3. Runs `cmd/migrate`, which applies embedded Goose application migrations and River migrations.
 4. Starts the Go API on port `8000` and waits for `/health`.
-5. Starts the durable generation worker and waits for `/ready` on port `8080`.
-6. Starts the Vite development server on port `5173`, with React Fast Refresh, Tailwind processing, and static assets from `apps/web/public`.
+5. Starts the card converter on port `8090` and waits for `/health`.
+6. Starts the durable generation worker after the converter and waits for `/ready` on port `8080`.
+7. Starts the Vite development server on port `5173`, with React Fast Refresh, Tailwind processing, and static assets from `apps/web/public`.
 
 Vite exposes only `VITE_*` variables to browser bundles. If `VITE_API_URL` is absent during local development, browser API requests fall back to port `8000` on the same loopback hostname.
 
@@ -52,14 +53,16 @@ Run these from the repository root inside `devenv shell`.
 | `just lint`               | Run Go vet and Biome checks                                   |
 | `just format`             | Format the repository                                         |
 
-The repository uses a Go module for `apps/api` and a Bun workspace for the web, shared types, and UI packages. It does not use a separate monorepo task runner.
+The repository uses a Go module for `apps/api` and a Bun workspace for the web, converter, cards, shared types, and UI packages. It does not use a separate monorepo task runner.
 
 ## Project Structure
 
-The active application is split into four workspace areas:
+The active application is split into six workspace areas:
 
 - `apps/api`: Go HTTP API, durable River worker, migration command, domain services, and integrations.
 - `apps/web`: Browser application shell, router, and route-level screens.
+- `apps/converter`: Private Bun service that validates model drafts into card documents.
+- `libs/cards`: The card document schema, validation, and draft conversion, shared by the converter and the browser.
 - `libs/types`: Shared presentation, scene, and research types.
 - `libs/ui`: Shared React components, hooks, UI contexts, and client-side helpers.
 

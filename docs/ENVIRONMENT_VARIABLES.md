@@ -123,7 +123,10 @@ Set `VITE_API_URL=https://api.slidesage.app` for the `slidesage.app` production 
 
 | Variable                  | Required | Secret | Purpose |
 | ------------------------- | -------- | ------ | ------- |
-| `PRESENTATION_GCS_BUCKET` | No | No | Private presentation object bucket. Production and devenv still provision it, but no application code reads it until card document storage lands |
+| `PRESENTATION_GCS_BUCKET` | Card generation | No | Private bucket holding immutable card document revisions. Without it the API refuses generation and the document route returns `503` |
+| `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
+| `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
+| `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |
 
 The Cloud CDN signing variables (`CDN_URL`, `CDN_SIGNING_KEY_NAME`, `CDN_SIGNING_KEY_SECRET`, `CDN_SIGNED_URL_TTL_SECONDS`) were read only by the removed template fetcher and thumbnail routes. `infra/prod` still passes them to Cloud Run.
 

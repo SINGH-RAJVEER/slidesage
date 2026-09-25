@@ -46,6 +46,7 @@ The profile carries a `landingPage` preference (`generate` or `presentations`, d
 | `POST`  | `/generation-jobs/{id}/cancel` | Request cancellation of an active generation job                                                        |
 | `GET`   | `/presentations`               | List the user's decks                                                                                   |
 | `GET`   | `/presentations/:id`           | Get one owned deck                                                                                      |
+| `GET`   | `/presentations/:id/document`  | Get the current card document revision of an owned deck                                                 |
 | `PATCH` | `/presentations/:id`           | Apply persistent presentation mutations                                                                 |
 | `DELETE` | `/presentations/:id`           | Delete one owned deck and its associated memory                                                         |
 
@@ -53,7 +54,7 @@ Generation requires `topic` and `slide_count`; the web client supports custom sl
 
 Iteration uses `parent_presentation_id` and `topic`. Retry uses `retry_presentation_id`. Request fields use snake case only.
 
-Submission returns `503` until a document drafter is configured (see [GAMMA_ARCHITECTURE.md](GAMMA_ARCHITECTURE.md)); research previews are unaffected. Generation creates a `generating` presentation placeholder before work is available to the worker. Point reservation, placeholder creation, application job creation, initial event persistence, and River insertion commit in one database transaction. Iteration requires a `ready` presentation and records its row revision in the same durable handoff. Provider, content-validation, cancellation, and final-save failures mark the job terminal and release the active reservation. Retrying reuses the failed presentation ID and moves the record back to `generating`; malformed requests and failures before the submission transaction do not create a job or presentation record.
+Submission returns `503` unless `CARD_CONVERTER_URL` and `PRESENTATION_GCS_BUCKET` are configured, and `409` for an iteration, since card documents cannot be revised by AI yet; research previews are unaffected. See [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md). Generation creates a `generating` presentation placeholder before work is available to the worker. Point reservation, placeholder creation, application job creation, initial event persistence, and River insertion commit in one database transaction. Iteration requires a `ready` presentation and records its row revision in the same durable handoff. Provider, content-validation, cancellation, and final-save failures mark the job terminal and release the active reservation. Retrying reuses the failed presentation ID and moves the record back to `generating`; malformed requests and failures before the submission transaction do not create a job or presentation record.
 
 Provider output must use the current content block contract with explicit `text` fields for paragraphs, quotes, and callouts and `items` for bullets. The API does not translate older document shapes or block aliases. It rejects generated slides without substantive text instead of persisting synthetic placeholder content as a successful presentation.
 

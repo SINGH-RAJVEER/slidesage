@@ -54,7 +54,7 @@ Authentication is implemented in `apps/api/internal/auth`. The API supports emai
 
 ## Presentation Documents
 
-Presentation contracts shared with the web application live in `libs/types`. The stored document carries identity, status, and retry state. The editable card document that will hold presentation content is proposed in [GAMMA_ARCHITECTURE.md](GAMMA_ARCHITECTURE.md); until it exists there is no presentation viewer or download.
+Presentation contracts shared with the web application live in `libs/types`. The stored document carries identity, status, and retry state. Presentation content is a card document stored as immutable revisions by `internal/carddocument`; see [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md). There is no download or PPTX export yet.
 
 ## Persistence
 

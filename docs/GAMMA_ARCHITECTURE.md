@@ -2,9 +2,27 @@
 
 ## Status and decision
 
-This is a proposed architecture for the `gamma` workspace. It describes work to implement, not behavior in this branch. The defining decision is that an editable card document becomes the authoritative presentation. Browser presentation and PPTX export derive from a saved card revision.
+This is the architecture for the `gamma` workspace. It describes the target design; the part already built is listed under "Implemented so far". The defining decision is that an editable card document becomes the authoritative presentation. Browser presentation and PPTX export derive from a saved card revision.
 
-The PPTX-first pipeline this replaces has been removed from the workspace: the template-slot compiler, the template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. The generation job now reaches drafting through the `documentDrafter` interface in `apps/api/internal/generation/drafter.go`. No implementation is configured yet, so `POST /presentation-jobs` returns `503` before any points are reserved. The production Terraform for the template CDN backend and the `presentation_revisions` table are still in place.
+The PPTX-first pipeline this replaces has been removed from the workspace: the template-slot compiler, the template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. The production Terraform for the template CDN backend and the `presentation_revisions` table are still in place.
+
+### Implemented so far
+
+The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 1 card schema in `libs/cards`, the Bun converter service, immutable card revisions in GCS and PostgreSQL, planned and batch-drafted generation with targeted card repair, and a read-only browser renderer.
+
+Still to build:
+
+- the editor schema and direct editing;
+- AI revisions against card and node IDs;
+- images, charts, and asset resolution;
+- theme choice at creation;
+- PPTX export.
+
+Also open:
+
+- Production has no service for the converter. The `converter` bake target is outside the default group, and `infra/prod` does not deploy it.
+- Provenance is recorded only on successful revisions. A failed run keeps its error and retry settings but not the model, prompt version, or source IDs it used.
+- At their schema limits most layouts are taller than one 16:9 slide. The browser grows those cards instead of cropping them. Export must split or refuse them, or the limits must tighten per layout.
 
 The design takes inspiration from Gamma's disclosed card system and its HTML-to-editor conversion. The [card system description](https://gamma.app/explore/content/guides/how-gamma-maps-content-directly-to-slides-using-its-card-system) describes flexible cards and layout selection. The [engineering case study](https://vercel.com/customers/gamma-builds-design-first-agents-with-vercel) says generated HTML is parsed into structured Tiptap content and assets are resolved. Neither source specifies Gamma's complete prompts, internal document schema, or export writer. The choices below are SlideSage proposals.
 
@@ -46,11 +64,11 @@ PPTX and PDF files are derived artifacts, not writable sources for the card docu
 ## Implementation sequence
 
 1. Specify the card schema, revision rules, supported content nodes, and export contract. Build a small set of representative cards and expected browser/PPTX outputs before changing generation.
-2. Implement card storage and revision commits behind the presentation-document interface, and implement `documentDrafter` against it.
+2. Implement card storage and revision commits behind the presentation-document interface, and implement `documentDrafter` against it. (Done.)
 3. Build the constrained editor schema, conversion process, browser renderer, and direct editing for the representative cards.
-4. Add planning, bounded card drafting, asset resolution, and AI edits using the current durable job and accounting flow.
+4. Add planning, bounded card drafting, asset resolution, and AI edits using the current durable job and accounting flow. (Planning and drafting are done; assets and AI edits remain.)
 5. Build PPTX export for the supported card types. Expand the type set only after native export and browser comparison pass for each one.
-6. Configure the drafter so submission accepts jobs again, and restore opening presentations from the library once the card renderer can display them.
+6. Configure the drafter so submission accepts jobs again, and restore opening presentations from the library once the card renderer can display them. (Done.)
 
 ## Acceptance gates and risks
 
