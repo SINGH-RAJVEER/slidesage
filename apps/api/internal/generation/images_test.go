@@ -4,14 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"image"
 	"image/color"
 	"image/png"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -29,54 +24,6 @@ func photoPNG(t *testing.T, width, height int) []byte {
 		t.Fatal(err)
 	}
 	return out.Bytes()
-}
-
-func TestPexelsSourceChoosesALandscapePhotoFromAllowedHosts(t *testing.T) {
-	var authorization, query string
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		switch request.URL.Path {
-		case "/v1/search":
-			authorization = request.Header.Get("Authorization")
-			query = request.URL.Query().Get("query")
-			fmt.Fprintf(writer, `{"photos": [
-				{"id": 1, "width": 800, "height": 600, "src": {"large2x": "%[1]s/small.png"}},
-				{"id": 2, "width": 3000, "height": 2000, "src": {"large2x": "%[1]s/redirect.png"}},
-				{"id": 3, "width": 3000, "height": 2000, "url": "https://www.pexels.com/photo/3", "photographer": "Ada",
-					"photographer_url": "https://www.pexels.com/@ada", "alt": "Battery racks", "src": {"large2x": "%[1]s/photo.png"}}]}`, server.URL)
-		case "/redirect.png":
-			http.Redirect(writer, request, "http://example.com/elsewhere.png", http.StatusFound)
-		case "/photo.png":
-			_, _ = writer.Write(photoPNG(t, 1600, 900))
-		default:
-			http.NotFound(writer, request)
-		}
-	}))
-	defer server.Close()
-	host, _ := url.Parse(server.URL)
-	source := newPexelsSource("test-key", server.URL, []string{host.Host})
-
-	found, err := source.Find(context.Background(), imageRequest{Query: "battery warehouse"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if authorization != "test-key" || query != "battery warehouse" {
-		t.Fatalf("authorization = %q, query = %q", authorization, query)
-	}
-	if found.Source.ProviderID != "3" || found.Source.Photographer != "Ada" || found.Source.PageURL != "https://www.pexels.com/photo/3" || found.Alt != "Battery racks" {
-		t.Fatalf("found = %+v", found.Source)
-	}
-}
-
-func TestPexelsSourceReportsNoImageWhenSearchFails(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		writer.WriteHeader(http.StatusTooManyRequests)
-	}))
-	defer server.Close()
-	source := newPexelsSource("key", server.URL, nil)
-	if _, err := source.Find(context.Background(), imageRequest{Query: "anything"}); !errors.Is(err, errNoImage) {
-		t.Fatalf("error = %v", err)
-	}
 }
 
 type stubImages struct {

@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/stockimages"
 )
 
 // Handler serves card documents to their owners.
@@ -19,13 +21,18 @@ type Handler struct {
 	// Converter validates edited documents; without it the save route
 	// reports that editing is unavailable.
 	Converter *Converter
-	Identity  func(*http.Request) (string, error)
+	// Stock searches and fetches Pexels photos; nil disables photo search.
+	Stock    *stockimages.Pexels
+	Identity func(*http.Request) (string, error)
 }
 
 func RegisterRoutes(mux *http.ServeMux, handler Handler) {
 	mux.HandleFunc("GET /presentations/{id}/document", handler.current)
 	mux.HandleFunc("GET /presentations/{id}/assets/{sha256}", handler.asset)
 	mux.HandleFunc("PUT /presentations/{id}/document", handler.save)
+	mux.HandleFunc("GET /images/search", handler.searchPhotos)
+	mux.HandleFunc("POST /presentations/{id}/assets/stock", handler.addStockPhoto)
+	mux.HandleFunc("POST /presentations/{id}/assets/upload", handler.uploadPhoto)
 }
 
 func writeJSON(writer http.ResponseWriter, status int, value any) {
