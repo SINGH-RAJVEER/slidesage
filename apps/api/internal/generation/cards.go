@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sort"
 	"strings"
 	"sync"
@@ -37,7 +38,7 @@ const (
 )
 
 const planSystemPrompt = `You plan presentations as a sequence of cards. Each card makes exactly one point.
-Return one JSON object: {"title": string, "cards": [{"position": number, "takeaway": string, "role": string, "layout": string, "evidence": string, "sourceIds": [string]}]}.
+Return one JSON object: {"title": string, "cards": [{"position": number, "takeaway": string, "role": string, "layout": string, "evidence": string, "sourceIds": [string], "imageQuery": string}]}. imageQuery is required for layouts marked image and omitted otherwise.
 Return exactly the requested number of cards with positions 1 to N in order.
 takeaway is one sentence stating the card's point, at most 200 characters.
 role and layout must be values from the supplied schema. Choose the layout whose description fits the content the card needs, and vary layouts where the content allows.
@@ -47,6 +48,7 @@ When the deck has at least three cards, open with an opening card and end with a
 No styling, colors, CSS, HTML, or coordinates.`
 
 const draftSystemPrompt = `You write presentation cards from an approved plan.
+For a layout marked image, draft only its text nodes; the photo is added for you.
 Return one JSON object: {"cards": [card, ...]} with exactly one card for each requested position.
 Each card follows the supplied card and node shapes exactly, uses the layout from its plan entry, and satisfies that layout's node counts, its item counts, and the character limits in the schema.
 Text may use **bold** and *italic*; no other markup, HTML, links, or emoji.
@@ -66,6 +68,8 @@ type cardPlanEntry struct {
 	Layout    string   `json:"layout"`
 	Evidence  string   `json:"evidence"`
 	SourceIDs []string `json:"sourceIds"`
+	// ImageQuery describes the photo an image layout should show.
+	ImageQuery string `json:"imageQuery,omitempty"`
 }
 
 type cardPlan struct {
@@ -75,8 +79,28 @@ type cardPlan struct {
 
 // draftingSchema is the part of the converter's schema the planner checks.
 type draftingSchema struct {
-	Roles   []string                   `json:"roles"`
-	Layouts map[string]json.RawMessage `json:"layouts"`
+	Roles   []string `json:"roles"`
+	Layouts map[string]struct {
+		Image bool `json:"image"`
+	} `json:"layouts"`
+}
+
+// maxImagesPerDeck keeps a deck within the stock provider's hourly quota,
+// which is shared by every generation using the same key.
+const maxImagesPerDeck = 6
+
+// textFallbackLayouts replace an image layout whose image could not be found.
+// Each holds the text the image layout's content rules allow.
+var textFallbackLayouts = map[string]string{
+	"image-left":  "statement",
+	"image-right": "statement",
+	"cover":       "title",
+}
+
+// placedImage is an image resolved for one card.
+type placedImage struct {
+	asset carddocument.Asset
+	alt   string
 }
 
 type citedSource struct {
@@ -95,13 +119,16 @@ type cardDrafter struct {
 	converter *carddocument.Converter
 	store     carddocument.ObjectStore
 	generate  generateFunc
+	// images is nil when no image source is configured; plans then use text
+	// layouts only.
+	images imageSource
 
 	schemaMu sync.Mutex
 	schema   json.RawMessage
 }
 
-func newCardDrafter(converter *carddocument.Converter, store carddocument.ObjectStore, generate generateFunc) *cardDrafter {
-	return &cardDrafter{converter: converter, store: store, generate: generate}
+func newCardDrafter(converter *carddocument.Converter, store carddocument.ObjectStore, generate generateFunc, images imageSource) *cardDrafter {
+	return &cardDrafter{converter: converter, store: store, generate: generate, images: images}
 }
 
 // drafting tracks one job's calls so every token is counted, including those
@@ -113,6 +140,8 @@ type drafting struct {
 	parsed  draftingSchema
 	sources []citedSource
 	tokens  int
+	// images holds the resolved image of each card position that shows one.
+	images map[int]placedImage
 }
 
 func (d *drafting) call(ctx context.Context, promptName, system, user string, maxOutput int) (map[string]any, error) {
@@ -151,11 +180,12 @@ func (drafter *cardDrafter) Draft(ctx context.Context, job streamJob) (draftResu
 	if err != nil {
 		return draftResult{}, err
 	}
+	d.resolveImages(ctx, &plan)
 	cards, err := d.draft(ctx, plan)
 	if err != nil {
 		return draftResult{}, err
 	}
-	document, issue, err := drafter.converter.Assemble(ctx, plan.Title, defaultCardTheme, cards)
+	document, issue, err := drafter.converter.Assemble(ctx, plan.Title, defaultCardTheme, cards, d.assetIDs())
 	if err != nil {
 		return draftResult{}, err
 	}
@@ -203,6 +233,9 @@ func (drafter *cardDrafter) Draft(ctx context.Context, job streamJob) (draftResu
 		commit: func(ctx context.Context, tx *sql.Tx) (map[string]any, error) {
 			// A generation is the first revision of its document. A retried
 			// generation belongs to a failed presentation, which has none.
+			if err := carddocument.RecordAssetsTx(ctx, tx, d.assets()); err != nil {
+				return nil, err
+			}
 			committed, err := carddocument.CommitTx(ctx, tx, 0, revision)
 			if err != nil {
 				return nil, err
@@ -238,7 +271,96 @@ func (d *drafting) context() string {
 	} else {
 		builder.WriteString("No research sources were supplied; leave sourceIds empty.\n")
 	}
+	if d.drafter.images != nil {
+		fmt.Fprintf(&builder, "Layouts marked image show a stock photo. Use them for at most %d cards where a photo helps the point, and give each an imageQuery: a concrete visual search of two to six words, describing a scene or object, with no text, logos, or named people.\n", d.maxImages())
+	} else {
+		builder.WriteString("Photos are unavailable: never use layouts marked image.\n")
+	}
 	return builder.String()
+}
+
+func (d *drafting) maxImages() int {
+	return min(maxImagesPerDeck, max(2, (d.job.slideCount+1)/2))
+}
+
+func (d *drafting) assets() []carddocument.Asset {
+	assets := make([]carddocument.Asset, 0, len(d.images))
+	for _, image := range d.images {
+		assets = append(assets, image.asset)
+	}
+	return assets
+}
+
+func (d *drafting) assetIDs() []string {
+	ids := make([]string, 0, len(d.images))
+	for _, image := range d.images {
+		ids = append(ids, image.asset.SHA256)
+	}
+	return ids
+}
+
+// resolveImages finds and stores a photo for every card whose layout shows
+// one, up to the deck's limit. A card whose photo cannot be found switches to a text layout before it
+// is drafted, so the deck never shows a placeholder.
+func (d *drafting) resolveImages(ctx context.Context, plan *cardPlan) {
+	d.images = map[int]placedImage{}
+	var mu sync.Mutex
+	positions := []int{}
+	for index, entry := range plan.Cards {
+		// A plan that asks for more photos than a deck may use keeps the first
+		// ones; the rest switch to text layouts below, like a failed search.
+		if d.parsed.Layouts[entry.Layout].Image && len(positions) < d.maxImages() {
+			positions = append(positions, index)
+		}
+	}
+	_ = runBounded(ctx, 3, positions, func(ctx context.Context, index int) error {
+		entry := plan.Cards[index]
+		found, err := d.drafter.images.Find(ctx, imageRequest{Query: entry.ImageQuery})
+		var asset carddocument.Asset
+		if err == nil {
+			asset, err = carddocument.PrepareAsset(ctx, d.drafter.store, d.job.presentationID, found.Data, found.Source)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			slog.WarnContext(ctx, "card image unavailable, using a text layout", "position", entry.Position, "error", err)
+			return nil
+		}
+		d.images[entry.Position] = placedImage{asset: asset, alt: found.Alt}
+		return nil
+	})
+	for index, entry := range plan.Cards {
+		if d.parsed.Layouts[entry.Layout].Image {
+			if _, ok := d.images[entry.Position]; !ok {
+				plan.Cards[index].Layout = textFallbackLayouts[entry.Layout]
+				plan.Cards[index].ImageQuery = ""
+			}
+		}
+	}
+}
+
+// withImage places the card's resolved image first in its drafted nodes. The
+// model never writes image nodes, so any it wrote are dropped.
+func (d *drafting) withImage(position int, draft json.RawMessage) json.RawMessage {
+	image, ok := d.images[position]
+	if !ok || len(draft) == 0 {
+		return draft
+	}
+	var card map[string]any
+	if json.Unmarshal(draft, &card) != nil || card == nil {
+		return draft
+	}
+	nodes, _ := card["nodes"].([]any)
+	kept := []any{map[string]any{"type": "image", "assetId": image.asset.SHA256, "alt": image.alt, "fit": "cover"}}
+	for _, node := range nodes {
+		if object, ok := node.(map[string]any); ok && object["type"] == "image" {
+			continue
+		}
+		kept = append(kept, node)
+	}
+	card["nodes"] = kept
+	encoded, _ := json.Marshal(card)
+	return encoded
 }
 
 func (d *drafting) plan(ctx context.Context) (cardPlan, error) {
@@ -286,8 +408,18 @@ func (d *drafting) checkPlan(plan *cardPlan) error {
 		if !contains(d.parsed.Roles, entry.Role) {
 			return fmt.Errorf("card %d role %q is not one of %s", entry.Position, entry.Role, strings.Join(d.parsed.Roles, ", "))
 		}
-		if _, ok := d.parsed.Layouts[entry.Layout]; !ok {
+		layout, ok := d.parsed.Layouts[entry.Layout]
+		if !ok {
 			return fmt.Errorf("card %d layout %q is not a known layout", entry.Position, entry.Layout)
+		}
+		if layout.Image {
+			if d.drafter.images == nil {
+				return fmt.Errorf("card %d uses image layout %q, but photos are unavailable", entry.Position, entry.Layout)
+			}
+			query := strings.TrimSpace(entry.ImageQuery)
+			if query == "" || utf8.RuneCountInString(query) > 100 {
+				return fmt.Errorf("card %d needs an imageQuery of 1-100 characters for layout %q", entry.Position, entry.Layout)
+			}
 		}
 		for _, id := range entry.SourceIDs {
 			if !known[id] {
@@ -337,9 +469,9 @@ func (d *drafting) draft(ctx context.Context, plan cardPlan) ([]json.RawMessage,
 		drafts := draftsByPosition(response)
 		inputs := make([]carddocument.DraftInput, len(batch))
 		for index, entry := range batch {
-			inputs[index] = carddocument.DraftInput{Position: entry.Position, Takeaway: entry.Takeaway, Role: entry.Role, Draft: drafts[entry.Position]}
+			inputs[index] = carddocument.DraftInput{Position: entry.Position, Takeaway: entry.Takeaway, Role: entry.Role, Draft: d.withImage(entry.Position, drafts[entry.Position])}
 		}
-		results, err := d.drafter.converter.ConvertCards(ctx, d.job.operationID, d.sourceIDs(), inputs)
+		results, err := d.drafter.converter.ConvertCards(ctx, d.job.operationID, d.sourceIDs(), d.assetIDs(), inputs)
 		if err != nil {
 			return nil, err
 		}
@@ -409,7 +541,8 @@ func (d *drafting) repair(ctx context.Context, plan []byte, input carddocument.D
 		card, _ := response["card"].(map[string]any)
 		delete(card, "position")
 		input.Draft, _ = json.Marshal(card)
-		results, err := d.drafter.converter.ConvertCards(ctx, d.job.operationID, d.sourceIDs(), []carddocument.DraftInput{input})
+		input.Draft = d.withImage(input.Position, input.Draft)
+		results, err := d.drafter.converter.ConvertCards(ctx, d.job.operationID, d.sourceIDs(), d.assetIDs(), []carddocument.DraftInput{input})
 		if err != nil {
 			return nil, err
 		}

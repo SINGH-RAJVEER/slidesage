@@ -92,14 +92,17 @@ func (converter *Converter) Schema(ctx context.Context) (json.RawMessage, error)
 
 // ConvertCards validates drafted cards independently, so one invalid card is
 // returned as an issue for targeted repair while the others convert.
-func (converter *Converter) ConvertCards(ctx context.Context, operationID string, sourceIDs []string, cards []DraftInput) ([]CardResult, error) {
+func (converter *Converter) ConvertCards(ctx context.Context, operationID string, sourceIDs, assetIDs []string, cards []DraftInput) ([]CardResult, error) {
 	if sourceIDs == nil {
 		sourceIDs = []string{}
+	}
+	if assetIDs == nil {
+		assetIDs = []string{}
 	}
 	var response struct {
 		Results []CardResult `json:"results"`
 	}
-	err := converter.do(ctx, http.MethodPost, "/v1/cards", map[string]any{"operationId": operationID, "sourceIds": sourceIDs, "cards": cards}, &response)
+	err := converter.do(ctx, http.MethodPost, "/v1/cards", map[string]any{"operationId": operationID, "sourceIds": sourceIDs, "assetIds": assetIDs, "cards": cards}, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -111,12 +114,15 @@ func (converter *Converter) ConvertCards(ctx context.Context, operationID string
 
 // Assemble orders converted cards into a validated document. A document the
 // schema refuses is reported as an Issue rather than an error.
-func (converter *Converter) Assemble(ctx context.Context, title, theme string, cards []json.RawMessage) (json.RawMessage, *Issue, error) {
+func (converter *Converter) Assemble(ctx context.Context, title, theme string, cards []json.RawMessage, assetIDs []string) (json.RawMessage, *Issue, error) {
+	if assetIDs == nil {
+		assetIDs = []string{}
+	}
 	var response struct {
 		Document json.RawMessage `json:"document"`
 		Issue    *Issue          `json:"issue"`
 	}
-	err := converter.do(ctx, http.MethodPost, "/v1/documents", map[string]any{"title": title, "theme": theme, "cards": cards}, &response)
+	err := converter.do(ctx, http.MethodPost, "/v1/documents", map[string]any{"title": title, "theme": theme, "cards": cards, "assetIds": assetIDs}, &response)
 	var converterErr *ConverterError
 	if errors.As(err, &converterErr) && converterErr.Status == http.StatusUnprocessableEntity {
 		return nil, response.Issue, nil

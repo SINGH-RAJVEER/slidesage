@@ -150,7 +150,7 @@ func TestCardDrafterPlansDraftsRepairsAndStores(t *testing.T) {
 	}
 
 	store := &memoryObjects{}
-	drafter := newCardDrafter(converter, store, generate)
+	drafter := newCardDrafter(converter, store, generate, nil)
 	job := streamJob{
 		kind: "generation", presentationID: "presentation-1", userID: "user-1", operationID: "operation-1",
 		prompt: "Grid storage", slideCount: 3, detailLevel: "balanced", tonality: "professional",
@@ -196,7 +196,7 @@ func TestCardDrafterRefusesAPlanThatNeverReachesTheRequestedCount(t *testing.T) 
 	generate := func(context.Context, streamJob, string, string, string, int) (map[string]any, int, error) {
 		return decoded(t, `{"title": "Short", "cards": [{"position": 1, "takeaway": "Only", "role": "opening", "layout": "title", "evidence": "e"}]}`), 1, nil
 	}
-	drafter := newCardDrafter(converter, &memoryObjects{}, generate)
+	drafter := newCardDrafter(converter, &memoryObjects{}, generate, nil)
 	_, err := drafter.Draft(context.Background(), streamJob{kind: "generation", presentationID: "p", userID: "u", operationID: "o", slideCount: 4})
 	if err == nil || !strings.Contains(err.Error(), "exactly 4 are required") {
 		t.Fatalf("error = %v", err)

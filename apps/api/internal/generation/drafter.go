@@ -45,5 +45,5 @@ func configureCardDrafter(h *handler) (documentDrafter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newCardDrafter(carddocument.ConverterFromEnv(), store, h.generateJSON), nil
+	return newCardDrafter(carddocument.ConverterFromEnv(), store, h.generateJSON, pexelsSourceFromEnv()), nil
 }

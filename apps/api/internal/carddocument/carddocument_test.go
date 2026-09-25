@@ -139,13 +139,13 @@ func TestConverterClassifiesFailures(t *testing.T) {
 	converter := NewConverter(server.URL, server.Client())
 	ctx := context.Background()
 
-	results, err := converter.ConvertCards(ctx, "op", nil, []DraftInput{{Position: 1, Takeaway: "t", Role: "evidence", Draft: json.RawMessage(`{}`)}})
+	results, err := converter.ConvertCards(ctx, "op", nil, nil, []DraftInput{{Position: 1, Takeaway: "t", Role: "evidence", Draft: json.RawMessage(`{}`)}})
 	if err != nil || results[0].Issue == nil || results[0].Issue.Path != "card.layout" || header != "2" {
 		t.Fatalf("results = %+v, err = %v, header = %q", results, err, header)
 	}
 
 	status = http.StatusUnprocessableEntity
-	_, issue, err := converter.Assemble(ctx, "Title", "slate", nil)
+	_, issue, err := converter.Assemble(ctx, "Title", "slate", nil, nil)
 	if err != nil || issue == nil || issue.Path != "document.cardOrder" {
 		t.Fatalf("issue = %+v, err = %v", issue, err)
 	}
@@ -155,7 +155,7 @@ func TestConverterClassifiesFailures(t *testing.T) {
 		temporary bool
 	}{{http.StatusServiceUnavailable, true}, {http.StatusConflict, false}, {http.StatusBadRequest, false}} {
 		status = test.status
-		_, err := converter.ConvertCards(ctx, "op", nil, nil)
+		_, err := converter.ConvertCards(ctx, "op", nil, nil, nil)
 		var converterErr *ConverterError
 		if !errors.As(err, &converterErr) || converterErr.Temporary() != test.temporary {
 			t.Fatalf("status %d: error = %v", test.status, err)
