@@ -1,17 +1,25 @@
 import {
 	addCard,
 	type CardDocument,
+	canAddImage,
 	compatibleLayouts,
 	deleteCard,
 	duplicateCard,
 	type LayoutId,
 	moveCard,
+	removeImage,
 	setLayout,
 } from "@slidesage/cards";
 import { Button } from "@slidesage/ui/components/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@slidesage/ui/components/select";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@slidesage/ui/components/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@slidesage/ui/components/tooltip";
-import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, ImageMinus, ImagePlus, Plus, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { DocumentEdit } from "./CardView";
 
@@ -28,7 +36,17 @@ const LAYOUT_NAMES: Record<LayoutId, string> = {
 	cover: "Photo cover",
 };
 
-function Action({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: ReactNode }) {
+function Action({
+	label,
+	onClick,
+	disabled,
+	children,
+}: {
+	label: string;
+	onClick: () => void;
+	disabled?: boolean;
+	children: ReactNode;
+}) {
 	return (
 		<Tooltip>
 			<TooltipTrigger asChild>
@@ -53,22 +71,37 @@ export interface CardToolbarProps {
 	document: CardDocument;
 	cardId: string;
 	edit: DocumentEdit;
+	/** Opens the photo picker for this card. */
+	onPhoto?: (cardId: string) => void;
 }
 
 /**
  * Actions for one card while editing. It sits above the card rather than on
  * it, so the card surface shows only the card's own content.
  */
-export function CardToolbar({ document, cardId, edit }: CardToolbarProps) {
+export function CardToolbar({ document, cardId, edit, onPhoto }: CardToolbarProps) {
 	const card = document.cards[cardId];
 	const index = document.cardOrder.indexOf(cardId);
 	if (!card) return null;
 	const layouts = compatibleLayouts(card);
+	const hasImage = card.nodes.some((node) => node.type === "image");
 
 	return (
-		<div role="toolbar" aria-label={`Card ${index + 1} actions`} className="flex items-center gap-1 pb-2">
-			<Select value={card.layout} onValueChange={(layout) => edit((current) => setLayout(current, cardId, layout as LayoutId))}>
-				<SelectTrigger aria-label="Card layout" className="h-8 w-40 border-white/10 bg-transparent text-xs text-white/70">
+		<div
+			role="toolbar"
+			aria-label={`Card ${index + 1} actions`}
+			className="flex items-center gap-1 pb-2"
+		>
+			<Select
+				value={card.layout}
+				onValueChange={(layout) =>
+					edit((current) => setLayout(current, cardId, layout as LayoutId))
+				}
+			>
+				<SelectTrigger
+					aria-label="Card layout"
+					className="h-8 w-40 border-white/10 bg-transparent text-xs text-white/70"
+				>
 					<SelectValue />
 				</SelectTrigger>
 				<SelectContent>
@@ -80,7 +113,34 @@ export function CardToolbar({ document, cardId, edit }: CardToolbarProps) {
 				</SelectContent>
 			</Select>
 			<div className="ml-auto flex items-center gap-1">
-				<Action label="Move card up" disabled={index === 0} onClick={() => edit((current) => moveCard(current, cardId, -1))}>
+				{onPhoto && (
+					<Action
+						label={
+							hasImage
+								? "Replace photo"
+								: canAddImage(card)
+									? "Add photo"
+									: "This card has too much text for a photo"
+						}
+						disabled={!hasImage && !canAddImage(card)}
+						onClick={() => onPhoto(cardId)}
+					>
+						<ImagePlus className="size-4" />
+					</Action>
+				)}
+				{hasImage && (
+					<Action
+						label="Remove photo"
+						onClick={() => edit((current) => removeImage(current, cardId))}
+					>
+						<ImageMinus className="size-4" />
+					</Action>
+				)}
+				<Action
+					label="Move card up"
+					disabled={index === 0}
+					onClick={() => edit((current) => moveCard(current, cardId, -1))}
+				>
 					<ArrowUp className="size-4" />
 				</Action>
 				<Action
@@ -90,7 +150,10 @@ export function CardToolbar({ document, cardId, edit }: CardToolbarProps) {
 				>
 					<ArrowDown className="size-4" />
 				</Action>
-				<Action label="Duplicate card" onClick={() => edit((current) => duplicateCard(current, cardId))}>
+				<Action
+					label="Duplicate card"
+					onClick={() => edit((current) => duplicateCard(current, cardId))}
+				>
 					<Copy className="size-4" />
 				</Action>
 				<Action label="Add card below" onClick={() => edit((current) => addCard(current, cardId))}>

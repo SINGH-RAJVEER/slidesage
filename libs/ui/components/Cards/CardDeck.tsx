@@ -14,10 +14,19 @@ export interface CardDeckProps {
 	assetUrl?: (assetId: string) => string;
 	/** Present while editing: text becomes editable and each card gets its actions. */
 	edit?: DocumentEdit;
+	/** Opens the photo picker for a card while editing. */
+	onPhoto?: (cardId: string) => void;
 }
 
 /** Renders a saved card document in reading order. */
-export function CardDeck({ document, sources = [], assets, assetUrl, edit }: CardDeckProps) {
+export function CardDeck({
+	document,
+	sources = [],
+	assets,
+	assetUrl,
+	edit,
+	onPhoto,
+}: CardDeckProps) {
 	const theme = CARD_THEMES[document.theme];
 	const citations = Object.fromEntries(
 		sources.map((source, index) => [
@@ -32,7 +41,9 @@ export function CardDeck({ document, sources = [], assets, assetUrl, edit }: Car
 				if (!card) return null;
 				return (
 					<li key={cardID}>
-						{edit && <CardToolbar document={document} cardId={cardID} edit={edit} />}
+						{edit && (
+							<CardToolbar document={document} cardId={cardID} edit={edit} onPhoto={onPhoto} />
+						)}
 						<CardView
 							card={card}
 							theme={theme}

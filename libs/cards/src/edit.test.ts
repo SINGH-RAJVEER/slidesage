@@ -3,13 +3,16 @@ import { assembleDocument, convertCards } from "./convert";
 import {
 	addCard,
 	addListItem,
+	canAddImage,
 	compatibleLayouts,
 	deleteCard,
 	duplicateCard,
 	moveCard,
 	newId,
 	normalizeRuns,
+	removeImage,
 	removeListItem,
+	setImage,
 	setItemText,
 	setLayout,
 	setNodeText,
@@ -145,5 +148,45 @@ describe("edit operations", () => {
 		expect(
 			normalizeRuns([{ text: "a" }, { text: "" }, { text: "b" }, { text: "c", italic: true }]),
 		).toEqual([{ text: "ab" }, { text: "c", italic: true }]);
+	});
+});
+
+describe("photos", () => {
+	const asset = "c".repeat(64);
+
+	it("adds a photo in a layout that fits, replaces it, and removes it", () => {
+		const document = deck();
+		const bullets = document.cardOrder[1] ?? "";
+		const card = document.cards[bullets];
+		if (!card) throw new Error("fixture");
+		expect(canAddImage(card)).toBe(true);
+
+		const added = setImage(document, bullets, asset, "Batteries");
+		expect(added.cards[bullets]?.layout).toBe("image-right");
+		expect(added.cards[bullets]?.nodes[0]).toMatchObject({
+			type: "image",
+			assetId: asset,
+			alt: "Batteries",
+		});
+		expect(validateCardDocument(added, { knownAssets: new Set([asset]) }).ok).toBe(true);
+
+		const other = "d".repeat(64);
+		const replaced = setImage(added, bullets, other, "Solar");
+		expect(replaced.cards[bullets]?.nodes).toHaveLength(3);
+		expect(replaced.cards[bullets]?.nodes[0]).toMatchObject({ assetId: other, alt: "Solar" });
+
+		const removed = removeImage(replaced, bullets);
+		expect(removed.cards[bullets]?.layout).toBe("bullets");
+		expect(removed.cards[bullets]?.nodes.some((node) => node.type === "image")).toBe(false);
+		valid(removed);
+	});
+
+	it("puts a title card's photo behind it", () => {
+		const document = deck();
+		const title = document.cardOrder[0] ?? "";
+		const added = setImage(document, title, asset, "Grid");
+		expect(added.cards[title]?.layout).toBe("cover");
+		// A heading alone fits no statement, so it returns to a title card.
+		expect(removeImage(added, title).cards[title]?.layout).toBe("title");
 	});
 });

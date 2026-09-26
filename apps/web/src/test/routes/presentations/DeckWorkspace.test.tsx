@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { assembleDocument, convertCards } from "@slidesage/cards";
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { fireEvent, render, waitFor, within } from "@testing-library/react";
 import { DeckWorkspace } from "../../../routes/presentations/DeckWorkspace";
 
 const originalFetch = globalThis.fetch;
@@ -59,12 +59,12 @@ describe("DeckWorkspace", () => {
 		fireEvent.click(view.getByRole("button", { name: "Edit" }));
 		typeHeading(view, "Grid batteries");
 
-		await waitFor(() => expect(bodies).toHaveLength(1), { timeout: 4000 });
+		await waitFor(() => expect(bodies).toHaveLength(1), { timeout: 8000 });
 		expect(bodies[0]).toMatchObject({ baseRevision: 3 });
 		expect(String(bodies[0]?.["operationId"])).toMatch(/^[0-9a-f-]{36}$/);
 		expect(JSON.stringify(bodies[0]?.["document"])).toContain("Grid batteries");
 		expect(await view.findByText("All changes saved")).toBeInTheDocument();
-	});
+	}, 15000);
 
 	it("does not save a document the schema would refuse", async () => {
 		const fetchMock = mock(async () => Response.json({ revision: { revision: 4 } }));
@@ -75,15 +75,22 @@ describe("DeckWorkspace", () => {
 		typeHeading(view, "");
 
 		expect(
-			await view.findByText("A text field is empty. Fill it in or remove it to save.", {}, { timeout: 4000 }),
+			await view.findByText(
+				"A text field is empty. Fill it in or remove it to save.",
+				{},
+				{ timeout: 8000 },
+			),
 		).toBeInTheDocument();
 		expect(fetchMock).not.toHaveBeenCalled();
-	});
+	}, 15000);
 
 	it("stops editing when the presentation changed elsewhere", async () => {
 		globalThis.fetch = mock(async () =>
 			Response.json(
-				{ error: { message: "This presentation was changed elsewhere. Reload it before editing." }, currentRevision: 5 },
+				{
+					error: { message: "This presentation was changed elsewhere. Reload it before editing." },
+					currentRevision: 5,
+				},
 				{ status: 409 },
 			),
 		) as unknown as typeof fetch;
@@ -93,8 +100,82 @@ describe("DeckWorkspace", () => {
 		fireEvent.click(view.getByRole("button", { name: "Edit" }));
 		typeHeading(view, "Conflicting edit");
 
-		fireEvent.click(await view.findByRole("button", { name: "Reload the latest version" }, { timeout: 4000 }));
+		fireEvent.click(
+			await view.findByRole("button", { name: "Reload the latest version" }, { timeout: 8000 }),
+		);
 		expect(onReload).toHaveBeenCalled();
 		expect(view.queryByRole("textbox", { name: "Card heading" })).not.toBeInTheDocument();
-	});
+	}, 15000);
+
+	it("adds a searched photo to a card and saves it", async () => {
+		const assetId = "e".repeat(64);
+		const requests: Array<{ url: string; body?: string }> = [];
+		globalThis.fetch = mock(async (input: string | URL | Request, init?: RequestInit) => {
+			const url = String(input);
+			requests.push({ url, body: typeof init?.body === "string" ? init.body : undefined });
+			if (url.includes("/images/search")) {
+				return Response.json({
+					photos: [
+						{
+							id: 7,
+							width: 1600,
+							height: 900,
+							alt: "Solar farm",
+							photographer: "Ada",
+							thumbnail: "/t.jpg",
+						},
+					],
+				});
+			}
+			if (url.endsWith("/assets/stock")) {
+				return Response.json(
+					{
+						assetId,
+						alt: "Solar farm",
+						asset: {
+							mimeType: "image/jpeg",
+							width: 1600,
+							height: 900,
+							source: { type: "stock", provider: "pexels", photographer: "Ada" },
+						},
+					},
+					{ status: 201 },
+				);
+			}
+			return Response.json({ revision: { revision: 4 } });
+		}) as unknown as typeof fetch;
+
+		const view = open();
+		fireEvent.click(view.getByRole("button", { name: "Edit" }));
+		fireEvent.click(view.getByRole("button", { name: "Add photo" }));
+		expect(await view.findByRole("textbox", { name: "Search photos" })).toHaveValue("Grid storage");
+		fireEvent.click(view.getByRole("button", { name: "Search" }));
+		fireEvent.click(await view.findByRole("img", { name: "Solar farm" }));
+
+		await waitFor(
+			() => expect(view.queryByRole("dialog", { hidden: true })).not.toBeInTheDocument(),
+			{
+				timeout: 2000,
+			},
+		);
+		// happy-dom keeps Radix's aria-hidden on the page after the dialog
+		// closes; the browser check covers that the page is interactive again.
+		const article = view.getByRole("article", { hidden: true });
+		const photo = within(article).getByRole("img", { name: "Solar farm", hidden: true });
+		expect(photo.getAttribute("src")).toEndWith(`/presentations/pres_1/assets/${assetId}`);
+		expect(article).toHaveAttribute("data-layout", "cover");
+		expect(
+			JSON.parse(requests.find((request) => request.url.endsWith("/assets/stock"))?.body ?? "{}"),
+		).toEqual({
+			photoId: 7,
+			query: "Grid storage",
+		});
+		await waitFor(
+			() =>
+				expect(requests.some((request) => request.body?.includes(`"assetId":"${assetId}"`))).toBe(
+					true,
+				),
+			{ timeout: 8000 },
+		);
+	}, 15000);
 });

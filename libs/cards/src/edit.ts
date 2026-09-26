@@ -344,3 +344,66 @@ export function syncTakeaway(document: CardDocument, cardId: string): CardDocume
 		return text ? { ...card, takeaway: text.slice(0, 200) } : card;
 	});
 }
+
+const IMAGE_LAYOUT_PREFERENCE: LayoutId[] = ["image-right", "image-left", "cover"];
+const TEXT_LAYOUT_PREFERENCE: LayoutId[] = [
+	"statement",
+	"bullets",
+	"title",
+	"comparison",
+	"process",
+	"quote",
+	"stats",
+];
+
+/** Whether a photo can be added to the card without changing its text. */
+export function canAddImage(card: Card): boolean {
+	if (card.nodes.some((node) => node.type === "image")) return true;
+	const withImage: ContentNode[] = [
+		{ id: "n_preview", type: "image", assetId: "0".repeat(64), alt: "preview", fit: "cover" },
+		...card.nodes,
+	];
+	return IMAGE_LAYOUT_PREFERENCE.some((layout) => layoutMismatch(layout, withImage) === null);
+}
+
+/**
+ * Shows an image on a card: replaces the card's photo, or adds one and moves
+ * the card to the first image layout its text fits. A card whose text fits no
+ * image layout is left unchanged.
+ */
+export function setImage(
+	document: CardDocument,
+	cardId: string,
+	assetId: string,
+	alt: string,
+): CardDocument {
+	const card = document.cards[cardId];
+	if (!card) return document;
+	const existing = card.nodes.find((node) => node.type === "image");
+	if (existing) {
+		return withNode(document, cardId, existing.id, (node) =>
+			node.type === "image" ? { ...node, assetId, alt, focus: undefined } : node,
+		);
+	}
+	const nodes: ContentNode[] = [
+		{ id: newId("n"), type: "image", assetId, alt, fit: "cover" },
+		...card.nodes,
+	];
+	const layout = IMAGE_LAYOUT_PREFERENCE.find(
+		(candidate) => layoutMismatch(candidate, nodes) === null,
+	);
+	if (!layout) return document;
+	return withCard(document, cardId, (current) => ({ ...current, layout, nodes }));
+}
+
+/** Removes a card's photo and moves it to the first text layout that fits. */
+export function removeImage(document: CardDocument, cardId: string): CardDocument {
+	const card = document.cards[cardId];
+	if (!card?.nodes.some((node) => node.type === "image")) return document;
+	const nodes = card.nodes.filter((node) => node.type !== "image");
+	const layout = TEXT_LAYOUT_PREFERENCE.find(
+		(candidate) => layoutMismatch(candidate, nodes) === null,
+	);
+	if (!layout) return document;
+	return withCard(document, cardId, (current) => ({ ...current, layout, nodes }));
+}
