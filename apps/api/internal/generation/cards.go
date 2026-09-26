@@ -122,6 +122,9 @@ type cardDrafter struct {
 	// images is nil when no image source is configured; plans then use text
 	// layouts only.
 	images imageSource
+	// recordAssets records a photo as soon as it is stored, so the streamed
+	// preview can show it before the revision commits. Nil skips it.
+	recordAssets func(ctx context.Context, assets []carddocument.Asset) error
 
 	schemaMu sync.Mutex
 	schema   json.RawMessage
@@ -164,23 +167,48 @@ func (drafter *cardDrafter) loadSchema(ctx context.Context) (json.RawMessage, er
 	return schema, nil
 }
 
+// start prepares one job's drafting: the schema its prompts and checks use,
+// and the research sources it may cite.
+func (drafter *cardDrafter) start(ctx context.Context, job streamJob) (*drafting, error) {
+	schema, err := drafter.loadSchema(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d := &drafting{drafter: drafter, job: job, schema: schema, sources: citedSources(job.researchPayload)}
+	if err := json.Unmarshal(schema, &d.parsed); err != nil {
+		return nil, fmt.Errorf("read drafting schema: %w", err)
+	}
+	return d, nil
+}
+
+// report sends a progress event when the job has somewhere to send it.
+func (d *drafting) report(eventType string, payload any) {
+	if d.job.report != nil {
+		d.job.report(eventType, payload)
+	}
+}
+
 func (drafter *cardDrafter) Draft(ctx context.Context, job streamJob) (draftResult, error) {
 	if job.kind != "generation" {
 		return draftResult{}, errors.New("card documents cannot be revised by AI yet")
 	}
-	schema, err := drafter.loadSchema(ctx)
+	d, err := drafter.start(ctx, job)
 	if err != nil {
 		return draftResult{}, err
 	}
-	d := &drafting{drafter: drafter, job: job, schema: schema, sources: citedSources(job.researchPayload)}
-	if err := json.Unmarshal(schema, &d.parsed); err != nil {
-		return draftResult{}, fmt.Errorf("read drafting schema: %w", err)
-	}
-	plan, err := d.plan(ctx)
-	if err != nil {
+	var plan cardPlan
+	if job.plan != nil {
+		// An approved outline was checked when it was submitted; it is checked
+		// again because the schema may have changed while the job was queued.
+		plan = *job.plan
+		if err := d.checkPlan(&plan); err != nil {
+			return draftResult{}, fmt.Errorf("approved outline: %w", err)
+		}
+	} else if plan, err = d.plan(ctx); err != nil {
 		return draftResult{}, err
 	}
 	d.resolveImages(ctx, &plan)
+	d.report("plan", planPreview(plan))
 	cards, err := d.draft(ctx, plan)
 	if err != nil {
 		return draftResult{}, err
@@ -327,6 +355,11 @@ func (d *drafting) resolveImages(ctx context.Context, plan *cardPlan) {
 			return nil
 		}
 		d.images[entry.Position] = placedImage{asset: asset, alt: found.Alt}
+		if d.drafter.recordAssets != nil {
+			if err := d.drafter.recordAssets(ctx, []carddocument.Asset{asset}); err != nil {
+				slog.WarnContext(ctx, "card image not recorded for preview", "position", entry.Position, "error", err)
+			}
+		}
 		return nil
 	})
 	for index, entry := range plan.Cards {
@@ -486,8 +519,40 @@ func (d *drafting) draft(ctx context.Context, plan cardPlan) ([]json.RawMessage,
 			converted[inputs[index].Position-1] = card
 			written = append(written, fmt.Sprintf("%d: %s", inputs[index].Position, inputs[index].Takeaway))
 		}
+		d.reportCards(converted, batch, len(written), len(plan.Cards))
 	}
 	return converted, nil
+}
+
+type previewEntry struct {
+	Position int    `json:"position"`
+	Takeaway string `json:"takeaway"`
+	Layout   string `json:"layout"`
+}
+
+// planPreview is what the viewer shows of a plan while its cards are drafted.
+func planPreview(plan cardPlan) map[string]any {
+	entries := make([]previewEntry, len(plan.Cards))
+	for index, entry := range plan.Cards {
+		entries[index] = previewEntry{Position: entry.Position, Takeaway: entry.Takeaway, Layout: entry.Layout}
+	}
+	return map[string]any{"title": plan.Title, "cards": entries}
+}
+
+// reportCards streams a finished batch. The cards are converter-validated,
+// but they are a preview: the committed revision is the document.
+func (d *drafting) reportCards(converted []json.RawMessage, batch []cardPlanEntry, completed, total int) {
+	cards := map[string]json.RawMessage{}
+	assets := map[string]carddocument.Asset{}
+	for _, entry := range batch {
+		if card := converted[entry.Position-1]; card != nil {
+			cards[fmt.Sprint(entry.Position)] = card
+		}
+		if image, ok := d.images[entry.Position]; ok {
+			assets[image.asset.SHA256] = image.asset
+		}
+	}
+	d.report("cards", map[string]any{"cards": cards, "assets": assets, "completed": completed, "total": total})
 }
 
 // draftsByPosition indexes a drafting response. A card the model left out has

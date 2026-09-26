@@ -70,7 +70,11 @@ func RegisterRoutes(mux *http.ServeMux, database *sql.DB, identity Identity, con
 		research:        config.Research,
 		draftingEnabled: carddocument.Configured(),
 	}
+	if handler.draftingEnabled {
+		handler.planner = newCardDrafter(carddocument.ConverterFromEnv(), nil, handler.generateJSON, pexelsSourceFromEnv())
+	}
 	mux.HandleFunc("POST /presentation-jobs", handler.submit)
+	mux.HandleFunc("POST /presentation-outlines", handler.outline)
 	mux.HandleFunc("GET /generation-jobs/{id}", handler.jobStatus)
 	mux.HandleFunc("GET /generation-jobs/{id}/events", handler.jobEvents)
 	mux.HandleFunc("POST /generation-jobs/{id}/cancel", handler.cancelJob)
@@ -108,16 +112,18 @@ type handler struct {
 	drafter documentDrafter
 	// draftingEnabled gates submission in the API process, which never drafts.
 	draftingEnabled bool
-	database        *sql.DB
-	identity        Identity
-	client          *http.Client
-	connections     ai.ConnectionService
-	queue           *queueClient
-	waker           Waker
-	streamContext   context.Context
-	streams         *streamLimiter
-	research        *presentation.ExaResearchService
-	sleep           func(context.Context, time.Duration) error
+	// planner writes outlines in the API process; it drafts nothing.
+	planner       *cardDrafter
+	database      *sql.DB
+	identity      Identity
+	client        *http.Client
+	connections   ai.ConnectionService
+	queue         *queueClient
+	waker         Waker
+	streamContext context.Context
+	streams       *streamLimiter
+	research      *presentation.ExaResearchService
+	sleep         func(context.Context, time.Duration) error
 }
 
 func (h *handler) body(writer http.ResponseWriter, request *http.Request, maximum int64) (string, map[string]any, bool) {

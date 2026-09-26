@@ -25,6 +25,8 @@ type submitInput struct {
 	Research        any
 	ResearchPayload *presentation.ResearchPayload
 	AI              *ai.Selection
+	// Plan is an outline the user approved; it fixes the card count.
+	Plan *cardPlan `json:",omitempty"`
 }
 
 type persistedPresentation struct {
@@ -122,6 +124,21 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 		writeError(writer, http.StatusConflict, "AI revisions of card presentations are not available yet")
 		return
 	}
+	if input.Plan != nil {
+		if h.planner == nil {
+			writeError(writer, http.StatusServiceUnavailable, "Presentation generation is not available yet")
+			return
+		}
+		d, err := h.planner.start(request.Context(), streamJob{slideCount: input.SlideCount, researchPayload: input.ResearchPayload})
+		if err != nil {
+			writeError(writer, http.StatusServiceUnavailable, "Presentation generation is not available right now")
+			return
+		}
+		if err := d.checkPlan(input.Plan); err != nil {
+			writeError(writer, http.StatusBadRequest, "The outline cannot be drafted: "+err.Error())
+			return
+		}
+	}
 
 	var job streamJob
 	var placeholder []byte
@@ -179,11 +196,23 @@ func parseSubmitInput(body map[string]any) (submitInput, error) {
 	if input.ParentID != "" && input.RetryID != "" {
 		return submitInput{}, errors.New("parent_presentation_id and retry_presentation_id are mutually exclusive")
 	}
-	slides, err := slideCount(body, input.ParentID == "")
-	if err != nil {
-		return submitInput{}, err
+	if value, found := body["plan"]; found && value != nil {
+		if input.ParentID != "" {
+			return submitInput{}, errors.New("an outline can only start a new presentation")
+		}
+		plan, err := parsePlan(value)
+		if err != nil {
+			return submitInput{}, err
+		}
+		input.Plan = plan
+		input.SlideCount = len(plan.Cards)
+	} else {
+		slides, err := slideCount(body, input.ParentID == "")
+		if err != nil {
+			return submitInput{}, err
+		}
+		input.SlideCount = slides
 	}
-	input.SlideCount = slides
 	research, err := parseResearch(body["research"])
 	if err != nil {
 		return submitInput{}, err
@@ -249,7 +278,7 @@ func (h *handler) generationJob(ctx context.Context, userID string, input submit
 	}
 	initial := generationPlaceholder(input)
 	placeholder, _ := json.Marshal(initial)
-	job := streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: presentationID, quote: quote, prompt: input.Topic, slideCount: input.SlideCount, detailLevel: input.DetailLevel, tonality: input.Tonality, research: input.Research, researchPayload: input.ResearchPayload, selection: selection, kind: "generation"}
+	job := streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: presentationID, quote: quote, prompt: input.Topic, slideCount: input.SlideCount, detailLevel: input.DetailLevel, tonality: input.Tonality, research: input.Research, researchPayload: input.ResearchPayload, selection: selection, plan: input.Plan, kind: "generation"}
 	return job, placeholder, nil
 }
 
@@ -317,6 +346,10 @@ type streamJob struct {
 	credential                                 string
 	current                                    json.RawMessage
 	requestHash                                string
+	// plan is an outline the user approved; drafting then skips planning.
+	plan *cardPlan
+	// report sends a progress event for the job. It is set by the worker.
+	report func(eventType string, payload any)
 }
 
 func generationUserPrompt(job streamJob) string {
