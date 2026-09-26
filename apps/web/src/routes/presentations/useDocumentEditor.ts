@@ -48,7 +48,11 @@ export function useDocumentEditor(options: {
 	onSaved?: (document: CardDocument, revision: number) => void;
 }): DocumentEditor {
 	const { presentationId, assetIds, onSaved } = options;
-	const [history, setHistory] = useState<History>({ past: [], present: options.initial, future: [] });
+	const [history, setHistory] = useState<History>({
+		past: [],
+		present: options.initial,
+		future: [],
+	});
 	const [status, setStatus] = useState<SaveStatus>({ state: "saved" });
 	const base = useRef(options.revision);
 	const saved = useRef<CardDocument>(options.initial);
@@ -79,7 +83,11 @@ export function useDocumentEditor(options: {
 		setHistory((current) => {
 			const previous = current.past[current.past.length - 1];
 			if (!previous) return current;
-			return { past: current.past.slice(0, -1), present: previous, future: [current.present, ...current.future] };
+			return {
+				past: current.past.slice(0, -1),
+				present: previous,
+				future: [current.present, ...current.future],
+			};
 		});
 	}, []);
 
@@ -101,7 +109,10 @@ export function useDocumentEditor(options: {
 		}
 		const checked = validateCardDocument(document, { knownAssets: new Set(assetIds) });
 		if (!checked.ok) {
-			setStatus({ state: "invalid", message: describeIssue(checked.issue.path, checked.issue.message) });
+			setStatus({
+				state: "invalid",
+				message: describeIssue(checked.issue.path, checked.issue.message),
+			});
 			return;
 		}
 		// A retry of the same document reuses its operation ID, so a save whose
@@ -111,16 +122,19 @@ export function useDocumentEditor(options: {
 		}
 		setStatus({ state: "saving" });
 		try {
-			const response = await fetch(`${API_URL}/presentations/${encodeURIComponent(presentationId)}/document`, {
-				method: "PUT",
-				credentials: "include",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					baseRevision: base.current,
-					operationId: pendingOperation.current.id,
-					document: checked.value,
-				}),
-			});
+			const response = await fetch(
+				`${API_URL}/presentations/${encodeURIComponent(presentationId)}/document`,
+				{
+					method: "PUT",
+					credentials: "include",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						baseRevision: base.current,
+						operationId: pendingOperation.current.id,
+						document: checked.value,
+					}),
+				},
+			);
 			const body = (await response.json().catch(() => null)) as {
 				revision?: { revision: number };
 				error?: { message?: string };

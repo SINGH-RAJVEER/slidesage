@@ -35,7 +35,8 @@ export default function PresentationPage() {
 	const navigate = useNavigate();
 	const { streamingState, cancelGeneration } = useStreaming();
 	const [state, setState] = useState<LoadState>({ status: "loading" });
-	const generatingHere = streamingState.isStreaming && streamingState.presentationId === presentationId;
+	const generatingHere =
+		streamingState.isStreaming && streamingState.presentationId === presentationId;
 
 	const load = useCallback(async () => {
 		try {
@@ -43,13 +44,18 @@ export default function PresentationPage() {
 				credentials: "include",
 			});
 			if (!detailResponse.ok) {
-				setState({ status: "error", message: await errorMessage(detailResponse, "Presentation not found") });
+				setState({
+					status: "error",
+					message: await errorMessage(detailResponse, "Presentation not found"),
+				});
 				return;
 			}
 			const detail = (await detailResponse.json()) as PresentationResponse;
 			const summary = detail.presentation.slides_data;
 			if (summary.status === "failed") {
-				navigate(`${ROUTES.presentationError}?id=${encodeURIComponent(presentationId)}`, { replace: true });
+				navigate(`${ROUTES.presentationError}?id=${encodeURIComponent(presentationId)}`, {
+					replace: true,
+				});
 				return;
 			}
 			if (summary.status === "generating") {
@@ -78,7 +84,10 @@ export default function PresentationPage() {
 				knownAssets: new Set(Object.keys(assets)),
 			});
 			if (!validated.ok) {
-				setState({ status: "error", message: "This presentation's saved document could not be read." });
+				setState({
+					status: "error",
+					message: "This presentation's saved document could not be read.",
+				});
 				return;
 			}
 			setState({
@@ -89,7 +98,10 @@ export default function PresentationPage() {
 				assets,
 			});
 		} catch {
-			setState({ status: "error", message: "Unable to load the presentation. Check your connection." });
+			setState({
+				status: "error",
+				message: "Unable to load the presentation. Check your connection.",
+			});
 		}
 	}, [navigate, presentationId]);
 
@@ -116,7 +128,10 @@ export default function PresentationPage() {
 					</p>
 				)}
 				{state.status === "generating" && (
-					<section className="flex flex-1 flex-col items-center justify-center gap-6" aria-live="polite">
+					<section
+						className="flex flex-1 flex-col items-center justify-center gap-6"
+						aria-live="polite"
+					>
 						<ThinkingOrb size={64} />
 						<div className="flex w-full max-w-sm flex-col items-center gap-3">
 							<p className="text-sm text-white/70">

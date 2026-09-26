@@ -35,7 +35,11 @@ function serve(status: string, document: unknown) {
 		const url = String(input);
 		if (url.endsWith("/presentations/pres_1")) {
 			return Response.json({
-				presentation: { id: "pres_1", title: "Grid storage", slides_data: { title: "Grid storage", status } },
+				presentation: {
+					id: "pres_1",
+					title: "Grid storage",
+					slides_data: { title: "Grid storage", status },
+				},
 			});
 		}
 		if (url.endsWith("/presentations/pres_1/document")) {
@@ -63,7 +67,9 @@ describe("PresentationPage", () => {
 		serve("ready", savedDocument());
 		const view = open();
 
-		expect(await view.findByRole("heading", { level: 1, name: "Grid storage" })).toBeInTheDocument();
+		expect(
+			await view.findByRole("heading", { level: 1, name: "Grid storage" }),
+		).toBeInTheDocument();
 		expect(view.getByRole("article")).toHaveAccessibleName("Card 1: Storage is now cheap");
 	});
 

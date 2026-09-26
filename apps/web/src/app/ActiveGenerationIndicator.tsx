@@ -8,7 +8,8 @@ export default function ActiveGenerationIndicator() {
 	const location = useLocation();
 	// The presentation page shows its own progress.
 	const onPresentationPage =
-		location.pathname.startsWith(`${ROUTES.presentations}/`) && location.pathname !== ROUTES.presentations;
+		location.pathname.startsWith(`${ROUTES.presentations}/`) &&
+		location.pathname !== ROUTES.presentations;
 
 	return (
 		<IndicatorView
