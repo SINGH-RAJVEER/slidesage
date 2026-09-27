@@ -19,11 +19,6 @@ output "cloud_sql_connection_name" {
 }
 
 output "presentation_gcs_bucket" {
-  description = "Private bucket for immutable canonical presentation revisions."
+  description = "Private bucket for immutable card document revisions and assets."
   value       = google_storage_bucket.presentation_revisions.name
-}
-
-output "template_gcs_bucket" {
-  description = "Existing GCS bucket used by the Cloud CDN template origin."
-  value       = data.google_storage_bucket.template_origin.name
 }

@@ -13,9 +13,9 @@ locals {
     "GITHUB_CLIENT_SECRET",
     "EXA_API_KEY",
     "OPEN_ROUTER_API_KEY",
+    "PEXELS_API_KEY",
     "RESEND_API_KEY",
     "RESEND_FROM_EMAIL",
-    "CDN_SIGNING_KEY_SECRET",
     "RAZORPAY_KEY_ID",
     "RAZORPAY_KEY_SECRET",
     "RAZORPAY_WEBHOOK_SECRET",
@@ -25,7 +25,7 @@ locals {
     "DATABASE_URL",
     "EXA_API_KEY",
     "OPEN_ROUTER_API_KEY",
-    "CDN_SIGNING_KEY_SECRET",
+    "PEXELS_API_KEY",
   ])
 
   # Telemetry export is opt-in: with no endpoint the services keep their local
@@ -137,7 +137,9 @@ resource "google_cloud_run_v2_service" "api" {
     }
 
     containers {
-      image = var.api_image
+      name       = "api"
+      image      = var.api_image
+      depends_on = ["converter"]
 
       volume_mounts {
         name       = "cloudsql"
@@ -190,16 +192,8 @@ resource "google_cloud_run_v2_service" "api" {
         value = local.presentation_gcs_bucket
       }
       env {
-        name  = "CDN_URL"
-        value = var.cdn_url
-      }
-      env {
-        name  = "CDN_SIGNING_KEY_NAME"
-        value = var.cdn_signing_key_name
-      }
-      env {
-        name  = "CDN_SIGNED_URL_TTL_SECONDS"
-        value = tostring(var.cdn_signed_url_ttl_seconds)
+        name  = "CARD_CONVERTER_URL"
+        value = "http://127.0.0.1:8090"
       }
       env {
         name  = "WORKER_WAKE_URL"
@@ -264,6 +258,39 @@ resource "google_cloud_run_v2_service" "api" {
       }
     }
 
+    containers {
+      name  = "converter"
+      image = var.converter_image
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle          = true
+        startup_cpu_boost = true
+      }
+
+      env {
+        name  = "CARD_CONVERTER_HOST"
+        value = "0.0.0.0"
+      }
+      env {
+        name  = "CARD_CONVERTER_PORT"
+        value = "8090"
+      }
+
+      startup_probe {
+        http_get {
+          path = "/health"
+          port = 8090
+        }
+        failure_threshold = 10
+        period_seconds    = 3
+        timeout_seconds   = 1
+      }
+    }
+
     volumes {
       name = "cloudsql"
       cloud_sql_instance {
@@ -312,8 +339,9 @@ resource "google_cloud_run_v2_service" "worker" {
     }
 
     containers {
-      name  = "worker-1"
-      image = var.worker_image
+      name       = "worker-1"
+      image      = var.worker_image
+      depends_on = ["converter"]
 
       volume_mounts {
         name       = "cloudsql"
@@ -370,16 +398,8 @@ resource "google_cloud_run_v2_service" "worker" {
         value = local.presentation_gcs_bucket
       }
       env {
-        name  = "CDN_URL"
-        value = var.cdn_url
-      }
-      env {
-        name  = "CDN_SIGNING_KEY_NAME"
-        value = var.cdn_signing_key_name
-      }
-      env {
-        name  = "CDN_SIGNED_URL_TTL_SECONDS"
-        value = tostring(var.cdn_signed_url_ttl_seconds)
+        name  = "CARD_CONVERTER_URL"
+        value = "http://127.0.0.1:8090"
       }
 
       dynamic "env" {
@@ -425,6 +445,39 @@ resource "google_cloud_run_v2_service" "worker" {
         period_seconds        = 3
         timeout_seconds       = 1
         initial_delay_seconds = 0
+      }
+    }
+
+    containers {
+      name  = "converter"
+      image = var.converter_image
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle          = false
+        startup_cpu_boost = true
+      }
+
+      env {
+        name  = "CARD_CONVERTER_HOST"
+        value = "0.0.0.0"
+      }
+      env {
+        name  = "CARD_CONVERTER_PORT"
+        value = "8090"
+      }
+
+      startup_probe {
+        http_get {
+          path = "/health"
+          port = 8090
+        }
+        failure_threshold = 10
+        period_seconds    = 3
+        timeout_seconds   = 1
       }
     }
 

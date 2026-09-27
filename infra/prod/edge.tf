@@ -33,28 +33,6 @@ resource "google_compute_backend_service" "api" {
   }
 }
 
-# Signed template delivery. The signing key named by var.cdn_signing_key_name is
-# created out of band with `gcloud compute backend-buckets add-signed-url-key`
-# because Cloud CDN never returns key material. Terraform does not manage keys
-# on this resource, so an apply leaves the configured key in place.
-resource "google_compute_backend_bucket" "templates" {
-  name             = "templates"
-  bucket_name      = data.google_storage_bucket.template_origin.name
-  enable_cdn       = true
-  compression_mode = "DISABLED"
-
-  cdn_policy {
-    cache_mode                   = "CACHE_ALL_STATIC"
-    client_ttl                   = 604800
-    default_ttl                  = 2592000
-    max_ttl                      = 15811200
-    negative_caching             = false
-    request_coalescing           = true
-    serve_while_stale            = 604800
-    signed_url_cache_max_age_sec = 604800
-  }
-}
-
 resource "google_compute_url_map" "api" {
   name            = "slidesage-api-map"
   default_service = google_compute_backend_service.api.id
@@ -69,10 +47,6 @@ resource "google_compute_url_map" "api" {
     name            = "api-matcher"
     default_service = google_compute_backend_service.api.id
 
-    path_rule {
-      paths   = ["/pptx-templates/*"]
-      service = google_compute_backend_bucket.templates.id
-    }
   }
 }
 

@@ -48,6 +48,15 @@ jobs:
             test -n "$image"
             echo "TF_VAR_${component}_image=$image" >> "$GITHUB_ENV"
           done
+          converter_image=$(gcloud run services describe api \
+            --project="$TF_VAR_gcp_project_id" --region=asia-south1 \
+            --format=json | jq -r '[ (.spec.template.spec.containers // .template.containers // [])[] | select(.name == "converter") | .image ][0] // empty')
+          if [ -z "$converter_image" ]; then
+            # Before the first gamma rollout the live API has no converter.
+            # Planning needs an image reference, but does not pull the image.
+            converter_image="asia-south1-docker.pkg.dev/$TF_VAR_gcp_project_id/slidesage/converter:latest"
+          fi
+          echo "TF_VAR_converter_image=$converter_image" >> "$GITHUB_ENV"
           image=$(gcloud run jobs describe slidesage-migrate \
             --project="$TF_VAR_gcp_project_id" --region=asia-south1 \
             --format='value(spec.template.spec.template.spec.containers[0].image)')

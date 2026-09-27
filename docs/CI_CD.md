@@ -1,20 +1,21 @@
 # CI/CD: Artifact Registry and Cloud Run
 
-The repository deploys its Go API and generation worker to Google Cloud Run. Every push to `main` builds versioned container images, pushes them to Artifact Registry, runs database migrations, and rolls the "latest iteration" of both services onto Cloud Run as a new revision.
+The repository deploys its Go API and generation worker to Google Cloud Run, each with a Bun card converter sidecar. Every push to `main` builds versioned container images, pushes them to Artifact Registry, runs database migrations, and rolls both services onto Cloud Run as new revisions.
 
 ## Flow
 
-1. GitHub Actions compiles the three release binaries on the runner, then builds three image targets from `apps/api/Dockerfile` with a single `docker buildx bake` over `docker-bake.hcl`. The images are `FROM scratch` and copy one binary each out of `dist/`, so the container carries no toolchain and the build is a `COPY`:
+1. GitHub Actions compiles three Go release binaries and bundles the Bun converter on the runner, then builds four image targets with one `docker buildx bake` over `docker-bake.hcl`. The Go images are `FROM scratch` and copy one binary each out of `dist/`:
    - `api` (web server, port 8000) -> Cloud Run **service** `api`
    - `worker` (River queue consumer with a health server, port 8080) -> Cloud Run **service** `worker`
    - `migrate` (Goose + River migrations, one-shot) -> Cloud Run **job** `slidesage-migrate`
+   - `converter` (card schema conversion and validation, port 8090) -> localhost **sidecar** in both `api` and `worker`
 2. Each image is tagged with the full git commit SHA (e.g. `api:a1b2c3d...`) plus `latest` and pushed to Artifact Registry.
 3. `terraform apply -target=google_cloud_run_v2_job.migrate` updates the migration job to the new image, then `gcloud run jobs execute` runs it against the database and waits.
-4. A fresh full plan and `terraform apply` point the `api` and `worker` Cloud Run services at the SHA-tagged image. Cloud Run creates a new revision and routes 100% of traffic to it, which is the "latest iteration" seen by users. Previous revisions remain available by SHA for rollback.
+4. A fresh full plan and `terraform apply` point both Cloud Run services and their converter sidecars at SHA-tagged images. Cloud Run creates new revisions and routes traffic to them. Previous revisions remain available for rollback.
 
-After this testing bookmark is merged through dev into main and the documented bootstrap is complete, Terraform will own the Cloud Run services, the job, the load balancer, and supporting IAM. The currently deployed services were created with gcloud; no adoption has been applied from this bookmark. The workflow supplies only the image references, through `TF_VAR_api_image`, `TF_VAR_worker_image`, and `TF_VAR_migrate_image`. It needs the `TF_STATE_BUCKET`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` repository secrets alongside the existing workload-identity secrets. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
+After the gamma changes reach main and the documented bootstrap is complete, Terraform will own the Cloud Run services, the job, the load balancer, and supporting IAM. The currently deployed services were created with gcloud; no adoption has been applied from this workspace. The workflow supplies `TF_VAR_api_image`, `TF_VAR_worker_image`, `TF_VAR_migrate_image`, and `TF_VAR_converter_image`. It needs the `TF_STATE_BUCKET`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` repository secrets alongside the existing workload-identity secrets. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
 
-Trigger: a push to `main` after the dev-to-main PR is merged, or a manual dispatch on `main`. Both jobs explicitly reject other refs, so dispatching from the testing bookmark cannot publish images or change production. All production runs share one concurrency group.
+Trigger: a push to `main` after the dev-to-main PR is merged, or a manual dispatch on `main`. Both jobs explicitly reject other refs, so dispatching from the gamma workspace cannot publish images or change production. All production runs share one concurrency group.
 
 A complete plan runs before the targeted migration update. Missing secrets, missing Cloudflare DNS permissions, or invalid import IDs stop deployment before any Terraform apply. The first deployment also needs the state bucket, credentials, and imports described in [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
 
@@ -41,7 +42,7 @@ Cache scope is per branch throughout: a run reads its own branch, the default br
 
 ### What is deliberately not cached
 
-**Docker layers.** Each image is a `COPY` of one binary onto `scratch`, sharing only the certificate stage, so there is nothing left that a layer cache would save. A `.dockerignore` keeps the build context to `dist/`; without it the whole repository, `.git` and `node_modules` included, is uploaded to the builder for a build that reads three files.
+**Docker layers.** The Go images copy one binary onto `scratch`, and the converter image copies one Bun bundle into a pinned Bun runtime. A `.dockerignore` keeps the build context to `dist/`; without it the whole repository, `.git` and `node_modules` included, would be uploaded to the builder.
 
 **BuildKit cache mounts.** The binaries were once compiled inside the image behind `--mount=type=cache`. Layer cache and cache-mount contents are separate mechanisms and `type=gha` carries only the former, so those mounts started empty on every run. `buildkit-cache-dance` fixed that and was measured over two releases: a warm cache took the bake from 88s to 37s, but injecting and extracting cost 17s and 52s, so 69s of overhead bought 51s of compile. Compiling on the runner removes the problem instead of paying for it.
 
@@ -72,6 +73,8 @@ asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/worker:<sha>
 asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/worker:latest
 asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/migrate:<sha>
 asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/migrate:latest
+asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/converter:<sha>
+asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/converter:latest
 ```
 
 Cloud Run runs in `asia-south1`. Change `RUN_REGION` and `REGISTRY_LOCATION` in `.github/workflows/deploy.yml` if you move regions.
@@ -157,7 +160,7 @@ API invocation policy is defined by `google_cloud_run_v2_service_iam_member.api_
 
 ## Secret Manager
 
-`DATABASE_URL`, `AUTH_SECRET`, `RATE_LIMIT_HASH_SECRET`, OAuth credentials, `EXA_API_KEY`, `OPEN_ROUTER_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `CDN_SIGNING_KEY_SECRET` are referenced by the pipeline and must exist as Secret Manager secrets (secret name + `:latest` version):
+`DATABASE_URL`, `AUTH_SECRET`, `RATE_LIMIT_HASH_SECRET`, OAuth credentials, `EXA_API_KEY`, `OPEN_ROUTER_API_KEY`, `PEXELS_API_KEY`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` are referenced by the pipeline and must exist as Secret Manager secrets (secret name + `:latest` version):
 
 ```bash
 printf "postgresql://user:pass@.../slidesage" | \
@@ -178,6 +181,8 @@ printf "<Exa API key>" | \
   gcloud secrets create EXA_API_KEY --data-file=- --project=$PROJECT_ID
 printf "<OpenRouter API key>" | \
   gcloud secrets create OPEN_ROUTER_API_KEY --data-file=- --project=$PROJECT_ID
+printf "<Pexels API key>" | \
+  gcloud secrets create PEXELS_API_KEY --data-file=- --project=$PROJECT_ID
 printf "<Resend API key>" | \
   gcloud secrets create RESEND_API_KEY --data-file=- --project=$PROJECT_ID
 printf "<verified SlideSage sender on slidesage.app>" | \
@@ -197,11 +202,9 @@ printf "<Razorpay webhook signing secret>" | \
 
 Payments are not optional. Terraform lists these secrets unconditionally, and the API refuses to start if any value is absent. This prevents a deployment from booting with dead checkout or webhook endpoints.
 
-Do not generate the Cloud CDN key independently from `CDN_SIGNING_KEY_SECRET`. Create one random 16-byte key, add its base64url value to the `templates` backend bucket under the configured `CDN_SIGNING_KEY_NAME`, then store that same value as a Secret Manager version. Google does not return the value after the CDN key is added. The current production key name is `templates-key-v2`.
-
 The API deployment sets `BASE_URL=https://api.slidesage.app` and trusts `https://slidesage.app`, `https://www.slidesage.app`, and `https://slide-sage.pages.dev` for browser authentication callbacks. Configure the provider callback URLs as `https://api.slidesage.app/auth/callback/google` and `https://api.slidesage.app/auth/callback/github`.
 
-`PRESENTATION_GCS_BUCKET`, `CDN_URL`, `CDN_SIGNING_KEY_NAME`, and `CDN_SIGNED_URL_TTL_SECONDS` reach the API and worker from `infra/prod/main.tf`. Change them there, not with `gcloud run deploy`: a direct deploy replaces the whole container specification and the next Terraform plan reverts it.
+`PRESENTATION_GCS_BUCKET` and `CARD_CONVERTER_URL` reach the API and worker from `infra/prod/main.tf`. The Go containers reach their colocated converter over localhost; only the Go ports receive Cloud Run ingress. Change runtime configuration there, since a direct `gcloud run deploy` replaces the whole container specification and the next Terraform plan reverts it.
 
 The Cloud SQL socket mount and the `roles/cloudsql.client` grant on the runtime service account are declared in `infra/prod`.
 
@@ -209,8 +212,8 @@ The Cloud SQL socket mount and the `roles/cloudsql.client` grant on the runtime 
 
 | Service | Port | Instances     | Concurrency | Notes                       |
 | ------- | ---- | ------------- | ----------- | --------------------------- |
-| `api`   | 8000 | min 0, max 10 | 80          | Scales from zero on traffic |
-| `worker` | 8080 | min 1, max 10 | 1           | Polls River and performs OpenRouter generation using `OPEN_ROUTER_API_KEY`. |
+| `api`   | 8000 | min 0, max 10 | 80          | Scales from zero on traffic; converter sidecar listens on localhost:8090 |
+| `worker` | 8080 | min 1, max 10 | 1           | River generation; converter sidecar listens on localhost:8090 |
 
 The queue worker keeps at least one instance running with CPU available between requests (`cpu_idle = false`). API-to-worker coordination uses PostgreSQL only; queued work cannot wake a Cloud Run service from zero instances. River uses row-level `SKIP LOCKED`, so concurrent workers can claim jobs safely. Monitor queue latency and size worker capacity explicitly; Cloud Run does not scale on PostgreSQL queue depth.
 
@@ -287,7 +290,9 @@ just binaries
 docker build --target api --file apps/api/Dockerfile --tag asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev .
 docker push asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev
 
-# Or all three, the way CI does:
+# Or all four, the way CI does, after bundling the converter:
+bun install --frozen-lockfile
+bun build apps/converter/src/main.ts --target bun --outfile dist/converter.js
 PROJECT_ID=slidesage-504414 IMAGE_VERSION=dev docker buildx bake -f docker-bake.hcl --push
 ```
 

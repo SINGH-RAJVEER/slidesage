@@ -4,7 +4,7 @@
 
 This is the architecture for the `gamma` workspace. It describes the target design; the part already built is listed under "Implemented so far". The defining decision is that an editable card document becomes the authoritative presentation. Browser presentation and PPTX export derive from a saved card revision.
 
-The PPTX-first pipeline this replaces has been removed from the workspace: the template-slot compiler, the template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. The production Terraform for the template CDN backend and the `presentation_revisions` table are still in place.
+The PPTX-first pipeline this replaces has been removed from the workspace: the template-slot compiler, the template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. Production Terraform now drops the template CDN route and deploys the converter with the API and worker. The legacy `presentation_revisions` table remains in the database; removing it needs a separate data-retention decision.
 
 ### Implemented so far
 
@@ -19,7 +19,7 @@ Still to build:
 
 Also open:
 
-- Production has no service for the converter. The `converter` bake target is outside the default group, and `infra/prod` does not deploy it.
+- The converter is configured as a localhost sidecar in both Cloud Run services, but this workspace has not been deployed or verified against the live environment.
 - Provenance is recorded only on successful revisions. A failed run keeps its error and retry settings but not the model, prompt version, or source IDs it used.
 - At their schema limits most layouts are taller than one 16:9 slide. The browser grows those cards instead of cropping them. Export must split or refuse them, or the limits must tighten per layout.
 
@@ -50,7 +50,7 @@ Store immutable card JSON objects in GCS by digest and keep revision metadata an
 
 ## Runtime placement
 
-The current API and worker images contain only Go binaries. They cannot run the proposed TypeScript editor-schema conversion unchanged. Package the conversion process as a separately deployed, private Bun service, or deliberately add a Bun runtime to a new worker image after measuring startup and memory costs. The Go worker calls a versioned conversion interface with timeouts and an idempotent operation ID. Keep card generation durable in River; a converter restart must not lose the job or commit a partial document. The browser and converter must ship compatible schema versions, and old card revisions must remain readable after an editor upgrade.
+The API and worker images contain only Go binaries. Production runs the Bun converter as a sidecar beside each Go container, reached at `127.0.0.1:8090` in the shared Cloud Run network namespace. The API uses it to validate saves and prepare outlines; the worker uses it to draft and assemble cards. All four runtime images are built from one commit and pinned to that commit by Terraform. This adds converter CPU and memory to each service instance, but avoids a separately exposed service and cross-service authentication. The Go processes call the versioned conversion interface with timeouts and idempotent operation IDs. Keep card generation durable in River; a converter restart must not lose the job or commit a partial document. The browser and converter must ship compatible schema versions, and old card revisions must remain readable after an editor upgrade.
 
 ## PPTX export
 
