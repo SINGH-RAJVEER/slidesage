@@ -8,13 +8,13 @@ The PPTX-first pipeline this replaces has been removed from the workspace: the t
 
 ### Implemented so far
 
-The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 1 card schema in `libs/cards`, the Bun converter service, immutable card revisions in GCS and PostgreSQL, planned and batch-drafted generation with targeted card repair, and a read-only browser renderer.
+The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 2 card schema in `libs/cards`, the Bun converter service, immutable card revisions in GCS and PostgreSQL, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, and direct editing in the browser.
 
 Still to build:
 
-- the editor schema and direct editing;
+- present mode and share links;
 - AI revisions against card and node IDs;
-- images, charts, and asset resolution;
+- charts, tables, and AI-generated images;
 - theme choice at creation;
 - PPTX export.
 
@@ -65,8 +65,8 @@ PPTX and PDF files are derived artifacts, not writable sources for the card docu
 
 1. Specify the card schema, revision rules, supported content nodes, and export contract. Build a small set of representative cards and expected browser/PPTX outputs before changing generation.
 2. Implement card storage and revision commits behind the presentation-document interface, and implement `documentDrafter` against it. (Done.)
-3. Build the constrained editor schema, conversion process, browser renderer, and direct editing for the representative cards.
-4. Add planning, bounded card drafting, asset resolution, and AI edits using the current durable job and accounting flow. (Planning and drafting are done; assets and AI edits remain.)
+3. Build the constrained editor schema, conversion process, browser renderer, and direct editing for the representative cards. (Done.)
+4. Add planning, bounded card drafting, asset resolution, and AI edits using the current durable job and accounting flow. (Planning, drafting, and photos are done; AI edits remain.)
 5. Build PPTX export for the supported card types. Expand the type set only after native export and browser comparison pass for each one.
 6. Configure the drafter so submission accepts jobs again, and restore opening presentations from the library once the card renderer can display them. (Done.)
 

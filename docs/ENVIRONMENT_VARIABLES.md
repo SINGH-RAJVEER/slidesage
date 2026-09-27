@@ -127,6 +127,8 @@ Set `VITE_API_URL=https://api.slidesage.app` for the `slidesage.app` production 
 | `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
 | `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
 | `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |
+| `PEXELS_API_KEY` | Stock photos | Yes | Pexels API key. Without it photo search returns `503` and generation drafts without photos |
+| `PEXELS_API_BASE` | No | No | Pexels API base URL; defaults to `https://api.pexels.com`. Only for tests and local stubs |
 
 The Cloud CDN signing variables (`CDN_URL`, `CDN_SIGNING_KEY_NAME`, `CDN_SIGNING_KEY_SECRET`, `CDN_SIGNED_URL_TTL_SECONDS`) were read only by the removed template fetcher and thumbnail routes. `infra/prod` still passes them to Cloud Run.
 
