@@ -36,6 +36,11 @@ export const router = createBrowserRouter([
 			{ path: "sign-up/verify-email", element: <VerifyEmailPage /> },
 			{ path: "forgot-password", element: <ForgotPasswordPage /> },
 			{ path: "reset-password", element: <ResetPasswordPage /> },
+			/* share links open without an account */
+			{
+				path: "s/:token",
+				lazy: lazyRoute(() => import("../../routes/presentations/SharedPresentationPage")),
+			},
 			{
 				element: <RequireSignedInLayout />,
 				children: [

@@ -98,6 +98,8 @@ An owner can create one read-only link per presentation. The token has 256 rando
 
 The shared routes need no sign-in. They serve only ready presentations, and they never return the revision's provenance, author, or prompt. A viewer always sees the latest saved revision. A malformed, unknown, or revoked token returns `404`. Photos are cached privately by the browser, so a viewer who already loaded one keeps it after the link is revoked.
 
+In the browser, Share on a saved deck opens a dialog that creates, replaces, or stops the link, and shows a new link once so it can be copied. The link opens `/s/:token`, which renders the deck read-only with Present and needs no account.
+
 ## Browser
 
 `/presentations/:presentationId` shows the deck as it is drafted while that presentation generates: written cards render as they will look, and cards still being written show their planned point. It then loads the saved document, validates it with `@slidesage/cards`, and renders it with `CardDeck` from `@slidesage/ui/components/Cards`. A failed presentation redirects to `/presentation-error`.

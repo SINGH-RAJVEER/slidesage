@@ -24,8 +24,9 @@ import {
 	SelectValue,
 } from "@slidesage/ui/components/select";
 import { API_URL } from "@slidesage/ui/lib/api";
-import { Check, Pencil, Play, Redo2, Undo2 } from "lucide-react";
+import { Check, Link2, Pencil, Play, Redo2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ShareDialog } from "./ShareDialog";
 import { type SaveStatus, useDocumentEditor } from "./useDocumentEditor";
 
 const THEME_NAMES: Record<ThemeId, string> = { slate: "Slate", paper: "Paper", ember: "Ember" };
@@ -69,6 +70,7 @@ export function DeckWorkspace({
 }: DeckWorkspaceProps) {
 	const [editing, setEditing] = useState(false);
 	const [presenting, setPresenting] = useState(false);
+	const [sharing, setSharing] = useState(false);
 	const [assets, setAssets] = useState(initialAssets);
 	const [photoCard, setPhotoCard] = useState<string | null>(null);
 	const assetIds = useMemo(() => Object.keys(assets), [assets]);
@@ -211,6 +213,16 @@ export function DeckWorkspace({
 				{!editing && (
 					<Button
 						variant="ghost"
+						onClick={() => setSharing(true)}
+						className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
+					>
+						<Link2 className="size-4" />
+						Share
+					</Button>
+				)}
+				{!editing && (
+					<Button
+						variant="ghost"
 						onClick={() => setPresenting(true)}
 						className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
 					>
@@ -268,6 +280,7 @@ export function DeckWorkspace({
 				choose={choosePhoto}
 				upload={uploadPhoto}
 			/>
+			<ShareDialog presentationId={presentationId} open={sharing} onOpenChange={setSharing} />
 			{presenting && (
 				<PresentMode
 					document={editor.document}

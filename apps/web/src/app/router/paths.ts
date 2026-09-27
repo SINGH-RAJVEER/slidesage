@@ -14,5 +14,6 @@ export const ROUTES = {
 	presentationById: (presentationId: string) =>
 		`/presentations/${encodeURIComponent(presentationId)}`,
 	presentationError: "/presentation-error",
+	shared: (token: string) => `/s/${encodeURIComponent(token)}`,
 	purchase: "/purchase",
 } as const;

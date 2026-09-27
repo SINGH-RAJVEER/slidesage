@@ -8,11 +8,10 @@ The PPTX-first pipeline this replaces has been removed from the workspace: the t
 
 ### Implemented so far
 
-The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 2 card schema in `libs/cards`, the Bun converter service, immutable card revisions in GCS and PostgreSQL, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, direct editing in the browser, and present mode.
+The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 2 card schema in `libs/cards`, the Bun converter service, immutable card revisions in GCS and PostgreSQL, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, direct editing in the browser, present mode, and read-only share links.
 
 Still to build:
 
-- share links;
 - AI revisions against card and node IDs;
 - charts, tables, and AI-generated images;
 - theme choice at creation;
