@@ -1,7 +1,6 @@
 import type { AIModelSelection, ResearchPayload } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
-import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { requestGenerationNotificationPermission } from "@slidesage/ui/lib/generation-notifications";
 import { ArrowLeft, ExternalLink, RefreshCw, Sparkles } from "lucide-react";
@@ -25,7 +24,7 @@ type ResearchStatus = "loading" | "ready" | "error";
 export default function GenerateResearchPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { streamingState, researchPreviewState, previewResearch, generate } = useStreaming();
+	const { streamingState, researchPreviewState, previewResearch } = useStreaming();
 
 	const routeState = location.state as ResearchRouteState | null;
 	const prompt = routeState?.prompt?.trim() ?? "";
@@ -38,10 +37,6 @@ export default function GenerateResearchPage() {
 
 	const [isProceeding, setIsProceeding] = useState(false);
 	const [researchAttempt, setResearchAttempt] = useState(0);
-	// A refused submission is reported here. Once the job is accepted the page
-	// moves to the presentation, which shows the rest of its progress.
-	const [generationError, setGenerationError] = useState<string | null>(null);
-	const submittedRef = useRef(false);
 	const isProceedingRef = useRef(false);
 
 	const researchRequest = useMemo(
@@ -81,19 +76,6 @@ export default function GenerateResearchPage() {
 	}, [navigate, prompt, slideCount]);
 
 	useEffect(() => {
-		if (streamingState.error) setGenerationError(streamingState.error);
-	}, [streamingState.error]);
-
-	useEffect(() => {
-		// A retry knows its presentation before submitting, so navigation waits
-		// for the server to accept the job; a refused one stays here to report why.
-		if (submittedRef.current && streamingState.accepted && streamingState.presentationId) {
-			submittedRef.current = false;
-			navigate(ROUTES.presentationById(streamingState.presentationId));
-		}
-	}, [navigate, streamingState.accepted, streamingState.presentationId]);
-
-	useEffect(() => {
 		if (!prompt || !slideCount) return;
 		void previewResearch(researchRequest, savedResearch, researchAttempt > 0);
 	}, [prompt, slideCount, researchAttempt, researchRequest, savedResearch, previewResearch]);
@@ -118,23 +100,19 @@ export default function GenerateResearchPage() {
 			...(estimatedTokens === null ? {} : { estimated_tokens: estimatedTokens }),
 		};
 
-		submittedRef.current = true;
-		const success = await generate({
-			prompt,
-			slideCount,
-			detailLevel,
-			tonality,
-			researchEnabled: true,
-			researchPayload: payload,
-			retryPresentationId,
-			ai,
+		navigate(ROUTES.outline, {
+			state: {
+				prompt,
+				slideCount,
+				detailLevel,
+				tonality,
+				researchPayload: payload,
+				retryPresentationId,
+				...(ai ? { ai } : {}),
+			},
 		});
-		if (!success) {
-			submittedRef.current = false;
-			isProceedingRef.current = false;
-			setIsProceeding(false);
-		}
 	}, [
+		navigate,
 		detailLevel,
 		estimatedTokens,
 		ai,
@@ -143,7 +121,6 @@ export default function GenerateResearchPage() {
 		retryPresentationId,
 		slideCount,
 		sources,
-		generate,
 		streamingState.isStreaming,
 		tonality,
 	]);
@@ -188,7 +165,6 @@ export default function GenerateResearchPage() {
 	return (
 		<div className="flex h-dvh flex-col overflow-hidden bg-transparent">
 			<Header />
-			<FloatingNotice error={generationError} onDismiss={() => setGenerationError(null)} />
 			<div className="relative min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
 				<button
 					type="button"

@@ -1,5 +1,7 @@
 import type {
 	AIModelSelection,
+	DraftPreview,
+	Outline,
 	PresentationData,
 	PresentationGenerationStage,
 	ResearchPayload,
@@ -106,6 +108,8 @@ export interface StreamingState {
 	generationMessage?: string;
 	generationProgress?: { completed: number; total: number };
 	completedDocument?: PresentationData;
+	/** Cards drafted so far; a preview until the revision commits. */
+	preview?: DraftPreview;
 }
 
 export interface GenerateOptions {
@@ -118,6 +122,8 @@ export interface GenerateOptions {
 	parentPresentationId?: string;
 	retryPresentationId?: string;
 	ai?: AIModelSelection;
+	/** An outline the user approved; drafting follows it instead of planning. */
+	plan?: Outline;
 }
 
 type ResearchPreviewStatus = "idle" | "loading" | "ready" | "error";
@@ -361,8 +367,50 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 					slideCount: 0,
 					isComplete: false,
 					error: undefined,
+					preview: undefined,
 				}));
 				break;
+
+			case "plan": {
+				const plan = data as { title: string; cards: DraftPreview["entries"] };
+				setStreamingState((prev) => ({
+					...prev,
+					title: plan.title || prev.title,
+					preview: {
+						title: plan.title,
+						entries: plan.cards,
+						cards: {},
+						assets: {},
+						completed: 0,
+						total: plan.cards.length,
+					},
+				}));
+				break;
+			}
+
+			case "cards": {
+				const batch = data as {
+					cards: Record<string, unknown>;
+					assets: Record<string, unknown>;
+					completed: number;
+					total: number;
+				};
+				setStreamingState((prev) =>
+					prev.preview
+						? {
+								...prev,
+								preview: {
+									...prev.preview,
+									cards: { ...prev.preview.cards, ...batch.cards },
+									assets: { ...prev.preview.assets, ...batch.assets },
+									completed: batch.completed,
+									total: batch.total,
+								},
+							}
+						: prev,
+				);
+				break;
+			}
 
 			case "complete": {
 				const document = data as PresentationData;
@@ -575,6 +623,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 						parent_presentation_id: options.parentPresentationId,
 						retry_presentation_id: options.retryPresentationId,
 						ai: options.ai,
+						plan: options.plan,
 					}),
 					signal: controller.signal,
 				});

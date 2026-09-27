@@ -23,7 +23,7 @@ import { ArrowDown, ArrowUp, Copy, ImageMinus, ImagePlus, Plus, Trash2 } from "l
 import type { ReactNode } from "react";
 import type { DocumentEdit } from "./CardView";
 
-const LAYOUT_NAMES: Record<LayoutId, string> = {
+export const LAYOUT_NAMES: Record<LayoutId, string> = {
 	title: "Title",
 	statement: "Statement",
 	bullets: "Bullets",

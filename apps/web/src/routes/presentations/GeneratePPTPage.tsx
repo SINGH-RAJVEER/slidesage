@@ -1,6 +1,5 @@
 import type { PresentationRetryOptions } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
-import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { GenerateForm, GenerateOptionsBar } from "@slidesage/ui/components/Generate";
 import { requestGenerationNotificationPermission } from "@slidesage/ui/lib/generation-notifications";
 import { useDebouncedCallback } from "@tanstack/react-pacer/debouncer";
@@ -28,29 +27,8 @@ export default function GeneratePPTPage() {
 	const [detailLevel, setDetailLevel] = useState(retry?.detail_level ?? "balanced");
 	const [tonality, setTonality] = useState(retry?.tonality ?? "professional");
 	const [useWebResearch, setUseWebResearch] = useState(retry?.research_enabled ?? false);
-	// A refused submission is reported here. Once the job is accepted the page
-	// moves to the presentation, which shows the rest of its progress.
-	const [generationError, setGenerationError] = useState<string | null>(null);
-	const submittedRef = useRef(false);
 	const navigate = useNavigate();
-	const { streamingState, generate } = useStreaming();
-
-	useEffect(() => {
-		// A retry knows its presentation before submitting, so navigation waits
-		// for the server to accept the job; a refused one stays here to report why.
-		if (submittedRef.current && streamingState.accepted && streamingState.presentationId) {
-			submittedRef.current = false;
-			navigate(ROUTES.presentationById(streamingState.presentationId));
-		}
-	}, [navigate, streamingState.accepted, streamingState.presentationId]);
-
-	useEffect(() => {
-		if (streamingState.error) {
-			console.error("Presentation generation failed:", streamingState.error);
-			setGenerationError(streamingState.error);
-			setLoading(false);
-		}
-	}, [streamingState.error]);
+	const { streamingState } = useStreaming();
 
 	useEffect(() => {
 		const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -96,19 +74,16 @@ export default function GeneratePPTPage() {
 			return;
 		}
 
-		submittedRef.current = true;
-		const success = await generate({
-			prompt: normalizedPrompt,
-			slideCount: count,
-			detailLevel,
-			tonality,
-			retryPresentationId,
-			ai: retry?.ai,
+		navigate(ROUTES.outline, {
+			state: {
+				prompt: normalizedPrompt,
+				slideCount: count,
+				detailLevel,
+				tonality,
+				retryPresentationId,
+				...(retry?.ai ? { ai: retry.ai } : {}),
+			},
 		});
-		if (!success) {
-			submittedRef.current = false;
-			setLoading(false);
-		}
 	};
 
 	const debouncedGenerate = useDebouncedCallback(handleGenerateInternal, {
@@ -119,7 +94,6 @@ export default function GeneratePPTPage() {
 	const handleGenerate = () => {
 		if (!prompt.trim()) return;
 
-		setGenerationError(null);
 		requestGenerationNotificationPermission();
 		debouncedGenerate(prompt);
 	};
@@ -156,7 +130,6 @@ export default function GeneratePPTPage() {
 	return (
 		<div className="flex min-h-dvh w-full flex-col overflow-x-hidden bg-transparent">
 			<Header />
-			<FloatingNotice error={generationError} onDismiss={() => setGenerationError(null)} />
 
 			<div
 				data-horizon-reveal

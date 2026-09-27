@@ -340,3 +340,40 @@ export interface BillingVerifyResponse {
 	tokens_awarded: number;
 	new_balance: number;
 }
+
+/** One planned card in an outline the user reviews before drafting. */
+export interface OutlineEntry {
+	position: number;
+	takeaway: string;
+	role: string;
+	layout: string;
+	evidence?: string;
+	sourceIds?: string[];
+	/** Photo search for layouts that show a photo. */
+	imageQuery?: string;
+}
+
+export interface Outline {
+	title: string;
+	cards: OutlineEntry[];
+}
+
+export interface OutlineResponse {
+	plan: Outline;
+	/** Whether photo layouts may be chosen. */
+	photos: boolean;
+	slide_tokens_charged: number;
+	slide_tokens_remaining: number;
+}
+
+/** Cards drafted so far, streamed while a presentation generates. */
+export interface DraftPreview {
+	title: string;
+	entries: Array<Pick<OutlineEntry, "position" | "takeaway" | "layout">>;
+	/** Converted cards keyed by position. */
+	cards: Record<string, unknown>;
+	/** Stored photos those cards show, keyed by asset ID. */
+	assets: Record<string, unknown>;
+	completed: number;
+	total: number;
+}

@@ -3,8 +3,13 @@
 import { describe, expect, it, mock } from "bun:test";
 import { StreamingProvider } from "@slidesage/ui";
 import { fireEvent, render, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import GenerateResearchPage from "../../../routes/presentations/GenerateResearchPage";
+
+function OutlineStateProbe() {
+	const location = useLocation();
+	return <pre data-testid="outline-state">{JSON.stringify(location.state)}</pre>;
+}
 
 function AwayPage() {
 	const navigate = useNavigate();
@@ -71,14 +76,9 @@ describe("GenerateResearchPage", () => {
 		const originalFetch = globalThis.fetch;
 		let requestCount = 0;
 		let resolveResearch: ((response: Response) => void) | undefined;
-		let generationBody: Record<string, unknown> | undefined;
 
-		globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+		globalThis.fetch = mock(() => {
 			requestCount += 1;
-			if (String(input).includes("/presentation-jobs")) {
-				generationBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-			}
-
 			return new Promise<Response>((resolve) => {
 				resolveResearch = resolve;
 			});
@@ -103,6 +103,7 @@ describe("GenerateResearchPage", () => {
 					<StreamingProvider>
 						<Routes>
 							<Route path="/generate/research" element={<GenerateResearchPage />} />
+							<Route path="/generate/outline" element={<OutlineStateProbe />} />
 						</Routes>
 					</StreamingProvider>
 				</MemoryRouter>,
@@ -148,13 +149,19 @@ describe("GenerateResearchPage", () => {
 
 			fireEvent.keyDown(window, { key: "Enter" });
 
-			await waitFor(() => expect(requestCount).toBe(2));
-			expect(generationBody?.["ai"]).toEqual({
-				provider: "google",
-				model: "gemini-2.5-pro",
+			const state = JSON.parse((await view.findByTestId("outline-state")).textContent ?? "{}");
+			expect(requestCount).toBe(1);
+			expect(state.ai).toEqual({ provider: "google", model: "gemini-2.5-pro" });
+			expect(state.researchPayload).toEqual({
+				sources: [
+					{
+						url: "https://example.com/storage",
+						title: "Battery storage outlook",
+						snippet: "A complete source preview.",
+					},
+				],
+				estimated_tokens: 5.8,
 			});
-			expect(generationBody?.["research"]).toEqual({ enabled: true });
-			expect(generationBody).not.toHaveProperty("template");
 		} finally {
 			globalThis.fetch = originalFetch;
 		}

@@ -46,6 +46,10 @@ export const router = createBrowserRouter([
 						lazy: lazyRoute(() => import("../../routes/presentations/GeneratePPTPage")),
 					},
 					{
+						path: "generate/outline",
+						lazy: lazyRoute(() => import("../../routes/presentations/OutlinePage")),
+					},
+					{
 						path: "generate/research",
 						lazy: lazyRoute(() => import("../../routes/presentations/GenerateResearchPage")),
 					},

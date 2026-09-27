@@ -9,6 +9,7 @@ export const ROUTES = {
 	settings: "/settings",
 	generate: "/generate",
 	research: "/generate/research",
+	outline: "/generate/outline",
 	presentations: "/presentations",
 	presentationById: (presentationId: string) =>
 		`/presentations/${encodeURIComponent(presentationId)}`,

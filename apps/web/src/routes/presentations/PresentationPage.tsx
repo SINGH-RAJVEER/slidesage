@@ -11,6 +11,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 import { DeckWorkspace } from "./DeckWorkspace";
+import { DraftPreviewView } from "./DraftPreviewView";
 
 type LoadState =
 	| { status: "loading" }
@@ -127,7 +128,18 @@ export default function PresentationPage() {
 						Loading presentation
 					</p>
 				)}
-				{state.status === "generating" && (
+				{state.status === "generating" && generatingHere && streamingState.preview && (
+					<DraftPreviewView
+						preview={streamingState.preview}
+						assetUrl={(assetId) =>
+							`${API_URL}/presentations/${encodeURIComponent(presentationId)}/assets/${assetId}`
+						}
+						message={streamingState.generationMessage ?? "Writing cards"}
+						percent={percent}
+						onCancel={() => void cancelGeneration()}
+					/>
+				)}
+				{state.status === "generating" && !(generatingHere && streamingState.preview) && (
 					<section
 						className="flex flex-1 flex-col items-center justify-center gap-6"
 						aria-live="polite"
