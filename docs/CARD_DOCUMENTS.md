@@ -90,4 +90,6 @@ Edits are pure functions in `libs/cards/src/edit.ts`: text, fields, list items, 
 
 Cards are at least 16:9, and text is sized in container units so a card scales like a fixed slide. A card never crops its content: one whose content needs more room grows taller and is marked `data-overflows-slide`. Filling every field to its schema limit makes most layouts taller than one slide, which PPTX export will have to split or refuse.
 
+Present shows the deck one card at a time over the whole screen, in full screen where the browser allows it. The arrow keys, Page Up and Page Down, and Space move between cards; Home and End jump to the first and last; N shows the card's speaker notes; Escape or leaving full screen stops presenting.
+
 The generate and research pages lead to the outline at `/generate/outline`, which moves to the presentation as soon as the job is accepted. The library opens ready presentations there, and the generation indicator links back to the running one.

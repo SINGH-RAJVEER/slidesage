@@ -18,6 +18,16 @@ export interface CardDeckProps {
 	onPhoto?: (cardId: string) => void;
 }
 
+/** Maps the drafter's source IDs (s1, s2, ...) to citation numbers and links. */
+export function citationsFor(sources: Source[]) {
+	return Object.fromEntries(
+		sources.map((source, index) => [
+			`s${index + 1}`,
+			{ number: index + 1, url: source.url, title: source.title },
+		]),
+	);
+}
+
 /** Renders a saved card document in reading order. */
 export function CardDeck({
 	document,
@@ -28,12 +38,7 @@ export function CardDeck({
 	onPhoto,
 }: CardDeckProps) {
 	const theme = CARD_THEMES[document.theme];
-	const citations = Object.fromEntries(
-		sources.map((source, index) => [
-			`s${index + 1}`,
-			{ number: index + 1, url: source.url, title: source.title },
-		]),
-	);
+	const citations = citationsFor(sources);
 	return (
 		<ol aria-label={document.title} className="flex w-full flex-col gap-8">
 			{document.cardOrder.map((cardID, index) => {

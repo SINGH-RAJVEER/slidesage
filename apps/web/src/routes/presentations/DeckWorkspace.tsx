@@ -12,6 +12,7 @@ import {
 	type CardAsset,
 	CardDeck,
 	PhotoPicker,
+	PresentMode,
 	type StockPhoto,
 } from "@slidesage/ui/components/Cards";
 import { Input } from "@slidesage/ui/components/input";
@@ -23,7 +24,7 @@ import {
 	SelectValue,
 } from "@slidesage/ui/components/select";
 import { API_URL } from "@slidesage/ui/lib/api";
-import { Check, Pencil, Redo2, Undo2 } from "lucide-react";
+import { Check, Pencil, Play, Redo2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { type SaveStatus, useDocumentEditor } from "./useDocumentEditor";
 
@@ -52,12 +53,12 @@ export interface DeckWorkspaceProps {
 	onReload: () => void;
 }
 
-/** A saved deck, readable by default and editable in place. */
 async function readError(response: Response, fallback: string): Promise<string> {
 	const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
 	return body?.error?.message ?? fallback;
 }
 
+/** A saved deck, readable by default, editable in place, and presentable. */
 export function DeckWorkspace({
 	presentationId,
 	document,
@@ -67,10 +68,12 @@ export function DeckWorkspace({
 	onReload,
 }: DeckWorkspaceProps) {
 	const [editing, setEditing] = useState(false);
+	const [presenting, setPresenting] = useState(false);
 	const [assets, setAssets] = useState(initialAssets);
 	const [photoCard, setPhotoCard] = useState<string | null>(null);
 	const assetIds = useMemo(() => Object.keys(assets), [assets]);
 	const presentationUrl = `${API_URL}/presentations/${encodeURIComponent(presentationId)}`;
+	const assetUrl = (assetId: string) => `${presentationUrl}/assets/${assetId}`;
 	const editor = useDocumentEditor({ presentationId, initial: document, revision, assetIds });
 	const { status } = editor;
 	const blocked = status.state === "conflict";
@@ -205,6 +208,16 @@ export function DeckWorkspace({
 						</Button>
 					</>
 				)}
+				{!editing && (
+					<Button
+						variant="ghost"
+						onClick={() => setPresenting(true)}
+						className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
+					>
+						<Play className="size-4" />
+						Present
+					</Button>
+				)}
 				<Button
 					variant="ghost"
 					onClick={() => (editing ? void finish() : setEditing(true))}
@@ -241,7 +254,7 @@ export function DeckWorkspace({
 				document={editor.document}
 				sources={sources}
 				assets={assets}
-				assetUrl={(assetId) => `${presentationUrl}/assets/${assetId}`}
+				assetUrl={assetUrl}
 				edit={editing && !blocked ? editor.edit : undefined}
 				onPhoto={editing && !blocked ? setPhotoCard : undefined}
 			/>
@@ -255,6 +268,15 @@ export function DeckWorkspace({
 				choose={choosePhoto}
 				upload={uploadPhoto}
 			/>
+			{presenting && (
+				<PresentMode
+					document={editor.document}
+					sources={sources}
+					assets={assets}
+					assetUrl={assetUrl}
+					onExit={() => setPresenting(false)}
+				/>
+			)}
 		</>
 	);
 }
