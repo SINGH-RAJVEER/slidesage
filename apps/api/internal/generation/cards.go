@@ -125,6 +125,9 @@ type cardDrafter struct {
 	// recordAssets records a photo as soon as it is stored, so the streamed
 	// preview can show it before the revision commits. Nil skips it.
 	recordAssets func(ctx context.Context, assets []carddocument.Asset) error
+	// loadCurrent reads the revision an AI revision starts from and the images
+	// the presentation owns. Nil makes AI revisions unavailable.
+	loadCurrent func(ctx context.Context, presentationID, userID string) (currentDocument, error)
 
 	schemaMu sync.Mutex
 	schema   json.RawMessage
@@ -145,6 +148,11 @@ type drafting struct {
 	tokens  int
 	// images holds the resolved image of each card position that shows one.
 	images map[int]placedImage
+	// knownAssets, when set, are every image the document may show; an AI
+	// revision starts from a document whose photos were stored earlier.
+	knownAssets []string
+	// revision is set while an AI revision drafts.
+	revision *revisionContext
 }
 
 func (d *drafting) call(ctx context.Context, promptName, system, user string, maxOutput int) (map[string]any, error) {
@@ -189,8 +197,12 @@ func (d *drafting) report(eventType string, payload any) {
 }
 
 func (drafter *cardDrafter) Draft(ctx context.Context, job streamJob) (draftResult, error) {
-	if job.kind != "generation" {
-		return draftResult{}, errors.New("card documents cannot be revised by AI yet")
+	switch job.kind {
+	case "iteration":
+		return drafter.revise(ctx, job)
+	case "generation":
+	default:
+		return draftResult{}, fmt.Errorf("unknown drafting kind %q", job.kind)
 	}
 	d, err := drafter.start(ctx, job)
 	if err != nil {
@@ -285,6 +297,9 @@ func citedSources(payload *presentation.ResearchPayload) []citedSource {
 }
 
 func (d *drafting) context() string {
+	if d.revision != nil {
+		return d.revisionPrompt()
+	}
 	job := d.job
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Topic: %s\nCards: %d\nDetail level: %s\nTone: %s\n", job.prompt, job.slideCount, job.detailLevel, job.tonality)
@@ -320,6 +335,9 @@ func (d *drafting) assets() []carddocument.Asset {
 }
 
 func (d *drafting) assetIDs() []string {
+	if d.knownAssets != nil {
+		return d.knownAssets
+	}
 	ids := make([]string, 0, len(d.images))
 	for _, image := range d.images {
 		ids = append(ids, image.asset.SHA256)
@@ -381,6 +399,10 @@ func (d *drafting) withImage(position int, draft json.RawMessage) json.RawMessag
 	}
 	var card map[string]any
 	if json.Unmarshal(draft, &card) != nil || card == nil {
+		return draft
+	}
+	// A revision may move a photo card to a text layout, which drops the photo.
+	if layout, _ := card["layout"].(string); d.revision != nil && !d.parsed.Layouts[layout].Image {
 		return draft
 	}
 	nodes, _ := card["nodes"].([]any)
@@ -511,7 +533,7 @@ func (d *drafting) draft(ctx context.Context, plan cardPlan) ([]json.RawMessage,
 		for index, result := range results {
 			card := result.Card
 			if result.Issue != nil {
-				card, err = d.repair(ctx, encodedPlan, inputs[index], *result.Issue)
+				card, err = d.repair(ctx, "Approved plan: "+string(encodedPlan), inputs[index], *result.Issue)
 				if err != nil {
 					return nil, err
 				}
@@ -592,13 +614,13 @@ func wholeNumber(value any) (int, bool) {
 
 // repair redrafts one card against the issue the converter reported, leaving
 // the rest of the batch untouched.
-func (d *drafting) repair(ctx context.Context, plan []byte, input carddocument.DraftInput, issue carddocument.Issue) (json.RawMessage, error) {
+func (d *drafting) repair(ctx context.Context, background string, input carddocument.DraftInput, issue carddocument.Issue) (json.RawMessage, error) {
 	for attempt := 0; attempt < cardRepairAttempts; attempt++ {
 		previous := string(input.Draft)
 		if previous == "" {
 			previous = "(the card was missing from the response)"
 		}
-		user := d.context() + "Approved plan: " + string(plan) + fmt.Sprintf("\nCard position %d, takeaway: %s\nPrevious card: %s\nValidation problem: %s", input.Position, input.Takeaway, previous, issue)
+		user := d.context() + background + fmt.Sprintf("\nCard position %d, takeaway: %s\nPrevious card: %s\nValidation problem: %s", input.Position, input.Takeaway, previous, issue)
 		response, err := d.call(ctx, "card-repair", repairSystemPrompt, user, draftTokensPerCard+200)
 		if err != nil {
 			return nil, err

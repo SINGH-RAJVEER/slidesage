@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { assembleDocument, cleanText, convertCards, parseInlineMarkup } from "./convert";
+import { cardToDraft } from "./draft-format";
 import type { Card } from "./schema";
 import { validateCardDocument } from "./validate";
 
@@ -181,5 +182,57 @@ describe("schema versions", () => {
 			cards: [card(bulletsDraft)],
 		});
 		expect(validateCardDocument({ ...document, schemaVersion: 3 }).ok).toBe(false);
+	});
+});
+
+describe("cardToDraft", () => {
+	it("writes a converted card back as the draft it came from", () => {
+		const converted = card({
+			...bulletsDraft,
+			notes: "Mention the pilot",
+		});
+		const draft: unknown = cardToDraft(converted);
+		expect(draft).toEqual({
+			takeaway: "Storage lowers peak costs",
+			...bulletsDraft,
+			notes: "Mention the pilot",
+		});
+	});
+
+	it("covers every text node and leaves photos out", () => {
+		const converted = card({
+			layout: "process",
+			nodes: [
+				{ type: "heading", text: "How it works" },
+				{
+					type: "steps",
+					items: [
+						{ title: "Charge", detail: "At *night*" },
+						{ title: "Hold" },
+						{ title: "Discharge" },
+					],
+				},
+			],
+		});
+		const draft = cardToDraft(converted);
+		expect(draft.nodes).toEqual([
+			{ type: "heading", text: "How it works" },
+			{
+				type: "steps",
+				items: [
+					{ title: "Charge", detail: "At *night*" },
+					{ title: "Hold" },
+					{ title: "Discharge" },
+				],
+			},
+		]);
+		const withPhoto: Card = {
+			...converted,
+			nodes: [
+				{ id: "n_photo", type: "image", assetId: "a".repeat(64), alt: "Batteries", fit: "cover" },
+				...converted.nodes,
+			],
+		};
+		expect(cardToDraft(withPhoto).nodes).toEqual(draft.nodes);
 	});
 });

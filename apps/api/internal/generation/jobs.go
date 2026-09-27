@@ -62,6 +62,8 @@ type jobPayload struct {
 	QuotedMillis     int64                         `json:"quoted_millis"`
 	RequestHash      string                        `json:"request_hash,omitempty"`
 	Plan             *cardPlan                     `json:"plan,omitempty"`
+	BaseRevision     int                           `json:"base_revision,omitempty"`
+	CardIDs          []string                      `json:"card_ids,omitempty"`
 }
 
 func payloadFromJob(job streamJob) jobPayload {
@@ -72,6 +74,7 @@ func payloadFromJob(job streamJob) jobPayload {
 		Research: job.research, ResearchPayload: job.researchPayload, Selection: job.selection,
 		Current: job.current, ExpectedRevision: job.expectedRevision, QuotedMillis: job.quote,
 		RequestHash: job.requestHash, Plan: job.plan,
+		BaseRevision: job.baseRevision, CardIDs: job.cardIDs,
 	}
 }
 
@@ -83,6 +86,7 @@ func (payload jobPayload) streamJob() streamJob {
 		tonality: payload.Tonality, research: payload.Research,
 		researchPayload: payload.ResearchPayload, selection: payload.Selection, current: payload.Current,
 		kind: payload.Kind, requestHash: payload.RequestHash, plan: payload.Plan,
+		baseRevision: payload.BaseRevision, cardIDs: payload.CardIDs,
 	}
 }
 
@@ -274,7 +278,11 @@ func (h *handler) processQueuedJob(ctx context.Context, riverJob *river.Job[JobA
 	if h.drafter == nil {
 		return h.finalizeQueuedFailure(ctx, record, riverJob, job, "drafting_unavailable", errDraftingUnavailable.Error())
 	}
-	_ = h.updateStage(ctx, record.ID, "drafting", "Writing presentation content", 2, 4)
+	draftingMessage := "Writing presentation content"
+	if job.kind == "iteration" {
+		draftingMessage = "Revising cards"
+	}
+	_ = h.updateStage(ctx, record.ID, "drafting", draftingMessage, 2, stageTotal)
 	job.report = func(eventType string, payload any) {
 		_ = h.appendEvent(ctx, record.ID, eventType, payload)
 	}

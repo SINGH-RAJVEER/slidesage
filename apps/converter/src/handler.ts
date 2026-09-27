@@ -3,6 +3,7 @@ import {
 	CARD_SCHEMA_VERSION,
 	type Card,
 	type CardDraftInput,
+	cardToDraft,
 	convertCards,
 	draftingSchema,
 	NARRATIVE_ROLES,
@@ -142,6 +143,31 @@ async function validateDocument(request: Request): Promise<Response> {
 }
 
 /**
+ * Returns every card of a document in draft form, keyed by card ID, so an AI
+ * revision can show the model cards in the shape it writes them.
+ */
+async function drafts(request: Request): Promise<Response> {
+	const body = await readBody(request);
+	try {
+		const document = parseCardDocument(body["document"], {
+			knownAssets: new Set(stringList(body["assetIds"], "assetIds")),
+		});
+		const cards = Object.fromEntries(
+			document.cardOrder.flatMap((id) => {
+				const card = document.cards[id];
+				return card ? [[id, cardToDraft(card)]] : [];
+			}),
+		);
+		return json(200, { schemaVersion: CARD_SCHEMA_VERSION, cards });
+	} catch (error) {
+		if (error instanceof SchemaError) {
+			return json(422, { schemaVersion: CARD_SCHEMA_VERSION, issue: error.issue });
+		}
+		throw error;
+	}
+}
+
+/**
  * Routes one request. Every conversion request names the schema version its
  * caller was built against; a mismatch is refused rather than converted into
  * a document the caller cannot read.
@@ -160,6 +186,7 @@ export async function handle(request: Request): Promise<Response> {
 			"/v1/cards": convert,
 			"/v1/documents": assemble,
 			"/v1/documents/validate": validateDocument,
+			"/v1/documents/drafts": drafts,
 		};
 		const route = routes[url.pathname];
 		if (!route) return json(404, { error: "not found" });

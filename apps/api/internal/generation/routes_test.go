@@ -50,9 +50,9 @@ func TestSubmitIterationCount(t *testing.T) {
 		name, fields string
 		valid        bool
 	}{
-		{"omitted", `"parent_presentation_id":"p"`, true},
-		{"one", `"parent_presentation_id":"p","slide_count":1`, true},
-		{"forty", `"parent_presentation_id":"p","slide_count":40`, true},
+		{"omitted", `"parent_presentation_id":"p","base_revision":1`, true},
+		{"one", `"parent_presentation_id":"p","base_revision":1,"slide_count":1`, true},
+		{"forty", `"parent_presentation_id":"p","base_revision":1,"slide_count":40`, true},
 		{"zero count", `"parent_presentation_id":"p","slide_count":0`, false},
 		{"large count", `"parent_presentation_id":"p","slide_count":41`, false},
 		{"fraction count", `"parent_presentation_id":"p","slide_count":1.5`, false},
@@ -104,19 +104,34 @@ func TestSubmitInputRejectsLegacyFieldNames(t *testing.T) {
 	}
 }
 
-func TestIterationJobRetainsTheSubmissionJobID(t *testing.T) {
-	job := buildIterationJob(
-		"iteration-job-123456789",
-		"user-1",
-		"operation-1",
-		persistedPresentation{ID: "presentation-1"},
-		submitInput{Topic: "Revise this deck"},
-		5,
-		1000,
-		nil,
-	)
-	if job.jobID != "iteration-job-123456789" {
-		t.Fatalf("iteration job ID = %q", job.jobID)
+func TestSubmitInputReadsARevisionTarget(t *testing.T) {
+	input, err := parseSubmitInput(decodeSubmitBody(t, `{
+		"topic":"Make these shorter",
+		"parent_presentation_id":"pres-1",
+		"base_revision":3,
+		"card_ids":["c_one","c_two"]
+	}`))
+	if err != nil || input.BaseRevision != 3 || len(input.CardIDs) != 2 || input.CardIDs[1] != "c_two" {
+		t.Fatalf("revision target = %+v, %v", input, err)
+	}
+	for _, body := range []string{
+		`{"topic":"Shorter","parent_presentation_id":"pres-1"}`,
+		`{"topic":"Shorter","parent_presentation_id":"pres-1","base_revision":0}`,
+		`{"topic":"Shorter","parent_presentation_id":"pres-1","base_revision":2,"card_ids":["c_one","c_one"]}`,
+		`{"topic":"Shorter","parent_presentation_id":"pres-1","base_revision":2,"card_ids":"c_one"}`,
+	} {
+		if _, err := parseSubmitInput(decodeSubmitBody(t, body)); err == nil {
+			t.Fatalf("accepted %s", body)
+		}
+	}
+}
+
+func TestRevisionPricingGrowsWithTargetsAndDocument(t *testing.T) {
+	one := revisionAuthorizationMillis(1, "Shorter", 4000, 0)
+	four := revisionAuthorizationMillis(4, "Shorter", 4000, 0)
+	larger := revisionAuthorizationMillis(1, "Shorter", 40000, 0)
+	if one <= 0 || four <= one || larger <= one {
+		t.Fatalf("quotes: one=%d four=%d larger=%d", one, four, larger)
 	}
 }
 

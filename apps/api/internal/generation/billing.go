@@ -148,7 +148,13 @@ func settleTx(ctx context.Context, tx *sql.Tx, job streamJob, data []byte, title
 	if job.selection != nil {
 		provider, selectedModel = string(job.selection.Provider), job.selection.Model
 	}
-	result, err = tx.ExecContext(ctx, `UPDATE presentations SET title = $1, prompt = $2, slides_data = $3::jsonb, ai_provider = $4, ai_model = $5, revision = revision + 1, updated_at = NOW() WHERE id = $6 AND user_id = $7 AND revision = $8`, title, job.prompt, data, provider, selectedModel, job.presentationID, job.userID, job.expectedRevision)
+	// An AI revision's instruction is not what the deck is about, so the
+	// presentation keeps the prompt it was generated from.
+	var prompt any = job.prompt
+	if job.kind == "iteration" {
+		prompt = nil
+	}
+	result, err = tx.ExecContext(ctx, `UPDATE presentations SET title = $1, prompt = COALESCE($2, prompt), slides_data = $3::jsonb, ai_provider = $4, ai_model = $5, revision = revision + 1, updated_at = NOW() WHERE id = $6 AND user_id = $7 AND revision = $8`, title, prompt, data, provider, selectedModel, job.presentationID, job.userID, job.expectedRevision)
 	if err != nil {
 		return 0, err
 	}

@@ -155,6 +155,21 @@ func (converter *Converter) ValidateDocument(ctx context.Context, document json.
 	return response.Document, nil, nil
 }
 
+// Drafts returns every card of a document in the shape the model drafts,
+// keyed by card ID. The document must be valid for the listed assets.
+func (converter *Converter) Drafts(ctx context.Context, document json.RawMessage, assetIDs []string) (map[string]json.RawMessage, error) {
+	if assetIDs == nil {
+		assetIDs = []string{}
+	}
+	var response struct {
+		Cards map[string]json.RawMessage `json:"cards"`
+	}
+	if err := converter.do(ctx, http.MethodPost, "/v1/documents/drafts", map[string]any{"document": document, "assetIds": assetIDs}, &response); err != nil {
+		return nil, err
+	}
+	return response.Cards, nil
+}
+
 func (converter *Converter) do(ctx context.Context, method, path string, body any, destination any) error {
 	var reader io.Reader
 	if body != nil {

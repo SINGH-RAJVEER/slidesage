@@ -106,4 +106,26 @@ describe("converter", () => {
 			"document.theme",
 		);
 	});
+
+	it("returns each card of a document in draft form", async () => {
+		const converted = await post("/v1/cards", {
+			operationId: "op-1",
+			cards: [{ position: 1, takeaway: "Opening", role: "opening", draft }],
+		});
+		const { results } = (await converted.json()) as { results: Array<{ card: { id: string } }> };
+		const assembled = await post("/v1/documents", {
+			title: "Grid storage",
+			theme: "slate",
+			cards: results.map((result) => result.card),
+		});
+		const { document } = (await assembled.json()) as { document: unknown };
+		const response = await post("/v1/documents/drafts", { document });
+		expect(response.status).toBe(200);
+		const { cards } = (await response.json()) as { cards: Record<string, unknown> };
+		expect(cards[results[0]?.card.id ?? ""]).toEqual({
+			takeaway: "Opening",
+			sourceIds: [],
+			...draft,
+		});
+	});
 });

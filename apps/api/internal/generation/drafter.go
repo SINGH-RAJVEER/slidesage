@@ -57,5 +57,20 @@ func configureCardDrafter(h *handler) (documentDrafter, error) {
 		}
 		return tx.Commit()
 	}
+	drafter.loadCurrent = func(ctx context.Context, presentationID, userID string) (currentDocument, error) {
+		revision, err := carddocument.CurrentRevision(ctx, h.database, presentationID, userID)
+		if err != nil {
+			return currentDocument{}, err
+		}
+		ids, err := carddocument.AssetIDsFor(ctx, h.database, presentationID)
+		if err != nil {
+			return currentDocument{}, err
+		}
+		assets, err := carddocument.AssetsFor(ctx, h.database, presentationID, ids)
+		if err != nil {
+			return currentDocument{}, err
+		}
+		return currentDocument{revision: revision, assets: assets}, nil
+	}
 	return drafter, nil
 }

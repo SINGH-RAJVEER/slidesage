@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
 )
@@ -27,6 +28,10 @@ type submitInput struct {
 	AI              *ai.Selection
 	// Plan is an outline the user approved; it fixes the card count.
 	Plan *cardPlan `json:",omitempty"`
+	// BaseRevision is the card revision an AI revision was asked against.
+	BaseRevision int `json:",omitempty"`
+	// CardIDs are the cards an AI revision rewrites; empty means every card.
+	CardIDs []string `json:",omitempty"`
 }
 
 type persistedPresentation struct {
@@ -120,10 +125,6 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 		writeError(writer, http.StatusServiceUnavailable, "Presentation generation is not available yet")
 		return
 	}
-	if input.ParentID != "" {
-		writeError(writer, http.StatusConflict, "AI revisions of card presentations are not available yet")
-		return
-	}
 	if input.Plan != nil {
 		if h.planner == nil {
 			writeError(writer, http.StatusServiceUnavailable, "Presentation generation is not available yet")
@@ -195,6 +196,11 @@ func parseSubmitInput(body map[string]any) (submitInput, error) {
 	}
 	if input.ParentID != "" && input.RetryID != "" {
 		return submitInput{}, errors.New("parent_presentation_id and retry_presentation_id are mutually exclusive")
+	}
+	if input.ParentID != "" {
+		if err := parseRevisionTarget(body, &input); err != nil {
+			return submitInput{}, err
+		}
 	}
 	if value, found := body["plan"]; found && value != nil {
 		if input.ParentID != "" {
@@ -306,19 +312,35 @@ func (h *handler) iterationJob(ctx context.Context, userID string, input submitI
 	if json.Unmarshal(base.Data, &current) != nil || current.Status != "ready" {
 		return streamJob{}, writeStatusError{http.StatusConflict, "This presentation has no completed document to revise yet"}
 	}
-	count := input.SlideCount
-	if count == 0 {
-		count = current.TotalSlides
+	revision, err := carddocument.CurrentRevision(ctx, h.database, base.ID, userID)
+	if errors.Is(err, carddocument.ErrNoRevision) {
+		return streamJob{}, writeStatusError{http.StatusConflict, "This presentation has no completed document to revise yet"}
+	}
+	if err != nil {
+		return streamJob{}, err
+	}
+	// Checked here as well as at commit, so a stale request is refused before
+	// any points are reserved or tokens spent.
+	if revision.Number != input.BaseRevision {
+		return streamJob{}, writeStatusError{http.StatusConflict, "This presentation changed since it was opened. Reload it and try again."}
+	}
+	targets := len(input.CardIDs)
+	if targets == 0 {
+		targets = revision.CardCount
+	}
+	if targets > revision.CardCount {
+		return streamJob{}, writeStatusError{http.StatusBadRequest, "card_ids names more cards than the presentation has"}
 	}
 
 	operationID, err := uuid()
 	if err != nil {
 		return streamJob{}, err
 	}
-	// Reserve for the full current document and one complete repair, including
-	// reductions whose input is larger than their requested output.
-	budgetCount := max(count, current.TotalSlides)
-	quote := authorizationMillis(maxOutputTokens(budgetCount), input.Topic, base.Data, input.Research, input.ResearchPayload, 2*maxOutputTokens(budgetCount))
+	var summary struct {
+		Sources json.RawMessage `json:"sources"`
+	}
+	_ = json.Unmarshal(base.Data, &summary)
+	quote := revisionAuthorizationMillis(targets, input.Topic, revision.ByteSize, len(summary.Sources))
 	selection, _, err := h.connections.CredentialForGeneration(ctx, userID, input.AI)
 	if err != nil {
 		return streamJob{}, writeStatusError{http.StatusConflict, err.Error()}
@@ -326,26 +348,64 @@ func (h *handler) iterationJob(ctx context.Context, userID string, input submitI
 	if selection != nil {
 		quote = 0
 	}
-	return buildIterationJob(jobID, userID, operationID, base, input, count, quote, selection), nil
+	return streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: base.ID, expectedRevision: base.Revision, baseRevision: revision.Number, cardIDs: input.CardIDs, quote: quote, prompt: input.Topic, slideCount: revision.CardCount, detailLevel: input.DetailLevel, tonality: input.Tonality, selection: selection, current: base.Data, kind: "iteration"}, nil
 }
 
-func buildIterationJob(jobID, userID, operationID string, base persistedPresentation, input submitInput, count int, quote int64, selection *ai.Selection) streamJob {
-	return streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: base.ID, expectedRevision: base.Revision, quote: quote, prompt: input.Topic, slideCount: count, detailLevel: input.DetailLevel, tonality: input.Tonality, research: input.Research, researchPayload: input.ResearchPayload, selection: selection, current: base.Data, kind: "iteration"}
+// parseRevisionTarget reads what an AI revision applies to: the card revision
+// the user was looking at and, optionally, the cards to rewrite.
+func parseRevisionTarget(body map[string]any, input *submitInput) error {
+	number, ok := body["base_revision"].(json.Number)
+	base, err := number.Int64()
+	if !ok || err != nil || base < 1 {
+		return errors.New("base_revision must be the positive card revision being revised")
+	}
+	input.BaseRevision = int(base)
+	if value := body["card_ids"]; value != nil {
+		list, ok := value.([]any)
+		if !ok || len(list) > 40 {
+			return errors.New("card_ids must be a list of at most 40 card IDs")
+		}
+		seen := map[string]bool{}
+		for _, item := range list {
+			id, ok := item.(string)
+			if !ok || id == "" || len(id) > 64 || seen[id] {
+				return errors.New("card_ids must hold distinct card IDs")
+			}
+			seen[id] = true
+			input.CardIDs = append(input.CardIDs, id)
+		}
+	}
+	return nil
+}
+
+// revisionAuthorizationMillis prices an AI revision: every targeted card at
+// its drafting bound, repair headroom, and the document and sources each
+// batch call resends.
+func revisionAuthorizationMillis(targets int, instruction string, documentBytes int64, sourceBytes int) int64 {
+	batches := (targets + cardBatchSize - 1) / cardBatchSize
+	perCall := (draftingPromptAllowanceBytes + len(instruction) + int(documentBytes) + sourceBytes + 3) / 4
+	headroom := repairHeadroomTokens(targets)
+	output := targets*draftTokensPerCard + headroom
+	return int64(output + ((batches*perCall+headroom)*12+9)/10)
 }
 
 type streamJob struct {
 	jobID, userID, operationID, presentationID string
 	expectedRevision                           int
-	quote                                      int64
-	prompt                                     string
-	slideCount                                 int
-	detailLevel, tonality, kind                string
-	research                                   any
-	researchPayload                            *presentation.ResearchPayload
-	selection                                  *ai.Selection
-	credential                                 string
-	current                                    json.RawMessage
-	requestHash                                string
+	// baseRevision is the card revision an AI revision rewrites, and cardIDs
+	// the cards it rewrites; empty means every card.
+	baseRevision                int
+	cardIDs                     []string
+	quote                       int64
+	prompt                      string
+	slideCount                  int
+	detailLevel, tonality, kind string
+	research                    any
+	researchPayload             *presentation.ResearchPayload
+	selection                   *ai.Selection
+	credential                  string
+	current                     json.RawMessage
+	requestHash                 string
 	// plan is an outline the user approved; drafting then skips planning.
 	plan *cardPlan
 	// report sends a progress event for the job. It is set by the worker.

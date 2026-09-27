@@ -1,5 +1,14 @@
 import { LAYOUT_RULES } from "./layouts";
-import { CARD_SCHEMA_VERSION, LAYOUTS, LIMITS, NARRATIVE_ROLES, THEMES } from "./schema";
+import {
+	CARD_SCHEMA_VERSION,
+	type Card,
+	type ContentNode,
+	LAYOUTS,
+	LIMITS,
+	NARRATIVE_ROLES,
+	type RichText,
+	THEMES,
+} from "./schema";
 
 /**
  * The shape the model drafts a card in. Text fields accept `**bold**` and
@@ -37,5 +46,69 @@ export function draftingSchema() {
 		limits: LIMITS,
 		card: DRAFT_CARD_SHAPE,
 		nodes: DRAFT_NODE_SHAPES,
+	};
+}
+
+/**
+ * Writes runs back as draft markup. The format has no way to combine bold and
+ * italic, so such a run keeps its bold.
+ */
+export function runsToMarkup(text: RichText): string {
+	return text
+		.map((run) => (run.bold ? `**${run.text}**` : run.italic ? `*${run.text}*` : run.text))
+		.join("");
+}
+
+function nodeToDraft(node: ContentNode): Record<string, unknown> | null {
+	switch (node.type) {
+		case "image":
+			return null;
+		case "heading":
+		case "paragraph":
+			return { type: node.type, text: runsToMarkup(node.text) };
+		case "bullets":
+			return { type: "bullets", items: node.items.map((item) => runsToMarkup(item.text)) };
+		case "quote":
+			return {
+				type: "quote",
+				text: runsToMarkup(node.text),
+				...(node.attribution ? { attribution: node.attribution } : {}),
+			};
+		case "stat":
+			return { type: "stat", value: node.value, label: node.label };
+		case "steps":
+			return {
+				type: "steps",
+				items: node.items.map((step) => ({
+					title: step.title,
+					...(step.detail ? { detail: runsToMarkup(step.detail) } : {}),
+				})),
+			};
+		case "columns":
+			return {
+				type: "columns",
+				columns: node.columns.map((column) => ({
+					heading: column.heading,
+					items: column.items.map((item) => runsToMarkup(item.text)),
+				})),
+			};
+	}
+}
+
+/**
+ * A saved card in the shape the model drafts, so an AI revision reads the card
+ * the way it would write it. IDs are dropped and image nodes are left out: the
+ * server keeps the card's photo and adds it back.
+ */
+export function cardToDraft(card: Card) {
+	return {
+		takeaway: card.takeaway,
+		layout: card.layout,
+		nodes: card.nodes.flatMap((node) => {
+			const draft = nodeToDraft(node);
+			return draft ? [draft] : [];
+		}),
+		sourceIds: card.sourceIds,
+		...(card.notes ? { notes: card.notes } : {}),
 	};
 }
