@@ -19,6 +19,10 @@ SlideSage uses PostgreSQL-backed fixed-window rate limits. The shared `api_rate_
 | `POST /billing/checkout`                                                                            | Authenticated user | 10        | 10 minutes |
 | `POST /billing/verify`                                                                              | Authenticated user | 20        | 15 minutes |
 | `POST /billing/webhook`                                                                             | Client IP          | 120       | 1 minute   |
+| `GET /shared/:token`                                                                                | Client IP          | 60        | 1 minute   |
+| `GET /shared/:token/assets/:sha256`                                                                 | Client IP          | 600       | 1 minute   |
+| `POST /presentations/:id/share`                                                                     | Authenticated user | 20        | 1 hour     |
+| `GET /images/search`                                                                                | Authenticated user | 60        | 1 hour     |
 
 Email and IP policies are both evaluated where listed when the body contains a parseable email; the IP policy still applies when it does not. A request is rejected if either applicable counter is exhausted. Invalid requests count because limiting runs before route validation. `OPTIONS` preflight requests bypass the limiter.
 

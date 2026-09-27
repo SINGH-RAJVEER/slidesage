@@ -14,7 +14,8 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/stockimages"
 )
 
-// Handler serves card documents to their owners.
+// Handler serves card documents to their owners, and read-only to anyone
+// holding a live share link.
 type Handler struct {
 	DB    *sql.DB
 	Store ObjectStore
@@ -33,6 +34,11 @@ func RegisterRoutes(mux *http.ServeMux, handler Handler) {
 	mux.HandleFunc("GET /images/search", handler.searchPhotos)
 	mux.HandleFunc("POST /presentations/{id}/assets/stock", handler.addStockPhoto)
 	mux.HandleFunc("POST /presentations/{id}/assets/upload", handler.uploadPhoto)
+	mux.HandleFunc("GET /presentations/{id}/share", handler.getShare)
+	mux.HandleFunc("POST /presentations/{id}/share", handler.createShare)
+	mux.HandleFunc("DELETE /presentations/{id}/share", handler.revokeShare)
+	mux.HandleFunc("GET /shared/{token}", handler.shared)
+	mux.HandleFunc("GET /shared/{token}/assets/{sha256}", handler.sharedAsset)
 }
 
 func writeJSON(writer http.ResponseWriter, status int, value any) {

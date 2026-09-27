@@ -84,6 +84,20 @@ Without `PEXELS_API_KEY` the stock routes return `503` and generation drafts wit
 Edits are pure functions in `libs/cards/src/edit.ts`: text, fields, list items, layout, order, duplication, insertion, deletion, and photos. The layout menu offers only layouts the card's content fits. Text is edited in place and supports bold and italic only. Undo history coalesces keystrokes within 800 ms, and the document autosaves 1.2 seconds after the last change. After a conflict the editor stops saving and offers to reload.
 
 
+## Sharing
+
+An owner can create one read-only link per presentation. The token has 256 random bits and is returned only when the link is created; `presentation_shares` keeps its SHA-256 digest. Creating a link revokes the previous one, and revoking leaves the row as a record.
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET`    | `/presentations/{id}/share` | Reports whether the owner's presentation has a live link, and since when |
+| `POST`   | `/presentations/{id}/share` | Creates a link, replacing any earlier one, and returns its token |
+| `DELETE` | `/presentations/{id}/share` | Revokes the live link |
+| `GET`    | `/shared/{token}` | Returns the current document, its photos, and the source titles and URLs its citations need |
+| `GET`    | `/shared/{token}/assets/{sha256}` | Serves a photo of the shared presentation |
+
+The shared routes need no sign-in. They serve only ready presentations, and they never return the revision's provenance, author, or prompt. A viewer always sees the latest saved revision. A malformed, unknown, or revoked token returns `404`. Photos are cached privately by the browser, so a viewer who already loaded one keeps it after the link is revoked.
+
 ## Browser
 
 `/presentations/:presentationId` shows the deck as it is drafted while that presentation generates: written cards render as they will look, and cards still being written show their planned point. It then loads the saved document, validates it with `@slidesage/cards`, and renders it with `CardDeck` from `@slidesage/ui/components/Cards`. A failed presentation redirects to `/presentation-error`.

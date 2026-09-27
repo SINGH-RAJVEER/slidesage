@@ -152,6 +152,14 @@ func policyFor(method, path string) (ratePolicy, bool) {
 		return ratePolicy{"billing-checkout", 10, tenMinutes, true}, true
 	case method == http.MethodPost && path == "/billing/verify":
 		return ratePolicy{"billing-verify", 20, fifteenMinutes, true}, true
+	case method == http.MethodGet && strings.HasPrefix(path, "/shared/") && strings.Contains(path, "/assets/"):
+		return ratePolicy{"shared-asset", 600, minute, false}, true
+	case method == http.MethodGet && strings.HasPrefix(path, "/shared/"):
+		return ratePolicy{"shared-document", 60, minute, false}, true
+	case method == http.MethodPost && strings.HasPrefix(path, "/presentations/") && strings.HasSuffix(path, "/share"):
+		return ratePolicy{"share-create", 20, hour, true}, true
+	case method == http.MethodGet && path == "/images/search":
+		return ratePolicy{"photo-search", 60, hour, true}, true
 	case method == http.MethodPost && path == "/billing/webhook":
 		return ratePolicy{"billing-webhook", 120, minute, false}, true
 	default:
