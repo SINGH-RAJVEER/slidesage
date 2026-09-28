@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { assembleDocument, convertCards } from "@slidesage/cards";
+import { StreamingProvider } from "@slidesage/ui";
 import { fireEvent, render, waitFor, within } from "@testing-library/react";
 import { DeckWorkspace } from "../../../routes/presentations/DeckWorkspace";
 
@@ -30,14 +31,16 @@ function deck() {
 
 function open(onReload = () => {}) {
 	return render(
-		<DeckWorkspace
-			presentationId="pres_1"
-			document={deck()}
-			revision={3}
-			sources={[]}
-			assets={{}}
-			onReload={onReload}
-		/>,
+		<StreamingProvider>
+			<DeckWorkspace
+				presentationId="pres_1"
+				document={deck()}
+				revision={3}
+				sources={[]}
+				assets={{}}
+				onReload={onReload}
+			/>
+		</StreamingProvider>,
 	);
 }
 
@@ -177,5 +180,51 @@ describe("DeckWorkspace", () => {
 				),
 			{ timeout: 8000 },
 		);
+	}, 15000);
+
+	it("saves pending edits, then asks AI to revise one card from the saved revision", async () => {
+		const requests: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
+		globalThis.fetch = mock(async (input: string | URL | Request, init?: RequestInit) => {
+			const url = String(input);
+			const method = init?.method ?? "GET";
+			requests.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+			if (url.endsWith("/document")) return Response.json({ revision: { revision: 4 } });
+			if (url.endsWith("/presentation-jobs")) {
+				return Response.json(
+					{ job_id: "job_1", presentation_id: "pres_1", status: "queued" },
+					{ status: 202 },
+				);
+			}
+			// The revision's event stream stays open for the rest of the test.
+			return new Promise<Response>(() => {});
+		}) as unknown as typeof fetch;
+
+		const view = open();
+		fireEvent.click(view.getByRole("button", { name: "Edit" }));
+		typeHeading(view, "Grid batteries");
+		fireEvent.click(view.getByRole("button", { name: "Revise this card with AI", hidden: true }));
+		fireEvent.click(await view.findByRole("button", { name: "Make it more concise" }));
+
+		await waitFor(
+			() =>
+				expect(requests.some((request) => request.url.endsWith("/presentation-jobs"))).toBe(true),
+			{
+				timeout: 8000,
+			},
+		);
+		const methods = requests.map(
+			(request) => `${request.method} ${request.url.split("/").slice(-1)[0]}`,
+		);
+		expect(methods.indexOf("PUT document")).toBeLessThan(methods.indexOf("POST presentation-jobs"));
+		const job = requests.find((request) => request.url.endsWith("/presentation-jobs"));
+		expect(job?.body).toMatchObject({
+			topic: "Make it more concise",
+			parent_presentation_id: "pres_1",
+			base_revision: 4,
+			card_ids: [deck().cardOrder[0]],
+		});
+		expect(await view.findByText(/read-only until the revision is saved/)).toBeInTheDocument();
+		expect(view.getByRole("button", { name: "Edit" })).toBeDisabled();
+		expect(view.queryByRole("textbox", { name: "Card heading" })).toBeNull();
 	}, 15000);
 });

@@ -19,7 +19,16 @@ import {
 	SelectValue,
 } from "@slidesage/ui/components/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@slidesage/ui/components/tooltip";
-import { ArrowDown, ArrowUp, Copy, ImageMinus, ImagePlus, Plus, Trash2 } from "lucide-react";
+import {
+	ArrowDown,
+	ArrowUp,
+	Copy,
+	ImageMinus,
+	ImagePlus,
+	Plus,
+	Sparkles,
+	Trash2,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import type { DocumentEdit } from "./CardView";
 
@@ -73,13 +82,15 @@ export interface CardToolbarProps {
 	edit: DocumentEdit;
 	/** Opens the photo picker for this card. */
 	onPhoto?: (cardId: string) => void;
+	/** Asks AI to revise this card. */
+	onRevise?: (cardId: string) => void;
 }
 
 /**
  * Actions for one card while editing. It sits above the card rather than on
  * it, so the card surface shows only the card's own content.
  */
-export function CardToolbar({ document, cardId, edit, onPhoto }: CardToolbarProps) {
+export function CardToolbar({ document, cardId, edit, onPhoto, onRevise }: CardToolbarProps) {
 	const card = document.cards[cardId];
 	const index = document.cardOrder.indexOf(cardId);
 	if (!card) return null;
@@ -113,6 +124,11 @@ export function CardToolbar({ document, cardId, edit, onPhoto }: CardToolbarProp
 				</SelectContent>
 			</Select>
 			<div className="ml-auto flex items-center gap-1">
+				{onRevise && (
+					<Action label="Revise this card with AI" onClick={() => onRevise(cardId)}>
+						<Sparkles className="size-4" />
+					</Action>
+				)}
 				{onPhoto && (
 					<Action
 						label={

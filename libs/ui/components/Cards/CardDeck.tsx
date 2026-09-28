@@ -16,6 +16,8 @@ export interface CardDeckProps {
 	edit?: DocumentEdit;
 	/** Opens the photo picker for a card while editing. */
 	onPhoto?: (cardId: string) => void;
+	/** Asks AI to revise a card while editing. */
+	onRevise?: (cardId: string) => void;
 }
 
 /** Maps the drafter's source IDs (s1, s2, ...) to citation numbers and links. */
@@ -36,6 +38,7 @@ export function CardDeck({
 	assetUrl,
 	edit,
 	onPhoto,
+	onRevise,
 }: CardDeckProps) {
 	const theme = CARD_THEMES[document.theme];
 	const citations = citationsFor(sources);
@@ -47,7 +50,13 @@ export function CardDeck({
 				return (
 					<li key={cardID}>
 						{edit && (
-							<CardToolbar document={document} cardId={cardID} edit={edit} onPhoto={onPhoto} />
+							<CardToolbar
+								document={document}
+								cardId={cardID}
+								edit={edit}
+								onPhoto={onPhoto}
+								onRevise={onRevise}
+							/>
 						)}
 						<CardView
 							card={card}

@@ -124,6 +124,10 @@ export interface GenerateOptions {
 	ai?: AIModelSelection;
 	/** An outline the user approved; drafting follows it instead of planning. */
 	plan?: Outline;
+	/** For an AI revision: the card revision being revised. */
+	baseRevision?: number;
+	/** For an AI revision: the cards to rewrite; omitted means every card. */
+	cardIds?: string[];
 }
 
 type ResearchPreviewStatus = "idle" | "loading" | "ready" | "error";
@@ -624,6 +628,8 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 						retry_presentation_id: options.retryPresentationId,
 						ai: options.ai,
 						plan: options.plan,
+						base_revision: options.baseRevision,
+						card_ids: options.cardIds,
 					}),
 					signal: controller.signal,
 				});

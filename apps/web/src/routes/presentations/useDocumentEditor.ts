@@ -32,6 +32,10 @@ export interface DocumentEditor {
 	status: SaveStatus;
 	/** Saves now instead of waiting for the edits to settle. */
 	flush: () => Promise<void>;
+	/** The revision the latest save produced, read at call time. */
+	savedRevision: () => number;
+	/** True when every edit is saved and saving is not blocked by a conflict. */
+	isSaved: () => boolean;
 }
 
 /**
@@ -194,6 +198,8 @@ export function useDocumentEditor(options: {
 		canRedo: history.future.length > 0,
 		status,
 		flush,
+		savedRevision: () => base.current,
+		isSaved: () => present.current === saved.current && !blocked.current,
 	};
 }
 

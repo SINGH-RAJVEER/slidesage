@@ -7,6 +7,7 @@ import {
 	type ThemeId,
 } from "@slidesage/cards";
 import type { Source } from "@slidesage/types";
+import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
 import {
 	type CardAsset,
@@ -15,7 +16,9 @@ import {
 	PresentMode,
 	type StockPhoto,
 } from "@slidesage/ui/components/Cards";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { Input } from "@slidesage/ui/components/input";
+import { Progress } from "@slidesage/ui/components/progress";
 import {
 	Select,
 	SelectContent,
@@ -24,8 +27,9 @@ import {
 	SelectValue,
 } from "@slidesage/ui/components/select";
 import { API_URL } from "@slidesage/ui/lib/api";
-import { Check, Link2, Pencil, Play, Redo2, Undo2 } from "lucide-react";
+import { Check, Link2, Pencil, Play, Redo2, Sparkles, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ReviseDialog } from "./ReviseDialog";
 import { ShareDialog } from "./ShareDialog";
 import { type SaveStatus, useDocumentEditor } from "./useDocumentEditor";
 
@@ -73,6 +77,14 @@ export function DeckWorkspace({
 	const [sharing, setSharing] = useState(false);
 	const [assets, setAssets] = useState(initialAssets);
 	const [photoCard, setPhotoCard] = useState<string | null>(null);
+	// The cards an AI revision will rewrite; empty means the whole deck.
+	const [reviseCards, setReviseCards] = useState<string[] | null>(null);
+	const [reviseError, setReviseError] = useState<string | null>(null);
+	const { streamingState, generate } = useStreaming();
+	const revising =
+		streamingState.isStreaming &&
+		streamingState.operation === "iteration" &&
+		streamingState.presentationId === presentationId;
 	const assetIds = useMemo(() => Object.keys(assets), [assets]);
 	const presentationUrl = `${API_URL}/presentations/${encodeURIComponent(presentationId)}`;
 	const assetUrl = (assetId: string) => `${presentationUrl}/assets/${assetId}`;
@@ -145,6 +157,42 @@ export function DeckWorkspace({
 		return heading?.type === "heading" ? heading.text.map((run) => run.text).join("") : "";
 	})();
 
+	// An AI revision starts from the saved revision, so pending edits are saved
+	// first and editing stays off until the revision is saved.
+	const revise = async (cardIds: string[], instruction: string) => {
+		setReviseError(null);
+		await editor.flush();
+		if (!editor.isSaved()) {
+			setReviseError("Save or reload your changes before revising with AI.");
+			return;
+		}
+		setEditing(false);
+		const done = await generate({
+			prompt: instruction,
+			slideCount: editor.document.cardOrder.length,
+			detailLevel: "balanced",
+			tonality: "professional",
+			parentPresentationId: presentationId,
+			baseRevision: editor.savedRevision(),
+			cardIds,
+		});
+		if (!done) setReviseError((current) => current ?? "The revision did not finish.");
+	};
+
+	useEffect(() => {
+		if (streamingState.operation === "iteration" && streamingState.error) {
+			setReviseError(streamingState.error);
+		}
+	}, [streamingState.operation, streamingState.error]);
+
+	const reviseScope = (() => {
+		if (!reviseCards || reviseCards.length === 0) return "every card";
+		const index = editor.document.cardOrder.indexOf(reviseCards[0] ?? "");
+		return `card ${index + 1}`;
+	})();
+
+	const progress = streamingState.generationProgress;
+
 	const finish = async () => {
 		await editor.flush();
 		setEditing(false);
@@ -152,6 +200,7 @@ export function DeckWorkspace({
 
 	return (
 		<>
+			<FloatingNotice error={reviseError} onDismiss={() => setReviseError(null)} />
 			<div className="flex flex-wrap items-center gap-3">
 				{editing ? (
 					<Input
@@ -210,6 +259,15 @@ export function DeckWorkspace({
 						</Button>
 					</>
 				)}
+				<Button
+					variant="ghost"
+					onClick={() => setReviseCards([])}
+					disabled={revising || blocked}
+					className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
+				>
+					<Sparkles className="size-4" />
+					Revise with AI
+				</Button>
 				{!editing && (
 					<Button
 						variant="ghost"
@@ -233,7 +291,7 @@ export function DeckWorkspace({
 				<Button
 					variant="ghost"
 					onClick={() => (editing ? void finish() : setEditing(true))}
-					disabled={blocked}
+					disabled={blocked || revising}
 					className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
 				>
 					{editing ? <Check className="size-4" /> : <Pencil className="size-4" />}
@@ -262,13 +320,36 @@ export function DeckWorkspace({
 					)}
 				</div>
 			)}
+			{revising && (
+				<div role="status" aria-live="polite" className="-mt-4 flex flex-col gap-2">
+					<p className="text-sm text-white/60">
+						{streamingState.generationMessage ?? "Revising cards"}. The deck is read-only until the
+						revision is saved.
+					</p>
+					<Progress
+						value={progress?.total ? Math.round((progress.completed / progress.total) * 100) : 0}
+						aria-label="Revision progress"
+					/>
+				</div>
+			)}
 			<CardDeck
 				document={editor.document}
 				sources={sources}
 				assets={assets}
 				assetUrl={assetUrl}
-				edit={editing && !blocked ? editor.edit : undefined}
-				onPhoto={editing && !blocked ? setPhotoCard : undefined}
+				edit={editing && !blocked && !revising ? editor.edit : undefined}
+				onPhoto={editing && !blocked && !revising ? setPhotoCard : undefined}
+				onRevise={
+					editing && !blocked && !revising ? (cardId) => setReviseCards([cardId]) : undefined
+				}
+			/>
+			<ReviseDialog
+				open={reviseCards !== null}
+				onOpenChange={(open) => {
+					if (!open) setReviseCards(null);
+				}}
+				scope={reviseScope}
+				onSubmit={(instruction) => void revise(reviseCards ?? [], instruction)}
 			/>
 			<PhotoPicker
 				open={photoCard !== null}

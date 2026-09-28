@@ -36,8 +36,11 @@ export default function PresentationPage() {
 	const navigate = useNavigate();
 	const { streamingState, cancelGeneration } = useStreaming();
 	const [state, setState] = useState<LoadState>({ status: "loading" });
-	const generatingHere =
-		streamingState.isStreaming && streamingState.presentationId === presentationId;
+	// An AI revision keeps the deck on screen; only a generation replaces it
+	// with progress.
+	const jobHere = streamingState.isStreaming && streamingState.presentationId === presentationId;
+	const generatingHere = jobHere && streamingState.operation !== "iteration";
+	const revisingHere = jobHere && streamingState.operation === "iteration";
 
 	const load = useCallback(async () => {
 		try {
@@ -114,7 +117,7 @@ export default function PresentationPage() {
 			return;
 		}
 		void load();
-	}, [generatingHere, load]);
+	}, [generatingHere, revisingHere, load]);
 
 	const progress = streamingState.generationProgress;
 	const percent = progress?.total ? Math.round((progress.completed / progress.total) * 100) : 0;
