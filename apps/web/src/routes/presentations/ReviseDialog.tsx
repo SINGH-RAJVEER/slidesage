@@ -60,7 +60,7 @@ export function ReviseDialog({ open, onOpenChange, scope, onSubmit }: ReviseDial
 						aria-label="What should change"
 						placeholder="For example: tighten the wording and lead with the numbers"
 						value={instruction}
-						maxLength={1000}
+						maxLength={400}
 						onChange={(event) => setInstruction(event.target.value)}
 						className="min-h-24"
 					/>

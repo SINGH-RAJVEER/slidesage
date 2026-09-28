@@ -27,6 +27,7 @@ A document may only reference assets the caller says the presentation owns (`kno
 | `POST` | `/v1/cards` | Converts drafted cards independently; each result is a card or an issue |
 | `POST` | `/v1/documents` | Assembles converted cards into a validated document, or returns `422` with an issue |
 | `POST` | `/v1/documents/validate` | Validates an edited document before it is saved |
+| `POST` | `/v1/documents/drafts` | Returns every card of a document in draft form, keyed by card ID, for AI revisions |
 
 Conversion, assembly, and validation take `assetIds`, the assets the presentation owns; an image node naming any other asset is an issue.
 
@@ -48,7 +49,19 @@ The worker drafts through `cardDrafter` (`apps/api/internal/generation/cards.go`
 
 Revision provenance records the provider, model, prompt version, plan version, and source IDs. Converter `5xx` responses and network failures are retried as temporary; `4xx` responses fail the job.
 
-The API accepts submissions only when `CARD_CONVERTER_URL` and `PRESENTATION_GCS_BUCKET` are both set; otherwise it returns `503` before reserving points. AI revision of an existing card document is not implemented, so a submission with `parent_presentation_id` returns `409`.
+The API accepts submissions only when `CARD_CONVERTER_URL` and `PRESENTATION_GCS_BUCKET` are both set; otherwise it returns `503` before reserving points.
+
+## AI revisions
+
+An AI revision rewrites chosen cards of a saved deck according to an instruction. It is submitted to `POST /presentation-jobs` with `parent_presentation_id`, `topic` (the instruction, 1 to 400 characters), `base_revision` (the card revision the user is looking at), and optionally `card_ids`. Without `card_ids`, every card is rewritten. A revision never adds, removes, or reorders cards.
+
+- Submission refuses a `base_revision` that is no longer current with `409`, before any points are reserved. Points are reserved for the targeted cards at their drafting bound, plus the document and sources each batch call resends, plus repair headroom.
+- The worker loads the base revision and has the converter return each card in draft form (`/v1/documents/drafts`). Targeted cards are rewritten in batches of four. Each call sees the instruction, the deck's outline, the research sources, and the cards' current drafts, and it returns an updated takeaway with each card.
+- Each rewritten card passes the same conversion and targeted repair as generation. It then takes the ID of the card it replaces and is spliced into the document. Every other card keeps its exact bytes. A photo card keeps its photo unless the new layout has no place for one.
+- The spliced document is validated whole, stored, and committed as an `ai_revision` with compare-and-swap against `base_revision`. Its provenance records the model, the instruction, and the card IDs. A deck that changed while the job ran fails the job and refunds the reservation.
+- The presentation keeps its title, sources, and original prompt.
+
+In the browser, Revise with AI asks for an instruction for the whole deck, or for one card from its toolbar while editing. Quick picks include making a card more concise or more persuasive. Pending edits are saved first. The deck stays on screen, read-only, with progress, and reloads on the new revision once it is saved.
 
 ## Outline
 
