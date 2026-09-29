@@ -27,7 +27,7 @@ import {
 	SelectValue,
 } from "@slidesage/ui/components/select";
 import { API_URL } from "@slidesage/ui/lib/api";
-import { Check, Link2, Pencil, Play, Redo2, Sparkles, Undo2 } from "lucide-react";
+import { Check, Download, Link2, Pencil, Play, Redo2, Sparkles, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ReviseDialog } from "./ReviseDialog";
 import { ShareDialog } from "./ShareDialog";
@@ -58,6 +58,20 @@ export interface DeckWorkspaceProps {
 	onReload: () => void;
 }
 
+/** The file name the server gave a download, if it gave one. */
+function downloadName(response: Response, fallback: string): string {
+	const header = response.headers.get("Content-Disposition") ?? "";
+	const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)?.[1];
+	if (encoded) {
+		try {
+			return decodeURIComponent(encoded);
+		} catch {
+			// Fall through to the plain name.
+		}
+	}
+	return /filename="([^"]+)"/i.exec(header)?.[1] ?? fallback;
+}
+
 async function readError(response: Response, fallback: string): Promise<string> {
 	const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
 	return body?.error?.message ?? fallback;
@@ -79,7 +93,8 @@ export function DeckWorkspace({
 	const [photoCard, setPhotoCard] = useState<string | null>(null);
 	// The cards an AI revision will rewrite; empty means the whole deck.
 	const [reviseCards, setReviseCards] = useState<string[] | null>(null);
-	const [reviseError, setReviseError] = useState<string | null>(null);
+	const [notice, setNotice] = useState<string | null>(null);
+	const [exporting, setExporting] = useState(false);
 	const { streamingState, generate } = useStreaming();
 	const revising =
 		streamingState.isStreaming &&
@@ -160,10 +175,10 @@ export function DeckWorkspace({
 	// An AI revision starts from the saved revision, so pending edits are saved
 	// first and editing stays off until the revision is saved.
 	const revise = async (cardIds: string[], instruction: string) => {
-		setReviseError(null);
+		setNotice(null);
 		await editor.flush();
 		if (!editor.isSaved()) {
-			setReviseError("Save or reload your changes before revising with AI.");
+			setNotice("Save or reload your changes before revising with AI.");
 			return;
 		}
 		setEditing(false);
@@ -176,12 +191,12 @@ export function DeckWorkspace({
 			baseRevision: editor.savedRevision(),
 			cardIds,
 		});
-		if (!done) setReviseError((current) => current ?? "The revision did not finish.");
+		if (!done) setNotice((current) => current ?? "The revision did not finish.");
 	};
 
 	useEffect(() => {
 		if (streamingState.operation === "iteration" && streamingState.error) {
-			setReviseError(streamingState.error);
+			setNotice(streamingState.error);
 		}
 	}, [streamingState.operation, streamingState.error]);
 
@@ -193,6 +208,31 @@ export function DeckWorkspace({
 
 	const progress = streamingState.generationProgress;
 
+	// The export is built from the saved revision, which is current whenever
+	// the deck is not being edited.
+	const downloadPptx = async () => {
+		setNotice(null);
+		setExporting(true);
+		try {
+			const response = await fetch(`${presentationUrl}/export/pptx`, { credentials: "include" });
+			if (!response.ok) {
+				setNotice(await readError(response, "The presentation could not be exported."));
+				return;
+			}
+			const url = URL.createObjectURL(await response.blob());
+			const link = window.document.createElement("a");
+			link.href = url;
+			link.download = downloadName(response, `${editor.document.title || "Presentation"}.pptx`);
+			link.click();
+			// The click starts the download; the URL can go once it has.
+			setTimeout(() => URL.revokeObjectURL(url), 1000);
+		} catch {
+			setNotice("The presentation could not be exported.");
+		} finally {
+			setExporting(false);
+		}
+	};
+
 	const finish = async () => {
 		await editor.flush();
 		setEditing(false);
@@ -200,7 +240,7 @@ export function DeckWorkspace({
 
 	return (
 		<>
-			<FloatingNotice error={reviseError} onDismiss={() => setReviseError(null)} />
+			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
 			<div className="flex flex-wrap items-center gap-3">
 				{editing ? (
 					<Input
@@ -286,6 +326,17 @@ export function DeckWorkspace({
 					>
 						<Play className="size-4" />
 						Present
+					</Button>
+				)}
+				{!editing && (
+					<Button
+						variant="ghost"
+						onClick={() => void downloadPptx()}
+						disabled={exporting || revising}
+						className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
+					>
+						<Download className="size-4" />
+						{exporting ? "Preparing PPTX" : "Download PPTX"}
 					</Button>
 				)}
 				<Button

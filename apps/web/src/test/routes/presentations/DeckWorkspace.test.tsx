@@ -227,4 +227,31 @@ describe("DeckWorkspace", () => {
 		expect(view.getByRole("button", { name: "Edit" })).toBeDisabled();
 		expect(view.queryByRole("textbox", { name: "Card heading" })).toBeNull();
 	}, 15000);
+	it("downloads the saved deck as PPTX under the file name the server gives it", async () => {
+		const urls: string[] = [];
+		globalThis.fetch = mock(async (input: string | URL | Request) => {
+			urls.push(String(input));
+			return new Response("PK", {
+				headers: {
+					"Content-Disposition": `attachment; filename="Grid storage.pptx"; filename*=UTF-8''Grid%20storage%20%C3%A9.pptx`,
+				},
+			});
+		}) as unknown as typeof fetch;
+		const createObjectURL = URL.createObjectURL;
+		const click = HTMLAnchorElement.prototype.click;
+		const downloads: string[] = [];
+		URL.createObjectURL = () => "blob:deck";
+		HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+			downloads.push(`${this.download} ${this.href}`);
+		};
+		try {
+			const view = open();
+			fireEvent.click(view.getByRole("button", { name: "Download PPTX" }));
+			await waitFor(() => expect(downloads).toEqual(["Grid storage \u00e9.pptx blob:deck"]));
+			expect(urls[0]).toEndWith("/presentations/pres_1/export/pptx");
+		} finally {
+			URL.createObjectURL = createObjectURL;
+			HTMLAnchorElement.prototype.click = click;
+		}
+	});
 });
