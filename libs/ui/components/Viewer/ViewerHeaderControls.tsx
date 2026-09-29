@@ -7,6 +7,8 @@ interface ViewerHeaderControlsProps {
 	title?: string;
 	canIterate: boolean;
 	onBack: () => void;
+	/** Names where Back goes. */
+	backLabel?: string;
 	onIterate: () => void;
 	onPresent: () => void;
 	presentDisabled?: boolean;
@@ -23,6 +25,7 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 	title,
 	canIterate,
 	onBack,
+	backLabel = "Back to presentations",
 	onIterate,
 	onPresent,
 	presentDisabled = false,
@@ -39,7 +42,7 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 			<div className="viewer-header__identity flex min-w-0 items-center gap-4">
 				<Button
 					onClick={onBack}
-					aria-label="Back to presentations"
+					aria-label={backLabel}
 					className="viewer-header__back bg-transparent hover:bg-white/5 text-white/40 hover:text-white transition-all duration-300 rounded-full p-2 h-10 w-10 border-none shadow-none"
 				>
 					<ArrowLeft className="w-5 h-5" />

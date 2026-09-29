@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { assembleDocument, type Card, convertCards } from "@slidesage/cards";
 import { render, within } from "@testing-library/react";
-import { CardDeck } from "../../components/Cards";
+import { CardList } from "../CardList";
 
 function cards(): Card[] {
 	const results = convertCards({
@@ -54,11 +54,11 @@ function cards(): Card[] {
 	});
 }
 
-describe("CardDeck", () => {
+describe("CardView", () => {
 	it("renders every card in order with its layout content", () => {
 		const document = assembleDocument({ title: "Grid storage", theme: "paper", cards: cards() });
 		const view = render(
-			<CardDeck
+			<CardList
 				document={document}
 				sources={[{ url: "https://example.com/report", title: "Battery report" }]}
 			/>,
@@ -75,7 +75,7 @@ describe("CardDeck", () => {
 	it("links a card's citations to the research sources", () => {
 		const document = assembleDocument({ title: "Grid storage", theme: "slate", cards: cards() });
 		const view = render(
-			<CardDeck
+			<CardList
 				document={document}
 				sources={[{ url: "https://example.com/report", title: "Battery report" }]}
 			/>,
@@ -134,7 +134,7 @@ describe("image cards", () => {
 			assetIds: [assetId],
 		});
 		const view = render(
-			<CardDeck
+			<CardList
 				document={document}
 				assetUrl={(id) => `/assets/${id}`}
 				assets={{

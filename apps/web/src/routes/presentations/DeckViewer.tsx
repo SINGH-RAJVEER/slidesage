@@ -23,6 +23,7 @@ export interface DeckViewerProps {
 	/** Null until the deck, or its plan, is known. */
 	deck: ViewerDeck | null;
 	onBack: () => void;
+	backLabel?: string;
 	/** Shows the waiting slide in place of a deck that has no slides yet. */
 	isWaiting?: boolean;
 	/** Set while the deck generates, so waiting slides can report progress. */
@@ -62,6 +63,7 @@ export function DeckViewer({
 	title,
 	deck,
 	onBack,
+	backLabel,
 	isWaiting = false,
 	generation,
 	edit,
@@ -202,6 +204,7 @@ export function DeckViewer({
 						canIterate={iterate?.canIterate ?? false}
 						showIterate={!!iterate}
 						onBack={onBack}
+						backLabel={backLabel}
 						onIterate={() => iterate?.onIterate()}
 						onPresent={() => void enterFullscreen()}
 						presentDisabled={!hasCards || presentDisabled}

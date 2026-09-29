@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { assembleDocument, type CardDocument, convertCards } from "@slidesage/cards";
 import { fireEvent, render } from "@testing-library/react";
-import { CardDeck } from "../../components/Cards";
+import { CardToolbar } from "../../components/Cards";
+import { CardList } from "../CardList";
 
 /** A deck with every text-bearing node type. */
 export function everyNodeDeck(): CardDocument {
@@ -85,7 +86,7 @@ describe("editing cards", () => {
 		const original = everyNodeDeck();
 		let edits = 0;
 		const view = render(
-			<CardDeck
+			<CardList
 				document={original}
 				edit={() => {
 					edits += 1;
@@ -103,7 +104,7 @@ describe("editing cards", () => {
 		const original = everyNodeDeck();
 		let current = original;
 		const view = render(
-			<CardDeck
+			<CardList
 				document={original}
 				edit={(update) => {
 					current = update(current);
@@ -133,7 +134,7 @@ describe("editing cards", () => {
 		const original = everyNodeDeck();
 		let current = original;
 		const view = render(
-			<CardDeck
+			<CardList
 				document={original}
 				edit={(update) => {
 					current = update(current);
@@ -151,15 +152,14 @@ describe("editing cards", () => {
 		expect(first?.takeaway).toBe("Grid batteries");
 	});
 
-	it("offers card actions only while editing", () => {
+	it("offers actions for one card, and only the moves its position allows", () => {
 		const document = everyNodeDeck();
-		const reading = render(<CardDeck document={document} />);
-		expect(reading.queryAllByRole("toolbar")).toHaveLength(0);
-		expect(reading.queryAllByRole("textbox")).toHaveLength(0);
-		reading.unmount();
-		const editing = render(<CardDeck document={document} edit={() => {}} />);
-		expect(editing.getAllByRole("toolbar")).toHaveLength(document.cardOrder.length);
-		expect(editing.getAllByRole("button", { name: "Move card left" })[0]).toBeDisabled();
-		expect(editing.getAllByRole("button", { name: "Move card right" })[0]).toBeEnabled();
+		const [first] = document.cardOrder;
+		if (!first) throw new Error("no card");
+		const view = render(<CardToolbar document={document} cardId={first} edit={() => {}} />);
+		expect(view.getByRole("toolbar", { name: "Card 1 actions" })).toBeInTheDocument();
+		expect(view.getByRole("button", { name: "Move card left" })).toBeDisabled();
+		expect(view.getByRole("button", { name: "Move card right" })).toBeEnabled();
+		expect(view.queryByRole("button", { name: "Delete card" })).toBeNull();
 	});
 });

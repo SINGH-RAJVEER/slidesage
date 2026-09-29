@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { assembleDocument, convertCards } from "@slidesage/cards";
-import { render } from "@testing-library/react";
+import { fireEvent, render } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import SharedPresentationPage from "../../../routes/presentations/SharedPresentationPage";
 
@@ -25,6 +25,7 @@ function deck() {
 					layout: "title",
 					sourceIds: ["s1"],
 					nodes: [{ type: "heading", text: "Grid storage" }],
+					notes: "Open with the price chart.",
 				},
 			},
 		],
@@ -56,13 +57,16 @@ describe("SharedPresentationPage", () => {
 			}),
 		);
 
-		expect(await view.findByRole("heading", { name: "Grid storage deck" })).toBeInTheDocument();
+		expect(await view.findByRole("article")).toHaveAccessibleName("Card 1: Opening");
 		expect(view.getByRole("link", { name: "[1]" })).toHaveAttribute(
 			"href",
 			"https://example.com/storage",
 		);
-		expect(view.getByRole("button", { name: "Present" })).toBeInTheDocument();
+		expect(view.getByRole("button", { name: "Present slideshow" })).toBeEnabled();
 		expect(view.queryByRole("button", { name: "Edit" })).toBeNull();
+		expect(view.queryByRole("button", { name: "Iterate presentation" })).toBeNull();
+		expect(view.queryByRole("button", { name: "Delete slide" })).toBeNull();
+		expect(view.queryByRole("button", { name: /Download/ })).toBeNull();
 		expect(String(fetchMock.mock.calls[0]?.[0])).toEndWith("/shared/token_1");
 	});
 
@@ -72,5 +76,18 @@ describe("SharedPresentationPage", () => {
 		);
 
 		expect(await view.findByText(/This link is not valid/)).toBeInTheDocument();
+	});
+
+	it("presents the deck full screen and shows the speaker notes on N", async () => {
+		const { view } = open(Response.json({ document: deck(), assets: {}, sources: [] }));
+
+		fireEvent.click(await view.findByRole("button", { name: "Present slideshow" }));
+		expect(await view.findByRole("button", { name: "Exit presentation" })).toBeInTheDocument();
+		expect(view.queryByRole("complementary", { name: "Speaker notes" })).toBeNull();
+
+		fireEvent.keyDown(window, { key: "n" });
+		expect(view.getByRole("complementary", { name: "Speaker notes" })).toHaveTextContent(
+			"Open with the price chart.",
+		);
 	});
 });

@@ -1,13 +1,13 @@
 import { type CardDocument, validateCardDocument } from "@slidesage/cards";
 import type { Source } from "@slidesage/types";
-import { Button } from "@slidesage/ui/components/button";
-import { type CardAsset, CardDeck, PresentMode } from "@slidesage/ui/components/Cards";
+import type { CardAsset } from "@slidesage/ui/components/Cards";
 import { SlideSageLogo } from "@slidesage/ui/components/SlideSageLogo";
+import { CenteredStatusScreen, deckFromDocument } from "@slidesage/ui/components/Viewer";
 import { API_URL } from "@slidesage/ui/lib/api";
-import { Play } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ROUTES } from "../../app/router/paths";
+import { DeckViewer } from "./DeckViewer";
 
 type SharedState =
 	| { status: "loading" }
@@ -24,7 +24,7 @@ type SharedState =
 export default function SharedPresentationPage() {
 	const { token = "" } = useParams();
 	const [state, setState] = useState<SharedState>({ status: "loading" });
-	const [presenting, setPresenting] = useState(false);
+	const navigate = useNavigate();
 	const sharedUrl = `${API_URL}/shared/${encodeURIComponent(token)}`;
 
 	useEffect(() => {
@@ -70,7 +70,24 @@ export default function SharedPresentationPage() {
 		if (state.status === "ready") window.document.title = `${state.document.title} · SlideSage`;
 	}, [state]);
 
-	const assetUrl = (assetId: string) => `${sharedUrl}/assets/${assetId}`;
+	if (state.status === "loading") {
+		return <CenteredStatusScreen message="Loading presentation..." />;
+	}
+
+	if (state.status === "ready") {
+		return (
+			<DeckViewer
+				title={state.document.title}
+				deck={deckFromDocument(state.document, {
+					sources: state.sources,
+					assets: state.assets,
+					assetUrl: (assetId) => `${sharedUrl}/assets/${assetId}`,
+				})}
+				onBack={() => navigate(ROUTES.landing)}
+				backLabel="SlideSage home"
+			/>
+		);
+	}
 
 	return (
 		<div className="flex min-h-dvh w-full flex-col bg-transparent">
@@ -79,54 +96,13 @@ export default function SharedPresentationPage() {
 					<SlideSageLogo className="h-8 w-auto" />
 				</Link>
 			</header>
-			<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-6 md:px-8">
-				{state.status === "loading" && (
-					<p className="text-sm text-white/50" role="status">
-						Loading presentation
-					</p>
-				)}
-				{(state.status === "missing" || state.status === "error") && (
-					<section className="flex flex-1 flex-col items-center justify-center gap-2" role="alert">
-						<p className="text-sm text-white/70">
-							{state.status === "missing"
-								? "This link is not valid. It may have been turned off by its owner."
-								: state.message}
-						</p>
-					</section>
-				)}
-				{state.status === "ready" && (
-					<>
-						<div className="flex flex-wrap items-center gap-3">
-							<h1 className="min-w-0 flex-1 text-2xl font-semibold text-white">
-								{state.document.title}
-							</h1>
-							<Button
-								variant="ghost"
-								onClick={() => setPresenting(true)}
-								className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
-							>
-								<Play className="size-4" />
-								Present
-							</Button>
-						</div>
-						<CardDeck
-							document={state.document}
-							sources={state.sources}
-							assets={state.assets}
-							assetUrl={assetUrl}
-						/>
-						{presenting && (
-							<PresentMode
-								document={state.document}
-								sources={state.sources}
-								assets={state.assets}
-								assetUrl={assetUrl}
-								onExit={() => setPresenting(false)}
-							/>
-						)}
-					</>
-				)}
-			</main>
+			<section className="flex flex-1 flex-col items-center justify-center gap-2 px-4" role="alert">
+				<p className="text-sm text-white/70">
+					{state.status === "missing"
+						? "This link is not valid. It may have been turned off by its owner."
+						: state.message}
+				</p>
+			</section>
 		</div>
 	);
 }
