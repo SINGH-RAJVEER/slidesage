@@ -34,14 +34,13 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@slidesage/ui/components/select";
-import { deckFromDocument } from "@slidesage/ui/components/Viewer";
+import { deckFromDocument, IterateModal, type IterateScope } from "@slidesage/ui/components/Viewer";
 import { API_URL } from "@slidesage/ui/lib/api";
 import { Check, Link2, Pencil, Redo2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "../../app/router/paths";
 import { DeckViewer } from "./DeckViewer";
-import { ReviseDialog } from "./ReviseDialog";
 import { ShareDialog } from "./ShareDialog";
 import { type SaveStatus, useDocumentEditor } from "./useDocumentEditor";
 
@@ -123,8 +122,9 @@ export function DeckWorkspace({
 	const [sharing, setSharing] = useState(false);
 	const [assets, setAssets] = useState(initialAssets);
 	const [photoCard, setPhotoCard] = useState<string | null>(null);
-	// The cards an AI revision will rewrite; empty means the whole deck.
-	const [reviseCards, setReviseCards] = useState<string[] | null>(null);
+	// The scope the iterate panel opened with; null while it is closed.
+	const [iterateScope, setIterateScope] = useState<IterateScope | null>(null);
+	const [currentSlide, setCurrentSlide] = useState(0);
 	const [slideToDelete, setSlideToDelete] = useState<number>();
 	const [notice, setNotice] = useState<string | null>(null);
 	const { streamingState, generate } = useStreaming();
@@ -254,12 +254,6 @@ export function DeckWorkspace({
 		}
 	}, [streamingState.operation, streamingState.error]);
 
-	const reviseScope = (() => {
-		if (!reviseCards || reviseCards.length === 0) return "every card";
-		const index = editor.document.cardOrder.indexOf(reviseCards[0] ?? "");
-		return `card ${index + 1}`;
-	})();
-
 	// The deck without the slide autosaves as the next revision; while
 	// editing, Undo brings the slide back.
 	const confirmDelete = () => {
@@ -299,11 +293,15 @@ export function DeckWorkspace({
 			deck={deck}
 			onBack={() => navigate(ROUTES.presentations)}
 			edit={editAllowed ? editor.edit : undefined}
-			iterate={{ canIterate: canEdit, onIterate: () => setReviseCards([]) }}
+			iterate={{
+				canIterate: canEdit,
+				onIterate: () => setIterateScope((open) => (open ? null : "deck")),
+			}}
 			presentDisabled={editing}
 			focusRequest={focusRequest}
 			onSlideChange={(index) => {
 				currentSlideRef.current = index;
+				setCurrentSlide(index);
 			}}
 			titleEditor={
 				editing ? (
@@ -437,7 +435,7 @@ export function DeckWorkspace({
 									cardId={cardId}
 									edit={editor.edit}
 									onPhoto={setPhotoCard}
-									onRevise={(id) => setReviseCards([id])}
+									onRevise={() => setIterateScope("slide")}
 								/>
 							</div>
 						)}
@@ -448,6 +446,23 @@ export function DeckWorkspace({
 			downloadDisabled={editing || revising || status.state !== "saved"}
 			onDeleteSlide={canEdit ? setSlideToDelete : undefined}
 			deleteDisabled={editor.document.cardOrder.length <= 1}
+			aside={
+				<IterateModal
+					open={iterateScope !== null}
+					onOpenChange={(open) => {
+						if (!open) setIterateScope(null);
+					}}
+					initialScope={iterateScope ?? "deck"}
+					currentSlide={currentSlide + 1}
+					isStreaming={!canEdit}
+					onIterate={(instruction, scope) => {
+						const cardId = editor.document.cardOrder[currentSlide];
+						setIterateScope(null);
+						void revise(scope === "slide" && cardId ? [cardId] : [], instruction);
+						return true;
+					}}
+				/>
+			}
 		>
 			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
 			<Dialog
@@ -473,14 +488,6 @@ export function DeckWorkspace({
 					</DialogFooter>
 				</DialogContent>
 			</Dialog>
-			<ReviseDialog
-				open={reviseCards !== null}
-				onOpenChange={(open) => {
-					if (!open) setReviseCards(null);
-				}}
-				scope={reviseScope}
-				onSubmit={(instruction) => void revise(reviseCards ?? [], instruction)}
-			/>
 			<PhotoPicker
 				open={photoCard !== null}
 				onOpenChange={(open) => {

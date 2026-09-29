@@ -62,7 +62,7 @@ An AI revision rewrites chosen cards of a saved deck according to an instruction
 - The spliced document is validated whole, stored, and committed as an `ai_revision` with compare-and-swap against `base_revision`. Its provenance records the model, the instruction, and the card IDs. A deck that changed while the job ran fails the job and refunds the reservation.
 - The presentation keeps its title, sources, and original prompt.
 
-In the browser, Revise with AI asks for an instruction for the whole deck, or for one card from its toolbar while editing. Quick picks include making a card more concise or more persuasive. Pending edits are saved first. The deck stays on screen, read-only, with progress, and reloads on the new revision once it is saved.
+In the browser, Iterate in the viewer header opens a side panel that asks for an instruction and whether it applies to every slide or to the slide on screen; the revise action in the editing toolbar opens it for that slide. Quick changes, such as making the text more concise or more persuasive, submit at once. Pending edits are saved first. The deck stays on screen, read-only, with progress, and reloads on the new revision once it is saved.
 
 ## Outline
 
