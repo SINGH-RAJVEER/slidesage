@@ -13,9 +13,15 @@ import {
 	THEMES,
 	type ThemeId,
 } from "@slidesage/cards";
+import { type ExportAsset, type ExportSource, writePptx } from "./pptx";
 
 /** Requests larger than this are refused before parsing. */
 export const MAX_BODY_BYTES = 1024 * 1024;
+
+/** An export carries the deck's images, so it may be much larger. */
+export const MAX_EXPORT_BODY_BYTES = 96 * 1024 * 1024;
+
+const PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
 export const SCHEMA_VERSION_HEADER = "X-Card-Schema-Version";
 
@@ -32,11 +38,14 @@ function json(status: number, body: unknown): Response {
 	return Response.json(body, { status });
 }
 
-async function readBody(request: Request): Promise<Record<string, unknown>> {
+async function readBody(
+	request: Request,
+	limit = MAX_BODY_BYTES,
+): Promise<Record<string, unknown>> {
 	const declared = Number(request.headers.get("content-length") ?? "0");
-	if (declared > MAX_BODY_BYTES) throw new RequestError(413, "request body is too large");
+	if (declared > limit) throw new RequestError(413, "request body is too large");
 	const raw = await request.text();
-	if (raw.length > MAX_BODY_BYTES) throw new RequestError(413, "request body is too large");
+	if (raw.length > limit) throw new RequestError(413, "request body is too large");
 	let body: unknown;
 	try {
 		body = JSON.parse(raw);
@@ -167,6 +176,78 @@ async function drafts(request: Request): Promise<Response> {
 	}
 }
 
+function exportAssets(value: unknown): Record<string, ExportAsset> {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		throw new RequestError(400, "assets must be an object");
+	}
+	return Object.fromEntries(
+		Object.entries(value).map(([id, raw]) => {
+			const entry = (raw ?? {}) as Record<string, unknown>;
+			const mimeType = entry["mimeType"];
+			if (mimeType !== "image/jpeg" && mimeType !== "image/png") {
+				throw new RequestError(400, `assets.${id}.mimeType must be image/jpeg or image/png`);
+			}
+			const width = entry["width"];
+			const height = entry["height"];
+			if (typeof width !== "number" || width < 1 || typeof height !== "number" || height < 1) {
+				throw new RequestError(400, `assets.${id} must have a positive width and height`);
+			}
+			const data = Buffer.from(requireString(entry["data"], `assets.${id}.data`), "base64");
+			const source = entry["source"];
+			return [
+				id,
+				{
+					mimeType,
+					width,
+					height,
+					data,
+					source: typeof source === "object" && source !== null ? source : undefined,
+				},
+			];
+		}),
+	);
+}
+
+/**
+ * Sources keep their positions, since cards cite them by number, but only a
+ * web link becomes a hyperlink in the file.
+ */
+function exportSources(value: unknown): ExportSource[] {
+	return requireArray(value ?? [], "sources").map((raw) => {
+		const entry = (raw ?? {}) as Record<string, unknown>;
+		const url = entry["url"];
+		const title = entry["title"];
+		return {
+			url: typeof url === "string" && /^https?:\/\//i.test(url) ? url : undefined,
+			title: typeof title === "string" ? title : undefined,
+		};
+	});
+}
+
+/**
+ * Writes a document as an editable PowerPoint file. The caller sends the
+ * images the document shows, since the converter stores nothing.
+ */
+async function exportPptx(request: Request): Promise<Response> {
+	const body = await readBody(request, MAX_EXPORT_BODY_BYTES);
+	const assets = exportAssets(body["assets"] ?? {});
+	try {
+		const document = parseCardDocument(body["document"], {
+			knownAssets: new Set(Object.keys(assets)),
+		});
+		const file = await writePptx({ document, assets, sources: exportSources(body["sources"]) });
+		return new Response(file as Uint8Array<ArrayBuffer>, {
+			status: 200,
+			headers: { "Content-Type": PPTX_TYPE, "Content-Length": String(file.byteLength) },
+		});
+	} catch (error) {
+		if (error instanceof SchemaError) {
+			return json(422, { schemaVersion: CARD_SCHEMA_VERSION, issue: error.issue });
+		}
+		throw error;
+	}
+}
+
 /**
  * Routes one request. Every conversion request names the schema version its
  * caller was built against; a mismatch is refused rather than converted into
@@ -187,6 +268,7 @@ export async function handle(request: Request): Promise<Response> {
 			"/v1/documents": assemble,
 			"/v1/documents/validate": validateDocument,
 			"/v1/documents/drafts": drafts,
+			"/v1/documents/pptx": exportPptx,
 		};
 		const route = routes[url.pathname];
 		if (!route) return json(404, { error: "not found" });
