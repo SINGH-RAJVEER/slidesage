@@ -28,6 +28,7 @@ A document may only reference assets the caller says the presentation owns (`kno
 | `POST` | `/v1/documents` | Assembles converted cards into a validated document, or returns `422` with an issue |
 | `POST` | `/v1/documents/validate` | Validates an edited document before it is saved |
 | `POST` | `/v1/documents/drafts` | Returns every card of a document in draft form, keyed by card ID, for AI revisions |
+| `POST` | `/v1/documents/pptx` | Writes a document, with the images it shows, as an editable PowerPoint file |
 
 Conversion, assembly, and validation take `assetIds`, the assets the presentation owns; an image node naming any other asset is an issue.
 
@@ -113,11 +114,21 @@ The shared routes need no sign-in. They serve only ready presentations, and they
 
 In the browser, Share on a saved deck opens a dialog that creates, replaces, or stops the link, and shows a new link once so it can be copied. The link opens `/s/:token`, which renders the deck read-only with Present and needs no account.
 
+## PPTX export
+
+`GET /presentations/{id}/export/pptx` sends the owner the current revision as a PowerPoint file. The API reads the revision, the images it shows (at most 64 MiB of them), and the presentation's research sources, and posts them to the converter's `/v1/documents/pptx`. The converter accepts bodies up to 96 MiB on that route, since images travel base64-encoded, and stores nothing.
+
+`apps/converter/src/pptx.ts` writes the file with pptxgenjs on a 13.333 by 7.5 inch slide, one slide per card. Everything is native and editable: headings and paragraphs are text boxes, bullets are PowerPoint list paragraphs, comparison columns and process steps are text boxes with hairlines, and photos are pictures cropped around the image node's focus the way the browser crops them. Layout, padding, type sizes, and theme colors follow the web card view; translucent theme colors are flattened onto the card surface. A cover card's gradient is a stretched PNG over the photo, because pptxgenjs shapes have no gradient fill. Citations become hyperlinks to their sources (only `http` and `https` links; other sources keep their number without a link), stock photos keep their credit, and card notes become speaker notes.
+
+A card taller than one slide in the browser is not split or cropped: its text shrinks until it fits, down to half its designed size. The fit is estimated from average glyph widths, not measured with the font, so every text box also has PowerPoint's shrink-on-overflow turned on for anything the estimate misses; PowerPoint applies that only once the text is edited.
+
+The download is named after the deck's title. In the browser, Download PPTX sits beside Present on a saved deck; it is hidden while editing, so the file always matches the saved revision. Exports are not recorded, and two downloads of the same revision are not byte-identical, because the file carries its creation time.
+
 ## Browser
 
 `/presentations/:presentationId` shows the deck as it is drafted while that presentation generates: written cards render as they will look, and cards still being written show their planned point. It then loads the saved document, validates it with `@slidesage/cards`, and renders it with `CardDeck` from `@slidesage/ui/components/Cards`. A failed presentation redirects to `/presentation-error`.
 
-Cards are at least 16:9, and text is sized in container units so a card scales like a fixed slide. A card never crops its content: one whose content needs more room grows taller and is marked `data-overflows-slide`. Filling every field to its schema limit makes most layouts taller than one slide, which PPTX export will have to split or refuse.
+Cards are at least 16:9, and text is sized in container units so a card scales like a fixed slide. A card never crops its content: one whose content needs more room grows taller and is marked `data-overflows-slide`. Filling every field to its schema limit makes most layouts taller than one slide; PPTX export shrinks the text of those cards to fit.
 
 Present shows the deck one card at a time over the whole screen, in full screen where the browser allows it. The arrow keys, Page Up and Page Down, and Space move between cards; Home and End jump to the first and last; N shows the card's speaker notes; Escape or leaving full screen stops presenting.
 

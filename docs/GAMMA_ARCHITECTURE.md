@@ -8,19 +8,19 @@ The PPTX-first pipeline this replaces has been removed from the workspace: the t
 
 ### Implemented so far
 
-The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 2 card schema in `libs/cards`, the Bun converter service, immutable card revisions in GCS and PostgreSQL, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, direct editing in the browser, AI revisions of chosen cards, present mode, and read-only share links.
+The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 2 card schema in `libs/cards`, the Bun converter service, immutable card revisions in GCS and PostgreSQL, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, direct editing in the browser, AI revisions of chosen cards, present mode, read-only share links, and synchronous PPTX export of native text, lists, and photos.
 
 Still to build:
 
 - charts, tables, and AI-generated images;
 - theme choice at creation;
-- PPTX export.
+- the rest of the export design below: asynchronous exports recorded with their revision, exporter version, and output digest; text measured with the actual fonts; and a browser-versus-PPTX comparison gate.
 
 Also open:
 
 - The converter is configured as a localhost sidecar in both Cloud Run services, but this workspace has not been deployed or verified against the live environment.
 - Provenance is recorded only on successful revisions. A failed run keeps its error and retry settings but not the model, prompt version, or source IDs it used.
-- At their schema limits most layouts are taller than one 16:9 slide. The browser grows those cards instead of cropping them. Export must split or refuse them, or the limits must tighten per layout.
+- At their schema limits most layouts are taller than one 16:9 slide. The browser grows those cards instead of cropping them, and export shrinks their text to fit, down to half size. Tighter per-layout limits would keep more cards at their designed size.
 
 The design takes inspiration from Gamma's disclosed card system and its HTML-to-editor conversion. The [card system description](https://gamma.app/explore/content/guides/how-gamma-maps-content-directly-to-slides-using-its-card-system) describes flexible cards and layout selection. The [engineering case study](https://vercel.com/customers/gamma-builds-design-first-agents-with-vercel) says generated HTML is parsed into structured Tiptap content and assets are resolved. Neither source specifies Gamma's complete prompts, internal document schema, or export writer. The choices below are SlideSage proposals.
 

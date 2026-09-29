@@ -53,6 +53,7 @@ The profile carries a `landingPage` preference (`generate` or `presentations`, d
 | `POST`  | `/presentations/:id/assets/stock` | Store a stock photo for an owned deck                                                                |
 | `POST`  | `/presentations/:id/assets/upload` | Store an uploaded photo for an owned deck                                                           |
 | `GET`   | `/images/search`               | Search stock photos                                                                                     |
+| `GET`   | `/presentations/:id/export/pptx` | Download an owned deck's current revision as an editable PowerPoint file                             |
 | `GET`   | `/presentations/:id/share`     | Report whether an owned deck has a live read-only link                                                  |
 | `POST`  | `/presentations/:id/share`     | Create a read-only link, replacing any earlier one                                                      |
 | `DELETE` | `/presentations/:id/share`    | Revoke an owned deck's read-only link                                                                   |
