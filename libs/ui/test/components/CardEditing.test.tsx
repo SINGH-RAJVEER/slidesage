@@ -159,7 +159,7 @@ describe("editing cards", () => {
 		reading.unmount();
 		const editing = render(<CardDeck document={document} edit={() => {}} />);
 		expect(editing.getAllByRole("toolbar")).toHaveLength(document.cardOrder.length);
-		expect(editing.getAllByRole("button", { name: "Delete card" })[0]).toBeEnabled();
-		expect(editing.getAllByRole("button", { name: "Move card up" })[0]).toBeDisabled();
+		expect(editing.getAllByRole("button", { name: "Move card left" })[0]).toBeDisabled();
+		expect(editing.getAllByRole("button", { name: "Move card right" })[0]).toBeEnabled();
 	});
 });

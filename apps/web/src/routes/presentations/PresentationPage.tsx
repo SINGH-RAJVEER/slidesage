@@ -3,15 +3,14 @@ import type { ApiErrorResponse, PresentationResponse, Source } from "@slidesage/
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
 import type { CardAsset } from "@slidesage/ui/components/Cards";
-import { Progress } from "@slidesage/ui/components/progress";
-import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
+import { CenteredStatusScreen, deckFromPreview } from "@slidesage/ui/components/Viewer";
 import { API_URL } from "@slidesage/ui/lib/api";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+import { DeckViewer } from "./DeckViewer";
 import { DeckWorkspace } from "./DeckWorkspace";
-import { DraftPreviewView } from "./DraftPreviewView";
 
 type LoadState =
 	| { status: "loading" }
@@ -119,70 +118,79 @@ export default function PresentationPage() {
 		void load();
 	}, [generatingHere, revisingHere, load]);
 
-	const progress = streamingState.generationProgress;
-	const percent = progress?.total ? Math.round((progress.completed / progress.total) * 100) : 0;
+	const [isCancelling, setIsCancelling] = useState(false);
+	const cancel = async () => {
+		setIsCancelling(true);
+		if (await cancelGeneration()) {
+			navigate(ROUTES.generate, { replace: true });
+			return;
+		}
+		setIsCancelling(false);
+	};
+
+	if (state.status === "loading") {
+		return <CenteredStatusScreen message="Loading presentation..." />;
+	}
+
+	if (state.status === "error") {
+		return (
+			<div className="flex min-h-dvh w-full flex-col bg-transparent">
+				<Header />
+				<section
+					className="flex flex-1 flex-col items-center justify-center gap-4 px-4"
+					role="alert"
+				>
+					<p className="text-sm text-white/70">{state.message}</p>
+					<Button variant="ghost" onClick={() => navigate(ROUTES.presentations)}>
+						Back to presentations
+					</Button>
+				</section>
+			</div>
+		);
+	}
+
+	if (state.status === "generating") {
+		const preview = generatingHere ? streamingState.preview : undefined;
+		return (
+			<DeckViewer
+				title={preview?.title || streamingState.prompt || "Untitled presentation"}
+				deck={
+					preview
+						? deckFromPreview(
+								preview,
+								(assetId) =>
+									`${API_URL}/presentations/${encodeURIComponent(presentationId)}/assets/${assetId}`,
+							)
+						: null
+				}
+				onBack={() => navigate(ROUTES.presentations)}
+				isWaiting
+				generation={
+					generatingHere
+						? {
+								stage: streamingState.generationStage,
+								message: streamingState.generationMessage,
+								isResearching: streamingState.researchStatus === "searching",
+							}
+						: undefined
+				}
+				onCancelGeneration={
+					generatingHere && streamingState.jobId ? () => void cancel() : undefined
+				}
+				cancelDisabled={isCancelling}
+			/>
+		);
+	}
 
 	return (
-		<div className="flex min-h-dvh w-full flex-col bg-transparent">
-			<Header />
-			<main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-4 py-10 md:px-8">
-				{state.status === "loading" && (
-					<p className="text-sm text-white/50" role="status">
-						Loading presentation
-					</p>
-				)}
-				{state.status === "generating" && generatingHere && streamingState.preview && (
-					<DraftPreviewView
-						preview={streamingState.preview}
-						assetUrl={(assetId) =>
-							`${API_URL}/presentations/${encodeURIComponent(presentationId)}/assets/${assetId}`
-						}
-						message={streamingState.generationMessage ?? "Writing cards"}
-						percent={percent}
-						onCancel={() => void cancelGeneration()}
-					/>
-				)}
-				{state.status === "generating" && !(generatingHere && streamingState.preview) && (
-					<section
-						className="flex flex-1 flex-col items-center justify-center gap-6"
-						aria-live="polite"
-					>
-						<ThinkingOrb size={64} />
-						<div className="flex w-full max-w-sm flex-col items-center gap-3">
-							<p className="text-sm text-white/70">
-								{generatingHere
-									? (streamingState.generationMessage ?? "Queued")
-									: "This presentation is still generating"}
-							</p>
-							{generatingHere && <Progress value={percent} aria-label="Generation progress" />}
-						</div>
-						{generatingHere && (
-							<Button variant="ghost" onClick={() => void cancelGeneration()}>
-								Cancel generation
-							</Button>
-						)}
-					</section>
-				)}
-				{state.status === "error" && (
-					<section className="flex flex-1 flex-col items-center justify-center gap-4" role="alert">
-						<p className="text-sm text-white/70">{state.message}</p>
-						<Button variant="ghost" onClick={() => navigate(ROUTES.presentations)}>
-							Back to presentations
-						</Button>
-					</section>
-				)}
-				{state.status === "ready" && (
-					<DeckWorkspace
-						key={state.revision}
-						presentationId={presentationId}
-						document={state.document}
-						revision={state.revision}
-						sources={state.sources}
-						assets={state.assets}
-						onReload={() => void load()}
-					/>
-				)}
-			</main>
-		</div>
+		<DeckWorkspace
+			key={state.revision}
+			presentationId={presentationId}
+			document={state.document}
+			revision={state.revision}
+			sources={state.sources}
+			assets={state.assets}
+			onReload={() => void load()}
+		/>
 	);
 }

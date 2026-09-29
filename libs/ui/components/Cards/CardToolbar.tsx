@@ -3,7 +3,6 @@ import {
 	type CardDocument,
 	canAddImage,
 	compatibleLayouts,
-	deleteCard,
 	duplicateCard,
 	type LayoutId,
 	moveCard,
@@ -19,16 +18,7 @@ import {
 	SelectValue,
 } from "@slidesage/ui/components/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@slidesage/ui/components/tooltip";
-import {
-	ArrowDown,
-	ArrowUp,
-	Copy,
-	ImageMinus,
-	ImagePlus,
-	Plus,
-	Sparkles,
-	Trash2,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Copy, ImageMinus, ImagePlus, Plus, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import type { DocumentEdit } from "./CardView";
 
@@ -87,8 +77,9 @@ export interface CardToolbarProps {
 }
 
 /**
- * Actions for one card while editing. It sits above the card rather than on
- * it, so the card surface shows only the card's own content.
+ * Actions for the card on screen while editing. It sits beside the carousel
+ * rather than on the card, so the card surface shows only its own content.
+ * Deleting a card is the viewer's Delete, which asks first.
  */
 export function CardToolbar({ document, cardId, edit, onPhoto, onRevise }: CardToolbarProps) {
 	const card = document.cards[cardId];
@@ -101,7 +92,7 @@ export function CardToolbar({ document, cardId, edit, onPhoto, onRevise }: CardT
 		<div
 			role="toolbar"
 			aria-label={`Card ${index + 1} actions`}
-			className="flex items-center gap-1 pb-2"
+			className="flex items-center gap-1"
 		>
 			<Select
 				value={card.layout}
@@ -153,18 +144,18 @@ export function CardToolbar({ document, cardId, edit, onPhoto, onRevise }: CardT
 					</Action>
 				)}
 				<Action
-					label="Move card up"
+					label="Move card left"
 					disabled={index === 0}
 					onClick={() => edit((current) => moveCard(current, cardId, -1))}
 				>
-					<ArrowUp className="size-4" />
+					<ArrowLeft className="size-4" />
 				</Action>
 				<Action
-					label="Move card down"
+					label="Move card right"
 					disabled={index === document.cardOrder.length - 1}
 					onClick={() => edit((current) => moveCard(current, cardId, 1))}
 				>
-					<ArrowDown className="size-4" />
+					<ArrowRight className="size-4" />
 				</Action>
 				<Action
 					label="Duplicate card"
@@ -172,15 +163,8 @@ export function CardToolbar({ document, cardId, edit, onPhoto, onRevise }: CardT
 				>
 					<Copy className="size-4" />
 				</Action>
-				<Action label="Add card below" onClick={() => edit((current) => addCard(current, cardId))}>
+				<Action label="Add card after" onClick={() => edit((current) => addCard(current, cardId))}>
 					<Plus className="size-4" />
-				</Action>
-				<Action
-					label="Delete card"
-					disabled={document.cardOrder.length <= 1}
-					onClick={() => edit((current) => deleteCard(current, cardId))}
-				>
-					<Trash2 className="size-4" />
 				</Action>
 			</div>
 		</div>

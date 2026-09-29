@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, mock } from "bun:test";
 import { assembleDocument, convertCards } from "@slidesage/cards";
 import { StreamingProvider } from "@slidesage/ui";
 import { fireEvent, render, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { DeckWorkspace } from "../../../routes/presentations/DeckWorkspace";
 
 const originalFetch = globalThis.fetch;
@@ -12,35 +13,37 @@ afterEach(() => {
 	globalThis.fetch = originalFetch;
 });
 
-function deck() {
-	const [result] = convertCards({
+function deck(headings = ["Grid storage"]) {
+	const cards = convertCards({
 		operationId: "workspace",
 		sourceIds: [],
-		cards: [
-			{
-				position: 1,
-				takeaway: "Opening",
-				role: "opening",
-				draft: { layout: "title", nodes: [{ type: "heading", text: "Grid storage" }] },
-			},
-		],
+		cards: headings.map((heading, index) => ({
+			position: index + 1,
+			takeaway: index === 0 ? "Opening" : heading,
+			role: index === 0 ? "opening" : "insight",
+			draft: { layout: "title", nodes: [{ type: "heading", text: heading }] },
+		})),
+	}).map((result) => {
+		if (!("card" in result)) throw new Error("fixture");
+		return result.card;
 	});
-	if (!result || !("card" in result)) throw new Error("fixture");
-	return assembleDocument({ title: "Grid storage", theme: "slate", cards: [result.card] });
+	return assembleDocument({ title: "Grid storage", theme: "slate", cards });
 }
 
-function open(onReload = () => {}) {
+function open(onReload = () => {}, document = deck()) {
 	return render(
-		<StreamingProvider>
-			<DeckWorkspace
-				presentationId="pres_1"
-				document={deck()}
-				revision={3}
-				sources={[]}
-				assets={{}}
-				onReload={onReload}
-			/>
-		</StreamingProvider>,
+		<MemoryRouter>
+			<StreamingProvider>
+				<DeckWorkspace
+					presentationId="pres_1"
+					document={document}
+					revision={3}
+					sources={[]}
+					assets={{}}
+					onReload={onReload}
+				/>
+			</StreamingProvider>
+		</MemoryRouter>,
 	);
 }
 
@@ -110,6 +113,8 @@ describe("DeckWorkspace", () => {
 		expect(view.queryByRole("textbox", { name: "Card heading" })).not.toBeInTheDocument();
 	}, 15000);
 
+	// Placing the photo blocks happy-dom's event loop for about ten seconds,
+	// so this test needs more time than the others.
 	it("adds a searched photo to a card and saves it", async () => {
 		const assetId = "e".repeat(64);
 		const requests: Array<{ url: string; body?: string }> = [];
@@ -163,7 +168,8 @@ describe("DeckWorkspace", () => {
 		);
 		// happy-dom keeps Radix's aria-hidden on the page after the dialog
 		// closes; the browser check covers that the page is interactive again.
-		const article = view.getByRole("article", { hidden: true });
+		const carousel = view.getByRole("listbox", { name: "Slides carousel", hidden: true });
+		const article = within(carousel).getByRole("article", { hidden: true });
 		const photo = within(article).getByRole("img", { name: "Solar farm", hidden: true });
 		expect(photo.getAttribute("src")).toEndWith(`/presentations/pres_1/assets/${assetId}`);
 		expect(article).toHaveAttribute("data-layout", "cover");
@@ -180,7 +186,7 @@ describe("DeckWorkspace", () => {
 				),
 			{ timeout: 8000 },
 		);
-	}, 15000);
+	}, 30000);
 
 	it("saves pending edits, then asks AI to revise one card from the saved revision", async () => {
 		const requests: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
@@ -246,7 +252,11 @@ describe("DeckWorkspace", () => {
 		};
 		try {
 			const view = open();
-			fireEvent.click(view.getByRole("button", { name: "Download PPTX" }));
+			fireEvent.pointerDown(view.getByRole("button", { name: /Download/ }), {
+				button: 0,
+				ctrlKey: false,
+			});
+			fireEvent.click(await view.findByText("PowerPoint"));
 			await waitFor(() => expect(downloads).toEqual(["Grid storage \u00e9.pptx blob:deck"]));
 			expect(urls[0]).toEndWith("/presentations/pres_1/export/pptx");
 		} finally {
@@ -254,4 +264,22 @@ describe("DeckWorkspace", () => {
 			HTMLAnchorElement.prototype.click = click;
 		}
 	});
+
+	it("asks before deleting the slide on screen, then saves the deck without it", async () => {
+		const bodies: Array<{ document: { cardOrder: string[] } }> = [];
+		globalThis.fetch = mock(async (_input: string | URL | Request, init?: RequestInit) => {
+			bodies.push(JSON.parse(String(init?.body)));
+			return Response.json({ revision: { revision: 4 } });
+		}) as unknown as typeof fetch;
+		const document = deck(["Grid storage", "Prices fell"]);
+
+		const view = open(() => {}, document);
+		fireEvent.click(view.getByRole("button", { name: "Delete slide" }));
+		expect(bodies).toHaveLength(0);
+		const dialog = await view.findByRole("dialog", { name: "Delete this slide?" });
+		fireEvent.click(within(dialog).getByRole("button", { name: "Delete slide" }));
+
+		await waitFor(() => expect(bodies).toHaveLength(1), { timeout: 8000 });
+		expect(bodies[0]?.document.cardOrder).toEqual(document.cardOrder.slice(1));
+	}, 15000);
 });

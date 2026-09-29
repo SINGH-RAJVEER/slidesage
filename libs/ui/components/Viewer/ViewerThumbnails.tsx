@@ -75,7 +75,8 @@ export const ViewerThumbnails: React.FC<{
                 backdrop-blur-sm relative`}
 							>
 								{"card" in slide ? (
-									<div className="pointer-events-none relative h-full w-full overflow-hidden">
+									// The button names the slide; its miniature card is only a picture.
+									<div aria-hidden inert className="relative h-full w-full overflow-hidden">
 										<CardView
 											card={slide.card}
 											theme={theme}

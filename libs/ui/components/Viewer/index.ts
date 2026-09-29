@@ -4,6 +4,7 @@ export type { PresentationExporter } from "./DownloadMenu";
 export { default as DownloadMenu } from "./DownloadMenu";
 export { deckFromDocument, deckFromPreview, type ViewerDeck, type ViewerSlide } from "./deck";
 export { GenerationProgress } from "./GenerationProgress";
+export { ViewerFullscreenOverlayControls } from "./ViewerFullscreenOverlayControls";
 export { ViewerHeaderControls } from "./ViewerHeaderControls";
 export { ViewerNavigationControls } from "./ViewerNavigationControls";
 export type { CarouselGenerationStatus } from "./ViewerSlideCarousel";

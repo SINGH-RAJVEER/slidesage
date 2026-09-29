@@ -1,5 +1,6 @@
 import {
 	type CardDocument,
+	deleteCard,
 	setImage,
 	setTheme,
 	setTitle,
@@ -11,11 +12,18 @@ import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
 import {
 	type CardAsset,
-	CardDeck,
+	CardToolbar,
 	PhotoPicker,
-	PresentMode,
 	type StockPhoto,
 } from "@slidesage/ui/components/Cards";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@slidesage/ui/components/dialog";
 import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { Input } from "@slidesage/ui/components/input";
 import { Progress } from "@slidesage/ui/components/progress";
@@ -26,14 +34,21 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@slidesage/ui/components/select";
+import { deckFromDocument } from "@slidesage/ui/components/Viewer";
 import { API_URL } from "@slidesage/ui/lib/api";
-import { Check, Download, Link2, Pencil, Play, Redo2, Sparkles, Undo2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Check, Link2, Pencil, Redo2, Undo2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ROUTES } from "../../app/router/paths";
+import { DeckViewer } from "./DeckViewer";
 import { ReviseDialog } from "./ReviseDialog";
 import { ShareDialog } from "./ShareDialog";
 import { type SaveStatus, useDocumentEditor } from "./useDocumentEditor";
 
 const THEME_NAMES: Record<ThemeId, string> = { slate: "Slate", paper: "Paper", ember: "Ember" };
+
+const headerButtonClassName =
+	"bg-white/5 hover:bg-white/10 backdrop-blur-lg border border-white/5 text-white transition-all duration-300";
 
 function statusText(status: SaveStatus): string {
 	switch (status.state) {
@@ -77,7 +92,24 @@ async function readError(response: Response, fallback: string): Promise<string> 
 	return body?.error?.message ?? fallback;
 }
 
-/** A saved deck, readable by default, editable in place, and presentable. */
+/**
+ * Where the carousel should go after the card order changes: to a card that
+ * was just added, else to the card that was on screen, else to the slide that
+ * took the place of a deleted one.
+ */
+function followCard(previous: string[], next: string[], currentId?: string): number | undefined {
+	const added = next.find((id) => !previous.includes(id));
+	if (added) return next.indexOf(added);
+	if (currentId && next.includes(currentId)) {
+		return next.indexOf(currentId) === previous.indexOf(currentId)
+			? undefined
+			: next.indexOf(currentId);
+	}
+	const removedAt = currentId ? previous.indexOf(currentId) : -1;
+	return removedAt >= 0 ? Math.min(removedAt, next.length - 1) : undefined;
+}
+
+/** A saved deck in the viewer: readable by default, editable in place, and presentable. */
 export function DeckWorkspace({
 	presentationId,
 	document,
@@ -86,15 +118,15 @@ export function DeckWorkspace({
 	assets: initialAssets,
 	onReload,
 }: DeckWorkspaceProps) {
+	const navigate = useNavigate();
 	const [editing, setEditing] = useState(false);
-	const [presenting, setPresenting] = useState(false);
 	const [sharing, setSharing] = useState(false);
 	const [assets, setAssets] = useState(initialAssets);
 	const [photoCard, setPhotoCard] = useState<string | null>(null);
 	// The cards an AI revision will rewrite; empty means the whole deck.
 	const [reviseCards, setReviseCards] = useState<string[] | null>(null);
+	const [slideToDelete, setSlideToDelete] = useState<number>();
 	const [notice, setNotice] = useState<string | null>(null);
-	const [exporting, setExporting] = useState(false);
 	const { streamingState, generate } = useStreaming();
 	const revising =
 		streamingState.isStreaming &&
@@ -102,10 +134,32 @@ export function DeckWorkspace({
 		streamingState.presentationId === presentationId;
 	const assetIds = useMemo(() => Object.keys(assets), [assets]);
 	const presentationUrl = `${API_URL}/presentations/${encodeURIComponent(presentationId)}`;
-	const assetUrl = (assetId: string) => `${presentationUrl}/assets/${assetId}`;
 	const editor = useDocumentEditor({ presentationId, initial: document, revision, assetIds });
 	const { status } = editor;
 	const blocked = status.state === "conflict";
+	const canEdit = !blocked && !revising;
+	const deck = useMemo(
+		() =>
+			deckFromDocument(editor.document, {
+				sources,
+				assets,
+				assetUrl: (assetId) => `${presentationUrl}/assets/${assetId}`,
+			}),
+		[editor.document, sources, assets, presentationUrl],
+	);
+
+	// Keep the card on screen in view when the order changes under it.
+	const [focusRequest, setFocusRequest] = useState<{ index: number }>();
+	const currentSlideRef = useRef(0);
+	const previousOrder = useRef(editor.document.cardOrder);
+	useEffect(() => {
+		const previous = previousOrder.current;
+		const next = editor.document.cardOrder;
+		previousOrder.current = next;
+		if (previous === next) return;
+		const index = followCard(previous, next, previous[currentSlideRef.current]);
+		if (index !== undefined) setFocusRequest({ index });
+	}, [editor.document.cardOrder]);
 
 	useEffect(() => {
 		if (!editing) return undefined;
@@ -206,31 +260,29 @@ export function DeckWorkspace({
 		return `card ${index + 1}`;
 	})();
 
-	const progress = streamingState.generationProgress;
+	// The deck without the slide autosaves as the next revision; while
+	// editing, Undo brings the slide back.
+	const confirmDelete = () => {
+		const cardId =
+			slideToDelete === undefined ? undefined : editor.document.cardOrder[slideToDelete];
+		setSlideToDelete(undefined);
+		if (cardId) editor.edit((current) => deleteCard(current, cardId));
+	};
 
-	// The export is built from the saved revision, which is current whenever
-	// the deck is not being edited.
+	// The export is built from the saved revision, so it is offered only when
+	// there are no unsaved edits.
 	const downloadPptx = async () => {
-		setNotice(null);
-		setExporting(true);
-		try {
-			const response = await fetch(`${presentationUrl}/export/pptx`, { credentials: "include" });
-			if (!response.ok) {
-				setNotice(await readError(response, "The presentation could not be exported."));
-				return;
-			}
-			const url = URL.createObjectURL(await response.blob());
-			const link = window.document.createElement("a");
-			link.href = url;
-			link.download = downloadName(response, `${editor.document.title || "Presentation"}.pptx`);
-			link.click();
-			// The click starts the download; the URL can go once it has.
-			setTimeout(() => URL.revokeObjectURL(url), 1000);
-		} catch {
-			setNotice("The presentation could not be exported.");
-		} finally {
-			setExporting(false);
+		const response = await fetch(`${presentationUrl}/export/pptx`, { credentials: "include" });
+		if (!response.ok) {
+			throw new Error(await readError(response, "The presentation could not be exported."));
 		}
+		const url = URL.createObjectURL(await response.blob());
+		const link = window.document.createElement("a");
+		link.href = url;
+		link.download = downloadName(response, `${editor.document.title || "Presentation"}.pptx`);
+		link.click();
+		// The click starts the download; the URL can go once it has.
+		setTimeout(() => URL.revokeObjectURL(url), 1000);
 	};
 
 	const finish = async () => {
@@ -238,24 +290,34 @@ export function DeckWorkspace({
 		setEditing(false);
 	};
 
+	const progress = streamingState.generationProgress;
+	const editAllowed = editing && canEdit;
+
 	return (
-		<>
-			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
-			<div className="flex flex-wrap items-center gap-3">
-				{editing ? (
+		<DeckViewer
+			title={editor.document.title}
+			deck={deck}
+			onBack={() => navigate(ROUTES.presentations)}
+			edit={editAllowed ? editor.edit : undefined}
+			iterate={{ canIterate: canEdit, onIterate: () => setReviseCards([]) }}
+			presentDisabled={editing}
+			focusRequest={focusRequest}
+			onSlideChange={(index) => {
+				currentSlideRef.current = index;
+			}}
+			titleEditor={
+				editing ? (
 					<Input
 						aria-label="Presentation title"
 						value={editor.document.title}
 						maxLength={120}
 						onChange={(event) => editor.edit((current) => setTitle(current, event.target.value))}
-						className="h-10 min-w-0 flex-1 border-white/10 bg-transparent text-xl font-semibold text-white"
+						className="h-10 min-w-0 flex-1 border-white/10 bg-transparent text-lg font-light text-white"
 					/>
-				) : (
-					<h1 className="min-w-0 flex-1 text-2xl font-semibold text-white">
-						{editor.document.title}
-					</h1>
-				)}
-				{editing && (
+				) : undefined
+			}
+			headerTools={
+				editing ? (
 					<>
 						<Select
 							value={editor.document.theme}
@@ -265,7 +327,7 @@ export function DeckWorkspace({
 						>
 							<SelectTrigger
 								aria-label="Theme"
-								className="h-9 w-32 border-white/10 bg-transparent text-white/80"
+								className="h-9 w-32 border-white/5 bg-white/5 text-white"
 							>
 								<SelectValue />
 							</SelectTrigger>
@@ -298,102 +360,119 @@ export function DeckWorkspace({
 							<Redo2 className="size-4" />
 						</Button>
 					</>
-				)}
-				<Button
-					variant="ghost"
-					onClick={() => setReviseCards([])}
-					disabled={revising || blocked}
-					className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
-				>
-					<Sparkles className="size-4" />
-					Revise with AI
-				</Button>
-				{!editing && (
-					<Button
-						variant="ghost"
-						onClick={() => setSharing(true)}
-						className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
-					>
-						<Link2 className="size-4" />
-						Share
-					</Button>
-				)}
-				{!editing && (
-					<Button
-						variant="ghost"
-						onClick={() => setPresenting(true)}
-						className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
-					>
-						<Play className="size-4" />
-						Present
-					</Button>
-				)}
-				{!editing && (
-					<Button
-						variant="ghost"
-						onClick={() => void downloadPptx()}
-						disabled={exporting || revising}
-						className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
-					>
-						<Download className="size-4" />
-						{exporting ? "Preparing PPTX" : "Download PPTX"}
-					</Button>
-				)}
-				<Button
-					variant="ghost"
-					onClick={() => (editing ? void finish() : setEditing(true))}
-					disabled={blocked || revising}
-					className="gap-2 text-white/80 hover:bg-white/10 hover:text-white"
-				>
-					{editing ? <Check className="size-4" /> : <Pencil className="size-4" />}
-					{editing ? "Done" : "Edit"}
-				</Button>
-			</div>
-			{editing && (
-				<div
-					role="status"
-					aria-live="polite"
-					className="-mt-5 flex items-center gap-3 text-xs text-white/50"
-				>
-					<span
-						className={
-							status.state === "invalid" || status.state === "error" || blocked
-								? "text-amber-200"
-								: undefined
-						}
-					>
-						{statusText(status)}
-					</span>
-					{blocked && (
-						<Button variant="link" className="h-auto p-0 text-xs text-sky-300" onClick={onReload}>
-							Reload the latest version
+				) : undefined
+			}
+			headerActions={
+				<>
+					{!editing && (
+						<Button
+							variant="outline"
+							onClick={() => setSharing(true)}
+							className={headerButtonClassName}
+						>
+							<Link2 className="mr-2 size-4" />
+							Share
 						</Button>
 					)}
-				</div>
-			)}
-			{revising && (
-				<div role="status" aria-live="polite" className="-mt-4 flex flex-col gap-2">
-					<p className="text-sm text-white/60">
-						{streamingState.generationMessage ?? "Revising cards"}. The deck is read-only until the
-						revision is saved.
-					</p>
-					<Progress
-						value={progress?.total ? Math.round((progress.completed / progress.total) * 100) : 0}
-						aria-label="Revision progress"
-					/>
-				</div>
-			)}
-			<CardDeck
-				document={editor.document}
-				sources={sources}
-				assets={assets}
-				assetUrl={assetUrl}
-				edit={editing && !blocked && !revising ? editor.edit : undefined}
-				onPhoto={editing && !blocked && !revising ? setPhotoCard : undefined}
-				onRevise={
-					editing && !blocked && !revising ? (cardId) => setReviseCards([cardId]) : undefined
+					<Button
+						variant="outline"
+						onClick={() => (editing ? void finish() : setEditing(true))}
+						disabled={!canEdit}
+						className={headerButtonClassName}
+					>
+						{editing ? <Check className="mr-2 size-4" /> : <Pencil className="mr-2 size-4" />}
+						{editing ? "Done" : "Edit"}
+					</Button>
+				</>
+			}
+			slideControls={(currentSlide) => {
+				const cardId = editor.document.cardOrder[currentSlide];
+				if (revising) {
+					return (
+						<div role="status" aria-live="polite" className="flex flex-col gap-2 px-4 pt-3">
+							<p className="text-sm text-white/60">
+								{streamingState.generationMessage ?? "Revising cards"}. The deck is read-only until
+								the revision is saved.
+							</p>
+							<Progress
+								value={
+									progress?.total ? Math.round((progress.completed / progress.total) * 100) : 0
+								}
+								aria-label="Revision progress"
+							/>
+						</div>
+					);
 				}
-			/>
+				if (!editing) return null;
+				return (
+					<div className="flex min-h-10 flex-wrap items-center gap-3 px-4 pt-3">
+						<div
+							role="status"
+							aria-live="polite"
+							className="flex items-center gap-3 text-xs text-white/50"
+						>
+							<span
+								className={
+									status.state === "invalid" || status.state === "error" || blocked
+										? "text-amber-200"
+										: undefined
+								}
+							>
+								{statusText(status)}
+							</span>
+							{blocked && (
+								<Button
+									variant="link"
+									className="h-auto p-0 text-xs text-sky-300"
+									onClick={onReload}
+								>
+									Reload the latest version
+								</Button>
+							)}
+						</div>
+						{editAllowed && cardId && (
+							<div className="ml-auto">
+								<CardToolbar
+									document={editor.document}
+									cardId={cardId}
+									edit={editor.edit}
+									onPhoto={setPhotoCard}
+									onRevise={(id) => setReviseCards([id])}
+								/>
+							</div>
+						)}
+					</div>
+				);
+			}}
+			onExport={downloadPptx}
+			downloadDisabled={editing || revising || status.state !== "saved"}
+			onDeleteSlide={canEdit ? setSlideToDelete : undefined}
+			deleteDisabled={editor.document.cardOrder.length <= 1}
+		>
+			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
+			<Dialog
+				open={slideToDelete !== undefined}
+				onOpenChange={(open) => {
+					if (!open) setSlideToDelete(undefined);
+				}}
+			>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Delete this slide?</DialogTitle>
+						<DialogDescription>
+							Slide {(slideToDelete ?? 0) + 1} is removed from the deck and a new revision is saved.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button variant="outline" onClick={() => setSlideToDelete(undefined)}>
+							Keep slide
+						</Button>
+						<Button variant="destructive" onClick={confirmDelete}>
+							Delete slide
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 			<ReviseDialog
 				open={reviseCards !== null}
 				onOpenChange={(open) => {
@@ -413,15 +492,6 @@ export function DeckWorkspace({
 				upload={uploadPhoto}
 			/>
 			<ShareDialog presentationId={presentationId} open={sharing} onOpenChange={setSharing} />
-			{presenting && (
-				<PresentMode
-					document={editor.document}
-					sources={sources}
-					assets={assets}
-					assetUrl={assetUrl}
-					onExit={() => setPresenting(false)}
-				/>
-			)}
-		</>
+		</DeckViewer>
 	);
 }

@@ -1,6 +1,7 @@
 import { Button } from "@slidesage/ui/components/button";
 import { ArrowLeft, Presentation, Sparkles } from "lucide-react";
 import type React from "react";
+import type { ReactNode } from "react";
 
 interface ViewerHeaderControlsProps {
 	title?: string;
@@ -10,6 +11,12 @@ interface ViewerHeaderControlsProps {
 	onPresent: () => void;
 	presentDisabled?: boolean;
 	showIterate?: boolean;
+	/** Shown in place of the title, at every width, while the title is edited. */
+	titleEditor?: ReactNode;
+	/** Further controls beside Present. */
+	tools?: ReactNode;
+	/** Further actions before Iterate. */
+	actions?: ReactNode;
 }
 
 export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
@@ -20,6 +27,9 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 	onPresent,
 	presentDisabled = false,
 	showIterate = true,
+	titleEditor,
+	tools,
+	actions,
 }) => {
 	return (
 		<header
@@ -34,11 +44,12 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 				>
 					<ArrowLeft className="w-5 h-5" />
 				</Button>
-				{title && (
-					<span className="viewer-header__title hidden truncate text-lg font-light tracking-wide text-white/60 select-none 2xl:block">
-						{title}
-					</span>
-				)}
+				{titleEditor ??
+					(title && (
+						<span className="viewer-header__title hidden truncate text-lg font-light tracking-wide text-white/60 select-none 2xl:block">
+							{title}
+						</span>
+					))}
 			</div>
 
 			<div className="viewer-header__tools flex items-center justify-center gap-2">
@@ -51,9 +62,11 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 				>
 					<Presentation className="mr-2 size-4" /> Present
 				</Button>
+				{tools}
 			</div>
 
 			<div className="viewer-header__actions flex items-center justify-end gap-2">
+				{actions}
 				{showIterate && (
 					<Button
 						onClick={onIterate}

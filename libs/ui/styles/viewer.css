@@ -150,8 +150,8 @@
 
 	.viewer-header {
 		position: relative;
-		grid-template-columns: minmax(0, 1fr);
-		grid-template-areas: "tools";
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-areas: "tools actions";
 		gap: 8px 10px;
 		padding: 8px 12px 4px;
 	}
@@ -174,16 +174,15 @@
 
 	.viewer-header__tools {
 		grid-area: tools;
-		display: grid;
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		display: flex;
+		align-items: center;
+		justify-content: flex-start;
 		gap: 8px;
-		width: calc(100% - 56px);
+		width: 100%;
 	}
 
-	.viewer-header__tools > *,
-	.viewer-header__tools > * > button {
+	.viewer-header__tools > * {
 		min-width: 0;
-		width: 100%;
 	}
 
 	.viewer-header__tools button {
@@ -202,6 +201,38 @@
 
 	.viewer-header__iterate svg {
 		margin: 0;
+	}
+
+	/* The deck's own actions (Share, Edit, Done) collapse to icons in a column of
+	   their own, left of the pinned Iterate icon, so neither covers the other. */
+	.viewer-header__actions {
+		grid-area: actions;
+		align-self: start;
+		padding-right: 52px;
+	}
+
+	.viewer-header__actions > button:not(.viewer-header__iterate) {
+		width: 44px;
+		height: 44px;
+		padding: 0;
+		font-size: 0;
+	}
+
+	.viewer-header__actions > button:not(.viewer-header__iterate) svg {
+		margin: 0;
+	}
+
+	/* While the title is being edited it gets a row of its own. */
+	.viewer-header:has(.viewer-header__identity input) {
+		grid-template-areas:
+			"title title"
+			"tools actions";
+	}
+
+	.viewer-header__identity:has(input) {
+		display: flex;
+		grid-area: title;
+		padding-right: 52px;
 	}
 
 	.viewer-header__present-button {
@@ -314,20 +345,6 @@
 }
 
 @media (orientation: portrait) and (max-width: 380px) {
-	.viewer-header__tools {
-		grid-template-columns: minmax(0, 1fr) 44px;
-	}
-
-	.viewer-header__tools > :nth-child(2) button {
-		width: 44px;
-		padding: 0;
-		font-size: 0;
-	}
-
-	.viewer-header__tools > :nth-child(2) button svg:last-child {
-		display: none;
-	}
-
 	.viewer-navigation__previous,
 	.viewer-navigation__next {
 		font-size: 0;

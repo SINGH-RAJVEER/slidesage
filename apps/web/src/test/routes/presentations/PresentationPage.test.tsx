@@ -67,10 +67,8 @@ describe("PresentationPage", () => {
 		serve("ready", savedDocument());
 		const view = open();
 
-		expect(
-			await view.findByRole("heading", { level: 1, name: "Grid storage" }),
-		).toBeInTheDocument();
-		expect(view.getByRole("article")).toHaveAccessibleName("Card 1: Storage is now cheap");
+		expect(await view.findByRole("article")).toHaveAccessibleName("Card 1: Storage is now cheap");
+		expect(view.getByRole("button", { name: "Go to slide 1" })).toBeInTheDocument();
 	});
 
 	it("sends a failed presentation to its retry page", async () => {

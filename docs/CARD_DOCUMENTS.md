@@ -97,6 +97,8 @@ Without `PEXELS_API_KEY` the stock routes return `503` and generation drafts wit
 
 Edits are pure functions in `libs/cards/src/edit.ts`: text, fields, list items, layout, order, duplication, insertion, deletion, and photos. The layout menu offers only layouts the card's content fits. Text is edited in place and supports bold and italic only. Undo history coalesces keystrokes within 800 ms, and the document autosaves 1.2 seconds after the last change. After a conflict the editor stops saving and offers to reload.
 
+In the viewer, Edit makes the slide in the middle of the carousel editable and puts the title, theme, undo, and redo in the header. The toolbar for that slide sits under the carousel: layout, AI revision, photo, move left or right, duplicate, and add a card after it. Delete in the navigation bar asks first and removes the slide on screen, whether or not the deck is being edited.
+
 
 ## Sharing
 
@@ -122,14 +124,14 @@ In the browser, Share on a saved deck opens a dialog that creates, replaces, or 
 
 A card taller than one slide in the browser is not split or cropped: its text shrinks until it fits, down to half its designed size. The fit is estimated from average glyph widths, not measured with the font, so every text box also has PowerPoint's shrink-on-overflow turned on for anything the estimate misses; PowerPoint applies that only once the text is edited.
 
-The download is named after the deck's title. In the browser, Download PPTX sits beside Present on a saved deck; it is hidden while editing, so the file always matches the saved revision. Exports are not recorded, and two downloads of the same revision are not byte-identical, because the file carries its creation time.
+The download is named after the deck's title. In the browser, the Download menu in the navigation bar offers PowerPoint; it is disabled while editing or while changes are unsaved, so the file always matches the saved revision. Exports are not recorded, and two downloads of the same revision are not byte-identical, because the file carries its creation time.
 
 ## Browser
 
-`/presentations/:presentationId` shows the deck as it is drafted while that presentation generates: written cards render as they will look, and cards still being written show their planned point. It then loads the saved document, validates it with `@slidesage/cards`, and renders it with `CardDeck` from `@slidesage/ui/components/Cards`. A failed presentation redirects to `/presentation-error`.
+`/presentations/:presentationId` opens the deck viewer (`apps/web/src/routes/presentations/DeckViewer.tsx`): each card is one slide of a horizontal carousel, with a strip of thumbnails under it that scrolls along with the carousel. While the presentation generates, the viewer shows the deck as it is drafted: written cards render as they will look, and cards still being written show their planned point and the generation stage. It then loads the saved document, validates it with `@slidesage/cards`, and shows it in the same viewer. A failed presentation redirects to `/presentation-error`.
 
-Cards are at least 16:9, and text is sized in container units so a card scales like a fixed slide. A card never crops its content: one whose content needs more room grows taller and is marked `data-overflows-slide`. Filling every field to its schema limit makes most layouts taller than one slide; PPTX export shrinks the text of those cards to fit.
+Cards are at least 16:9, and text is sized in container units so a card scales like a fixed slide. A card never crops its content: one whose content needs more room grows taller and is marked `data-overflows-slide`. Filling every field to its schema limit makes most layouts taller than one slide. In the viewer such a card is drawn narrower until its whole height fits the slide (`CardSlide`), and PPTX export shrinks its text to fit.
 
-Present shows the deck one card at a time over the whole screen, in full screen where the browser allows it. The arrow keys, Page Up and Page Down, and Space move between cards; Home and End jump to the first and last; N shows the card's speaker notes; Escape or leaving full screen stops presenting.
+Present shows the deck one card at a time over the whole screen, in full screen where the browser allows it, with timed playback. The left and right arrow keys, or J and L, move between cards; the up and down arrow keys jump to the first and last; N shows the card's speaker notes; leaving full screen stops presenting.
 
 The generate and research pages lead to the outline at `/generate/outline`, which moves to the presentation as soon as the job is accepted. The library opens ready presentations there, and the generation indicator links back to the running one.
