@@ -1,0 +1,340 @@
+/* Carousel styles for horizontal slide viewer */
+.slide-carousel {
+	display: flex;
+	gap: 1rem;
+	overflow-x: auto;
+	scroll-snap-type: x mandatory;
+	-webkit-overflow-scrolling: touch;
+
+	/* Ensure the first/last fixed-size slide can snap centered */
+	padding-block: 1rem;
+	padding-inline: max(2rem, calc(50% - (var(--ss-slide-width) / 2)));
+
+	align-items: center;
+	position: relative;
+	mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+	-webkit-mask-image: linear-gradient(
+		to right,
+		transparent 0,
+		black 10%,
+		black 90%,
+		transparent 100%
+	);
+}
+
+.slide-carousel__item {
+	/* fixed 1280x720 stage; CardSlide fits the card inside this box */
+	flex: 0 0 auto;
+	scroll-snap-align: center;
+	box-sizing: border-box;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: var(--ss-slide-width);
+	height: var(--ss-slide-height);
+	position: relative;
+}
+
+.presentation-viewer__shell {
+	width: min(95vw, 100%);
+	transition: width 220ms cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.viewer-iterate-panel {
+	width: 0;
+	transition:
+		width 220ms cubic-bezier(0.2, 0.9, 0.2, 1),
+		box-shadow 220ms ease,
+		border-color 160ms ease;
+	will-change: width;
+}
+
+.viewer-iterate-panel--closed {
+	border-left-color: transparent;
+	box-shadow: none;
+}
+
+.viewer-iterate-panel--open {
+	width: min(28rem, 40vw);
+}
+
+@media (min-width: 1280px) {
+	.viewer-iterate-panel--closed {
+		visibility: hidden;
+	}
+}
+
+@media (max-width: 1279px) {
+	.viewer-iterate-panel {
+		width: min(28rem, 100vw);
+		transform: translateX(100%);
+		transition: transform 220ms cubic-bezier(0.2, 0.9, 0.2, 1);
+	}
+
+	.viewer-iterate-panel--open {
+		transform: translateX(0);
+	}
+
+	.viewer-iterate-panel--closed {
+		pointer-events: none;
+		visibility: hidden;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.presentation-viewer__shell,
+	.viewer-iterate-panel {
+		transition: none;
+	}
+}
+
+/* Hide horizontal scrollbar while keeping scroll accessible */
+.slide-carousel::-webkit-scrollbar {
+	display: none;
+}
+.slide-carousel {
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE and Edge */
+}
+.slide-carousel:focus {
+	outline: none;
+}
+
+/* Thumbnails container with soft wrap effect */
+.slide-thumbnails-container {
+	position: relative;
+	mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+	-webkit-mask-image: linear-gradient(
+		to right,
+		transparent 0%,
+		black 5%,
+		black 95%,
+		transparent 100%
+	);
+}
+
+/* Portrait devices use a focused, touch-first viewer instead of the desktop control rails. */
+@media (orientation: portrait) {
+	/* The viewer is exactly one dynamic viewport tall, while the document
+	   defaults to 100vh. Whenever the two disagree - a mobile browser with its
+	   URL bar shown, a keyboard, a safe-area inset - the difference showed as a
+	   lighter strip of page background under the control bar. Pin the document
+	   to the same dynamic viewport and give it the viewer's base colour so any
+	   remainder is indistinguishable. */
+	html:has(.presentation-viewer),
+	body:has(.presentation-viewer) {
+		height: 100dvh;
+		min-height: 100dvh;
+		max-height: 100dvh;
+		overflow: hidden;
+		background-color: hsl(222 27% 10%);
+		background-image: none;
+	}
+
+	.presentation-viewer {
+		min-height: 100dvh !important;
+		height: 100dvh !important;
+		max-height: 100dvh !important;
+		background:
+			radial-gradient(circle at 50% 20%, rgba(59, 130, 246, 0.12), transparent 34%),
+			hsl(222 27% 10%);
+	}
+
+	.presentation-viewer__shell {
+		min-height: 100dvh !important;
+		height: 100dvh !important;
+		max-height: 100dvh !important;
+		max-width: none;
+		padding-top: env(safe-area-inset-top);
+	}
+
+	.viewer-header {
+		position: relative;
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-areas: "tools";
+		gap: 8px 10px;
+		padding: 8px 12px 4px;
+	}
+
+	.viewer-header__identity {
+		display: none;
+	}
+
+	.viewer-header__back {
+		min-width: 44px;
+		height: 44px;
+	}
+
+	.viewer-header__title {
+		display: block;
+		font-size: 15px;
+		font-weight: 500;
+		color: rgba(255, 255, 255, 0.78);
+	}
+
+	.viewer-header__tools {
+		grid-area: tools;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 8px;
+		width: calc(100% - 56px);
+	}
+
+	.viewer-header__tools > *,
+	.viewer-header__tools > * > button {
+		min-width: 0;
+		width: 100%;
+	}
+
+	.viewer-header__tools button {
+		height: 44px;
+	}
+
+	.viewer-header__iterate {
+		position: absolute;
+		top: 8px;
+		right: 12px;
+		width: 44px !important;
+		height: 44px !important;
+		padding: 0;
+		font-size: 0;
+	}
+
+	.viewer-header__iterate svg {
+		margin: 0;
+	}
+
+	.viewer-header__present-button {
+		display: none;
+	}
+
+	.viewer-slide-area {
+		min-height: 0;
+		max-height: none !important;
+		margin-top: 4px;
+	}
+
+	.slide-carousel {
+		gap: 12px;
+		padding-block: 8px;
+		padding-inline: 12px;
+		mask-image: none;
+		-webkit-mask-image: none;
+	}
+
+	.slide-carousel__item {
+		width: calc(100vw - 24px);
+		height: auto;
+		aspect-ratio: 16 / 9;
+		scroll-snap-stop: always;
+	}
+
+	.viewer-thumbnails {
+		order: 2;
+		min-height: 66px !important;
+	}
+
+	.viewer-thumbnails .slide-thumbnails-container {
+		gap: 8px;
+		padding: 4px 12px 8px;
+		scroll-padding-inline: 12px;
+		mask-image: none;
+		-webkit-mask-image: none;
+	}
+
+	.viewer-thumbnails button {
+		width: 96px;
+		height: 54px;
+		margin-inline: 0 !important;
+		border-radius: 7px;
+	}
+
+	.viewer-navigation {
+		order: 3;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		min-height: calc(64px + env(safe-area-inset-bottom)) !important;
+		margin-top: 0;
+		padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+		border-top: 1px solid rgba(255, 255, 255, 0.08);
+		background: rgba(11, 18, 32, 0.94);
+		backdrop-filter: blur(18px);
+	}
+
+	.viewer-navigation__pager {
+		display: none;
+	}
+
+	.viewer-navigation__download,
+	.viewer-navigation__delete {
+		position: static;
+		transform: none;
+		/* Tailwind centres these with the translate property, not transform, so
+		   clearing transform alone left them half a button above the bar. */
+		translate: none;
+	}
+
+	.viewer-navigation__download button,
+	.viewer-navigation__delete button {
+		display: inline-flex;
+		width: 44px;
+		height: 44px;
+		align-items: center;
+		justify-content: center;
+		/* The label collapses to a zero-width anonymous flex item, but the
+		   button's gap would still push the icon off-centre. */
+		gap: 0;
+		padding: 0;
+		font-size: 0;
+		line-height: 0;
+	}
+
+	.viewer-navigation__download button svg,
+	.viewer-navigation__delete button svg {
+		margin: 0;
+	}
+
+	.viewer-navigation__download button svg:last-child {
+		display: none;
+	}
+
+	.slide-thumbnails-container {
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+
+	.slide-thumbnails-container::-webkit-scrollbar {
+		display: none;
+	}
+
+	.viewer-iterate-panel {
+		width: 100vw !important;
+	}
+}
+
+@media (orientation: portrait) and (max-width: 380px) {
+	.viewer-header__tools {
+		grid-template-columns: minmax(0, 1fr) 44px;
+	}
+
+	.viewer-header__tools > :nth-child(2) button {
+		width: 44px;
+		padding: 0;
+		font-size: 0;
+	}
+
+	.viewer-header__tools > :nth-child(2) button svg:last-child {
+		display: none;
+	}
+
+	.viewer-navigation__previous,
+	.viewer-navigation__next {
+		font-size: 0;
+	}
+
+	.viewer-navigation__previous svg,
+	.viewer-navigation__next svg {
+		margin: 0;
+	}
+}

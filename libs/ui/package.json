@@ -8,6 +8,7 @@
 		"./components/Cards": "./components/Cards/index.ts",
 		"./components/Generate": "./components/Generate/index.ts",
 		"./components/Presentations": "./components/Presentations/index.ts",
+		"./components/Viewer": "./components/Viewer/index.ts",
 		"./components/*": "./components/*.tsx",
 		"./context/*": "./context/*.tsx",
 		"./hooks/*": "./hooks/*.ts",

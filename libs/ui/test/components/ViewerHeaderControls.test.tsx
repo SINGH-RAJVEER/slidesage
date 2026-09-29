@@ -1,0 +1,48 @@
+/// <reference lib="dom" />
+
+import { expect, it, mock } from "bun:test";
+import { ViewerHeaderControls } from "@slidesage/ui/components/Viewer/ViewerHeaderControls";
+import { fireEvent, render } from "@testing-library/react";
+import type React from "react";
+
+const renderHeader = (
+	overrides: Partial<React.ComponentProps<typeof ViewerHeaderControls>> = {},
+) => {
+	const onPresent = mock();
+	const props: React.ComponentProps<typeof ViewerHeaderControls> = {
+		title: "Quarterly review",
+		canIterate: true,
+		onBack: mock(),
+		onIterate: mock(),
+		onPresent,
+		presentDisabled: false,
+		...overrides,
+	};
+
+	return { view: render(<ViewerHeaderControls {...props} />), onPresent };
+};
+
+it("uses Present as the fullscreen action", () => {
+	const { view, onPresent } = renderHeader();
+
+	fireEvent.click(view.getByRole("button", { name: "Present slideshow" }));
+
+	expect(onPresent).toHaveBeenCalledTimes(1);
+});
+
+it("disables Present until slides are available", () => {
+	const { view, onPresent } = renderHeader({ presentDisabled: true });
+	const present = view.getByRole("button", { name: "Present slideshow" });
+
+	expect(present).toBeDisabled();
+	fireEvent.click(present);
+
+	expect(onPresent).not.toHaveBeenCalled();
+});
+
+it("omits generation controls in read-only mode", () => {
+	const { view } = renderHeader({ showIterate: false });
+
+	expect(view.queryByRole("button", { name: "Iterate presentation" })).toBeNull();
+	expect(view.queryByRole("combobox")).toBeNull();
+});

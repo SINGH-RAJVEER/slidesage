@@ -3,8 +3,7 @@ import type { Source } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
 import { ChevronLeft, ChevronRight, NotebookText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { citationsFor } from "./CardDeck";
-import { type CardAsset, CardView } from "./CardView";
+import { type CardAsset, CardView, citationsFor } from "./CardView";
 import { CARD_THEMES } from "./themes";
 
 export interface PresentModeProps {

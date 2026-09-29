@@ -1,7 +1,7 @@
 import type { CardDocument } from "@slidesage/cards";
 import type { Source } from "@slidesage/types";
 import { CardToolbar } from "./CardToolbar";
-import { type CardAsset, CardView, type DocumentEdit } from "./CardView";
+import { type CardAsset, CardView, citationsFor, type DocumentEdit } from "./CardView";
 import { CARD_THEMES } from "./themes";
 
 export interface CardDeckProps {
@@ -18,16 +18,6 @@ export interface CardDeckProps {
 	onPhoto?: (cardId: string) => void;
 	/** Asks AI to revise a card while editing. */
 	onRevise?: (cardId: string) => void;
-}
-
-/** Maps the drafter's source IDs (s1, s2, ...) to citation numbers and links. */
-export function citationsFor(sources: Source[]) {
-	return Object.fromEntries(
-		sources.map((source, index) => [
-			`s${index + 1}`,
-			{ number: index + 1, url: source.url, title: source.title },
-		]),
-	);
 }
 
 /** Renders a saved card document in reading order. */

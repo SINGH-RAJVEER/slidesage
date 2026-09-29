@@ -19,6 +19,7 @@ import {
 	setPartField,
 	syncTakeaway,
 } from "@slidesage/cards";
+import type { Source } from "@slidesage/types";
 import { cn } from "@slidesage/ui/lib/utils";
 import { Plus, X } from "lucide-react";
 import {
@@ -564,6 +565,16 @@ function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 				</div>
 			);
 	}
+}
+
+/** Maps the drafter's source IDs (s1, s2, ...) to citation numbers and links. */
+export function citationsFor(sources: Source[]) {
+	return Object.fromEntries(
+		sources.map((source, index) => [
+			`s${index + 1}`,
+			{ number: index + 1, url: source.url, title: source.title },
+		]),
+	);
 }
 
 /** What the server knows about a stored image. */
