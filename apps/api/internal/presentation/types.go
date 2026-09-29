@@ -23,8 +23,11 @@ type Presentation struct {
 	AIModel              sql.NullString
 	ParentPresentationID sql.NullString
 	Revision             int
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	// HasCardDocument is false for a presentation that has no saved card
+	// revision, such as one generated before card documents existed.
+	HasCardDocument bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type NewPresentation struct {

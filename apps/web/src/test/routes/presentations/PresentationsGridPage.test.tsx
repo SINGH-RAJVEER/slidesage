@@ -359,3 +359,50 @@ it("removes a presentation after an empty 204 delete response", async () => {
 		globalThis.fetch = originalFetch;
 	}
 }, 15000);
+
+it("lists a deck from before card documents as unavailable, deletable but not openable", async () => {
+	const originalFetch = globalThis.fetch;
+	const fetchMock = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+		if (init?.method === "DELETE") return new Response(null, { status: 204 });
+
+		return Response.json({
+			presentations: [
+				{
+					id: "presentation_pptx",
+					title: "An old deck",
+					prompt: "Made by the PPTX pipeline",
+					slide_count: 8,
+					status: "unavailable",
+					has_research: false,
+					created_at: "2026-07-14T10:00:00.000Z",
+					updated_at: "2026-07-14T10:00:00.000Z",
+				},
+			],
+			total: 1,
+			limit: 20,
+			offset: 0,
+			has_more: false,
+		});
+	});
+	globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+	try {
+		const view = render(
+			<MemoryRouter>
+				<PresentationsGridPage />
+			</MemoryRouter>,
+		);
+
+		const title = await view.findByText("An old deck");
+		expect(view.getByText(/can no longer be opened/)).toBeInTheDocument();
+		const listCalls = fetchMock.mock.calls.length;
+		fireEvent.click(title);
+		expect(fetchMock.mock.calls.length).toBe(listCalls);
+
+		fireEvent.click(view.getByRole("button", { name: "Delete presentation" }));
+		fireEvent.click(view.getByRole("button", { name: "Delete" }));
+		await waitFor(() => expect(view.queryByText("An old deck")).toBeNull());
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+}, 10000);

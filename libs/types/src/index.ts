@@ -244,12 +244,18 @@ export interface ApiErrorResponse {
 	};
 }
 
+/**
+ * A presentation's state in the library. `unavailable` is a finished
+ * presentation with no card document, made before card documents existed.
+ */
+export type PresentationSummaryStatus = PresentationStatus | "unavailable";
+
 export interface PresentationSummary {
 	id: string;
 	title: string;
 	prompt: string;
 	slide_count: number;
-	status: PresentationStatus;
+	status: PresentationSummaryStatus;
 	has_research: boolean;
 	created_at: string;
 	updated_at: string;

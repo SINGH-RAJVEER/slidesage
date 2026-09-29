@@ -2,7 +2,7 @@ import type { PresentationSummary } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@slidesage/ui/components/card";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
-import { Calendar, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, Calendar, RotateCcw, Trash2 } from "lucide-react";
 import type React from "react";
 
 interface PresentationCardProps {
@@ -22,12 +22,14 @@ export const PresentationCard: React.FC<PresentationCardProps> = ({
 	onDelete,
 	formatDate,
 }) => {
+	// A deck from before card documents cannot be opened, only deleted.
+	const unavailable = presentation.status === "unavailable";
 	return (
 		<Card
-			className={`group flex h-full cursor-pointer flex-col border bg-black/20 transition-colors hover:bg-white/5 ${
-				presentation.status === "failed" ? "border-red-300/20" : "border-white/10"
-			}`}
-			onClick={() => !isOpening && onCardClick(presentation.id)}
+			className={`group flex h-full flex-col border bg-black/20 transition-colors ${
+				unavailable ? "cursor-default opacity-60" : "cursor-pointer hover:bg-white/5"
+			} ${presentation.status === "failed" ? "border-red-300/20" : "border-white/10"}`}
+			onClick={() => !isOpening && !unavailable && onCardClick(presentation.id)}
 		>
 			<CardHeader className="pb-3">
 				<CardTitle className="flex items-start justify-between gap-2 text-lg text-white">
@@ -38,12 +40,19 @@ export const PresentationCard: React.FC<PresentationCardProps> = ({
 								Ready to retry
 							</span>
 						)}
+						{unavailable && (
+							<span className="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/50">
+								<Ban className="h-3.5 w-3.5" />
+								Made with an earlier version and can no longer be opened
+							</span>
+						)}
 						<span className="line-clamp-2 block font-light opacity-90">{presentation.title}</span>
 					</span>
 					<Button
 						variant="ghost"
 						size="icon"
 						className="h-8 w-8 text-white/40 hover:text-red-400 hover:bg-red-500/10 flex-shrink-0 ml-2 -mt-0.5"
+						aria-label="Delete presentation"
 						onClick={(e) => onDelete(e, presentation.id)}
 						disabled={isDeleting}
 					>

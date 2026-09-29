@@ -134,4 +134,4 @@ Cards are at least 16:9, and text is sized in container units so a card scales l
 
 Present shows the deck one card at a time over the whole screen, in full screen where the browser allows it, with timed playback. The left and right arrow keys, or J and L, move between cards; the up and down arrow keys jump to the first and last; N shows the card's speaker notes; leaving full screen stops presenting.
 
-The generate and research pages lead to the outline at `/generate/outline`, which moves to the presentation as soon as the job is accepted. The library opens ready presentations there, and the generation indicator links back to the running one.
+The generate and research pages lead to the outline at `/generate/outline`, which moves to the presentation as soon as the job is accepted. The library opens ready presentations there, and the generation indicator links back to the running one. Presentations made before card documents are listed as unavailable: they cannot be opened, only deleted.
