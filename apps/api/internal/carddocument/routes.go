@@ -34,6 +34,7 @@ func RegisterRoutes(mux *http.ServeMux, handler Handler) {
 	mux.HandleFunc("GET /images/search", handler.searchPhotos)
 	mux.HandleFunc("POST /presentations/{id}/assets/stock", handler.addStockPhoto)
 	mux.HandleFunc("POST /presentations/{id}/assets/upload", handler.uploadPhoto)
+	mux.HandleFunc("GET /presentations/{id}/export/pptx", handler.exportPptx)
 	mux.HandleFunc("GET /presentations/{id}/share", handler.getShare)
 	mux.HandleFunc("POST /presentations/{id}/share", handler.createShare)
 	mux.HandleFunc("DELETE /presentations/{id}/share", handler.revokeShare)

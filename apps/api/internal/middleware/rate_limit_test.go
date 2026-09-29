@@ -34,6 +34,7 @@ func TestPolicyForShareLinks(t *testing.T) {
 		{http.MethodGet, "/shared/abc/assets/0f", "shared-asset", false},
 		{http.MethodPost, "/presentations/p1/share", "share-create", true},
 		{http.MethodGet, "/images/search", "photo-search", true},
+		{http.MethodGet, "/presentations/p1/export/pptx", "presentation-export", true},
 	} {
 		policy, ok := policyFor(item.method, item.path)
 		if !ok || policy.scope != item.scope || policy.authenticated != item.authenticated {

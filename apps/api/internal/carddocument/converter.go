@@ -170,18 +170,77 @@ func (converter *Converter) Drafts(ctx context.Context, document json.RawMessage
 	return response.Cards, nil
 }
 
-func (converter *Converter) do(ctx context.Context, method, path string, body any, destination any) error {
+// ExportAsset is an image an export embeds, with its bytes.
+type ExportAsset struct {
+	MIMEType string          `json:"mimeType"`
+	Width    int             `json:"width"`
+	Height   int             `json:"height"`
+	Data     []byte          `json:"data"`
+	Source   json.RawMessage `json:"source,omitempty"`
+}
+
+// ExportSource is a research source a card may cite, numbered by position.
+type ExportSource struct {
+	URL   string `json:"url"`
+	Title string `json:"title,omitempty"`
+}
+
+// maxExportBytes bounds the PowerPoint file read back from the converter.
+const maxExportBytes = 256 << 20
+
+// Pptx writes a document as an editable PowerPoint file. A document the
+// schema refuses is reported as an Issue rather than an error.
+func (converter *Converter) Pptx(ctx context.Context, document json.RawMessage, assets map[string]ExportAsset, sources []ExportSource) ([]byte, *Issue, error) {
+	if assets == nil {
+		assets = map[string]ExportAsset{}
+	}
+	if sources == nil {
+		sources = []ExportSource{}
+	}
+	response, err := converter.send(ctx, http.MethodPost, "/v1/documents/pptx", map[string]any{"document": document, "assets": assets, "sources": sources})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(response.Body, maxExportBytes+1))
+	if err != nil {
+		return nil, nil, fmt.Errorf("read card converter response: %w", err)
+	}
+	if response.StatusCode == http.StatusUnprocessableEntity {
+		var failure struct {
+			Issue *Issue `json:"issue"`
+		}
+		_ = json.Unmarshal(raw, &failure)
+		if failure.Issue == nil {
+			failure.Issue = &Issue{Path: "document", Message: "failed validation"}
+		}
+		return nil, failure.Issue, nil
+	}
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		var failure struct {
+			Error string `json:"error"`
+		}
+		_ = json.Unmarshal(raw, &failure)
+		return nil, nil, &ConverterError{Status: response.StatusCode, Message: failure.Error}
+	}
+	if len(raw) > maxExportBytes {
+		return nil, nil, &ConverterError{Status: http.StatusBadGateway, Message: "export is too large"}
+	}
+	return raw, nil, nil
+}
+
+func (converter *Converter) send(ctx context.Context, method, path string, body any) (*http.Response, error) {
 	var reader io.Reader
 	if body != nil {
 		encoded, err := json.Marshal(body)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		reader = bytes.NewReader(encoded)
 	}
 	request, err := http.NewRequestWithContext(ctx, method, converter.baseURL+path, reader)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	request.Header.Set(schemaVersionHeader, strconv.Itoa(SchemaVersion))
 	if body != nil {
@@ -189,7 +248,15 @@ func (converter *Converter) do(ctx context.Context, method, path string, body an
 	}
 	response, err := converter.client.Do(request)
 	if err != nil {
-		return fmt.Errorf("call card converter: %w", err)
+		return nil, fmt.Errorf("call card converter: %w", err)
+	}
+	return response, nil
+}
+
+func (converter *Converter) do(ctx context.Context, method, path string, body any, destination any) error {
+	response, err := converter.send(ctx, method, path, body)
+	if err != nil {
+		return err
 	}
 	defer response.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(response.Body, MaxDocumentBytes*2))
