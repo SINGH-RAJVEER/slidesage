@@ -52,7 +52,7 @@ jobs:
             --project="$TF_VAR_gcp_project_id" --region=asia-south1 \
             --format=json | jq -r '[ (.spec.template.spec.containers // .template.containers // [])[] | select(.name == "converter") | .image ][0] // empty')
           if [ -z "$converter_image" ]; then
-            # Before the first gamma rollout the live API has no converter.
+            # Before the first card-document rollout the live API has no converter.
             # Planning needs an image reference, but does not pull the image.
             converter_image="asia-south1-docker.pkg.dev/$TF_VAR_gcp_project_id/slidesage/converter:latest"
           fi

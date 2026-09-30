@@ -1,6 +1,6 @@
 # Card documents
 
-A generated presentation is a versioned card document: an ordered set of cards, each making one point, stored as an immutable JSON revision. The browser renders the saved revision directly. The design and its remaining work are in [GAMMA_ARCHITECTURE.md](GAMMA_ARCHITECTURE.md).
+A generated presentation is a versioned card document: an ordered set of cards, each making one point, stored as an immutable JSON revision. The browser renders the saved revision directly. The design and its remaining work are in [CARD_ARCHITECTURE.md](CARD_ARCHITECTURE.md).
 
 ## Schema
 

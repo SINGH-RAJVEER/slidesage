@@ -33,7 +33,7 @@ Justfile        Common development commands
 - [CI/CD: Artifact Registry and Cloud Run](docs/CI_CD.md)
 - [Production infrastructure](docs/PRODUCTION_INFRASTRUCTURE.md)
 - [Architecture](docs/API_ARCHITECTURE.md)
-- [Card document proposal](docs/GAMMA_ARCHITECTURE.md)
+- [Card document architecture](docs/CARD_ARCHITECTURE.md)
 - [Card documents](docs/CARD_DOCUMENTS.md)
 - [API reference](docs/API_OVERVIEW.md)
 - [Authentication](docs/AUTH_API.md)

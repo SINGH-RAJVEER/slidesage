@@ -2,7 +2,7 @@
 
 ## Requirements
 
-Install Nix with [devenv](https://devenv.sh/getting-started/). The environment provides Go, Bun, PostgreSQL, Goose, Clang, and `just`.
+Install Nix with [devenv](https://devenv.sh/getting-started/). The environment provides Go, Bun, PostgreSQL, Goose, `just`, Terraform, and `fake-gcs-server`.
 
 `apps/api` targets Go 1.27.1. The pinned devenv nixpkgs still ships Go 1.26, so the first `go` command in the shell downloads the 1.27.1 toolchain through the default `GOTOOLCHAIN=auto` and caches it under the module cache. That first build needs network access; later builds reuse the cached toolchain.
 
@@ -13,7 +13,7 @@ bun install
 just dev
 ```
 
-Set `AUTH_SECRET` and `OPEN_ROUTER_API_KEY` in `.env`. Add `EXA_API_KEY` for research, `RESEND_API_KEY` for email delivery, OAuth credentials for social sign-in, and Razorpay credentials for purchases.
+Set `AUTH_SECRET` and `OPEN_ROUTER_API_KEY` in `.env`. Add `PEXELS_API_KEY` for stock photos, `EXA_API_KEY` for research, `RESEND_API_KEY` for email delivery, OAuth credentials for social sign-in, and Razorpay credentials for purchases.
 
 ## Startup
 
@@ -22,10 +22,11 @@ Set `AUTH_SECRET` and `OPEN_ROUTER_API_KEY` in `.env`. Add `EXA_API_KEY` for res
 1. Starts devenv PostgreSQL with pgvector.
 2. Ensures the local role, database, and vector extension exist.
 3. Runs `cmd/migrate`, which applies embedded Goose application migrations and River migrations.
-4. Starts the Go API on port `8000` and waits for `/health`.
+4. Starts `fake-gcs-server` on port `4443` as the local presentation bucket. Devenv points the API and worker at it with `STORAGE_EMULATOR_HOST` and names the bucket `slidesage-dev-revisions`, so card revisions and photos stay on disk under `.devenv/state/gcs`.
 5. Starts the card converter on port `8090` and waits for `/health`.
-6. Starts the durable generation worker after the converter and waits for `/ready` on port `8080`.
-7. Starts the Vite development server on port `5173`, with React Fast Refresh, Tailwind processing, and static assets from `apps/web/public`.
+6. Starts the Go API on port `8000` after the converter and waits for `/health`.
+7. Starts the durable generation worker after the converter and waits for `/ready` on port `8080`.
+8. Starts the Vite development server on port `5173`, with React Fast Refresh, Tailwind processing, and static assets from `apps/web/public`.
 
 Vite exposes only `VITE_*` variables to browser bundles. If `VITE_API_URL` is absent during local development, browser API requests fall back to port `8000` on the same loopback hostname.
 

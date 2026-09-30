@@ -130,7 +130,7 @@ Set `VITE_API_URL=https://api.slidesage.app` for the `slidesage.app` production 
 | `PEXELS_API_KEY` | Stock photos | Yes | Pexels API key. Production Terraform requires this Secret Manager secret for the API and worker. Without it photo search returns `503` and generation drafts without photos |
 | `PEXELS_API_BASE` | No | No | Pexels API base URL; defaults to `https://api.pexels.com`. Only for tests and local stubs |
 
-The removed template fetcher and thumbnail routes were the only users of the Cloud CDN signing variables (`CDN_URL`, `CDN_SIGNING_KEY_NAME`, `CDN_SIGNING_KEY_SECRET`, `CDN_SIGNED_URL_TTL_SECONDS`). Gamma production Terraform no longer passes them to Cloud Run or manages the template CDN route.
+The removed template fetcher and thumbnail routes were the only users of the Cloud CDN signing variables (`CDN_URL`, `CDN_SIGNING_KEY_NAME`, `CDN_SIGNING_KEY_SECRET`, `CDN_SIGNED_URL_TTL_SECONDS`). Production Terraform no longer passes them to Cloud Run or manages the template CDN route.
 
 The API refuses to initialize authentication on an HTTPS base URL without a sufficiently strong `AUTH_SECRET`.
 

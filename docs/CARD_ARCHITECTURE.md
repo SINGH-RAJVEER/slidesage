@@ -2,9 +2,9 @@
 
 ## Status and decision
 
-This is the architecture for the `gamma` workspace. It describes the target design; the part already built is listed under "Implemented so far". The defining decision is that an editable card document becomes the authoritative presentation. Browser presentation and PPTX export derive from a saved card revision.
+This is the architecture of SlideSage presentations. It describes the target design; the part already built is listed under "Implemented so far". The defining decision is that an editable card document becomes the authoritative presentation. Browser presentation and PPTX export derive from a saved card revision.
 
-The PPTX-first pipeline this replaces has been removed from the workspace: the template-slot compiler, the template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. Production Terraform now drops the template CDN route and deploys the converter with the API and worker. The legacy `presentation_revisions` table remains in the database; removing it needs a separate data-retention decision.
+The PPTX-first pipeline this replaces has been removed: the template-slot compiler, the template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. Production Terraform now drops the template CDN route and deploys the converter with the API and worker. The legacy `presentation_revisions` table remains in the database; removing it needs a separate data-retention decision.
 
 ### Implemented so far
 
