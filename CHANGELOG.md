@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.8
+
+- Add AI revisions for selected cards and whole decks.
+
 ## 0.2.7
 
 - Add read only deck sharing and the one card at a time presentation viewer.
