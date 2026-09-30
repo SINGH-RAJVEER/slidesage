@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.9
+
+- Export card decks to editable PowerPoint files.
+
 ## 0.2.8
 
 - Add AI revisions for selected cards and whole decks.
