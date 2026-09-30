@@ -147,7 +147,6 @@ describe("failed presentation retries", () => {
 									],
 									estimated_tokens: 9.2,
 								},
-								template: { id: "soft-skills-training", version: 1 },
 								ai: { provider: "google", model: "gemini-2.5-pro" },
 							},
 						},

@@ -324,7 +324,6 @@ it("treats saved as terminal", async () => {
 			parent_presentation_id: "presentation_1",
 			slide_count: 2,
 		});
-		expect(requestBody).not.toHaveProperty("template");
 	} finally {
 		globalThis.fetch = originalFetch;
 	}

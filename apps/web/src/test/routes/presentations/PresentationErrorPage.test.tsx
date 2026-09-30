@@ -123,7 +123,6 @@ describe("PresentationErrorPage", () => {
 						title: "Failed deck",
 						slides: [],
 						status: "failed",
-						template: { id: "soft-skills-training", version: 1 },
 						failure: {
 							message: "Generation failed",
 							retry: {
@@ -132,7 +131,6 @@ describe("PresentationErrorPage", () => {
 								detail_level: "detailed",
 								tonality: "professional",
 								research_enabled: false,
-								template: { id: "soft-skills-training", version: 1 },
 							},
 						},
 					},
@@ -159,7 +157,7 @@ describe("PresentationErrorPage", () => {
 				expect(retryRequest).toHaveBeenCalledTimes(1);
 				expect(view.getByText(/"prompt":"Retry this deck"/)).toBeInTheDocument();
 			});
-			expect(view.getByText(/"id":"soft-skills-training"/)).toBeInTheDocument();
+			expect(view.getByText(/"slide_count":7/)).toBeInTheDocument();
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
