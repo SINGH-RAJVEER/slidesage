@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.6
+
+- Add outline approval and the live card viewer for generated decks.
+
 ## 0.2.5
 
 - Support direct card editing and save edits as new revisions.
