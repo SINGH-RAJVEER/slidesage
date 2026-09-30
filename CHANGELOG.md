@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Add the versioned card schema, converter service, and immutable card revision storage.
+
 ## 0.2.1
 
 - Retire the PPTX first generation path and document the card based architecture.
