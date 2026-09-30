@@ -8,20 +8,9 @@
         pkgs.goose
         pkgs.just
         pkgs.terraform
-        pkgs.chromium
         pkgs.fake-gcs-server
 		pkgs.uv
     ];
-
-    env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
-
-    env.FONTCONFIG_FILE = pkgs.makeFontsConf {
-        fontDirectories = [
-            pkgs.dejavu_fonts
-            pkgs.liberation_ttf
-            pkgs.noto-fonts
-        ];
-    };
 
     services.postgres = {
         enable = true;
@@ -182,7 +171,5 @@
 		STORAGE_EMULATOR_HOST = "http://127.0.0.1:4443";
 		PRESENTATION_GCS_BUCKET = "slidesage-dev-revisions";
 		CARD_CONVERTER_URL = "http://127.0.0.1:8090";
-		EDITOR_WHITE_LABEL = "true";
-		EDITOR_CONNECTOR = "true";
     };
 }
