@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Polish the card viewer, retire unused template paths, and update the shipped architecture documentation.
+
 ## 0.2.9
 
 - Export card decks to editable PowerPoint files.
