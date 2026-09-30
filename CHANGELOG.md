@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.5
+
+- Support direct card editing and save edits as new revisions.
+
 ## 0.2.4
 
 - Add image cards, stock photo search, uploads, and persistent asset storage.
