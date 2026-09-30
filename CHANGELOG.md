@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- Add image cards, stock photo search, uploads, and persistent asset storage.
+
 ## 0.2.3
 
 - Generate card decks through approved outlines, planned drafting, and incremental progress updates.

@@ -24,7 +24,7 @@
     },
     "apps/web": {
       "name": "slidesage-web",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@slidesage/cards": "workspace:*",
         "@slidesage/types": "workspace:*",
@@ -60,14 +60,14 @@
     },
     "libs/types": {
       "name": "@slidesage/types",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "devDependencies": {
         "@biomejs/biome": "^2.4.7",
       },
     },
     "libs/ui": {
       "name": "@slidesage/ui",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@radix-ui/react-dialog": "^1.1.15",
         "@radix-ui/react-dropdown-menu": "^2.1.15",
