@@ -63,11 +63,6 @@ func presentationSummary(presentation Presentation) PresentationSummary {
 	if status != "failed" && status != "generating" {
 		status = "ready"
 	}
-	// A finished presentation without a card revision was made by the removed
-	// PPTX pipeline. Nothing can open it, but its owner can still delete it.
-	if status == "ready" && !presentation.HasCardDocument {
-		status = "unavailable"
-	}
 	hasResearch := len(document.Sources) > 0
 	if status == "failed" {
 		hasResearch = len(document.Failure.Retry.ResearchPayload.Sources) > 0

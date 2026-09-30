@@ -3,13 +3,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { StreamingProvider } from "@slidesage/ui";
 import { PRESENTATIONS_UPDATED_EVENT } from "@slidesage/ui/lib/presentation-events";
-import {
-	act,
-	fireEvent,
-	render,
-	waitFor,
-	waitForElementToBeRemoved,
-} from "@testing-library/react";
+import { act, fireEvent, render, waitFor, waitForElementToBeRemoved } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import GenerateResearchPage from "../../../routes/presentations/GenerateResearchPage";
 import PresentationsGridPage from "../../../routes/presentations/PresentationsGridPage";
@@ -366,49 +360,27 @@ it("removes a presentation after an empty 204 delete response", async () => {
 	}
 });
 
-it("lists a deck from before card documents as unavailable, deletable but not openable", async () => {
+it("shows why a presentation could not be opened", async () => {
 	const originalFetch = globalThis.fetch;
-	const fetchMock = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
-		if (init?.method === "DELETE") return new Response(null, { status: 204 });
-
-		return Response.json({
-			presentations: [
-				{
-					id: "presentation_pptx",
-					title: "An old deck",
-					prompt: "Made by the PPTX pipeline",
-					slide_count: 8,
-					status: "unavailable",
-					has_research: false,
-					created_at: "2026-07-14T10:00:00.000Z",
-					updated_at: "2026-07-14T10:00:00.000Z",
-				},
-			],
-			total: 1,
-			limit: 20,
-			offset: 0,
-			has_more: false,
-		});
-	});
-	globalThis.fetch = fetchMock as unknown as typeof fetch;
+	globalThis.fetch = mock(async () =>
+		Response.json({ presentations: [], total: 0, limit: 20, offset: 0, has_more: false }),
+	) as unknown as typeof fetch;
 
 	try {
 		const view = render(
-			<MemoryRouter>
-				<PresentationsGridPage />
+			<MemoryRouter
+				initialEntries={[
+					{ pathname: "/presentations", state: { notice: "This deck can no longer be opened." } },
+				]}
+			>
+				<Routes>
+					<Route path="/presentations" element={<PresentationsGridPage />} />
+				</Routes>
 			</MemoryRouter>,
 		);
 
-		const title = await view.findByText("An old deck");
-		expect(view.getByText(/can no longer be opened/)).toBeInTheDocument();
-		const listCalls = fetchMock.mock.calls.length;
-		fireEvent.click(title);
-		expect(fetchMock.mock.calls.length).toBe(listCalls);
-
-		fireEvent.click(view.getByRole("button", { name: "Delete presentation" }));
-		fireEvent.click(view.getByRole("button", { name: "Delete" }));
-		await waitForElementToBeRemoved(() => view.queryByText("An old deck"));
+		expect(await view.findByRole("alert")).toHaveTextContent("This deck can no longer be opened.");
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
-}, 10000);
+});

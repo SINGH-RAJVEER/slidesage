@@ -21,7 +21,7 @@ func NewRepository(db DBTX) *Repository {
 }
 
 func (r *Repository) FindByID(ctx context.Context, presentationID string) (Presentation, error) {
-	const query = `SELECT id, user_id, title, prompt, slides_data, ai_provider, ai_model, parent_presentation_id, revision, current_card_revision IS NOT NULL, created_at, updated_at
+	const query = `SELECT id, user_id, title, prompt, slides_data, ai_provider, ai_model, parent_presentation_id, revision, created_at, updated_at
         FROM presentations WHERE id = $1`
 	presentation, err := scanPresentation(r.db.QueryRowContext(ctx, query, presentationID))
 	if errors.Is(err, ErrPresentationNotFound) {
@@ -38,7 +38,7 @@ func (r *Repository) ListByUserID(ctx context.Context, userID string, limit, off
 	if err := r.db.QueryRowContext(ctx, `SELECT count(*) FROM presentations WHERE user_id = $1`, userID).Scan(&total); err != nil {
 		return PresentationPage{}, fmt.Errorf("count presentations: %w", err)
 	}
-	rows, err := r.db.QueryContext(ctx, `SELECT id, user_id, title, prompt, slides_data, ai_provider, ai_model, parent_presentation_id, revision, current_card_revision IS NOT NULL, created_at, updated_at
+	rows, err := r.db.QueryContext(ctx, `SELECT id, user_id, title, prompt, slides_data, ai_provider, ai_model, parent_presentation_id, revision, created_at, updated_at
         FROM presentations WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3`, userID, limit, offset)
 	if err != nil {
 		return PresentationPage{}, fmt.Errorf("list presentations: %w", err)
@@ -93,7 +93,7 @@ func scanPresentation(row scanner) (Presentation, error) {
 	var slidesData []byte
 	err := row.Scan(&presentation.ID, &presentation.UserID, &presentation.Title, &presentation.Prompt, &slidesData,
 		&presentation.AIProvider, &presentation.AIModel, &presentation.ParentPresentationID, &presentation.Revision,
-		&presentation.HasCardDocument, &presentation.CreatedAt, &presentation.UpdatedAt)
+		&presentation.CreatedAt, &presentation.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Presentation{}, ErrPresentationNotFound
 	}

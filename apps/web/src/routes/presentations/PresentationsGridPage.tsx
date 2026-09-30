@@ -21,10 +21,11 @@ import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
 import { PRESENTATIONS_UPDATED_EVENT } from "@slidesage/ui/lib/presentation-events";
 import { getPresentationRetryDestination } from "@slidesage/ui/lib/presentation-retry";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
+import type { LibraryNotice } from "./PresentationPage";
 
 interface PaginationState {
 	total: number;
@@ -105,6 +106,18 @@ export default function PresentationsGridPage() {
 		return saved ? (parseInt(saved, 10) as 2 | 3 | 4) : 3;
 	});
 	const navigate = useNavigate();
+	const location = useLocation();
+
+	// A presentation that could not be opened sends its reason here. It is
+	// shown once, so a reload of the library does not repeat it.
+	const [notice, setNotice] = useState(
+		() => (location.state as LibraryNotice | null)?.notice ?? null,
+	);
+	useEffect(() => {
+		if ((location.state as LibraryNotice | null)?.notice) {
+			navigate(location.pathname, { replace: true, state: null });
+		}
+	}, [location.state, location.pathname, navigate]);
 
 	const filteredPresentations = useMemo(() => {
 		const query = searchQuery.trim();
@@ -288,7 +301,13 @@ export default function PresentationsGridPage() {
 	return (
 		<div className="flex h-dvh flex-col overflow-hidden bg-transparent">
 			<Header />
-			<FloatingNotice error={error} onDismiss={() => setError("")} />
+			<FloatingNotice
+				error={error || notice}
+				onDismiss={() => {
+					setError("");
+					setNotice(null);
+				}}
+			/>
 			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
 				<div className="max-w-7xl mx-auto">
 					<div

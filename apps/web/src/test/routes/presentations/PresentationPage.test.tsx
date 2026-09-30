@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, mock } from "bun:test";
 import { assembleDocument, convertCards } from "@slidesage/cards";
 import { StreamingProvider } from "@slidesage/ui";
 import { render } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import PresentationPage from "../../../routes/presentations/PresentationPage";
 
 const originalFetch = globalThis.fetch;
@@ -30,7 +30,13 @@ function savedDocument() {
 	return assembleDocument({ title: "Grid storage", theme: "slate", cards: [result.card] });
 }
 
-function serve(status: string, document: unknown) {
+/** Stands in for the library, showing the notice a failed open sent it. */
+function Library() {
+	const state = useLocation().state as { notice?: string } | null;
+	return <p>Library: {state?.notice}</p>;
+}
+
+function serve(status: string, document: unknown, documentStatus = 200) {
 	globalThis.fetch = mock(async (input: string | URL | Request) => {
 		const url = String(input);
 		if (url.endsWith("/presentations/pres_1")) {
@@ -43,6 +49,12 @@ function serve(status: string, document: unknown) {
 			});
 		}
 		if (url.endsWith("/presentations/pres_1/document")) {
+			if (documentStatus !== 200) {
+				return Response.json(
+					{ error: { message: "This presentation has no saved document yet" } },
+					{ status: documentStatus },
+				);
+			}
 			return Response.json({ revision: { revision: 1 }, document });
 		}
 		return new Response(null, { status: 404 });
@@ -56,6 +68,7 @@ function open() {
 				<Routes>
 					<Route path="/presentations/:presentationId" element={<PresentationPage />} />
 					<Route path="/presentation-error" element={<div>Failed presentation</div>} />
+					<Route path="/presentations" element={<Library />} />
 				</Routes>
 			</StreamingProvider>
 		</MemoryRouter>,
@@ -78,13 +91,20 @@ describe("PresentationPage", () => {
 		expect(await view.findByText("Failed presentation")).toBeInTheDocument();
 	});
 
-	it("refuses to render a document that does not match the schema", async () => {
+	it("returns to the library, saying why, when the document does not match the schema", async () => {
 		serve("ready", { ...savedDocument(), theme: "neon" });
 		const view = open();
 
 		expect(
-			await view.findByText("This presentation's saved document could not be read."),
+			await view.findByText("Library: This presentation's saved document could not be read."),
 		).toBeInTheDocument();
 		expect(view.queryByRole("article")).not.toBeInTheDocument();
+	});
+
+	it("returns to the library when the presentation predates card documents", async () => {
+		serve("ready", null, 409);
+		const view = open();
+
+		expect(await view.findByText(/Library: .*made with an earlier version/)).toBeInTheDocument();
 	});
 });

@@ -1,13 +1,12 @@
 import { type CardDocument, validateCardDocument } from "@slidesage/cards";
 import type { ApiErrorResponse, PresentationResponse, Source } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
-import { Button } from "@slidesage/ui/components/button";
 import type { CardAsset } from "@slidesage/ui/components/Cards";
+import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { CenteredStatusScreen, deckFromPreview } from "@slidesage/ui/components/Viewer";
 import { API_URL } from "@slidesage/ui/lib/api";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 import { DeckViewer } from "./DeckViewer";
 import { DeckWorkspace } from "./DeckWorkspace";
@@ -21,8 +20,17 @@ type LoadState =
 			revision: number;
 			sources: Source[];
 			assets: Record<string, CardAsset>;
-	  }
-	| { status: "error"; message: string };
+	  };
+
+/** What the library shows when a presentation cannot be opened. */
+export interface LibraryNotice {
+	notice: string;
+}
+
+/** The server's answer when a finished presentation has no card document. */
+const NO_CARD_DOCUMENT = 409;
+const EARLIER_VERSION =
+	"This presentation was made with an earlier version of SlideSage and can no longer be opened.";
 
 async function errorMessage(response: Response, fallback: string): Promise<string> {
 	const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
@@ -35,11 +43,28 @@ export default function PresentationPage() {
 	const navigate = useNavigate();
 	const { streamingState, cancelGeneration } = useStreaming();
 	const [state, setState] = useState<LoadState>({ status: "loading" });
+	const [notice, setNotice] = useState<string | null>(null);
+	const shown = useRef(false);
+	shown.current = state.status === "ready";
 	// An AI revision keeps the deck on screen; only a generation replaces it
 	// with progress.
 	const jobHere = streamingState.isStreaming && streamingState.presentationId === presentationId;
 	const generatingHere = jobHere && streamingState.operation !== "iteration";
 	const revisingHere = jobHere && streamingState.operation === "iteration";
+
+	// A presentation that cannot be opened goes back to the library, which says
+	// why. One already on screen stays there and reports a failed reload.
+	const fail = useCallback(
+		(message: string) => {
+			if (shown.current) {
+				setNotice(message);
+				return;
+			}
+			const state: LibraryNotice = { notice: message };
+			navigate(ROUTES.presentations, { replace: true, state });
+		},
+		[navigate],
+	);
 
 	const load = useCallback(async () => {
 		try {
@@ -47,10 +72,7 @@ export default function PresentationPage() {
 				credentials: "include",
 			});
 			if (!detailResponse.ok) {
-				setState({
-					status: "error",
-					message: await errorMessage(detailResponse, "Presentation not found"),
-				});
+				fail(await errorMessage(detailResponse, "Presentation not found"));
 				return;
 			}
 			const detail = (await detailResponse.json()) as PresentationResponse;
@@ -69,10 +91,11 @@ export default function PresentationPage() {
 				credentials: "include",
 			});
 			if (!documentResponse.ok) {
-				setState({
-					status: "error",
-					message: await errorMessage(documentResponse, "Unable to load the presentation"),
-				});
+				fail(
+					documentResponse.status === NO_CARD_DOCUMENT
+						? EARLIER_VERSION
+						: await errorMessage(documentResponse, "Unable to load the presentation"),
+				);
 				return;
 			}
 			const body = (await documentResponse.json()) as {
@@ -87,10 +110,7 @@ export default function PresentationPage() {
 				knownAssets: new Set(Object.keys(assets)),
 			});
 			if (!validated.ok) {
-				setState({
-					status: "error",
-					message: "This presentation's saved document could not be read.",
-				});
+				fail("This presentation's saved document could not be read.");
 				return;
 			}
 			setState({
@@ -101,12 +121,9 @@ export default function PresentationPage() {
 				assets,
 			});
 		} catch {
-			setState({
-				status: "error",
-				message: "Unable to load the presentation. Check your connection.",
-			});
+			fail("Unable to load the presentation. Check your connection.");
 		}
-	}, [navigate, presentationId]);
+	}, [fail, navigate, presentationId]);
 
 	// Reload whenever a generation for this deck starts or stops, so the saved
 	// document replaces the progress view the moment it is committed.
@@ -130,23 +147,6 @@ export default function PresentationPage() {
 
 	if (state.status === "loading") {
 		return <CenteredStatusScreen message="Loading presentation..." />;
-	}
-
-	if (state.status === "error") {
-		return (
-			<div className="flex min-h-dvh w-full flex-col bg-transparent">
-				<Header />
-				<section
-					className="flex flex-1 flex-col items-center justify-center gap-4 px-4"
-					role="alert"
-				>
-					<p className="text-sm text-white/70">{state.message}</p>
-					<Button variant="ghost" onClick={() => navigate(ROUTES.presentations)}>
-						Back to presentations
-					</Button>
-				</section>
-			</div>
-		);
 	}
 
 	if (state.status === "generating") {
@@ -183,14 +183,17 @@ export default function PresentationPage() {
 	}
 
 	return (
-		<DeckWorkspace
-			key={state.revision}
-			presentationId={presentationId}
-			document={state.document}
-			revision={state.revision}
-			sources={state.sources}
-			assets={state.assets}
-			onReload={() => void load()}
-		/>
+		<>
+			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
+			<DeckWorkspace
+				key={state.revision}
+				presentationId={presentationId}
+				document={state.document}
+				revision={state.revision}
+				sources={state.sources}
+				assets={state.assets}
+				onReload={() => void load()}
+			/>
+		</>
 	);
 }
