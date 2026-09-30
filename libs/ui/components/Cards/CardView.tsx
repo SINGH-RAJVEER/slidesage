@@ -135,9 +135,9 @@ function RemoveItem({
 			type="button"
 			aria-label={label}
 			onClick={onRemove}
-			className="ml-auto shrink-0 self-start rounded-full p-[0.3cqw] opacity-0 transition-opacity group-hover/item:opacity-60 hover:!opacity-100 focus-visible:opacity-100"
+			className="ml-auto shrink-0 self-start rounded-full p-[calc(0.3cqw*var(--fit,1))] opacity-0 transition-opacity group-hover/item:opacity-60 hover:!opacity-100 focus-visible:opacity-100"
 		>
-			<X className="size-[1.6cqw]" />
+			<X className="size-[calc(1.6cqw*var(--fit,1))]" />
 		</button>
 	);
 }
@@ -159,11 +159,11 @@ function AddItem({
 			type="button"
 			onClick={onAdd}
 			className={cn(
-				"flex w-fit items-center gap-[0.6cqw] rounded-full px-[1cqw] py-[0.4cqw] text-[1.3cqw] opacity-60 transition-opacity hover:opacity-100",
+				"flex w-fit items-center gap-[calc(0.6cqw*var(--fit,1))] rounded-full px-[calc(1cqw*var(--fit,1))] py-[calc(0.4cqw*var(--fit,1))] text-[length:calc(1.3cqw*var(--fit,1))] opacity-60 transition-opacity hover:opacity-100",
 				theme.muted,
 			)}
 		>
-			<Plus className="size-[1.4cqw]" />
+			<Plus className="size-[calc(1.4cqw*var(--fit,1))]" />
 			{label}
 		</button>
 	);
@@ -181,7 +181,9 @@ function Heading({ card, theme, large }: { card: Card; theme: CardTheme; large?:
 			data-node-id={heading.id}
 			className={cn(
 				"font-semibold leading-[1.1] tracking-tight text-balance",
-				large ? "text-[5.4cqw]" : "text-[3.4cqw]",
+				large
+					? "text-[length:calc(5.4cqw*var(--fit,1))]"
+					: "text-[length:calc(3.4cqw*var(--fit,1))]",
 				theme.heading,
 			)}
 		>
@@ -205,7 +207,9 @@ function Paragraphs({ card, theme, large }: { card: Card; theme: CardTheme; larg
 					data-node-id={paragraph.id}
 					className={cn(
 						"leading-snug text-pretty",
-						large ? "text-[2.2cqw]" : "text-[1.8cqw]",
+						large
+							? "text-[length:calc(2.2cqw*var(--fit,1))]"
+							: "text-[length:calc(1.8cqw*var(--fit,1))]",
 						theme.body,
 					)}
 				>
@@ -224,18 +228,21 @@ function Bullets({ node, theme }: { node: BulletsNode; theme: CardTheme }) {
 	const editing = useEditing();
 	const bounds = editing ? itemBounds(editing.card) : undefined;
 	return (
-		<div className="flex flex-col gap-[1.2cqw]">
-			<ul data-node-id={node.id} className="flex flex-col gap-[1.2cqw]">
+		<div className="flex flex-col gap-[calc(1.2cqw*var(--fit,1))]">
+			<ul data-node-id={node.id} className="flex flex-col gap-[calc(1.2cqw*var(--fit,1))]">
 				{node.items.map((item) => (
 					<li
 						key={item.id}
 						data-node-id={item.id}
-						className={cn("group/item flex gap-[1.4cqw] text-[1.9cqw] leading-snug", theme.body)}
+						className={cn(
+							"group/item flex gap-[calc(1.4cqw*var(--fit,1))] text-[length:calc(1.9cqw*var(--fit,1))] leading-snug",
+							theme.body,
+						)}
 					>
 						<span
 							aria-hidden
 							className={cn(
-								"mt-[0.9cqw] size-[0.7cqw] shrink-0 rounded-full bg-current",
+								"mt-[calc(0.9cqw*var(--fit,1))] size-[calc(0.7cqw*var(--fit,1))] shrink-0 rounded-full bg-current",
 								theme.accent,
 							)}
 						/>
@@ -276,7 +283,7 @@ function Columns({ node, theme }: { node: ColumnsNode; theme: CardTheme }) {
 	return (
 		<div
 			data-node-id={node.id}
-			className="grid flex-1 gap-[3cqw]"
+			className="grid flex-1 gap-[calc(3cqw*var(--fit,1))]"
 			style={{ gridTemplateColumns: `repeat(${node.columns.length}, minmax(0, 1fr))` }}
 		>
 			{node.columns.map((column, index) => (
@@ -284,12 +291,12 @@ function Columns({ node, theme }: { node: ColumnsNode; theme: CardTheme }) {
 					key={column.id}
 					data-node-id={column.id}
 					className={cn(
-						"flex flex-col gap-[1.4cqw]",
-						index > 0 && "border-l pl-[3cqw]",
+						"flex flex-col gap-[calc(1.4cqw*var(--fit,1))]",
+						index > 0 && "border-l pl-[calc(3cqw*var(--fit,1))]",
 						theme.rule,
 					)}
 				>
-					<h3 className={cn("text-[2.1cqw] font-semibold", theme.accent)}>
+					<h3 className={cn("text-[length:calc(2.1cqw*var(--fit,1))] font-semibold", theme.accent)}>
 						<PlainField
 							value={column.heading}
 							label="Column heading"
@@ -298,12 +305,15 @@ function Columns({ node, theme }: { node: ColumnsNode; theme: CardTheme }) {
 							}
 						/>
 					</h3>
-					<ul className="flex flex-col gap-[1cqw]">
+					<ul className="flex flex-col gap-[calc(1cqw*var(--fit,1))]">
 						{column.items.map((item) => (
 							<li
 								key={item.id}
 								data-node-id={item.id}
-								className={cn("group/item flex gap-[1cqw] text-[1.7cqw] leading-snug", theme.body)}
+								className={cn(
+									"group/item flex gap-[calc(1cqw*var(--fit,1))] text-[length:calc(1.7cqw*var(--fit,1))] leading-snug",
+									theme.body,
+								)}
 							>
 								<span className="min-w-0 flex-1">
 									<RichField
@@ -346,19 +356,27 @@ function Steps({ node, theme }: { node: StepsNode; theme: CardTheme }) {
 	const editing = useEditing();
 	const bounds = editing ? itemBounds(editing.card) : undefined;
 	return (
-		<div className="flex flex-1 flex-col gap-[1.6cqw]">
+		<div className="flex flex-1 flex-col gap-[calc(1.6cqw*var(--fit,1))]">
 			<ol
 				data-node-id={node.id}
-				className="grid flex-1 gap-[2.4cqw]"
+				className="grid flex-1 gap-[calc(2.4cqw*var(--fit,1))]"
 				style={{ gridTemplateColumns: `repeat(${node.items.length}, minmax(0, 1fr))` }}
 			>
 				{node.items.map((step, index) => (
 					<li
 						key={step.id}
 						data-node-id={step.id}
-						className={cn("group/item flex flex-col gap-[1cqw] border-t pt-[1.6cqw]", theme.rule)}
+						className={cn(
+							"group/item flex flex-col gap-[calc(1cqw*var(--fit,1))] border-t pt-[calc(1.6cqw*var(--fit,1))]",
+							theme.rule,
+						)}
 					>
-						<span className={cn("flex text-[1.6cqw] font-semibold tabular-nums", theme.accent)}>
+						<span
+							className={cn(
+								"flex text-[length:calc(1.6cqw*var(--fit,1))] font-semibold tabular-nums",
+								theme.accent,
+							)}
+						>
 							{String(index + 1).padStart(2, "0")}
 							<RemoveItem
 								label="Remove step"
@@ -370,7 +388,12 @@ function Steps({ node, theme }: { node: StepsNode; theme: CardTheme }) {
 								}
 							/>
 						</span>
-						<span className={cn("text-[1.9cqw] font-semibold leading-tight", theme.heading)}>
+						<span
+							className={cn(
+								"text-[length:calc(1.9cqw*var(--fit,1))] font-semibold leading-tight",
+								theme.heading,
+							)}
+						>
 							<PlainField
 								value={step.title}
 								label="Step title"
@@ -380,7 +403,9 @@ function Steps({ node, theme }: { node: StepsNode; theme: CardTheme }) {
 							/>
 						</span>
 						{(step.detail || editing) && (
-							<span className={cn("text-[1.5cqw] leading-snug", theme.body)}>
+							<span
+								className={cn("text-[length:calc(1.5cqw*var(--fit,1))] leading-snug", theme.body)}
+							>
 								<RichField
 									value={step.detail ?? []}
 									label="Step detail"
@@ -406,12 +431,21 @@ function Steps({ node, theme }: { node: StepsNode; theme: CardTheme }) {
 function Stats({ nodes, theme }: { nodes: StatNode[]; theme: CardTheme }) {
 	return (
 		<div
-			className="grid gap-[3cqw]"
+			className="grid gap-[calc(3cqw*var(--fit,1))]"
 			style={{ gridTemplateColumns: `repeat(${nodes.length}, minmax(0, 1fr))` }}
 		>
 			{nodes.map((stat) => (
-				<div key={stat.id} data-node-id={stat.id} className="flex flex-col gap-[0.6cqw]">
-					<span className={cn("text-[5cqw] font-semibold leading-none tabular-nums", theme.accent)}>
+				<div
+					key={stat.id}
+					data-node-id={stat.id}
+					className="flex flex-col gap-[calc(0.6cqw*var(--fit,1))]"
+				>
+					<span
+						className={cn(
+							"text-[length:calc(5cqw*var(--fit,1))] font-semibold leading-none tabular-nums",
+							theme.accent,
+						)}
+					>
 						<PlainField
 							value={stat.value}
 							label="Figure"
@@ -420,7 +454,7 @@ function Stats({ nodes, theme }: { nodes: StatNode[]; theme: CardTheme }) {
 							}
 						/>
 					</span>
-					<span className={cn("text-[1.6cqw] leading-snug", theme.body)}>
+					<span className={cn("text-[length:calc(1.6cqw*var(--fit,1))] leading-snug", theme.body)}>
 						<PlainField
 							value={stat.label}
 							label="Figure label"
@@ -438,9 +472,12 @@ function Stats({ nodes, theme }: { nodes: StatNode[]; theme: CardTheme }) {
 function Quote({ node, theme }: { node: QuoteNode; theme: CardTheme }) {
 	const editing = useEditing();
 	return (
-		<figure data-node-id={node.id} className="flex flex-col gap-[2cqw]">
+		<figure data-node-id={node.id} className="flex flex-col gap-[calc(2cqw*var(--fit,1))]">
 			<blockquote
-				className={cn("text-[3.2cqw] font-medium leading-[1.2] text-balance", theme.heading)}
+				className={cn(
+					"text-[length:calc(3.2cqw*var(--fit,1))] font-medium leading-[1.2] text-balance",
+					theme.heading,
+				)}
 			>
 				<span className={theme.accent}>“</span>
 				<RichField
@@ -451,7 +488,7 @@ function Quote({ node, theme }: { node: QuoteNode; theme: CardTheme }) {
 				<span className={theme.accent}>”</span>
 			</blockquote>
 			{(node.attribution || editing) && (
-				<figcaption className={cn("text-[1.7cqw]", theme.muted)}>
+				<figcaption className={cn("text-[length:calc(1.7cqw*var(--fit,1))]", theme.muted)}>
 					<PlainField
 						value={node.attribution ?? ""}
 						label="Attribution"
@@ -489,21 +526,21 @@ function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 	switch (card.layout) {
 		case "title":
 			return (
-				<div className="flex flex-1 flex-col justify-center gap-[2cqw]">
+				<div className="flex flex-1 flex-col justify-center gap-[calc(2cqw*var(--fit,1))]">
 					<Heading card={card} theme={theme} large />
 					<Paragraphs card={card} theme={theme} large />
 				</div>
 			);
 		case "statement":
 			return (
-				<div className="flex flex-1 flex-col justify-center gap-[2.4cqw]">
+				<div className="flex flex-1 flex-col justify-center gap-[calc(2.4cqw*var(--fit,1))]">
 					<Heading card={card} theme={theme} />
 					<Paragraphs card={card} theme={theme} large />
 				</div>
 			);
 		case "bullets":
 			return (
-				<div className="flex flex-1 flex-col gap-[3cqw]">
+				<div className="flex flex-1 flex-col gap-[calc(3cqw*var(--fit,1))]">
 					<Heading card={card} theme={theme} />
 					{nodesOf(card, "bullets").map((node) => (
 						<Bullets key={node.id} node={node} theme={theme} />
@@ -513,7 +550,7 @@ function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 			);
 		case "comparison":
 			return (
-				<div className="flex flex-1 flex-col gap-[3cqw]">
+				<div className="flex flex-1 flex-col gap-[calc(3cqw*var(--fit,1))]">
 					<Heading card={card} theme={theme} />
 					{nodesOf(card, "columns").map((node) => (
 						<Columns key={node.id} node={node} theme={theme} />
@@ -522,7 +559,7 @@ function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 			);
 		case "process":
 			return (
-				<div className="flex flex-1 flex-col gap-[3.4cqw]">
+				<div className="flex flex-1 flex-col gap-[calc(3.4cqw*var(--fit,1))]">
 					<Heading card={card} theme={theme} />
 					{nodesOf(card, "steps").map((node) => (
 						<Steps key={node.id} node={node} theme={theme} />
@@ -531,7 +568,7 @@ function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 			);
 		case "quote":
 			return (
-				<div className="flex flex-1 flex-col justify-center gap-[2.4cqw]">
+				<div className="flex flex-1 flex-col justify-center gap-[calc(2.4cqw*var(--fit,1))]">
 					<Heading card={card} theme={theme} />
 					{nodesOf(card, "quote").map((node) => (
 						<Quote key={node.id} node={node} theme={theme} />
@@ -541,7 +578,7 @@ function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 		case "image-left":
 		case "image-right":
 			return (
-				<div className="flex flex-1 flex-col justify-center gap-[2.4cqw]">
+				<div className="flex flex-1 flex-col justify-center gap-[calc(2.4cqw*var(--fit,1))]">
 					<Heading card={card} theme={theme} />
 					{nodesOf(card, "bullets").map((node) => (
 						<Bullets key={node.id} node={node} theme={theme} />
@@ -551,14 +588,14 @@ function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 			);
 		case "cover":
 			return (
-				<div className="flex flex-1 flex-col justify-end gap-[1.6cqw]">
+				<div className="flex flex-1 flex-col justify-end gap-[calc(1.6cqw*var(--fit,1))]">
 					<Heading card={card} theme={theme} large />
 					<Paragraphs card={card} theme={theme} large />
 				</div>
 			);
 		case "stats":
 			return (
-				<div className="flex flex-1 flex-col justify-center gap-[3.4cqw]">
+				<div className="flex flex-1 flex-col justify-center gap-[calc(3.4cqw*var(--fit,1))]">
 					<Heading card={card} theme={theme} />
 					<Stats nodes={nodesOf(card, "stat")} theme={theme} />
 					<Paragraphs card={card} theme={theme} />
@@ -678,11 +715,36 @@ function Attribution({ asset, className }: { asset?: CardAsset; className?: stri
 	);
 }
 
+/** Text never shrinks below this fraction of its designed size, as in PPTX export. */
+export const MIN_TEXT_SCALE = 0.5;
+
 /**
- * One card with text sized to the card, not the window. A card is at least
- * 16:9 and grows when its content needs more room, so nothing is ever
- * cropped. `data-overflows-slide` marks a card taller than one slide, which
- * PPTX export must split or refuse rather than crop.
+ * The largest text scale, at most 1 and at least `MIN_TEXT_SCALE`, at which
+ * the content fits its box. Every content size is multiplied by `--fit`, so
+ * the scale is found by trying values on the element and measuring.
+ */
+export function fitTextScale(target: HTMLElement, box: HTMLElement): number {
+	const fits = (scale: number) => {
+		target.style.setProperty("--fit", String(scale));
+		return box.scrollHeight <= box.clientHeight + 1;
+	};
+	if (fits(1)) return 1;
+	let low = MIN_TEXT_SCALE;
+	let high = 1;
+	for (let step = 0; step < 8; step++) {
+		const middle = (low + high) / 2;
+		if (fits(middle)) low = middle;
+		else high = middle;
+	}
+	target.style.setProperty("--fit", String(low));
+	return low;
+}
+
+/**
+ * One card, always exactly 16:9, with text sized to the card rather than the
+ * window. Content that needs more room than the slide has shrinks, text and
+ * the space between items together, until it fits, the way PPTX export fits
+ * it. `data-text-scale` records how far it shrank.
  */
 export function CardView({
 	card,
@@ -695,23 +757,28 @@ export function CardView({
 }: CardViewProps) {
 	const cited = card.sourceIds.flatMap((id) => (sources?.[id] ? [sources[id]] : []));
 	const articleRef = useRef<HTMLElement>(null);
-	const [overflows, setOverflows] = useState(false);
+	const contentRef = useRef<HTMLDivElement>(null);
+	const [textScale, setTextScale] = useState(1);
 	const [image] = nodesOf(card, "image");
 	const asset = image ? assets?.[image.assetId] : undefined;
 	const split = card.layout === "image-left" || card.layout === "image-right";
 	const cover = card.layout === "cover";
 	const textTheme = cover ? COVER_TEXT : theme;
 
+	// Refit whenever the card changes, the slide is resized, or the content
+	// grows or shrinks while it is edited.
 	useLayoutEffect(() => {
 		const article = articleRef.current;
-		if (!article || typeof ResizeObserver === "undefined") return undefined;
-		const measure = () =>
-			setOverflows(article.offsetHeight > Math.ceil((article.offsetWidth * 9) / 16) + 1);
-		const observer = new ResizeObserver(measure);
+		const content = contentRef.current;
+		if (!article || !content) return undefined;
+		const fit = () => setTextScale(fitTextScale(article, content));
+		fit();
+		if (typeof ResizeObserver === "undefined") return undefined;
+		const observer = new ResizeObserver(fit);
 		observer.observe(article);
-		measure();
+		if (content.firstElementChild) observer.observe(content.firstElementChild);
 		return () => observer.disconnect();
-	}, []);
+	}, [card]);
 
 	const footer = (
 		<footer
@@ -742,10 +809,10 @@ export function CardView({
 				ref={articleRef}
 				data-card-id={card.id}
 				data-layout={card.layout}
-				data-overflows-slide={overflows || undefined}
+				data-text-scale={textScale < 1 ? textScale.toFixed(2) : undefined}
 				aria-label={`Card ${position}: ${card.takeaway}`}
 				className={cn(
-					"relative flex min-h-[56.25cqw] w-full overflow-hidden rounded-[1.2cqw]",
+					"relative flex h-[56.25cqw] w-full overflow-hidden rounded-[1.2cqw]",
 					split ? (card.layout === "image-right" ? "flex-row-reverse" : "flex-row") : "flex-col",
 					!split && "px-[6cqw] pt-[5cqw] pb-[2.2cqw]",
 					theme.surface,
@@ -771,11 +838,14 @@ export function CardView({
 				)}
 				<div
 					className={cn(
-						"relative flex flex-1 flex-col",
+						"relative flex min-h-0 flex-1 flex-col",
 						split && "px-[5cqw] pt-[5cqw] pb-[2.2cqw]",
 					)}
 				>
-					<div className="flex flex-1 flex-col pb-[2.8cqw]">
+					<div
+						ref={contentRef}
+						className="flex min-h-0 flex-1 flex-col overflow-hidden pb-[2.8cqw]"
+					>
 						<CardEditScope edit={edit} card={card}>
 							<CardBody card={card} theme={textTheme} />
 						</CardEditScope>

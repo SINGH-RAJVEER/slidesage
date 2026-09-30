@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { assembleDocument, type Card, convertCards } from "@slidesage/cards";
 import { render, within } from "@testing-library/react";
+import { fitTextScale, MIN_TEXT_SCALE } from "../../components/Cards/CardView";
 import { CardList } from "../CardList";
 
 function cards(): Card[] {
@@ -166,5 +167,37 @@ describe("image cards", () => {
 		expect(
 			within(cover as HTMLElement).getByRole("img", { name: "City at night" }),
 		).toBeInTheDocument();
+	});
+});
+
+describe("fitTextScale", () => {
+	/** A content box whose content is `natural` tall at full size and shrinks with --fit. */
+	function measuredBox(natural: number, available: number) {
+		const target = document.createElement("div");
+		const box = document.createElement("div");
+		Object.defineProperty(box, "clientHeight", { value: available });
+		Object.defineProperty(box, "scrollHeight", {
+			get: () => natural * Number(target.style.getPropertyValue("--fit") || 1),
+		});
+		return { target, box };
+	}
+
+	it("keeps content at full size when it fits the slide", () => {
+		const { target, box } = measuredBox(500, 600);
+		expect(fitTextScale(target, box)).toBe(1);
+		expect(target.style.getPropertyValue("--fit")).toBe("1");
+	});
+
+	it("shrinks content until it fits, and no further", () => {
+		const { target, box } = measuredBox(1000, 600);
+		const scale = fitTextScale(target, box);
+		expect(scale).toBeLessThanOrEqual(0.601);
+		expect(scale).toBeGreaterThan(0.59);
+		expect(Number(target.style.getPropertyValue("--fit"))).toBe(scale);
+	});
+
+	it("stops at half size, as PPTX export does", () => {
+		const { target, box } = measuredBox(5000, 600);
+		expect(fitTextScale(target, box)).toBe(MIN_TEXT_SCALE);
 	});
 });

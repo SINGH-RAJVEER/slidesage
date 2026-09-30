@@ -20,7 +20,7 @@ Also open:
 
 - The converter is configured as a localhost sidecar in both Cloud Run services, but this workspace has not been deployed or verified against the live environment.
 - Provenance is recorded only on successful revisions. A failed run keeps its error and retry settings but not the model, prompt version, or source IDs it used.
-- At their schema limits most layouts are taller than one 16:9 slide. The browser grows those cards instead of cropping them, and export shrinks their text to fit, down to half size. Tighter per-layout limits would keep more cards at their designed size.
+- At their schema limits most layouts need more room than one 16:9 slide. Cards never change shape: the browser and export both shrink their text to fit, down to half size. Tighter per-layout limits would keep more cards at their designed size.
 
 The design takes inspiration from Gamma's disclosed card system and its HTML-to-editor conversion. The [card system description](https://gamma.app/explore/content/guides/how-gamma-maps-content-directly-to-slides-using-its-card-system) describes flexible cards and layout selection. The [engineering case study](https://vercel.com/customers/gamma-builds-design-first-agents-with-vercel) says generated HTML is parsed into structured Tiptap content and assets are resolved. Neither source specifies Gamma's complete prompts, internal document schema, or export writer. The choices below are SlideSage proposals.
 
