@@ -174,7 +174,13 @@ export function useDocumentEditor(options: {
 	}, [save]);
 
 	useEffect(() => {
-		if (history.present === saved.current || blocked.current) return undefined;
+		if (blocked.current) return undefined;
+		// Undoing back to the saved document leaves nothing to save, and clears
+		// whatever the abandoned edits reported.
+		if (history.present === saved.current) {
+			setStatus((current) => (current.state === "saving" ? current : { state: "saved" }));
+			return undefined;
+		}
 		setStatus((current) => (current.state === "saving" ? current : { state: "pending" }));
 		const timer = window.setTimeout(() => void flush(), SAVE_DELAY_MS);
 		return () => window.clearTimeout(timer);

@@ -88,6 +88,11 @@ describe("DeckWorkspace", () => {
 			),
 		).toBeInTheDocument();
 		expect(fetchMock).not.toHaveBeenCalled();
+
+		// Undoing back to the saved document clears the refusal.
+		fireEvent.click(view.getByRole("button", { name: "Undo" }));
+		expect(await view.findByText("All changes saved")).toBeInTheDocument();
+		expect(fetchMock).not.toHaveBeenCalled();
 	}, 15000);
 
 	it("stops editing when the presentation changed elsewhere", async () => {
