@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- Generate card decks through approved outlines, planned drafting, and incremental progress updates.
+
 ## 0.2.2
 
 - Add the versioned card schema, converter service, and immutable card revision storage.
