@@ -3,7 +3,13 @@
 import { describe, expect, it, mock } from "bun:test";
 import { StreamingProvider } from "@slidesage/ui";
 import { PRESENTATIONS_UPDATED_EVENT } from "@slidesage/ui/lib/presentation-events";
-import { act, fireEvent, render, waitFor } from "@testing-library/react";
+import {
+	act,
+	fireEvent,
+	render,
+	waitFor,
+	waitForElementToBeRemoved,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import GenerateResearchPage from "../../../routes/presentations/GenerateResearchPage";
 import PresentationsGridPage from "../../../routes/presentations/PresentationsGridPage";
@@ -353,12 +359,12 @@ it("removes a presentation after an empty 204 delete response", async () => {
 		fireEvent.click(deleteButton as HTMLButtonElement);
 		fireEvent.click(view.getByRole("button", { name: "Delete" }));
 
-		await waitFor(() => expect(view.queryByText("Delete this deck")).toBeNull());
+		await waitForElementToBeRemoved(() => view.queryByText("Delete this deck"));
 		expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(true);
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
-}, 15000);
+});
 
 it("lists a deck from before card documents as unavailable, deletable but not openable", async () => {
 	const originalFetch = globalThis.fetch;
@@ -401,7 +407,7 @@ it("lists a deck from before card documents as unavailable, deletable but not op
 
 		fireEvent.click(view.getByRole("button", { name: "Delete presentation" }));
 		fireEvent.click(view.getByRole("button", { name: "Delete" }));
-		await waitFor(() => expect(view.queryByText("An old deck")).toBeNull());
+		await waitForElementToBeRemoved(() => view.queryByText("An old deck"));
 	} finally {
 		globalThis.fetch = originalFetch;
 	}

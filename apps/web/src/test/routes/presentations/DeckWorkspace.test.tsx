@@ -3,7 +3,13 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { assembleDocument, convertCards } from "@slidesage/cards";
 import { StreamingProvider } from "@slidesage/ui";
-import { fireEvent, render, waitFor, within } from "@testing-library/react";
+import {
+	fireEvent,
+	render,
+	waitFor,
+	waitForElementToBeRemoved,
+	within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { DeckWorkspace } from "../../../routes/presentations/DeckWorkspace";
 
@@ -118,8 +124,6 @@ describe("DeckWorkspace", () => {
 		expect(view.queryByRole("textbox", { name: "Card heading" })).not.toBeInTheDocument();
 	}, 15000);
 
-	// Placing the photo blocks happy-dom's event loop for about ten seconds,
-	// so this test needs more time than the others.
 	it("adds a searched photo to a card and saves it", async () => {
 		const assetId = "e".repeat(64);
 		const requests: Array<{ url: string; body?: string }> = [];
@@ -165,12 +169,9 @@ describe("DeckWorkspace", () => {
 		fireEvent.click(view.getByRole("button", { name: "Search" }));
 		fireEvent.click(await view.findByRole("img", { name: "Solar farm" }));
 
-		await waitFor(
-			() => expect(view.queryByRole("dialog", { hidden: true })).not.toBeInTheDocument(),
-			{
-				timeout: 2000,
-			},
-		);
+		await waitForElementToBeRemoved(() => view.queryByRole("dialog", { hidden: true }), {
+			timeout: 2000,
+		});
 		// happy-dom keeps Radix's aria-hidden on the page after the dialog
 		// closes; the browser check covers that the page is interactive again.
 		const carousel = view.getByRole("listbox", { name: "Slides carousel", hidden: true });
@@ -191,7 +192,7 @@ describe("DeckWorkspace", () => {
 				),
 			{ timeout: 8000 },
 		);
-	}, 30000);
+	}, 15000);
 
 	it("saves pending edits, then asks AI to revise one card from the saved revision", async () => {
 		const requests: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];

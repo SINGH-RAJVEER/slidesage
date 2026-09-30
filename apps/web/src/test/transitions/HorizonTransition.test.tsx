@@ -73,7 +73,11 @@ describe("horizon route handoff", () => {
 		await act(async () => {
 			for (const finish of finishes) finish();
 		});
-		await waitFor(() => expect(view.container.querySelector(".horizon-route-cover")).toBeNull());
+		// A boolean, not the element: a failing matcher formats the element it
+		// received, and formatting a happy-dom node costs seconds.
+		await waitFor(() =>
+			expect(view.container.querySelector(".horizon-route-cover") === null).toBe(true),
+		);
 		expect(view.container.querySelector(".horizon-route-content")?.hasAttribute("inert")).toBe(
 			false,
 		);
