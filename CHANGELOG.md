@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.7
+
+- Add read only deck sharing and the one card at a time presentation viewer.
+
 ## 0.2.6
 
 - Add outline approval and the live card viewer for generated decks.
