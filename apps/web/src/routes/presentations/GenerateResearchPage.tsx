@@ -2,7 +2,6 @@ import type { AIModelSelection, ResearchPayload } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
-import { requestGenerationNotificationPermission } from "@slidesage/ui/lib/generation-notifications";
 import { ArrowLeft, ExternalLink, RefreshCw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -91,7 +90,6 @@ export default function GenerateResearchPage() {
 			return;
 		}
 
-		requestGenerationNotificationPermission();
 		isProceedingRef.current = true;
 		setIsProceeding(true);
 

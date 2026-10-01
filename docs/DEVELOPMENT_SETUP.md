@@ -64,10 +64,12 @@ The active application is split into six workspace areas:
 - `apps/web`: Browser application shell, router, and route-level screens.
 - `apps/converter`: Private Bun service that validates model drafts into card documents.
 - `libs/cards`: The card document schema, validation, and draft conversion, shared by the converter and the browser.
-- `libs/types`: Shared presentation, scene, and research types.
+- `libs/types`: Shared presentation, outline, draft preview, research source, AI configuration, profile, and billing types.
 - `libs/ui`: Shared React components, hooks, UI contexts, and client-side helpers.
 
 Web routes are grouped by domain under `apps/web/src/routes`: `auth`, `landing`, `presentations`, `settings`, and `billing`. Application startup and router infrastructure live under `apps/web/src/app`.
+
+Generation progress and completion appear in-app. Starting generation does not request browser notification permission.
 
 The former TypeScript API has been removed. `apps/api` is the only API implementation and contains the application migration history and River migration runner.
 

@@ -16,10 +16,10 @@ import {
 import { type ExportAsset, type ExportSource, writePptx } from "./pptx";
 
 /** Requests larger than this are refused before parsing. */
-export const MAX_BODY_BYTES = 1024 * 1024;
+const MAX_BODY_BYTES = 1024 * 1024;
 
 /** An export carries the deck's images, so it may be much larger. */
-export const MAX_EXPORT_BODY_BYTES = 96 * 1024 * 1024;
+const MAX_EXPORT_BODY_BYTES = 96 * 1024 * 1024;
 
 const PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 

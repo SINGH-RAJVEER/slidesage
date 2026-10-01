@@ -28,7 +28,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 
-export interface OutlineRouteState {
+interface OutlineRouteState {
 	prompt: string;
 	slideCount: number;
 	detailLevel: string;

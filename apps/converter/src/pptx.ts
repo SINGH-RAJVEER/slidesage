@@ -530,7 +530,7 @@ function body(card: Card, colors: Palette): Block[] {
  * the floor the text would be unreadable, so the floor is used and
  * PowerPoint's shrink-on-overflow takes over.
  */
-export function fittingScale(content: Block, width: number, height: number): number {
+function fittingScale(content: Block, width: number, height: number): number {
 	if (content.height(width, 1) <= height) return 1;
 	let low = MIN_SCALE;
 	let high = 1;

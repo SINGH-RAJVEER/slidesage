@@ -1,7 +1,6 @@
 import type { PresentationRetryOptions } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { GenerateForm, GenerateOptionsBar } from "@slidesage/ui/components/Generate";
-import { requestGenerationNotificationPermission } from "@slidesage/ui/lib/generation-notifications";
 import { useDebouncedCallback } from "@tanstack/react-pacer/debouncer";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -94,7 +93,6 @@ export default function GeneratePPTPage() {
 	const handleGenerate = () => {
 		if (!prompt.trim()) return;
 
-		requestGenerationNotificationPermission();
 		debouncedGenerate(prompt);
 	};
 
