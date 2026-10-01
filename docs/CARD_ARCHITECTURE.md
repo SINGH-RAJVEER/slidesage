@@ -8,7 +8,7 @@ The PPTX-first pipeline this replaces has been removed: the template-slot compil
 
 ### Implemented so far
 
-The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 2 card schema in `libs/cards`, the Bun converter service, immutable card revisions in GCS and PostgreSQL, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, direct editing in the browser, AI revisions of chosen cards, present mode, read-only share links, and synchronous PPTX export of native text, lists, and photos.
+The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 2 card schema in `libs/cards`, the Bun converter service, immutable card revisions in PostgreSQL JSONB and image assets in GCS, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, direct editing in the browser, AI revisions of chosen cards, present mode, read-only share links, and synchronous PPTX export of native text, lists, and photos.
 
 Still to build:
 
@@ -36,7 +36,7 @@ Define a versioned `CardDocument` with document ID, schema version, theme refere
 
 One presentation-document module owns `create`, `get`, `revise`, `saveEdit`, and `exportPPTX`. Its interface guarantees card-count checks, schema validation, operation idempotency, optimistic revision checks, immutable storage, and asset ownership. Callers do not manipulate editor JSON, ZIP entries, or GCS object keys directly. Internally, a card-layout module and a PPTX-export module can change independently behind that interface.
 
-Store immutable card JSON objects in GCS by digest and keep revision metadata and the current-revision pointer in PostgreSQL. Use compare-and-swap on manual and AI saves. Keep assets under immutable identifiers with MIME, size, digest, license or source metadata, and ownership checks. An export records the card revision, exporter version, dimensions, and output digest that produced it. Repeat downloads of the same export return the same bytes.
+Store immutable card bodies as JSONB alongside revision metadata in PostgreSQL, and advance the current-revision pointer in the same transaction. Use compare-and-swap on manual and AI saves. Keep image bytes in GCS under immutable identifiers with MIME, size, digest, license or source metadata, and ownership checks. Migration 33 and `cmd/migrate` backfill legacy GCS document bodies before runtime rollout; see [Card documents](CARD_DOCUMENTS.md#storage). An export records the card revision, exporter version, dimensions, and output digest that produced it. Repeat downloads of the same export return the same bytes.
 
 ## Generation and editing flow
 

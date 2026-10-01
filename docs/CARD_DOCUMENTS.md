@@ -45,12 +45,12 @@ The worker drafts through `cardDrafter` (`apps/api/internal/generation/cards.go`
 3. Cards are drafted in batches of four with the whole plan and the takeaways already written.
 4. The converter validates each batch. An invalid or missing card is redrafted on its own against the reported issue, up to twice, and the rest of the batch is kept. Each finished batch is reported as a `cards` event with the photos it shows, so the browser can preview the deck before it is saved.
 5. The converter assembles the document, and the drafter checks it holds the requested number of cards.
-6. The document is uploaded to GCS under `presentations/{id}/cards/{sha256}.json` before the database commit, so a retried commit finds the object already in place.
-7. The completion transaction records the photo assets, commits the revision, advances `presentations.current_card_revision`, and settles points together.
+6. The worker prepares the document body and revision metadata for a PostgreSQL JSONB commit. It does not upload document JSON to GCS.
+7. The completion transaction records the photo assets, commits the revision and its body, advances `presentations.current_card_revision`, and settles points together.
 
 Revision provenance records the provider, model, prompt version, plan version, and source IDs. Converter `5xx` responses and network failures are retried as temporary; `4xx` responses fail the job.
 
-The API accepts submissions only when `CARD_CONVERTER_URL` and `PRESENTATION_GCS_BUCKET` are both set; otherwise it returns `503` before reserving points.
+The API accepts submissions only when `CARD_CONVERTER_URL` is set; otherwise it returns `503` before reserving points. `PRESENTATION_GCS_BUCKET` supplies image storage. Text-only document generation and reads do not require a bucket.
 
 ## AI revisions
 
@@ -93,13 +93,19 @@ Without `PEXELS_API_KEY` or `UNSPLASH_ACCESS_KEY` the stock routes return `503` 
 
 ## Storage
 
-`card_revisions` holds one row per revision: digest, size, card count, schema version, author, operation kind and ID, base revision, and provenance. Writers commit with compare-and-swap against the expected current revision; a stale base is a conflict, and repeating an operation ID returns the first result. Deleting a user removes their presentations and revisions.
+`card_revisions` holds one row per revision: the authoritative `document` JSONB body, digest, size, card count, schema version, author, operation kind and ID, base revision, and provenance. Writers commit the body and metadata with compare-and-swap against the expected current revision; a stale base is a conflict, and repeating an operation ID returns the first result. Deleting a user removes their presentations and revisions. Stored image bytes remain in GCS.
 
-`GET /presentations/{id}/document` returns the current revision, its document, and the assets it shows to the owner. The object is checked against the revision's size and digest before it is served. A revision's referenced assets must all be recorded for the presentation when it commits.
+`GET /presentations/{id}/document` returns the current revision, its document, and the assets it shows to the owner. The database selects the body and revision metadata together; reads have no GCS fallback. Digest and byte size describe compact submitted JSON bytes, or verified original GCS bytes for imported revisions. They must not be compared with JSONB's reserialized bytes. A revision's referenced assets must all be recorded for the presentation when it commits.
+
+Migration `00033_card_revision_documents.sql` adds JSONB storage and blocks new revisions without bodies. After Goose, `cmd/migrate` imports every missing body from its legacy `object_key` in `PRESENTATION_GCS_BUCKET`, checks original size, SHA-256, schema version, and card count, and commits each body separately. A retry skips completed rows. Missing objects or invalid bodies fail migration; no placeholder bodies are invented. The runner validates the required-body constraint before applying River migrations. Legacy keys and source metadata remain for tracing, and no GCS objects are deleted. New revisions have no object key. Run the migration command successfully before deploying JSONB readers, even if Goose already reports version 33.
+
+Legacy JSON must also be representable in PostgreSQL JSONB. Invalid UTF-8, `\u0000`, unpaired Unicode surrogates in strings or keys, and numbers outside PostgreSQL numeric limits fail backfill. The runner preserves the source object and revision metadata and reports the failing source key; it does not silently replace characters, round numbers, normalize historical content, or delete the revision. Keep runtimes paused, preserve the original bytes, and inspect the reported source. Resolve compatibility through an explicit manual remediation plan that accounts for the immutable revision, its source digest and size, and recovery from the preserved original. Simply retrying cannot fix incompatible content. After remediation, rerun `cmd/migrate`; completed imports are skipped.
 
 ## Editing
 
 `PUT /presentations/{id}/document` saves an edited document as a new revision. The body is `{baseRevision, operationId, document}`. The presentation must be ready; the converter validates the document against the presentation's assets; the revision commits with compare-and-swap. A stale `baseRevision` returns `409` with `currentRevision`, and repeating an `operationId` returns the first result. A save also updates the presentation's title.
+
+New edits must pass document validation and JSONB compatibility checks. An incompatible string or number returns `422` before the revision is committed; it is not silently normalized into storable content.
 
 Edits are pure functions in `libs/cards/src/edit.ts`: text, fields, list items, layout, order, duplication, insertion, deletion, and photos. The layout menu offers only layouts the card's content fits. Text is edited in place and supports bold and italic only. Undo history coalesces keystrokes within 800 ms, and the document autosaves 1.2 seconds after the last change. After a conflict the editor stops saving and offers to reload.
 
