@@ -10,7 +10,7 @@ import {
 	waitForElementToBeRemoved,
 	within,
 } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { DeckWorkspace } from "../../../routes/presentations/DeckWorkspace";
 
 const originalFetch = globalThis.fetch;
@@ -37,19 +37,29 @@ function deck(headings = ["Grid storage"]) {
 }
 
 function open(onReload = () => {}, document = deck()) {
+	const router = createMemoryRouter(
+		[
+			{
+				path: "/presentations/pres_1",
+				element: (
+					<DeckWorkspace
+						presentationId="pres_1"
+						document={document}
+						revision={3}
+						sources={[]}
+						assets={{}}
+						onReload={onReload}
+					/>
+				),
+			},
+			{ path: "/presentations", element: <p>Library</p> },
+		],
+		{ initialEntries: ["/presentations/pres_1"] },
+	);
 	return render(
-		<MemoryRouter>
-			<StreamingProvider>
-				<DeckWorkspace
-					presentationId="pres_1"
-					document={document}
-					revision={3}
-					sources={[]}
-					assets={{}}
-					onReload={onReload}
-				/>
-			</StreamingProvider>
-		</MemoryRouter>,
+		<StreamingProvider>
+			<RouterProvider router={router} />
+		</StreamingProvider>,
 	);
 }
 
@@ -108,6 +118,48 @@ describe("DeckWorkspace", () => {
 		expect(JSON.stringify(bodies[2]?.document)).toContain("Grid batteries at scale");
 		expect(await view.findByText("All changes saved")).toBeInTheDocument();
 	}, 20000);
+
+	it("saves edits the timer has not yet saved before leaving the deck", async () => {
+		const bodies: Array<{ document: unknown }> = [];
+		globalThis.fetch = mock(async (_input: string | URL | Request, init?: RequestInit) => {
+			bodies.push(JSON.parse(String(init?.body)));
+			return Response.json({ revision: { revision: 4 } });
+		}) as unknown as typeof fetch;
+
+		const view = open();
+		fireEvent.click(view.getByRole("button", { name: "Edit" }));
+		typeHeading(view, "Grid batteries");
+		fireEvent.click(view.getByRole("button", { name: "Back to presentations" }));
+
+		expect(await view.findByText("Library")).toBeInTheDocument();
+		expect(bodies).toHaveLength(1);
+		expect(JSON.stringify(bodies[0]?.document)).toContain("Grid batteries");
+	});
+
+	it("asks before leaving edits that could not be saved", async () => {
+		globalThis.fetch = mock(async () => {
+			throw new TypeError("network");
+		}) as unknown as typeof fetch;
+
+		const view = open();
+		fireEvent.click(view.getByRole("button", { name: "Edit" }));
+		typeHeading(view, "Grid batteries");
+		fireEvent.click(view.getByRole("button", { name: "Back to presentations" }));
+
+		const dialog = await view.findByRole("dialog", { name: "Leave without saving?" });
+		fireEvent.click(within(dialog).getByRole("button", { name: "Stay" }));
+		await waitFor(() => expect(view.queryByRole("dialog")).not.toBeInTheDocument());
+		expect(view.queryByText("Library")).not.toBeInTheDocument();
+
+		fireEvent.click(view.getByRole("button", { name: "Back to presentations", hidden: true }));
+		fireEvent.click(
+			within(await view.findByRole("dialog", { name: "Leave without saving?" })).getByRole(
+				"button",
+				{ name: "Leave anyway" },
+			),
+		);
+		expect(await view.findByText("Library")).toBeInTheDocument();
+	});
 
 	it("does not save a document the schema would refuse", async () => {
 		const fetchMock = mock(async () => Response.json({ revision: { revision: 4 } }));

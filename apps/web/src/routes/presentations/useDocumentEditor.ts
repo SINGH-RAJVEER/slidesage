@@ -213,6 +213,17 @@ export function useDocumentEditor(options: {
 		return () => window.clearTimeout(timer);
 	}, [flush, history.present]);
 
+	// Leaving the deck in the app, or switching to another one, saves what the
+	// timer had not yet; the latest flush is called so it knows every photo.
+	const latestFlush = useRef(flush);
+	latestFlush.current = flush;
+	useEffect(
+		() => () => {
+			if (present.current !== saved.current) void latestFlush.current();
+		},
+		[],
+	);
+
 	// Unsaved edits would be lost with the tab, so leaving asks first.
 	useEffect(() => {
 		const warn = (event: BeforeUnloadEvent) => {

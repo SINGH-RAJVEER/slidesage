@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, mock } from "bun:test";
 import { assembleDocument, convertCards } from "@slidesage/cards";
 import { StreamingProvider } from "@slidesage/ui";
 import { render } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import PresentationPage from "../../../routes/presentations/PresentationPage";
 
 const originalFetch = globalThis.fetch;
@@ -62,16 +62,18 @@ function serve(status: string, document: unknown, documentStatus = 200) {
 }
 
 function open() {
+	const router = createMemoryRouter(
+		[
+			{ path: "/presentations/:presentationId", element: <PresentationPage /> },
+			{ path: "/presentation-error", element: <div>Failed presentation</div> },
+			{ path: "/presentations", element: <Library /> },
+		],
+		{ initialEntries: ["/presentations/pres_1"] },
+	);
 	return render(
-		<MemoryRouter initialEntries={["/presentations/pres_1"]}>
-			<StreamingProvider>
-				<Routes>
-					<Route path="/presentations/:presentationId" element={<PresentationPage />} />
-					<Route path="/presentation-error" element={<div>Failed presentation</div>} />
-					<Route path="/presentations" element={<Library />} />
-				</Routes>
-			</StreamingProvider>
-		</MemoryRouter>,
+		<StreamingProvider>
+			<RouterProvider router={router} />
+		</StreamingProvider>,
 	);
 }
 

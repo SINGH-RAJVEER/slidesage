@@ -39,7 +39,7 @@ import { deckFromDocument, IterateModal, type IterateScope } from "@slidesage/ui
 import { API_URL } from "@slidesage/ui/lib/api";
 import { Check, Link2, Pencil, Redo2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useBlocker, useNavigate } from "react-router-dom";
 import { ROUTES } from "../../app/router/paths";
 import { DeckViewer } from "./DeckViewer";
 import { ShareDialog } from "./ShareDialog";
@@ -161,6 +161,32 @@ export function DeckWorkspace({
 		const index = followCard(previous, next, previous[currentSlideRef.current]);
 		if (index !== undefined) setFocusRequest({ index });
 	}, [editor.document.cardOrder]);
+
+	// Leaving for another page saves pending edits first. Edits that cannot be
+	// saved are dropped only once the user confirms.
+	const blocker = useBlocker(
+		({ currentLocation, nextLocation }) =>
+			currentLocation.pathname !== nextLocation.pathname && !editor.isSaved(),
+	);
+	const [leaveUnsaved, setLeaveUnsaved] = useState(false);
+	const leaving = useRef(false);
+	useEffect(() => {
+		if (blocker.state !== "blocked") {
+			leaving.current = false;
+			return;
+		}
+		// One save attempt per blocked navigation; the dialog takes it from there.
+		if (leaving.current) return;
+		leaving.current = true;
+		void editor.flush().then(() => {
+			if (editor.isSaved()) blocker.proceed();
+			else setLeaveUnsaved(true);
+		});
+	}, [blocker, editor]);
+	const stay = () => {
+		setLeaveUnsaved(false);
+		if (blocker.state === "blocked") blocker.reset();
+	};
 
 	useEffect(() => {
 		if (!editing) return undefined;
@@ -485,6 +511,35 @@ export function DeckWorkspace({
 						</Button>
 						<Button variant="destructive" onClick={confirmDelete}>
 							Delete slide
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+			<Dialog
+				open={leaveUnsaved}
+				onOpenChange={(open) => {
+					if (!open) stay();
+				}}
+			>
+				<DialogContent className="sm:max-w-md">
+					<DialogHeader>
+						<DialogTitle>Leave without saving?</DialogTitle>
+						<DialogDescription>
+							Your latest changes are not saved: {statusText(status)}
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button variant="outline" onClick={stay}>
+							Stay
+						</Button>
+						<Button
+							variant="destructive"
+							onClick={() => {
+								setLeaveUnsaved(false);
+								if (blocker.state === "blocked") blocker.proceed();
+							}}
+						>
+							Leave anyway
 						</Button>
 					</DialogFooter>
 				</DialogContent>
