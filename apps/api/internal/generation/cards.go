@@ -246,7 +246,7 @@ func (drafter *cardDrafter) Draft(ctx context.Context, job streamJob) (draftResu
 	for _, source := range d.sources {
 		sourceIDs = append(sourceIDs, source.ID)
 	}
-	revision, err := carddocument.Prepare(ctx, drafter.store, carddocument.PrepareInput{
+	revision, err := carddocument.Prepare(carddocument.PrepareInput{
 		PresentationID: job.presentationID,
 		AuthorID:       job.userID,
 		OperationID:    job.operationID,

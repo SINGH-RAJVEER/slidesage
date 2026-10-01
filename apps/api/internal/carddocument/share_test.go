@@ -18,11 +18,10 @@ func TestShareLinksServeTheCurrentDocumentUntilRevoked(t *testing.T) {
 	}
 	userID, presentationID := insertFixture(t, database)
 	ctx := context.Background()
-	store := &memoryStore{}
 	if _, err := database.ExecContext(ctx, `UPDATE presentations SET slides_data = '{"status":"ready","sources":[{"url":"https://example.com/a","title":"Source A","snippet":"private notes"}]}' WHERE id = $1`, presentationID); err != nil {
 		t.Fatal(err)
 	}
-	revision, err := Prepare(ctx, store, PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "generation-" + presentationID, OperationKind: OperationGeneration, Document: editedDocument("Shared deck")})
+	revision, err := Prepare(PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "generation-" + presentationID, OperationKind: OperationGeneration, Document: editedDocument("Shared deck")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +35,7 @@ func TestShareLinksServeTheCurrentDocumentUntilRevoked(t *testing.T) {
 
 	caller := userID
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, Handler{DB: database, Store: store, Identity: func(*http.Request) (string, error) { return caller, nil }})
+	RegisterRoutes(mux, Handler{DB: database, Identity: func(*http.Request) (string, error) { return caller, nil }})
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	call := func(method, path string) (int, map[string]any, string) {

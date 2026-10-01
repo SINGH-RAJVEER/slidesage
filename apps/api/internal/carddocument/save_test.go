@@ -39,11 +39,10 @@ func TestSaveCommitsEditsAndRefusesStaleOnes(t *testing.T) {
 	database := integrationDatabase(t)
 	userID, presentationID := insertFixture(t, database)
 	ctx := context.Background()
-	store := &memoryStore{}
 	if _, err := database.ExecContext(ctx, `UPDATE presentations SET slides_data = '{"status":"ready","title":"Original"}' WHERE id = $1`, presentationID); err != nil {
 		t.Fatal(err)
 	}
-	generated, err := Prepare(ctx, store, PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "generation-" + presentationID, OperationKind: OperationGeneration, Document: editedDocument("Original")})
+	generated, err := Prepare(PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "generation-" + presentationID, OperationKind: OperationGeneration, Document: editedDocument("Original")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,9 +56,17 @@ func TestSaveCommitsEditsAndRefusesStaleOnes(t *testing.T) {
 
 	caller := userID
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, Handler{DB: database, Store: store, Converter: fakeValidator(t), Identity: func(*http.Request) (string, error) { return caller, nil }})
+	RegisterRoutes(mux, Handler{DB: database, Converter: fakeValidator(t), Identity: func(*http.Request) (string, error) { return caller, nil }})
 	server := httptest.NewServer(mux)
 	defer server.Close()
+	response, err := http.Get(server.URL + "/presentations/" + presentationID + "/document")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("document read without bucket = %d", response.StatusCode)
+	}
 	save := func(base int, operation, title string) (int, map[string]any) {
 		body, _ := json.Marshal(map[string]any{"baseRevision": base, "operationId": operation, "document": editedDocument(title)})
 		request, _ := http.NewRequest(http.MethodPut, server.URL+"/presentations/"+presentationID+"/document", bytes.NewReader(body))
@@ -93,14 +100,30 @@ func TestSaveCommitsEditsAndRefusesStaleOnes(t *testing.T) {
 		t.Fatalf("stale save = %d %v", status, body)
 	}
 
-	status, body = save(1, "edit-operation-0001", "Edited title")
-	if status != http.StatusOK || revisionOf(body) != 2 {
+	status, body = save(1, "edit-operation-0001", "Different retry payload")
+	if status != http.StatusOK || revisionOf(body) != 2 || body["document"].(map[string]any)["title"] != "Edited title" {
 		t.Fatalf("repeated save = %d %v", status, body)
 	}
 
 	status, _ = save(2, "edit-operation-0003", "invalid")
 	if status != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid save = %d", status)
+	}
+	for _, title := range []string{`before\u0000after`, `\ud800`, `\udc00`} {
+		status, body = save(2, "edit-incompatible-0001", title)
+		failure, _ := body["error"].(map[string]any)
+		message, _ := failure["message"].(string)
+		if status != http.StatusUnprocessableEntity || !strings.Contains(message, "JSONB compatibility") {
+			t.Fatalf("incompatible save = %d %v", status, body)
+		}
+	}
+	current, err := CurrentRevision(ctx, database, presentationID, userID)
+	if err != nil || current.Number != 2 || !bytes.Contains(current.Document, []byte(`Edited title`)) {
+		t.Fatalf("incompatible saves changed current revision: %+v, %v", current, err)
+	}
+	status, body = save(2, "edit-literal-backslash", `literal\\u0000`)
+	if status != http.StatusOK || revisionOf(body) != 3 || body["document"].(map[string]any)["title"] != `literal\u0000` {
+		t.Fatalf("literal backslash text save = %d %v", status, body)
 	}
 
 	caller = "someone-else"

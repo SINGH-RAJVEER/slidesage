@@ -27,7 +27,7 @@ func (handler Handler) save(writer http.ResponseWriter, request *http.Request) {
 		writeError(writer, http.StatusUnauthorized, "Authentication required")
 		return
 	}
-	if handler.Store == nil || handler.Converter == nil {
+	if handler.Converter == nil {
 		writeError(writer, http.StatusServiceUnavailable, "Editing is not available")
 		return
 	}
@@ -67,7 +67,7 @@ func (handler Handler) save(writer http.ResponseWriter, request *http.Request) {
 		writeJSON(writer, http.StatusUnprocessableEntity, map[string]any{"error": map[string]string{"message": "The presentation is not valid: " + issue.String()}, "issue": issue})
 		return
 	}
-	revision, err := Prepare(ctx, handler.Store, PrepareInput{
+	revision, err := Prepare(PrepareInput{
 		PresentationID: presentationID,
 		AuthorID:       userID,
 		OperationID:    input.OperationID,
@@ -75,6 +75,10 @@ func (handler Handler) save(writer http.ResponseWriter, request *http.Request) {
 		Document:       document,
 		Provenance:     map[string]string{"source": "editor"},
 	})
+	if errors.Is(err, ErrInvalidDocument) {
+		writeError(writer, http.StatusUnprocessableEntity, "The presentation cannot be stored: "+err.Error())
+		return
+	}
 	if err != nil {
 		handler.fail(ctx, writer, "store edited document", err)
 		return
@@ -118,5 +122,5 @@ func (handler Handler) save(writer http.ResponseWriter, request *http.Request) {
 		handler.fail(ctx, writer, "commit save", err)
 		return
 	}
-	writeJSON(writer, http.StatusOK, map[string]any{"revision": committed.Revision, "document": document})
+	writeJSON(writer, http.StatusOK, map[string]any{"revision": committed.Revision, "document": committed.Revision.Document})
 }

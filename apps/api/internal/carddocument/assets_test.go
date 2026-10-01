@@ -85,7 +85,7 @@ func TestCommitTxRefusesImagesThePresentationDoesNotHave(t *testing.T) {
 	}
 	document := json.RawMessage(`{"schemaVersion": 2, "title": "T", "theme": "slate", "cardOrder": ["c_aaaaaaaa"],
 		"cards": {"c_aaaaaaaa": {"nodes": [{"type": "image", "assetId": "` + asset.SHA256 + `"}]}}}`)
-	revision, err := Prepare(ctx, store, PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "op-" + presentationID, OperationKind: OperationGeneration, Document: document})
+	revision, err := Prepare(PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "op-" + presentationID, OperationKind: OperationGeneration, Document: document})
 	if err != nil {
 		t.Fatal(err)
 	}

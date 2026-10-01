@@ -28,7 +28,7 @@ func (handler Handler) exportPptx(writer http.ResponseWriter, request *http.Requ
 	if !ok {
 		return
 	}
-	if handler.Store == nil || handler.Converter == nil {
+	if handler.Converter == nil {
 		writeError(writer, http.StatusServiceUnavailable, "Export is not available right now")
 		return
 	}
@@ -45,7 +45,7 @@ func (handler Handler) exportPptx(writer http.ResponseWriter, request *http.Requ
 		handler.fail(ctx, writer, "load card revision", err)
 		return
 	}
-	document, err := Load(ctx, handler.Store, revision)
+	document, err := Load(revision)
 	if err != nil {
 		handler.fail(ctx, writer, "load card document", err)
 		return
@@ -120,6 +120,9 @@ func (handler Handler) exportPptx(writer http.ResponseWriter, request *http.Requ
 }
 
 func (handler Handler) readAsset(request *http.Request, asset Asset) ([]byte, error) {
+	if handler.Store == nil {
+		return nil, fmt.Errorf("image storage is not configured")
+	}
 	reader, err := handler.Store.OpenObject(request.Context(), asset.ObjectKey)
 	if err != nil {
 		return nil, err

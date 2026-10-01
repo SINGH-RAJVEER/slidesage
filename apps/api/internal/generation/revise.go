@@ -60,7 +60,7 @@ func (drafter *cardDrafter) revise(ctx context.Context, job streamJob) (draftRes
 	if current.revision.Number != job.baseRevision {
 		return draftResult{}, errRevisionMoved
 	}
-	source, err := carddocument.Load(ctx, drafter.store, current.revision)
+	source, err := carddocument.Load(current.revision)
 	if err != nil {
 		return draftResult{}, err
 	}
@@ -125,7 +125,7 @@ func (drafter *cardDrafter) revise(ctx context.Context, job streamJob) (draftRes
 	for index, target := range targets {
 		cardIDs[index] = target.id
 	}
-	revision, err := carddocument.Prepare(ctx, drafter.store, carddocument.PrepareInput{
+	revision, err := carddocument.Prepare(carddocument.PrepareInput{
 		PresentationID: job.presentationID,
 		AuthorID:       job.userID,
 		OperationID:    job.operationID,

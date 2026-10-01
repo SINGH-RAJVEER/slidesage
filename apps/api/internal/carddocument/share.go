@@ -158,10 +158,6 @@ func (handler Handler) inTx(ctx context.Context, work func(*sql.Tx) error) error
 // unknown, malformed, or revoked token and a presentation that is not ready
 // all look the same to the caller.
 func (handler Handler) sharedPresentation(writer http.ResponseWriter, request *http.Request) (string, string, bool) {
-	if handler.Store == nil {
-		writeError(writer, http.StatusServiceUnavailable, "Presentation storage is not configured")
-		return "", "", false
-	}
 	token := request.PathValue("token")
 	if !validShareToken(token) {
 		writeError(writer, http.StatusNotFound, "This link is not valid")
@@ -205,7 +201,7 @@ func (handler Handler) shared(writer http.ResponseWriter, request *http.Request)
 		handler.fail(ctx, writer, "load shared revision", err)
 		return
 	}
-	document, err := Load(ctx, handler.Store, revision)
+	document, err := Load(revision)
 	if err != nil {
 		handler.fail(ctx, writer, "load shared document", err)
 		return

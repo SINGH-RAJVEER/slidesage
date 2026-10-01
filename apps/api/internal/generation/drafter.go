@@ -41,11 +41,19 @@ func configureCardDrafter(h *handler) (documentDrafter, error) {
 	if !carddocument.Configured() {
 		return nil, nil
 	}
-	store, err := carddocument.NewGCSBlobStore(context.Background(), strings.TrimSpace(os.Getenv("PRESENTATION_GCS_BUCKET")))
-	if err != nil {
-		return nil, err
+	var store carddocument.ObjectStore
+	if bucket := strings.TrimSpace(os.Getenv("PRESENTATION_GCS_BUCKET")); bucket != "" {
+		configured, err := carddocument.NewGCSBlobStore(context.Background(), bucket)
+		if err != nil {
+			return nil, err
+		}
+		store = configured
 	}
-	drafter := newCardDrafter(carddocument.ConverterFromEnv(), store, h.generateJSON, stockSourceFromEnv())
+	var images imageSource
+	if store != nil {
+		images = stockSourceFromEnv()
+	}
+	drafter := newCardDrafter(carddocument.ConverterFromEnv(), store, h.generateJSON, images)
 	drafter.recordAssets = func(ctx context.Context, assets []carddocument.Asset) error {
 		tx, err := h.database.BeginTx(ctx, nil)
 		if err != nil {

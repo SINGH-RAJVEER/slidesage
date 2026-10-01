@@ -65,10 +65,6 @@ func (handler Handler) current(writer http.ResponseWriter, request *http.Request
 		writeError(writer, http.StatusUnauthorized, "Authentication required")
 		return
 	}
-	if handler.Store == nil {
-		writeError(writer, http.StatusServiceUnavailable, "Presentation storage is not configured")
-		return
-	}
 	ctx := request.Context()
 	revision, err := CurrentRevision(ctx, handler.DB, request.PathValue("id"), userID)
 	switch {
@@ -82,7 +78,7 @@ func (handler Handler) current(writer http.ResponseWriter, request *http.Request
 		handler.fail(ctx, writer, "load card revision", err)
 		return
 	}
-	document, err := Load(ctx, handler.Store, revision)
+	document, err := Load(revision)
 	if err != nil {
 		handler.fail(ctx, writer, "load card document", err)
 		return
@@ -141,6 +137,10 @@ func (handler Handler) serveAsset(writer http.ResponseWriter, request *http.Requ
 	}
 	if asset.URL != "" {
 		http.Redirect(writer, request, asset.URL, http.StatusFound)
+		return
+	}
+	if handler.Store == nil {
+		writeError(writer, http.StatusServiceUnavailable, "Image storage is not configured")
 		return
 	}
 	etag := `"` + asset.SHA256 + `"`

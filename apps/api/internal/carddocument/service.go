@@ -2,12 +2,10 @@ package carddocument
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 )
 
 // documentShape is the part of a converted document this package checks
@@ -28,13 +26,8 @@ type PrepareInput struct {
 	Provenance     any
 }
 
-// Prepare uploads the document as an immutable, content-addressed object and
-// returns the revision to commit. Uploading first means an interrupted database
-// commit can retry safely: the object is already there, byte for byte.
-func Prepare(ctx context.Context, store ObjectStore, input PrepareInput) (Revision, error) {
-	if store == nil {
-		return Revision{}, fmt.Errorf("card document storage is not configured")
-	}
+// Prepare validates and copies the submitted document for an atomic JSONB commit.
+func Prepare(input PrepareInput) (Revision, error) {
 	if input.PresentationID == "" || input.AuthorID == "" || input.OperationID == "" {
 		return Revision{}, fmt.Errorf("%w: presentation, author, and operation are required", ErrInvalidDocument)
 	}
@@ -45,16 +38,22 @@ func Prepare(ctx context.Context, store ObjectStore, input PrepareInput) (Revisi
 	if compact.Len() > MaxDocumentBytes {
 		return Revision{}, fmt.Errorf("%w: document is %d bytes", ErrInvalidDocument, compact.Len())
 	}
+	if err := validateJSONB(compact.Bytes()); err != nil {
+		return Revision{}, fmt.Errorf("%w: document: %v", ErrInvalidDocument, err)
+	}
 	var shape documentShape
 	if err := json.Unmarshal(compact.Bytes(), &shape); err != nil {
 		return Revision{}, fmt.Errorf("%w: %v", ErrInvalidDocument, err)
 	}
-	if shape.SchemaVersion != SchemaVersion || len(shape.CardOrder) == 0 {
+	if shape.SchemaVersion != SchemaVersion || len(shape.CardOrder) == 0 || len(shape.CardOrder) > 40 || len(shape.Cards) == 0 || shape.Cards[0] != '{' {
 		return Revision{}, fmt.Errorf("%w: schema version %d with %d cards", ErrInvalidDocument, shape.SchemaVersion, len(shape.CardOrder))
 	}
 	provenance, err := json.Marshal(input.Provenance)
 	if err != nil || input.Provenance == nil {
 		provenance = []byte(`{}`)
+	}
+	if err := validateJSONB(provenance); err != nil {
+		return Revision{}, fmt.Errorf("%w: provenance: %v", ErrInvalidDocument, err)
 	}
 	assetIDs, err := ReferencedAssets(compact.Bytes())
 	if err != nil {
@@ -62,13 +61,9 @@ func Prepare(ctx context.Context, store ObjectStore, input PrepareInput) (Revisi
 	}
 	sum := sha256.Sum256(compact.Bytes())
 	digest := hex.EncodeToString(sum[:])
-	key := objectKey(input.PresentationID, digest)
-	if err := store.PutImmutable(ctx, key, bytes.NewReader(compact.Bytes()), int64(compact.Len()), ContentType, digest); err != nil {
-		return Revision{}, fmt.Errorf("store card document: %w", err)
-	}
 	return Revision{
 		PresentationID: input.PresentationID,
-		ObjectKey:      key,
+		Document:       append(json.RawMessage(nil), compact.Bytes()...),
 		SHA256:         digest,
 		ByteSize:       int64(compact.Len()),
 		CardCount:      len(shape.CardOrder),
@@ -81,28 +76,11 @@ func Prepare(ctx context.Context, store ObjectStore, input PrepareInput) (Revisi
 	}, nil
 }
 
-// Load reads a revision's document and checks it is the object the revision
-// names, so a replaced or corrupted object is never served as the document.
-func Load(ctx context.Context, store ObjectStore, revision Revision) (json.RawMessage, error) {
-	reader, err := store.OpenObject(ctx, revision.ObjectKey)
-	if err != nil {
-		return nil, err
+// Load returns the body selected atomically with the revision metadata. Digest
+// metadata must not be compared against JSONB's reserialized bytes.
+func Load(revision Revision) (json.RawMessage, error) {
+	if len(revision.Document) == 0 || !json.Valid(revision.Document) {
+		return nil, fmt.Errorf("%w: revision body is missing; run cmd/migrate", ErrInvalidDocument)
 	}
-	defer reader.Close()
-	contents, err := io.ReadAll(io.LimitReader(reader, MaxDocumentBytes+1))
-	if err != nil {
-		return nil, fmt.Errorf("read card document: %w", err)
-	}
-	if int64(len(contents)) != revision.ByteSize {
-		return nil, ErrObjectSize
-	}
-	sum := sha256.Sum256(contents)
-	if hex.EncodeToString(sum[:]) != revision.SHA256 {
-		return nil, ErrObjectDigest
-	}
-	return contents, nil
-}
-
-func objectKey(presentationID, digest string) string {
-	return "presentations/" + presentationID + "/cards/" + digest + ".json"
+	return append(json.RawMessage(nil), revision.Document...), nil
 }

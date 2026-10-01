@@ -30,7 +30,7 @@ func TestExportSendsTheCurrentDocumentWithItsImagesAndSources(t *testing.T) {
 	document := json.RawMessage(`{"schemaVersion": 2, "title": "Grid: storage / 2026", "theme": "slate", "cardOrder": ["c_aaaaaaaa", "c_bbbbbbbb"],
 		"cards": {"c_aaaaaaaa": {"nodes": [{"type": "image", "assetId": "` + asset.SHA256 + `"}]},
 			"c_bbbbbbbb": {"nodes": [{"type": "image", "assetId": "` + hotlinked.SHA256 + `"}]}}}`)
-	revision, err := Prepare(ctx, store, PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "op-" + presentationID, OperationKind: OperationGeneration, Document: document})
+	revision, err := Prepare(PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "op-" + presentationID, OperationKind: OperationGeneration, Document: document})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestExportSendsTheCurrentDocumentWithItsImagesAndSources(t *testing.T) {
 	}
 	// A hotlinked photo is downloaded into the file, normalized, and not kept.
 	remote := sent.Assets[hotlinked.SHA256]
-	if len(fetched) != 1 || fetched[0] != hotlinked.URL || remote.MIMEType != "image/jpeg" || remote.Width != 2400 || len(remote.Data) == 0 || len(store.objects) != 2 {
+	if len(fetched) != 1 || fetched[0] != hotlinked.URL || remote.MIMEType != "image/jpeg" || remote.Width != 2400 || len(remote.Data) == 0 || len(store.objects) != 1 {
 		t.Fatalf("hotlinked export = %+v, fetched %v, stored %d objects", remote, fetched, len(store.objects))
 	}
 	if len(sent.Sources) != 1 || sent.Sources[0].URL != "https://example.com/a" || !strings.Contains(string(sent.Document), "Grid: storage") {

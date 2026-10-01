@@ -56,7 +56,7 @@ func baseDeck(t *testing.T, converter *carddocument.Converter, store *memoryObje
 	if err := json.Unmarshal(document, &deck.document); err != nil {
 		t.Fatal(err)
 	}
-	deck.revision, err = carddocument.Prepare(ctx, store, carddocument.PrepareInput{PresentationID: "presentation-1", AuthorID: "user-1", OperationID: "generation-op", OperationKind: carddocument.OperationGeneration, Document: document})
+	deck.revision, err = carddocument.Prepare(carddocument.PrepareInput{PresentationID: "presentation-1", AuthorID: "user-1", OperationID: "generation-op", OperationKind: carddocument.OperationGeneration, Document: document})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,8 @@ func baseDeck(t *testing.T, converter *carddocument.Converter, store *memoryObje
 }
 
 func TestCardDrafterRevisesOnlyTheRequestedCardsInPlace(t *testing.T) {
-	converter := startConverter(t)
+	var revisedDocument json.RawMessage
+	converter := startConverter(t, &revisedDocument)
 	store := &memoryObjects{}
 	deck := baseDeck(t, converter, store)
 	first, second, third, fourth := deck.document.CardOrder[0], deck.document.CardOrder[1], deck.document.CardOrder[2], deck.document.CardOrder[3]
@@ -121,12 +122,11 @@ func TestCardDrafterRevisesOnlyTheRequestedCardsInPlace(t *testing.T) {
 		CardOrder []string                   `json:"cardOrder"`
 		Cards     map[string]json.RawMessage `json:"cards"`
 	}
-	for key, contents := range store.objects {
-		if strings.Contains(key, "/cards/") && !strings.Contains(string(contents), `"Batteries scale"`) {
-			if err := json.Unmarshal(contents, &revised); err != nil {
-				t.Fatal(err)
-			}
-		}
+	if err := json.Unmarshal(revisedDocument, &revised); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.objects) != 1 {
+		t.Fatalf("expected only the image in GCS, got %d objects", len(store.objects))
 	}
 	if strings.Join(revised.CardOrder, ",") != strings.Join(deck.document.CardOrder, ",") {
 		t.Fatalf("card order changed: %v", revised.CardOrder)

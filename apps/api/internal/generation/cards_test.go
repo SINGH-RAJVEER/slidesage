@@ -51,7 +51,7 @@ func (store *memoryObjects) OpenObject(_ context.Context, key string) (io.ReadCl
 
 // startConverter runs the real Bun converter, the schema authority, so the
 // drafter is tested against the validation production uses.
-func startConverter(t *testing.T) *carddocument.Converter {
+func startConverter(t *testing.T, document ...*json.RawMessage) *carddocument.Converter {
 	t.Helper()
 	bun, err := exec.LookPath("bun")
 	if err != nil {
@@ -86,7 +86,37 @@ func startConverter(t *testing.T) *carddocument.Converter {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	return carddocument.NewConverter(baseURL, &http.Client{Timeout: 5 * time.Second})
+	client := &http.Client{Timeout: 5 * time.Second}
+	if len(document) > 0 {
+		client.Transport = documentCaptureTransport{document: document[0]}
+	}
+	return carddocument.NewConverter(baseURL, client)
+}
+
+type documentCaptureTransport struct {
+	document *json.RawMessage
+}
+
+func (transport documentCaptureTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	response, err := http.DefaultTransport.RoundTrip(request)
+	if err != nil || response.StatusCode != http.StatusOK ||
+		(request.URL.Path != "/v1/documents" && request.URL.Path != "/v1/documents/validate") {
+		return response, err
+	}
+	body, err := io.ReadAll(response.Body)
+	response.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	response.Body = io.NopCloser(bytes.NewReader(body))
+	var result struct {
+		Document json.RawMessage `json:"document"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+	*transport.document = result.Document
+	return response, nil
 }
 
 func decoded(t *testing.T, raw string) map[string]any {
@@ -106,8 +136,9 @@ func bulletsCard(position int) string {
 		{"type": "bullets", "items": ["First **reason**", "Second reason"]}]}`, position, position)
 }
 
-func TestCardDrafterPlansDraftsRepairsAndStores(t *testing.T) {
-	converter := startConverter(t)
+func TestCardDrafterPlansDraftsRepairsWithoutImageStorage(t *testing.T) {
+	var assembled json.RawMessage
+	converter := startConverter(t, &assembled)
 	previousBatch := cardBatchSize
 	cardBatchSize = 2
 	defer func() { cardBatchSize = previousBatch }()
@@ -149,8 +180,7 @@ func TestCardDrafterPlansDraftsRepairsAndStores(t *testing.T) {
 		return nil, 0, nil
 	}
 
-	store := &memoryObjects{}
-	drafter := newCardDrafter(converter, store, generate, nil)
+	drafter := newCardDrafter(converter, nil, generate, nil)
 	job := streamJob{
 		kind: "generation", presentationID: "presentation-1", userID: "user-1", operationID: "operation-1",
 		prompt: "Grid storage", slideCount: 3, detailLevel: "balanced", tonality: "professional",
@@ -173,21 +203,29 @@ func TestCardDrafterPlansDraftsRepairsAndStores(t *testing.T) {
 	if draft.document["totalSlides"] != 3 || draft.document["status"] != "ready" || draft.commit == nil {
 		t.Fatalf("document = %+v", draft.document)
 	}
-	if len(store.objects) != 1 {
-		t.Fatalf("stored %d objects", len(store.objects))
+	var document struct {
+		SchemaVersion int                        `json:"schemaVersion"`
+		CardOrder     []string                   `json:"cardOrder"`
+		Cards         map[string]json.RawMessage `json:"cards"`
 	}
-	for _, contents := range store.objects {
-		var document struct {
-			SchemaVersion int                        `json:"schemaVersion"`
-			CardOrder     []string                   `json:"cardOrder"`
-			Cards         map[string]json.RawMessage `json:"cards"`
-		}
-		if err := json.Unmarshal(contents, &document); err != nil {
-			t.Fatal(err)
-		}
-		if document.SchemaVersion != 2 || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
-			t.Fatalf("stored document = %s", contents)
-		}
+	if err := json.Unmarshal(assembled, &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.SchemaVersion != 2 || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
+		t.Fatalf("assembled document = %s", assembled)
+	}
+}
+
+func TestConfigureCardDrafterWithoutImageBucket(t *testing.T) {
+	t.Setenv("CARD_CONVERTER_URL", "http://converter.test")
+	t.Setenv("PRESENTATION_GCS_BUCKET", "")
+	drafter, err := configureCardDrafter(&handler{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cards, ok := drafter.(*cardDrafter)
+	if !ok || cards.store != nil || cards.images != nil || cards.converter == nil {
+		t.Fatalf("text-only drafter configuration = %#v", drafter)
 	}
 }
 

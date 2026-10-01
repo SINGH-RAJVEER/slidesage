@@ -1,6 +1,5 @@
-// Package carddocument owns card document revisions: immutable JSON objects in
-// GCS addressed by digest, revision metadata and the current-revision pointer
-// in PostgreSQL, and the converter that turns model drafts into valid cards.
+// Package carddocument owns immutable JSONB document revisions and their current
+// pointer in PostgreSQL, images in GCS, and the card schema converter.
 //
 // Callers never build object keys or edit document JSON directly. The
 // converter is the schema authority, shared with the browser editor.
@@ -48,15 +47,20 @@ type Revision struct {
 	PresentationID string          `json:"-"`
 	Number         int             `json:"revision"`
 	ObjectKey      string          `json:"-"`
-	SHA256         string          `json:"sha256"`
-	ByteSize       int64           `json:"byteSize"`
-	CardCount      int             `json:"cardCount"`
-	SchemaVersion  int             `json:"schemaVersion"`
-	AuthorID       string          `json:"-"`
-	OperationKind  OperationKind   `json:"operationKind"`
-	OperationID    string          `json:"-"`
-	BaseRevision   *int            `json:"baseRevision,omitempty"`
-	Provenance     json.RawMessage `json:"-"`
+	Document       json.RawMessage `json:"-"`
+	// SHA256 and ByteSize describe the compact submitted JSON bytes, or the
+	// original GCS bytes for imported revisions. They are audit metadata, not
+	// hashes of PostgreSQL's JSONB serialization, which changes whitespace,
+	// key order and number formatting. OperationID provides idempotency.
+	SHA256        string          `json:"sha256"`
+	ByteSize      int64           `json:"byteSize"`
+	CardCount     int             `json:"cardCount"`
+	SchemaVersion int             `json:"schemaVersion"`
+	AuthorID      string          `json:"-"`
+	OperationKind OperationKind   `json:"operationKind"`
+	OperationID   string          `json:"-"`
+	BaseRevision  *int            `json:"baseRevision,omitempty"`
+	Provenance    json.RawMessage `json:"-"`
 	// AssetIDs are the images the document shows. The commit fails unless each
 	// is recorded for the presentation.
 	AssetIDs  []string  `json:"-"`

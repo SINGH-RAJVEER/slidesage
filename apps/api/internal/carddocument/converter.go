@@ -80,7 +80,7 @@ func NewConverter(baseURL string, client *http.Client) *Converter {
 // environment. The API uses it to decide whether to accept submissions that
 // only the worker will draft.
 func Configured() bool {
-	return strings.TrimSpace(os.Getenv("CARD_CONVERTER_URL")) != "" && strings.TrimSpace(os.Getenv("PRESENTATION_GCS_BUCKET")) != ""
+	return strings.TrimSpace(os.Getenv("CARD_CONVERTER_URL")) != ""
 }
 
 // Schema returns the drafting schema the prompts are built from.

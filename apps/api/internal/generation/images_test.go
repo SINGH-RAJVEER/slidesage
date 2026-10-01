@@ -39,7 +39,8 @@ func (stub stubImages) Find(_ context.Context, request imageRequest) (foundImage
 }
 
 func TestCardDrafterPlacesPhotosAndFallsBackWhenNoneIsFound(t *testing.T) {
-	converter := startConverter(t)
+	var assembled json.RawMessage
+	converter := startConverter(t, &assembled)
 	var draftPrompts string
 	generate := func(_ context.Context, _ streamJob, promptName, _, user string, _ int) (map[string]any, int, error) {
 		switch promptName {
@@ -82,14 +83,15 @@ func TestCardDrafterPlacesPhotosAndFallsBackWhenNoneIsFound(t *testing.T) {
 		} `json:"cards"`
 	}
 	assets := 0
-	for key, contents := range store.objects {
+	for key := range store.objects {
 		if strings.Contains(key, "/assets/") {
 			assets++
 			continue
 		}
-		if err := json.Unmarshal(contents, &document); err != nil {
-			t.Fatal(err)
-		}
+		t.Fatalf("unexpected non-image object %s", key)
+	}
+	if err := json.Unmarshal(assembled, &document); err != nil {
+		t.Fatal(err)
 	}
 	if assets != 1 || draft.commit == nil {
 		t.Fatalf("stored %d assets", assets)

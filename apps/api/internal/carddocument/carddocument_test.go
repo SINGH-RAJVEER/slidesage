@@ -69,27 +69,31 @@ func prepareInput() PrepareInput {
 	}
 }
 
-func TestPrepareStoresACompactContentAddressedObject(t *testing.T) {
-	store := &memoryStore{}
-	revision, err := Prepare(context.Background(), store, prepareInput())
+func TestPrepareCopiesCompactDocumentWithoutObjectStorage(t *testing.T) {
+	input := prepareInput()
+	revision, err := Prepare(input)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if revision.CardCount != 1 || revision.SchemaVersion != 2 {
 		t.Fatalf("revision = %+v", revision)
 	}
-	if revision.ObjectKey != "presentations/presentation-1/cards/"+revision.SHA256+".json" {
+	if revision.ObjectKey != "" {
 		t.Fatalf("object key = %s", revision.ObjectKey)
 	}
-	stored := store.objects[revision.ObjectKey]
+	stored := revision.Document
+	input.Document[0] = 'x'
+	if stored[0] != '{' {
+		t.Fatal("Prepare retained the caller's document bytes")
+	}
 	if bytes.Contains(stored, []byte("\n")) || int64(len(stored)) != revision.ByteSize {
 		t.Fatalf("stored %q", stored)
 	}
-	again, err := Prepare(context.Background(), store, prepareInput())
+	again, err := Prepare(prepareInput())
 	if err != nil || again.SHA256 != revision.SHA256 {
 		t.Fatalf("repeat prepare = %+v, %v", again, err)
 	}
-	loaded, err := Load(context.Background(), store, revision)
+	loaded, err := Load(revision)
 	if err != nil || !bytes.Equal(loaded, stored) {
 		t.Fatalf("load = %s, %v", loaded, err)
 	}
@@ -103,22 +107,30 @@ func TestPrepareRefusesOtherSchemaVersionsAndEmptyDocuments(t *testing.T) {
 	} {
 		input := prepareInput()
 		input.Document = json.RawMessage(document)
-		if _, err := Prepare(context.Background(), &memoryStore{}, input); !errors.Is(err, ErrInvalidDocument) {
+		if _, err := Prepare(input); !errors.Is(err, ErrInvalidDocument) {
 			t.Fatalf("%s: error = %v", document, err)
 		}
 	}
 }
 
-func TestLoadRejectsAnObjectThatDoesNotMatchItsRevision(t *testing.T) {
-	store := &memoryStore{}
-	revision, err := Prepare(context.Background(), store, prepareInput())
+func TestLoadDoesNotCompareJSONBSerializationAgainstSubmittedDigest(t *testing.T) {
+	revision, err := Prepare(prepareInput())
 	if err != nil {
 		t.Fatal(err)
 	}
-	tampered := bytes.Replace(store.objects[revision.ObjectKey], []byte("Grid"), []byte("Grim"), 1)
-	store.objects[revision.ObjectKey] = tampered
-	if _, err := Load(context.Background(), store, revision); !errors.Is(err, ErrObjectDigest) {
-		t.Fatalf("error = %v", err)
+	// PostgreSQL can reorder keys and insert whitespace while preserving JSON.
+	revision.Document = json.RawMessage(sampleDocument)
+	loaded, err := Load(revision)
+	if err != nil || !bytes.Equal(loaded, revision.Document) {
+		t.Fatalf("load = %s, %v", loaded, err)
+	}
+	loaded[0] = 'x'
+	if revision.Document[0] != '{' {
+		t.Fatal("Load returned an alias of the revision body")
+	}
+	revision.Document = nil
+	if _, err := Load(revision); !errors.Is(err, ErrInvalidDocument) {
+		t.Fatalf("missing body error = %v", err)
 	}
 }
 
@@ -167,17 +179,13 @@ func TestCommitTxAdvancesOnceAndRefusesStaleBases(t *testing.T) {
 	database := integrationDatabase(t)
 	userID, presentationID := insertFixture(t, database)
 	ctx := context.Background()
-	revision := Revision{
-		PresentationID: presentationID,
-		SHA256:         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		ByteSize:       10,
-		CardCount:      1,
-		SchemaVersion:  SchemaVersion,
-		AuthorID:       userID,
-		OperationKind:  OperationGeneration,
-		OperationID:    "generation-" + presentationID,
+	input := prepareInput()
+	input.PresentationID, input.AuthorID = presentationID, userID
+	input.OperationID = "generation-" + presentationID
+	revision, err := Prepare(input)
+	if err != nil {
+		t.Fatal(err)
 	}
-	revision.ObjectKey = objectKey(presentationID, revision.SHA256)
 
 	commit := func(expected int, revision Revision) (CommitResult, error) {
 		tx, err := database.BeginTx(ctx, nil)
@@ -215,6 +223,63 @@ func TestCommitTxAdvancesOnceAndRefusesStaleBases(t *testing.T) {
 	}
 	if _, err := CurrentRevision(ctx, database, presentationID, "someone-else"); !errors.Is(err, ErrPresentationMissing) {
 		t.Fatalf("foreign owner error = %v", err)
+	}
+	if current.ObjectKey != "" || !json.Valid(current.Document) || current.SHA256 != revision.SHA256 {
+		t.Fatalf("JSONB round trip = %+v", current)
+	}
+	// A later failure in the caller's transaction rolls back both the body
+	// and the pointer, just as a billing or summary failure would.
+	edit.OperationID = "rollback-" + presentationID
+	tx, err := database.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CommitTx(ctx, tx, 2, edit); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	var count, pointer int
+	if err := database.QueryRowContext(ctx, `SELECT count(*) FROM card_revisions WHERE presentation_id = $1`, presentationID).Scan(&count); err != nil || count != 2 {
+		t.Fatalf("rollback revision count = %d, %v", count, err)
+	}
+	if err := database.QueryRowContext(ctx, `SELECT current_card_revision FROM presentations WHERE id = $1`, presentationID).Scan(&pointer); err != nil || pointer != 2 {
+		t.Fatalf("rollback pointer = %d, %v", pointer, err)
+	}
+	// Two edits with the same base serialize on the presentation row lock.
+	results := make(chan error, 2)
+	for _, operation := range []string{"race-a-", "race-b-"} {
+		candidate := edit
+		candidate.OperationID = operation + presentationID
+		go func() {
+			tx, err := database.BeginTx(ctx, nil)
+			if err != nil {
+				results <- err
+				return
+			}
+			defer tx.Rollback()
+			_, err = CommitTx(ctx, tx, 2, candidate)
+			if err == nil {
+				err = tx.Commit()
+			}
+			results <- err
+		}()
+	}
+	var successes, conflicts int
+	for range 2 {
+		err := <-results
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, ErrRevisionConflict):
+			conflicts++
+		default:
+			t.Fatalf("concurrent edit error = %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 {
+		t.Fatalf("concurrent results = %d successes, %d conflicts", successes, conflicts)
 	}
 }
 
