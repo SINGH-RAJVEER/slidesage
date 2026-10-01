@@ -12,6 +12,7 @@ import type {
 	StepsNode,
 	ThemeId,
 } from "@slidesage/cards";
+import { STOCK_LIBRARIES } from "@slidesage/cards";
 import PptxGenJS from "pptxgenjs";
 
 /**
@@ -29,7 +30,7 @@ export interface ExportAsset {
 	height: number;
 	/** The image bytes. */
 	data: Uint8Array;
-	source?: { type?: string; provider?: string; photographer?: string };
+	source?: { type?: string; provider?: string; photographer?: string; photographerUrl?: string };
 }
 
 /** A research source, numbered by its position as the drafter cited it. */
@@ -54,8 +55,6 @@ const PT_PER_CQW = CQW * 72;
 const FONT = "Arial";
 /** Text never shrinks below this fraction of its designed size. */
 const MIN_SCALE = 0.5;
-/** How stock photo libraries are named in photo credits. */
-const STOCK_LIBRARIES: Record<string, string> = { pexels: "Pexels", unsplash: "Unsplash" };
 
 type Rgb = [number, number, number];
 
@@ -680,8 +679,16 @@ function footer(
 	}
 	const credit = asset?.source;
 	if (credit?.type === "stock" && credit.photographer) {
-		const provider = STOCK_LIBRARIES[credit.provider ?? ""] ?? credit.provider ?? "";
-		runs.push({ text: `Photo by ${credit.photographer} on ${provider}` });
+		// "Photo by X on Library", with both names linked as the libraries ask.
+		const library = STOCK_LIBRARIES[credit.provider ?? ""];
+		const link = (url: string | undefined) =>
+			url ? { hyperlink: { url }, color: colors.muted } : {};
+		runs.push(
+			{ text: "Photo by " },
+			{ text: credit.photographer, options: link(credit.photographerUrl) },
+			{ text: " on " },
+			{ text: library?.name ?? credit.provider ?? "", options: link(library?.url) },
+		);
 	}
 	const options = {
 		y,

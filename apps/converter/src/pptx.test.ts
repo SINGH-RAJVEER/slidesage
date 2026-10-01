@@ -119,7 +119,12 @@ const assets = {
 		width: 1600,
 		height: 900,
 		data: PIXEL,
-		source: { type: "stock", provider: "pexels", photographer: "Ada" },
+		source: {
+			type: "stock",
+			provider: "unsplash",
+			photographer: "Ada",
+			photographerUrl: "https://unsplash.com/@ada?utm_source=slidesage&utm_medium=referral",
+		},
 	},
 };
 const sources = [{ url: "https://example.com/report", title: "Report" }];
@@ -153,7 +158,16 @@ describe("PPTX export", () => {
 		// The citation links to its source, and the photo credit is kept.
 		expect(await read("ppt/slides/_rels/slide3.xml.rels")).toContain("https://example.com/report");
 		expect(all[7]).toContain("<p:pic>");
-		expect(all[7]).toContain("Photo by Ada on Pexels");
+		// The photo credit links the photographer and the library.
+		expect(all[7]).toContain("Photo by </a:t>");
+		expect(all[7]).toContain(">Unsplash</a:t>");
+		const creditLinks = await read("ppt/slides/_rels/slide8.xml.rels");
+		expect(creditLinks).toContain(
+			"https://unsplash.com/@ada?utm_source=slidesage&amp;utm_medium=referral",
+		);
+		expect(creditLinks).toContain(
+			"https://unsplash.com/?utm_source=slidesage&amp;utm_medium=referral",
+		);
 		expect(all[5]).toContain("Storage is the new baseload.");
 		expect(all[6]).toContain("90%");
 		// A cover card has its photo and the scrim over it.
