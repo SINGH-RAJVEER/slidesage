@@ -21,6 +21,7 @@ jobs:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
       TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_presentation_gcs_bucket: ${{ vars.PRESENTATION_GCS_BUCKET || format('{0}-presentation-revisions', secrets.GCP_PROJECT_ID) }}
       TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.DATADOG_OTLP_ENDPOINT }}
