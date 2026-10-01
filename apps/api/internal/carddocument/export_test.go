@@ -23,14 +23,19 @@ func TestExportSendsTheCurrentDocumentWithItsImagesAndSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := json.RawMessage(`{"schemaVersion": 2, "title": "Grid: storage / 2026", "theme": "slate", "cardOrder": ["c_aaaaaaaa"],
-		"cards": {"c_aaaaaaaa": {"nodes": [{"type": "image", "assetId": "` + asset.SHA256 + `"}]}}}`)
+	hotlinked, err := RemoteAsset(presentationID, "https://images.unsplash.com/photo-1?w=2400", 4000, 2000, AssetSource{Type: "stock", Provider: "unsplash", ProviderID: "Ab_1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := json.RawMessage(`{"schemaVersion": 2, "title": "Grid: storage / 2026", "theme": "slate", "cardOrder": ["c_aaaaaaaa", "c_bbbbbbbb"],
+		"cards": {"c_aaaaaaaa": {"nodes": [{"type": "image", "assetId": "` + asset.SHA256 + `"}]},
+			"c_bbbbbbbb": {"nodes": [{"type": "image", "assetId": "` + hotlinked.SHA256 + `"}]}}}`)
 	revision, err := Prepare(ctx, store, PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "op-" + presentationID, OperationKind: OperationGeneration, Document: document})
 	if err != nil {
 		t.Fatal(err)
 	}
 	tx, _ := database.BeginTx(ctx, nil)
-	if err := RecordAssetsTx(ctx, tx, []Asset{asset}); err != nil {
+	if err := RecordAssetsTx(ctx, tx, []Asset{asset, hotlinked}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := CommitTx(ctx, tx, 0, revision); err != nil {
@@ -56,7 +61,12 @@ func TestExportSendsTheCurrentDocumentWithItsImagesAndSources(t *testing.T) {
 
 	caller := userID
 	mux := http.NewServeMux()
-	RegisterRoutes(mux, Handler{DB: database, Store: store, Converter: NewConverter(converter.URL, converter.Client()), Identity: func(*http.Request) (string, error) { return caller, nil }})
+	var fetched []string
+	fetchHotlink := func(_ context.Context, link string) ([]byte, error) {
+		fetched = append(fetched, link)
+		return encodedPNG(t, 2400, 1200, 255), nil
+	}
+	RegisterRoutes(mux, Handler{DB: database, Store: store, Converter: NewConverter(converter.URL, converter.Client()), FetchHotlink: fetchHotlink, Identity: func(*http.Request) (string, error) { return caller, nil }})
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	get := func() (*http.Response, []byte) {
@@ -83,6 +93,11 @@ func TestExportSendsTheCurrentDocumentWithItsImagesAndSources(t *testing.T) {
 	exported := sent.Assets[asset.SHA256]
 	if !bytes.Equal(exported.Data, stored) || exported.Width != 64 || exported.MIMEType != asset.MIMEType || !strings.Contains(string(exported.Source), "Ada") {
 		t.Fatalf("exported asset = %+v", exported)
+	}
+	// A hotlinked photo is downloaded into the file, normalized, and not kept.
+	remote := sent.Assets[hotlinked.SHA256]
+	if len(fetched) != 1 || fetched[0] != hotlinked.URL || remote.MIMEType != "image/jpeg" || remote.Width != 2400 || len(remote.Data) == 0 || len(store.objects) != 2 {
+		t.Fatalf("hotlinked export = %+v, fetched %v, stored %d objects", remote, fetched, len(store.objects))
 	}
 	if len(sent.Sources) != 1 || sent.Sources[0].URL != "https://example.com/a" || !strings.Contains(string(sent.Document), "Grid: storage") {
 		t.Fatalf("sent = %+v", sent)

@@ -20,9 +20,21 @@ type imageRequest struct {
 }
 
 type foundImage struct {
-	Data   []byte
-	Alt    string
-	Source carddocument.AssetSource
+	// Data is the image to store. A hotlinked photo has none; it has a
+	// Hotlink and the photo's size instead.
+	Data          []byte
+	Hotlink       string
+	Width, Height int
+	Alt           string
+	Source        carddocument.AssetSource
+}
+
+// asset stores the image, or describes where it is hotlinked from.
+func (found foundImage) asset(ctx context.Context, store carddocument.ObjectStore, presentationID string) (carddocument.Asset, error) {
+	if found.Hotlink != "" {
+		return carddocument.RemoteAsset(presentationID, found.Hotlink, found.Width, found.Height, found.Source)
+	}
+	return carddocument.PrepareAsset(ctx, store, presentationID, found.Data, found.Source)
 }
 
 // imageSource finds one image for a card. Stock photo libraries are the only
@@ -66,7 +78,7 @@ func findStock(ctx context.Context, library stockimages.Source, request imageReq
 		if photo.Width < 1200 || photo.Width < photo.Height {
 			continue
 		}
-		data, err := library.Download(ctx, photo)
+		data, err := library.Use(ctx, photo)
 		if err != nil {
 			continue
 		}
@@ -74,7 +86,10 @@ func findStock(ctx context.Context, library stockimages.Source, request imageReq
 		if alt == "" {
 			alt = strings.TrimSpace(request.Query)
 		}
-		return foundImage{Data: data, Alt: truncate(alt, 200), Source: carddocument.StockSource(photo, request.Query)}, nil
+		return foundImage{
+			Data: data, Hotlink: photo.Hotlink, Width: photo.Width, Height: photo.Height,
+			Alt: truncate(alt, 200), Source: carddocument.StockSource(photo, request.Query),
+		}, nil
 	}
 	return foundImage{}, errNoImage
 }

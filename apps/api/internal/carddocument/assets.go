@@ -14,6 +14,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"sort"
+	"strings"
 
 	// Registered for image.Decode.
 	_ "image/gif"
@@ -39,7 +40,8 @@ var (
 	ErrUnknownAsset     = errors.New("document shows an image this presentation does not have")
 )
 
-// Asset is an image stored for one presentation.
+// Asset is an image one presentation shows. Most are stored objects; a
+// hotlinked photo has a URL on its library's servers instead.
 type Asset struct {
 	PresentationID string          `json:"-"`
 	SHA256         string          `json:"-"`
@@ -49,7 +51,12 @@ type Asset struct {
 	Width          int             `json:"width"`
 	Height         int             `json:"height"`
 	Source         json.RawMessage `json:"source"`
+	// URL is set for a hotlinked photo, which browsers load directly.
+	URL string `json:"url,omitempty"`
 }
+
+// hotlinkPrefix is the only place a hotlinked photo may be shown from.
+const hotlinkPrefix = "https://images.unsplash.com/"
 
 // AssetSource records where an image came from.
 type AssetSource struct {
@@ -159,13 +166,41 @@ func PrepareAsset(ctx context.Context, store ObjectStore, presentationID string,
 	return asset, nil
 }
 
+// RemoteAsset describes a hotlinked photo. Its ID is a digest of the library
+// and photo ID, so choosing the same photo again finds the same asset. The
+// link asks for the photo at most maxStoredWidth wide, so the recorded size
+// is scaled the same way.
+func RemoteAsset(presentationID, link string, width, height int, source AssetSource) (Asset, error) {
+	if !strings.HasPrefix(link, hotlinkPrefix) || source.Provider == "" || source.ProviderID == "" || width < 1 || height < 1 {
+		return Asset{}, fmt.Errorf("%w: hotlinked photo %q", ErrUnsupportedImage, link)
+	}
+	if width > maxStoredWidth {
+		height = max(1, height*maxStoredWidth/width)
+		width = maxStoredWidth
+	}
+	encodedSource, err := json.Marshal(source)
+	if err != nil {
+		return Asset{}, err
+	}
+	sum := sha256.Sum256([]byte(source.Provider + ":" + source.ProviderID))
+	return Asset{
+		PresentationID: presentationID,
+		SHA256:         hex.EncodeToString(sum[:]),
+		MIMEType:       "image/jpeg",
+		Width:          width,
+		Height:         height,
+		Source:         encodedSource,
+		URL:            link,
+	}, nil
+}
+
 // RecordAssetsTx records prepared assets. Recording the same image twice for a
 // presentation is a no-op.
 func RecordAssetsTx(ctx context.Context, tx *sql.Tx, assets []Asset) error {
 	for _, asset := range assets {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO card_assets (presentation_id, sha256, object_key, mime_type, byte_size, width, height, source)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb) ON CONFLICT (presentation_id, sha256) DO NOTHING`,
-			asset.PresentationID, asset.SHA256, asset.ObjectKey, asset.MIMEType, asset.ByteSize, asset.Width, asset.Height, []byte(asset.Source)); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO card_assets (presentation_id, sha256, object_key, mime_type, byte_size, width, height, source, remote_url)
+			VALUES ($1, $2, NULLIF($3, ''), $4, NULLIF($5, 0), $6, $7, $8::jsonb, NULLIF($9, '')) ON CONFLICT (presentation_id, sha256) DO NOTHING`,
+			asset.PresentationID, asset.SHA256, asset.ObjectKey, asset.MIMEType, asset.ByteSize, asset.Width, asset.Height, []byte(asset.Source), asset.URL); err != nil {
 			return fmt.Errorf("record image asset: %w", err)
 		}
 	}
@@ -182,7 +217,7 @@ func AssetsFor(ctx context.Context, database rowsQuerier, presentationID string,
 	if len(ids) == 0 {
 		return assets, nil
 	}
-	rows, err := database.QueryContext(ctx, `SELECT sha256, object_key, mime_type, byte_size, width, height, source
+	rows, err := database.QueryContext(ctx, `SELECT sha256, COALESCE(object_key, ''), mime_type, COALESCE(byte_size, 0), width, height, source, COALESCE(remote_url, '')
 		FROM card_assets WHERE presentation_id = $1 AND sha256 = ANY($2)`, presentationID, ids)
 	if err != nil {
 		return nil, fmt.Errorf("load image assets: %w", err)
@@ -191,7 +226,7 @@ func AssetsFor(ctx context.Context, database rowsQuerier, presentationID string,
 	for rows.Next() {
 		asset := Asset{PresentationID: presentationID}
 		var source []byte
-		if err := rows.Scan(&asset.SHA256, &asset.ObjectKey, &asset.MIMEType, &asset.ByteSize, &asset.Width, &asset.Height, &source); err != nil {
+		if err := rows.Scan(&asset.SHA256, &asset.ObjectKey, &asset.MIMEType, &asset.ByteSize, &asset.Width, &asset.Height, &source, &asset.URL); err != nil {
 			return nil, err
 		}
 		asset.Source = append(json.RawMessage(nil), source...)

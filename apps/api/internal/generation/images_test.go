@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
 )
 
@@ -99,5 +100,19 @@ func TestCardDrafterPlacesPhotosAndFallsBackWhenNoneIsFound(t *testing.T) {
 	}
 	if third := document.Cards[document.CardOrder[2]]; third.Layout != "title" {
 		t.Fatalf("third card layout = %s", third.Layout)
+	}
+}
+
+func TestFoundImageIsStoredUnlessItIsHotlinked(t *testing.T) {
+	store := &memoryObjects{}
+	ctx := context.Background()
+	source := carddocument.AssetSource{Type: "stock", Provider: "unsplash", ProviderID: "Ab_1"}
+	hotlinked, err := foundImage{Hotlink: "https://images.unsplash.com/photo-1?w=2400", Width: 4800, Height: 2700, Source: source}.asset(ctx, store, "presentation-1")
+	if err != nil || hotlinked.URL == "" || hotlinked.Width != 2400 || len(store.objects) != 0 {
+		t.Fatalf("hotlinked asset = %+v, err = %v, stored %d objects", hotlinked, err, len(store.objects))
+	}
+	stored, err := foundImage{Data: photoPNG(t, 1600, 900), Source: carddocument.AssetSource{Type: "stock", Provider: "pexels"}}.asset(ctx, store, "presentation-1")
+	if err != nil || stored.URL != "" || len(store.objects) != 1 {
+		t.Fatalf("stored asset = %+v, err = %v, stored %d objects", stored, err, len(store.objects))
 	}
 }

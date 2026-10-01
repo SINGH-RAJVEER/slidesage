@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/stockimages"
 )
 
 // maxExportImageBytes bounds the images one export embeds, so a request to
@@ -61,14 +63,26 @@ func (handler Handler) exportPptx(writer http.ResponseWriter, request *http.Requ
 	assets := make(map[string]ExportAsset, len(stored))
 	var total int64
 	for id, asset := range stored {
-		total += asset.ByteSize
-		if total > maxExportImageBytes {
-			writeError(writer, http.StatusRequestEntityTooLarge, "This presentation's images are too large to export")
-			return
+		var data []byte
+		if asset.URL != "" {
+			data, asset.MIMEType, asset.Width, asset.Height, err = handler.readHotlink(request, asset)
+			if err != nil {
+				// The library is down or the photo was removed; the file
+				// cannot be complete without it.
+				slog.WarnContext(ctx, "fetch hotlinked photo for export", "asset", id, "error", err)
+				writeError(writer, http.StatusBadGateway, "A photo in this presentation could not be fetched from its library. Try again shortly.")
+				return
+			}
+		} else {
+			data, err = handler.readAsset(request, asset)
 		}
-		data, err := handler.readAsset(request, asset)
 		if err != nil {
 			handler.fail(ctx, writer, "read image for export", err)
+			return
+		}
+		total += int64(len(data))
+		if total > maxExportImageBytes {
+			writeError(writer, http.StatusRequestEntityTooLarge, "This presentation's images are too large to export")
 			return
 		}
 		assets[id] = ExportAsset{MIMEType: asset.MIMEType, Width: asset.Width, Height: asset.Height, Data: data, Source: asset.Source}
@@ -119,6 +133,20 @@ func (handler Handler) readAsset(request *http.Request, asset Asset) ([]byte, er
 		return nil, fmt.Errorf("image %s is %d bytes, expected %d", asset.SHA256, len(data), asset.ByteSize)
 	}
 	return data, nil
+}
+
+// readHotlink downloads a hotlinked photo into the export, normalized like a
+// stored image. The download is not kept.
+func (handler Handler) readHotlink(request *http.Request, asset Asset) ([]byte, string, int, int, error) {
+	fetch := handler.FetchHotlink
+	if fetch == nil {
+		fetch = stockimages.FetchHotlink
+	}
+	data, err := fetch(request.Context(), asset.URL)
+	if err != nil {
+		return nil, "", 0, 0, err
+	}
+	return normalizeImage(data)
 }
 
 // contentDisposition names the download after the deck, with an ASCII

@@ -26,6 +26,15 @@ func StockSource(photo stockimages.Photo, query string) AssetSource {
 	}
 }
 
+// StockAsset turns a chosen stock photo into an asset: stored from data, or
+// hotlinked when its library requires that.
+func StockAsset(ctx context.Context, store ObjectStore, presentationID string, photo stockimages.Photo, data []byte, query string) (Asset, error) {
+	if photo.Hotlink != "" {
+		return RemoteAsset(presentationID, photo.Hotlink, photo.Width, photo.Height, StockSource(photo, query))
+	}
+	return PrepareAsset(ctx, store, presentationID, data, StockSource(photo, query))
+}
+
 // stockSource returns the photo library a request names, or the first one
 // configured when it names none.
 func (handler Handler) stockSource(name string) stockimages.Source {
@@ -154,7 +163,7 @@ func (handler Handler) addStockPhoto(writer http.ResponseWriter, request *http.R
 		writeError(writer, http.StatusServiceUnavailable, "The photo could not be fetched. Try again shortly.")
 		return
 	}
-	data, err := source.Download(ctx, photo)
+	data, err := source.Use(ctx, photo)
 	if err != nil {
 		writeError(writer, http.StatusServiceUnavailable, "The photo could not be fetched. Try again shortly.")
 		return
@@ -163,7 +172,7 @@ func (handler Handler) addStockPhoto(writer http.ResponseWriter, request *http.R
 	if utf8.RuneCountInString(query) > 100 {
 		query = ""
 	}
-	asset, err := PrepareAsset(ctx, handler.Store, presentationID, data, StockSource(photo, query))
+	asset, err := StockAsset(ctx, handler.Store, presentationID, photo, data, query)
 	if err != nil {
 		handler.fail(ctx, writer, "store stock photo", err)
 		return

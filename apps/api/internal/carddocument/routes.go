@@ -24,8 +24,11 @@ type Handler struct {
 	Converter *Converter
 	// Stock lists the stock photo libraries, the default first; none
 	// disables photo search.
-	Stock    []stockimages.Source
-	Identity func(*http.Request) (string, error)
+	Stock []stockimages.Source
+	// FetchHotlink downloads a hotlinked photo for export; nil uses
+	// stockimages.FetchHotlink.
+	FetchHotlink func(ctx context.Context, link string) ([]byte, error)
+	Identity     func(*http.Request) (string, error)
 }
 
 func RegisterRoutes(mux *http.ServeMux, handler Handler) {
@@ -134,6 +137,10 @@ func (handler Handler) serveAsset(writer http.ResponseWriter, request *http.Requ
 	asset, found := assets[digest]
 	if !found {
 		writeError(writer, http.StatusNotFound, "Image not found")
+		return
+	}
+	if asset.URL != "" {
+		http.Redirect(writer, request, asset.URL, http.StatusFound)
 		return
 	}
 	etag := `"` + asset.SHA256 + `"`

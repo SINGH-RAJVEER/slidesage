@@ -364,7 +364,7 @@ func (d *drafting) resolveImages(ctx context.Context, plan *cardPlan) {
 		found, err := d.drafter.images.Find(ctx, imageRequest{Query: entry.ImageQuery})
 		var asset carddocument.Asset
 		if err == nil {
-			asset, err = carddocument.PrepareAsset(ctx, d.drafter.store, d.job.presentationID, found.Data, found.Source)
+			asset, err = found.asset(ctx, d.drafter.store, d.job.presentationID)
 		}
 		mu.Lock()
 		defer mu.Unlock()

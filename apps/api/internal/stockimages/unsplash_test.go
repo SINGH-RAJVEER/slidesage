@@ -30,12 +30,6 @@ func TestUnsplashCreditsAndRecordsEachUse(t *testing.T) {
 			fmt.Fprint(writer, photoJSON())
 		case "/photos/Ab_1/download":
 			fmt.Fprint(writer, `{"url": "ignored"}`)
-		case "/photo.png":
-			if request.URL.Query().Get("w") != "2400" || request.URL.Query().Get("ixid") != "x" {
-				http.Error(writer, "unexpected size", http.StatusBadRequest)
-				return
-			}
-			_, _ = writer.Write(photoPNG(t))
 		default:
 			http.NotFound(writer, request)
 		}
@@ -60,12 +54,17 @@ func TestUnsplashCreditsAndRecordsEachUse(t *testing.T) {
 		t.Fatalf("photographer link = %q", photo.PhotographerURL)
 	}
 
-	calls = nil
-	if data, err := unsplash.Download(ctx, photo); err != nil || len(data) == 0 {
-		t.Fatalf("download = %d bytes, err = %v", len(data), err)
+	hotlink, _ := url.Parse(photo.Hotlink)
+	if hotlink.Path != "/photo.png" || hotlink.Query().Get("w") != "2400" || hotlink.Query().Get("ixid") != "x" {
+		t.Fatalf("hotlink = %q", photo.Hotlink)
 	}
-	if len(calls) != 2 || calls[0] != "/photos/Ab_1/download" {
-		t.Fatalf("calls = %v, want the download endpoint before the file", calls)
+
+	calls = nil
+	if data, err := unsplash.Use(ctx, photo); err != nil || data != nil {
+		t.Fatalf("use = %d bytes, err = %v; a hotlinked photo is not downloaded", len(data), err)
+	}
+	if len(calls) != 1 || calls[0] != "/photos/Ab_1/download" {
+		t.Fatalf("calls = %v, want only the download endpoint", calls)
 	}
 
 	if found, err := unsplash.Photo(ctx, "Ab_1"); err != nil || found.ID != "Ab_1" {
@@ -77,18 +76,22 @@ func TestUnsplashCreditsAndRecordsEachUse(t *testing.T) {
 }
 
 func TestUnsplashPhotoIsNotUsedWhenItsUseCannotBeRecorded(t *testing.T) {
-	var fetched bool
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path == "/photo.png" {
-			fetched = true
-		}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusForbidden)
 	}))
 	defer server.Close()
 	host, _ := url.Parse(server.URL)
 	unsplash := NewUnsplash("key", server.URL, []string{host.Host})
-	photo := Photo{download: server.URL + "/photo.png", track: server.URL + "/photos/a/download"}
-	if _, err := unsplash.Download(context.Background(), photo); !errors.Is(err, ErrUnavailable) || fetched {
-		t.Fatalf("error = %v, fetched = %v", err, fetched)
+	photo := Photo{Hotlink: "https://images.unsplash.com/photo-1", track: server.URL + "/photos/a/download"}
+	if _, err := unsplash.Use(context.Background(), photo); !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestFetchHotlinkStaysOnUnsplashImageHosts(t *testing.T) {
+	for _, link := range []string{"https://evil.test/a.jpg", "http://images.unsplash.com/a.jpg", "https://images.pexels.com/a.jpg"} {
+		if _, err := FetchHotlink(context.Background(), link); err == nil {
+			t.Fatalf("%s was allowed", link)
+		}
 	}
 }

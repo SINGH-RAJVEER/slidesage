@@ -60,10 +60,10 @@ func TestSearchAndDownloadStayOnAllowedHosts(t *testing.T) {
 	if photos[1].Photographer != "Ada" || photos[1].PageURL != "https://www.pexels.com/photo/3" || photos[1].Thumbnail != server.URL+"/thumb.png" {
 		t.Fatalf("photo = %+v", photos[1])
 	}
-	if _, err := pexels.Download(ctx, photos[0]); err == nil {
+	if _, err := pexels.Use(ctx, photos[0]); err == nil {
 		t.Fatal("a redirect off the allowed hosts was followed")
 	}
-	if data, err := pexels.Download(ctx, photos[1]); err != nil || len(data) == 0 {
+	if data, err := pexels.Use(ctx, photos[1]); err != nil || len(data) == 0 {
 		t.Fatalf("download = %d bytes, err = %v", len(data), err)
 	}
 	photo, err := pexels.Photo(ctx, "3")
@@ -88,7 +88,7 @@ func TestRefusedRequestsAreUnavailable(t *testing.T) {
 func TestDownloadRefusesHostsOutsideTheAllowlist(t *testing.T) {
 	pexels := NewPexels("key", "https://api.pexels.com", []string{"images.pexels.com"})
 	for _, link := range []string{"https://evil.test/a.jpg", "http://images.pexels.com/a.jpg", "file:///etc/passwd"} {
-		if _, err := pexels.Download(context.Background(), Photo{download: link}); err == nil {
+		if _, err := pexels.Use(context.Background(), Photo{download: link}); err == nil {
 			t.Fatalf("%s was allowed", link)
 		}
 	}

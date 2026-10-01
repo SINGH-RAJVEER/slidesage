@@ -98,6 +98,7 @@ func (pexels *Pexels) Photo(ctx context.Context, id string) (Photo, error) {
 	return photo.photo(), nil
 }
 
-func (pexels *Pexels) Download(ctx context.Context, photo Photo) ([]byte, error) {
-	return pexels.client.download(ctx, photo)
+// Use downloads the photo; Pexels needs no other record of its use.
+func (pexels *Pexels) Use(ctx context.Context, photo Photo) ([]byte, error) {
+	return pexels.client.download(ctx, photo.download)
 }

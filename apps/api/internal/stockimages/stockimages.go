@@ -1,9 +1,10 @@
 // Package stockimages searches free stock photo libraries, Pexels and
-// Unsplash, and downloads the photos they find.
+// Unsplash, and records each use of a photo chosen from them.
 //
 // Both licenses permit using photos commercially and modifying them. Both ask
 // for credit to the photographer and the library, which callers record with
-// each stored photo and show beside it.
+// each photo and show beside it. Pexels photos are downloaded and stored;
+// Unsplash photos are shown hotlinked from Unsplash, as its API requires.
 package stockimages
 
 import (
@@ -44,7 +45,10 @@ type Photo struct {
 	// Thumbnail is a small library-hosted preview for choosing a photo.
 	Thumbnail string `json:"thumbnail"`
 	License   string `json:"-"`
-	download  string
+	// Hotlink is set for libraries that require showing the photo from
+	// their own servers. Such a photo is never stored.
+	Hotlink  string `json:"-"`
+	download string
 	// track is a library URL to call when the photo is used.
 	track string
 }
@@ -58,8 +62,9 @@ type Source interface {
 	// Photo looks up one photo by the library's ID, so a stored photo is
 	// always the one the library names, never a URL a client supplied.
 	Photo(ctx context.Context, id string) (Photo, error)
-	// Download fetches a photo's full-size file for use on a card.
-	Download(ctx context.Context, photo Photo) ([]byte, error)
+	// Use records with the library that a photo was chosen and returns its
+	// file to store. It returns no file for a photo with a Hotlink.
+	Use(ctx context.Context, photo Photo) ([]byte, error)
 }
 
 // FromEnv returns the libraries with API keys set, Pexels first. None set
@@ -73,6 +78,16 @@ func FromEnv() []Source {
 		sources = append(sources, unsplash)
 	}
 	return sources
+}
+
+// hotlinks fetches hotlinked photos. Their hosts serve files without an API
+// key, so a deck's photos can be exported whatever libraries are configured.
+var hotlinks = newClient("Unsplash", "", []string{"images.unsplash.com"}, func(*http.Request) {})
+
+// FetchHotlink downloads a hotlinked photo, for embedding it in a file the
+// user downloads. The file is not kept.
+func FetchHotlink(ctx context.Context, link string) ([]byte, error) {
+	return hotlinks.download(ctx, link)
 }
 
 // client is an HTTP client limited to a library's API host and image hosts.
@@ -157,10 +172,10 @@ func (limited *client) endpoint(path string, query url.Values) string {
 }
 
 // download fetches a photo file from an allowlisted host.
-func (limited *client) download(ctx context.Context, photo Photo) ([]byte, error) {
-	target, err := url.Parse(photo.download)
+func (limited *client) download(ctx context.Context, link string) ([]byte, error) {
+	target, err := url.Parse(link)
 	if err != nil || !limited.allowed(target) {
-		return nil, fmt.Errorf("photo host is not allowed: %s", photo.download)
+		return nil, fmt.Errorf("photo host is not allowed: %s", link)
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
 	if err != nil {

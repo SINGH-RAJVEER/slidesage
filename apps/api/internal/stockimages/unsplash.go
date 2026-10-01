@@ -18,9 +18,9 @@ const (
 
 var unsplashID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
-// Unsplash searches the Unsplash library. Unsplash counts a photo as used
-// only when its download endpoint is called, so Download calls it before
-// fetching the file.
+// Unsplash searches the Unsplash library. Its photos are shown hotlinked
+// from Unsplash's image servers, and a photo counts as used only when its
+// download endpoint is called.
 type Unsplash struct {
 	client *client
 }
@@ -82,6 +82,7 @@ func referral(link string) string {
 }
 
 // sized asks Unsplash's image service for a JPEG no wider than a slide needs.
+// Unsplash allows these parameters on hotlinks.
 func sized(raw string) string {
 	target, err := url.Parse(raw)
 	if err != nil || raw == "" {
@@ -105,7 +106,7 @@ func (photo unsplashPhoto) photo() Photo {
 		Provider: "unsplash", ID: photo.ID, Width: photo.Width, Height: photo.Height, PageURL: referral(photo.Links.HTML),
 		Photographer: photo.User.Name, PhotographerURL: referral(photo.User.Links.HTML),
 		Alt: alt, Thumbnail: photo.URLs.Small, License: "Unsplash License",
-		download: sized(photo.URLs.Raw), track: photo.Links.DownloadLocation,
+		Hotlink: sized(photo.URLs.Raw), track: photo.Links.DownloadLocation,
 	}
 }
 
@@ -142,14 +143,14 @@ func (unsplash *Unsplash) Photo(ctx context.Context, id string) (Photo, error) {
 	return photo.photo(), nil
 }
 
-// Download records the use with Unsplash, then fetches the file. A photo
-// whose use cannot be recorded is not used.
-func (unsplash *Unsplash) Download(ctx context.Context, photo Photo) ([]byte, error) {
+// Use records the use with Unsplash. A photo whose use cannot be recorded
+// is not used. The photo is shown from its Hotlink, so no file is returned.
+func (unsplash *Unsplash) Use(ctx context.Context, photo Photo) ([]byte, error) {
 	if photo.track == "" {
 		return nil, fmt.Errorf("%w: photo has no download endpoint", ErrUnavailable)
 	}
 	if err := unsplash.client.get(ctx, photo.track, nil); err != nil {
 		return nil, err
 	}
-	return unsplash.client.download(ctx, photo)
+	return nil, nil
 }
