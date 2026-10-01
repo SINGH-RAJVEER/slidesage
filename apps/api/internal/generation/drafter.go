@@ -45,7 +45,7 @@ func configureCardDrafter(h *handler) (documentDrafter, error) {
 	if err != nil {
 		return nil, err
 	}
-	drafter := newCardDrafter(carddocument.ConverterFromEnv(), store, h.generateJSON, pexelsSourceFromEnv())
+	drafter := newCardDrafter(carddocument.ConverterFromEnv(), store, h.generateJSON, stockSourceFromEnv())
 	drafter.recordAssets = func(ctx context.Context, assets []carddocument.Asset) error {
 		tx, err := h.database.BeginTx(ctx, nil)
 		if err != nil {

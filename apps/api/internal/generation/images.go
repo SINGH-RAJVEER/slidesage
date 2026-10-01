@@ -25,28 +25,38 @@ type foundImage struct {
 	Source carddocument.AssetSource
 }
 
-// imageSource finds one image for a card. Pexels stock photos are the only
+// imageSource finds one image for a card. Stock photo libraries are the only
 // implementation today; an AI image generator fits the same interface once it
 // has per-image pricing in the quote and settlement.
 type imageSource interface {
 	Find(ctx context.Context, request imageRequest) (foundImage, error)
 }
 
-// pexelsSource picks the first suitable landscape photo for a query.
-type pexelsSource struct {
-	pexels *stockimages.Pexels
+// stockSource picks the first suitable landscape photo for a query, trying
+// each configured library in turn.
+type stockSource struct {
+	libraries []stockimages.Source
 }
 
-func pexelsSourceFromEnv() imageSource {
-	pexels := stockimages.FromEnv()
-	if pexels == nil {
+func stockSourceFromEnv() imageSource {
+	libraries := stockimages.FromEnv()
+	if len(libraries) == 0 {
 		return nil
 	}
-	return pexelsSource{pexels: pexels}
+	return stockSource{libraries: libraries}
 }
 
-func (source pexelsSource) Find(ctx context.Context, request imageRequest) (foundImage, error) {
-	photos, err := source.pexels.Search(ctx, request.Query, 8)
+func (source stockSource) Find(ctx context.Context, request imageRequest) (foundImage, error) {
+	for _, library := range source.libraries {
+		if image, err := findStock(ctx, library, request); err == nil {
+			return image, nil
+		}
+	}
+	return foundImage{}, errNoImage
+}
+
+func findStock(ctx context.Context, library stockimages.Source, request imageRequest) (foundImage, error) {
+	photos, err := library.Search(ctx, request.Query, 8)
 	if err != nil {
 		// A rate limit or outage leaves the card without an image rather than
 		// failing the deck.
@@ -56,7 +66,7 @@ func (source pexelsSource) Find(ctx context.Context, request imageRequest) (foun
 		if photo.Width < 1200 || photo.Width < photo.Height {
 			continue
 		}
-		data, err := source.pexels.Download(ctx, photo)
+		data, err := library.Download(ctx, photo)
 		if err != nil {
 			continue
 		}

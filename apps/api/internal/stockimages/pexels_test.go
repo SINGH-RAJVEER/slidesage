@@ -47,7 +47,7 @@ func TestSearchAndDownloadStayOnAllowedHosts(t *testing.T) {
 	}))
 	defer server.Close()
 	host, _ := url.Parse(server.URL)
-	pexels := New("test-key", server.URL, []string{host.Host})
+	pexels := NewPexels("test-key", server.URL, []string{host.Host})
 	ctx := context.Background()
 
 	photos, err := pexels.Search(ctx, "battery warehouse", 8)
@@ -66,11 +66,11 @@ func TestSearchAndDownloadStayOnAllowedHosts(t *testing.T) {
 	if data, err := pexels.Download(ctx, photos[1]); err != nil || len(data) == 0 {
 		t.Fatalf("download = %d bytes, err = %v", len(data), err)
 	}
-	photo, err := pexels.Photo(ctx, 3)
-	if err != nil || photo.ID != 3 {
+	photo, err := pexels.Photo(ctx, "3")
+	if err != nil || photo.ID != "3" {
 		t.Fatalf("photo lookup = %+v, err = %v", photo, err)
 	}
-	if _, err := pexels.Photo(ctx, 4); !errors.Is(err, ErrNotFound) {
+	if _, err := pexels.Photo(ctx, "4"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing photo error = %v", err)
 	}
 }
@@ -80,13 +80,13 @@ func TestRefusedRequestsAreUnavailable(t *testing.T) {
 		writer.WriteHeader(http.StatusTooManyRequests)
 	}))
 	defer server.Close()
-	if _, err := New("key", server.URL, nil).Search(context.Background(), "anything", 8); !errors.Is(err, ErrUnavailable) {
+	if _, err := NewPexels("key", server.URL, nil).Search(context.Background(), "anything", 8); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("error = %v", err)
 	}
 }
 
 func TestDownloadRefusesHostsOutsideTheAllowlist(t *testing.T) {
-	pexels := New("key", "https://api.pexels.com", []string{"images.pexels.com"})
+	pexels := NewPexels("key", "https://api.pexels.com", []string{"images.pexels.com"})
 	for _, link := range []string{"https://evil.test/a.jpg", "http://images.pexels.com/a.jpg", "file:///etc/passwd"} {
 		if _, err := pexels.Download(context.Background(), Photo{download: link}); err == nil {
 			t.Fatalf("%s was allowed", link)

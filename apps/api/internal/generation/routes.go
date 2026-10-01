@@ -71,7 +71,7 @@ func RegisterRoutes(mux *http.ServeMux, database *sql.DB, identity Identity, con
 		draftingEnabled: carddocument.Configured(),
 	}
 	if handler.draftingEnabled {
-		handler.planner = newCardDrafter(carddocument.ConverterFromEnv(), nil, handler.generateJSON, pexelsSourceFromEnv())
+		handler.planner = newCardDrafter(carddocument.ConverterFromEnv(), nil, handler.generateJSON, stockSourceFromEnv())
 	}
 	mux.HandleFunc("POST /presentation-jobs", handler.submit)
 	mux.HandleFunc("POST /presentation-outlines", handler.outline)

@@ -22,8 +22,9 @@ type Handler struct {
 	// Converter validates edited documents; without it the save route
 	// reports that editing is unavailable.
 	Converter *Converter
-	// Stock searches and fetches Pexels photos; nil disables photo search.
-	Stock    *stockimages.Pexels
+	// Stock lists the stock photo libraries, the default first; none
+	// disables photo search.
+	Stock    []stockimages.Source
 	Identity func(*http.Request) (string, error)
 }
 

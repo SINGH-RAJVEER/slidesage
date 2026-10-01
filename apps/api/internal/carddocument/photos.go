@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -13,18 +12,29 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/stockimages"
 )
 
-// StockSource describes a Pexels photo for asset records and attribution.
+// StockSource describes a stock photo for asset records and attribution.
 func StockSource(photo stockimages.Photo, query string) AssetSource {
 	return AssetSource{
 		Type:            "stock",
-		Provider:        "pexels",
-		ProviderID:      fmt.Sprint(photo.ID),
+		Provider:        photo.Provider,
+		ProviderID:      photo.ID,
 		Photographer:    photo.Photographer,
 		PhotographerURL: photo.PhotographerURL,
 		PageURL:         photo.PageURL,
-		License:         "Pexels License",
+		License:         photo.License,
 		Query:           query,
 	}
+}
+
+// stockSource returns the photo library a request names, or the first one
+// configured when it names none.
+func (handler Handler) stockSource(name string) stockimages.Source {
+	for _, source := range handler.Stock {
+		if name == "" || source.Name() == name {
+			return source
+		}
+	}
+	return nil
 }
 
 // ownedEditable reports whether the user owns a presentation that can take
@@ -75,14 +85,17 @@ func (handler Handler) respondAsset(writer http.ResponseWriter, request *http.Re
 	writeJSON(writer, http.StatusCreated, map[string]any{"assetId": asset.SHA256, "asset": asset, "alt": alt})
 }
 
-// searchPhotos proxies a Pexels search so the API key stays on the server.
+// searchPhotos proxies a stock photo search so the API keys stay on the
+// server. The response names every configured library so the picker can
+// offer the others.
 func (handler Handler) searchPhotos(writer http.ResponseWriter, request *http.Request) {
 	userID, err := handler.Identity(request)
 	if err != nil || strings.TrimSpace(userID) == "" {
 		writeError(writer, http.StatusUnauthorized, "Authentication required")
 		return
 	}
-	if handler.Stock == nil {
+	source := handler.stockSource(request.URL.Query().Get("provider"))
+	if source == nil {
 		writeError(writer, http.StatusServiceUnavailable, "Photo search is not available")
 		return
 	}
@@ -91,7 +104,7 @@ func (handler Handler) searchPhotos(writer http.ResponseWriter, request *http.Re
 		writeError(writer, http.StatusBadRequest, "Search for 1-100 characters")
 		return
 	}
-	photos, err := handler.Stock.Search(request.Context(), query, 24)
+	photos, err := source.Search(request.Context(), query, 24)
 	if errors.Is(err, stockimages.ErrUnavailable) {
 		writeError(writer, http.StatusServiceUnavailable, "Photo search is unavailable right now. Try again shortly.")
 		return
@@ -103,30 +116,36 @@ func (handler Handler) searchPhotos(writer http.ResponseWriter, request *http.Re
 	if photos == nil {
 		photos = []stockimages.Photo{}
 	}
-	writeJSON(writer, http.StatusOK, map[string]any{"photos": photos})
+	providers := make([]string, 0, len(handler.Stock))
+	for _, configured := range handler.Stock {
+		providers = append(providers, configured.Name())
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{"photos": photos, "provider": source.Name(), "providers": providers})
 }
 
-// addStockPhoto stores a Pexels photo named by its ID. The server looks the
+// addStockPhoto stores a stock photo named by its library and ID. The server looks the
 // photo up itself, so a client can never make it download an arbitrary URL.
 func (handler Handler) addStockPhoto(writer http.ResponseWriter, request *http.Request) {
 	presentationID, ok := handler.ownedEditable(writer, request)
 	if !ok {
 		return
 	}
-	if handler.Stock == nil {
-		writeError(writer, http.StatusServiceUnavailable, "Photo search is not available")
-		return
-	}
 	var input struct {
-		PhotoID int64  `json:"photoId"`
-		Query   string `json:"query"`
+		Provider string `json:"provider"`
+		PhotoID  string `json:"photoId"`
+		Query    string `json:"query"`
 	}
-	if err := json.NewDecoder(io.LimitReader(request.Body, 4096)).Decode(&input); err != nil || input.PhotoID < 1 {
+	if err := json.NewDecoder(io.LimitReader(request.Body, 4096)).Decode(&input); err != nil || input.Provider == "" || input.PhotoID == "" {
 		writeError(writer, http.StatusBadRequest, "Request must name a photo")
 		return
 	}
+	source := handler.stockSource(input.Provider)
+	if source == nil {
+		writeError(writer, http.StatusServiceUnavailable, "Photo search is not available")
+		return
+	}
 	ctx := request.Context()
-	photo, err := handler.Stock.Photo(ctx, input.PhotoID)
+	photo, err := source.Photo(ctx, input.PhotoID)
 	if errors.Is(err, stockimages.ErrNotFound) {
 		writeError(writer, http.StatusNotFound, "Photo not found")
 		return
@@ -135,7 +154,7 @@ func (handler Handler) addStockPhoto(writer http.ResponseWriter, request *http.R
 		writeError(writer, http.StatusServiceUnavailable, "The photo could not be fetched. Try again shortly.")
 		return
 	}
-	data, err := handler.Stock.Download(ctx, photo)
+	data, err := source.Download(ctx, photo)
 	if err != nil {
 		writeError(writer, http.StatusServiceUnavailable, "The photo could not be fetched. Try again shortly.")
 		return

@@ -16,7 +16,7 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/stockimages"
 )
 
-func stubPexels(t *testing.T) *stockimages.Pexels {
+func stubPexels(t *testing.T) []stockimages.Source {
 	t.Helper()
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -35,7 +35,7 @@ func stubPexels(t *testing.T) *stockimages.Pexels {
 	}))
 	t.Cleanup(server.Close)
 	host, _ := url.Parse(server.URL)
-	return stockimages.New("key", server.URL, []string{host.Host})
+	return []stockimages.Source{stockimages.NewPexels("key", server.URL, []string{host.Host})}
 }
 
 func TestPhotoRoutesStoreOnlyVerifiedImagesForTheOwner(t *testing.T) {
@@ -56,15 +56,26 @@ func TestPhotoRoutesStoreOnlyVerifiedImagesForTheOwner(t *testing.T) {
 		t.Fatal(err)
 	}
 	var search struct {
-		Photos []stockimages.Photo `json:"photos"`
+		Photos    []stockimages.Photo `json:"photos"`
+		Provider  string              `json:"provider"`
+		Providers []string            `json:"providers"`
 	}
 	_ = json.NewDecoder(response.Body).Decode(&search)
 	response.Body.Close()
-	if len(search.Photos) != 1 || search.Photos[0].ID != 7 {
+	if len(search.Photos) != 1 || search.Photos[0].ID != "7" || search.Provider != "pexels" || len(search.Providers) != 1 {
 		t.Fatalf("search = %+v", search)
 	}
 
-	response, err = http.Post(base+"/assets/stock", "application/json", bytes.NewReader([]byte(`{"photoId": 7, "query": "solar"}`)))
+	response, err = http.Post(base+"/assets/stock", "application/json", bytes.NewReader([]byte(`{"provider": "unsplash", "photoId": "7"}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("photo from an unconfigured library = %d", response.StatusCode)
+	}
+
+	response, err = http.Post(base+"/assets/stock", "application/json", bytes.NewReader([]byte(`{"provider": "pexels", "photoId": "7", "query": "solar"}`)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +91,7 @@ func TestPhotoRoutesStoreOnlyVerifiedImagesForTheOwner(t *testing.T) {
 	}
 	var source AssetSource
 	_ = json.Unmarshal(added.Asset.Source, &source)
-	if source.Provider != "pexels" || source.ProviderID != "7" || source.Photographer != "Ada" {
+	if source.Provider != "pexels" || source.ProviderID != "7" || source.Photographer != "Ada" || source.License != "Pexels License" {
 		t.Fatalf("source = %+v", source)
 	}
 
