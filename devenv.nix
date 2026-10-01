@@ -48,13 +48,13 @@
             '';
         };
 
-        "db:migrate" = {
-            after = [ "db:setup" ];
-            exec = ''
-                DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" \
-                    go -C "$DEVENV_ROOT/apps/api" run ./cmd/migrate
-            '';
-        };
+		"db:migrate" = {
+			after = [ "db:setup" "devenv:processes:storage@ready" ];
+			exec = ''
+				DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" \
+					go -C "$DEVENV_ROOT/apps/api" run ./cmd/migrate
+			'';
+		};
     };
 
 	processes = {
@@ -169,6 +169,7 @@
 		WORKER_DATABASE_POOL_MAX = "5";
 
 		STORAGE_EMULATOR_HOST = "http://127.0.0.1:4443";
+		# Preserve the image bucket and legacy document objects for JSONB backfill.
 		PRESENTATION_GCS_BUCKET = "slidesage-dev-revisions";
 		CARD_CONVERTER_URL = "http://127.0.0.1:8090";
     };

@@ -12,9 +12,10 @@ dev:
 db-shell:
     psql -h 127.0.0.1 -p "${PGPORT:-${POSTGRES_PORT:-5432}}" -U "${POSTGRES_USER:-slidesage}" -d "${POSTGRES_DB:-slidesage}"
 
-# Apply Go API migrations
+# Apply Goose, resumable document backfill, and River migrations.
+# Start local storage first when legacy bodies remain; retain bucket/emulator env.
 migrate:
-    CGO_ENABLED=0 go -C apps/api run ./cmd/migrate
+	CGO_ENABLED=0 go -C apps/api run ./cmd/migrate
 
 # Create a new Goose SQL migration
 db-generate name:
