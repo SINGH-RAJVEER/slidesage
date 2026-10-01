@@ -16,6 +16,13 @@ interface History {
 	future: CardDocument[];
 }
 
+/** One save request. A retry sends the same ID, so the server applies it once. */
+interface Operation {
+	document: CardDocument;
+	validated: CardDocument;
+	id: string;
+}
+
 /** Edits closer together than this undo as one step, so typing is not undone a letter at a time. */
 const COALESCE_MS = 800;
 /** Quiet time after the last edit before it is saved. */
@@ -63,7 +70,8 @@ export function useDocumentEditor(options: {
 	const lastEdit = useRef(0);
 	const saving = useRef<Promise<void> | null>(null);
 	const blocked = useRef(false);
-	const pendingOperation = useRef<{ document: CardDocument; id: string } | null>(null);
+	// The last save that did not succeed, kept while it may still have landed.
+	const pendingOperation = useRef<Operation | null>(null);
 	const present = useRef(history.present);
 	present.current = history.present;
 
@@ -104,9 +112,65 @@ export function useDocumentEditor(options: {
 		});
 	}, []);
 
+	/** Sends one save, reporting whether it is now the saved revision. */
+	const send = useCallback(
+		async (operation: Operation): Promise<boolean> => {
+			setStatus({ state: "saving" });
+			try {
+				const response = await fetch(
+					`${API_URL}/presentations/${encodeURIComponent(presentationId)}/document`,
+					{
+						method: "PUT",
+						credentials: "include",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							baseRevision: base.current,
+							operationId: operation.id,
+							document: operation.validated,
+						}),
+					},
+				);
+				const body = (await response.json().catch(() => null)) as {
+					revision?: { revision: number };
+					error?: { message?: string };
+				} | null;
+				if (response.status === 409) {
+					blocked.current = true;
+					pendingOperation.current = null;
+					setStatus({
+						state: "conflict",
+						message: body?.error?.message ?? "This presentation was changed elsewhere.",
+					});
+					return false;
+				}
+				if (!response.ok || !body?.revision) {
+					// A refusal means nothing was stored. A server error may have
+					// come after the revision was, so that save stays pending.
+					if (response.status < 500) pendingOperation.current = null;
+					setStatus({ state: "error", message: body?.error?.message ?? "Unable to save changes." });
+					return false;
+				}
+				base.current = body.revision.revision;
+				saved.current = operation.document;
+				pendingOperation.current = null;
+				onSaved?.(operation.document, body.revision.revision);
+				return true;
+			} catch {
+				setStatus({ state: "error", message: "Unable to save changes. Check your connection." });
+				return false;
+			}
+		},
+		[onSaved, presentationId],
+	);
+
 	const save = useCallback(async () => {
 		if (blocked.current) return;
 		const document = present.current;
+		// A save whose response was lost may still have landed, and a newer
+		// save based on the revision before it would then conflict. Repeating
+		// it first returns the revision it made, or makes it now.
+		const unsettled = pendingOperation.current;
+		if (unsettled && unsettled.document !== document && !(await send(unsettled))) return;
 		if (document === saved.current) {
 			setStatus({ state: "saved" });
 			return;
@@ -122,48 +186,11 @@ export function useDocumentEditor(options: {
 		// A retry of the same document reuses its operation ID, so a save whose
 		// response was lost is not applied twice.
 		if (pendingOperation.current?.document !== document) {
-			pendingOperation.current = { document, id: crypto.randomUUID() };
+			pendingOperation.current = { document, validated: checked.value, id: crypto.randomUUID() };
 		}
-		setStatus({ state: "saving" });
-		try {
-			const response = await fetch(
-				`${API_URL}/presentations/${encodeURIComponent(presentationId)}/document`,
-				{
-					method: "PUT",
-					credentials: "include",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({
-						baseRevision: base.current,
-						operationId: pendingOperation.current.id,
-						document: checked.value,
-					}),
-				},
-			);
-			const body = (await response.json().catch(() => null)) as {
-				revision?: { revision: number };
-				error?: { message?: string };
-			} | null;
-			if (response.status === 409) {
-				blocked.current = true;
-				setStatus({
-					state: "conflict",
-					message: body?.error?.message ?? "This presentation was changed elsewhere.",
-				});
-				return;
-			}
-			if (!response.ok || !body?.revision) {
-				setStatus({ state: "error", message: body?.error?.message ?? "Unable to save changes." });
-				return;
-			}
-			base.current = body.revision.revision;
-			saved.current = document;
-			pendingOperation.current = null;
-			onSaved?.(document, body.revision.revision);
-			setStatus(present.current === document ? { state: "saved" } : { state: "pending" });
-		} catch {
-			setStatus({ state: "error", message: "Unable to save changes. Check your connection." });
-		}
-	}, [assetIds, onSaved, presentationId]);
+		if (!(await send(pendingOperation.current))) return;
+		setStatus(present.current === document ? { state: "saved" } : { state: "pending" });
+	}, [assetIds, send]);
 
 	const flush = useCallback(async () => {
 		while (saving.current) await saving.current;

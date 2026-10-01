@@ -78,6 +78,37 @@ describe("DeckWorkspace", () => {
 		expect(await view.findByText("All changes saved")).toBeInTheDocument();
 	}, 15000);
 
+	it("repeats a save whose response was lost before saving newer edits", async () => {
+		const bodies: Array<{ baseRevision: number; operationId: string; document: unknown }> = [];
+		let revision = 3;
+		globalThis.fetch = mock(async (_input: string | URL | Request, init?: RequestInit) => {
+			bodies.push(JSON.parse(String(init?.body)));
+			// The first save lands, but its response never arrives.
+			revision += bodies.length === 2 ? 0 : 1;
+			if (bodies.length === 1) throw new TypeError("network");
+			return Response.json({ revision: { revision } });
+		}) as unknown as typeof fetch;
+
+		const view = open();
+		fireEvent.click(view.getByRole("button", { name: "Edit" }));
+		typeHeading(view, "Grid batteries");
+		expect(
+			await view.findByText(
+				"Unable to save changes. Check your connection.",
+				{},
+				{ timeout: 8000 },
+			),
+		).toBeInTheDocument();
+		typeHeading(view, "Grid batteries at scale");
+
+		await waitFor(() => expect(bodies).toHaveLength(3), { timeout: 8000 });
+		expect(bodies[1]).toEqual(bodies[0] as (typeof bodies)[number]);
+		expect(bodies[2]).toMatchObject({ baseRevision: 4 });
+		expect(bodies[2]?.operationId).not.toBe(bodies[0]?.operationId);
+		expect(JSON.stringify(bodies[2]?.document)).toContain("Grid batteries at scale");
+		expect(await view.findByText("All changes saved")).toBeInTheDocument();
+	}, 20000);
+
 	it("does not save a document the schema would refuse", async () => {
 		const fetchMock = mock(async () => Response.json({ revision: { revision: 4 } }));
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
