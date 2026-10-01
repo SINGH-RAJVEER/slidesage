@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/draw"
+	"image/color"
 	"image/jpeg"
 	"image/png"
 	"sort"
@@ -19,8 +19,8 @@ import (
 	// Registered for image.Decode.
 	_ "image/gif"
 
-	xdraw "golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -28,12 +28,19 @@ const (
 	MaxSourceImageBytes = 15 << 20
 	// maxSourcePixels bounds the decoded size, since a small file can declare
 	// enormous dimensions.
-	maxSourcePixels = 60_000_000
+	maxSourcePixels = 50_000_000
 	maxSourceSide   = 12_000
 	// maxStoredWidth is wide enough for a full-bleed card on a 2x display.
 	maxStoredWidth = 2400
 	jpegQuality    = 85
+	// decodeBudgetBytes is the memory every image decode in one process may
+	// hold at once. The API serves many requests from 512 MiB, so decodes
+	// wait for each other here instead of exhausting the instance, and an
+	// image that alone would need more is refused.
+	decodeBudgetBytes = 192 << 20
 )
+
+var decodeBudget = semaphore.NewWeighted(decodeBudgetBytes)
 
 var (
 	ErrUnsupportedImage = errors.New("unsupported or oversized image")
@@ -73,11 +80,12 @@ type AssetSource struct {
 // normalizeImage decodes an image within fixed bounds, shrinks it to the
 // stored width, and re-encodes it. Re-encoding drops every byte the source
 // carried besides pixels: EXIF, location, color profiles, and anything hidden.
-func normalizeImage(data []byte) ([]byte, string, int, int, error) {
+// It waits for its share of the decode budget, or for ctx to end.
+func normalizeImage(ctx context.Context, data []byte) ([]byte, string, int, int, error) {
 	if len(data) == 0 || len(data) > MaxSourceImageBytes {
 		return nil, "", 0, 0, fmt.Errorf("%w: %d bytes", ErrUnsupportedImage, len(data))
 	}
-	config, _, err := image.DecodeConfig(bytes.NewReader(data))
+	config, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return nil, "", 0, 0, fmt.Errorf("%w: %v", ErrUnsupportedImage, err)
 	}
@@ -85,24 +93,24 @@ func normalizeImage(data []byte) ([]byte, string, int, int, error) {
 		config.Width*config.Height > maxSourcePixels {
 		return nil, "", 0, 0, fmt.Errorf("%w: %dx%d", ErrUnsupportedImage, config.Width, config.Height)
 	}
+	width, height := storedSize(config.Width, config.Height)
+	cost := decodeCost(data, format, config) + int64(width)*int64(height)*4
+	if cost > decodeBudgetBytes {
+		return nil, "", 0, 0, fmt.Errorf("%w: %dx%d %s needs %d MB to decode", ErrUnsupportedImage, config.Width, config.Height, format, cost>>20)
+	}
+	if err := decodeBudget.Acquire(ctx, cost); err != nil {
+		return nil, "", 0, 0, err
+	}
+	defer decodeBudget.Release(cost)
 	decoded, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, "", 0, 0, fmt.Errorf("%w: %v", ErrUnsupportedImage, err)
 	}
-	bounds := decoded.Bounds()
-	width, height := bounds.Dx(), bounds.Dy()
-	if width > maxStoredWidth {
-		height = height * maxStoredWidth / width
-		width = maxStoredWidth
-	}
+	// A GIF's first frame may be smaller than its screen, never larger.
+	width, height = storedSize(decoded.Bounds().Dx(), decoded.Bounds().Dy())
 	opaque := isOpaque(decoded)
-	var canvas draw.Image
-	if opaque {
-		canvas = image.NewRGBA(image.Rect(0, 0, width, height))
-	} else {
-		canvas = image.NewNRGBA(image.Rect(0, 0, width, height))
-	}
-	xdraw.CatmullRom.Scale(canvas, canvas.Bounds(), decoded, bounds, xdraw.Src, nil)
+	canvas := image.NewRGBA(image.Rect(0, 0, width, height))
+	shrink(canvas, decoded)
 
 	var out bytes.Buffer
 	mimeType := "image/jpeg"
@@ -116,6 +124,106 @@ func normalizeImage(data []byte) ([]byte, string, int, int, error) {
 		return nil, "", 0, 0, fmt.Errorf("encode image: %w", err)
 	}
 	return out.Bytes(), mimeType, width, height, nil
+}
+
+// storedSize scales an image's size down to the stored width.
+func storedSize(width, height int) (int, int) {
+	if width > maxStoredWidth {
+		return maxStoredWidth, max(1, height*maxStoredWidth/width)
+	}
+	return width, height
+}
+
+// decodeCost estimates the bytes decoding an image allocates: its pixels in
+// the layout the decoder produces and, for a progressive JPEG, the
+// coefficients it keeps until the last scan.
+func decodeCost(data []byte, format string, config image.Config) int64 {
+	pixels := float64(config.Width) * float64(config.Height)
+	perPixel := 8.0
+	switch format {
+	case "jpeg":
+		planes, progressive := jpegLayout(data)
+		perPixel = planes
+		if progressive {
+			perPixel += planes * 4
+		}
+		if planes > 3 {
+			// Four-component JPEGs are converted to a separate CMYK image.
+			perPixel += 4
+		}
+	case "png":
+		perPixel = 4
+		if _, paletted := config.ColorModel.(color.Palette); paletted {
+			perPixel = 1
+			break
+		}
+		switch config.ColorModel {
+		case color.GrayModel:
+			perPixel = 1
+		case color.Gray16Model:
+			perPixel = 2
+		case color.RGBA64Model, color.NRGBA64Model:
+			perPixel = 8
+		}
+		// An interlaced PNG holds each pass beside the merged image; the
+		// largest pass is half of it.
+		if len(data) > 28 && data[28] == 1 {
+			perPixel *= 1.5
+		}
+	case "gif":
+		perPixel = 1
+	case "webp":
+		// Lossy WebP decodes to subsampled planes and an alpha plane. Lossless
+		// decodes to packed pixels and then copies them to NRGBA.
+		perPixel = 8
+		if len(data) >= 16 && string(data[12:16]) == "VP8 " {
+			perPixel = 3
+		}
+	}
+	// Block and row padding, and the band shrink converts through.
+	return int64(pixels*perPixel*1.1) + int64(config.Width)*shrinkBand*4
+}
+
+// jpegLayout reads a JPEG's frame header: the bytes per pixel its component
+// planes take after chroma subsampling, and whether it is progressive. A
+// header it cannot read is assumed the costliest kind.
+func jpegLayout(data []byte) (float64, bool) {
+	for at := 2; at+4 <= len(data) && data[at] == 0xFF; {
+		marker := data[at+1]
+		if marker == 0xFF {
+			at++
+			continue
+		}
+		length := int(data[at+2])<<8 | int(data[at+3])
+		end := at + 2 + length
+		if length < 2 || end > len(data) {
+			break
+		}
+		// SOF0 to SOF2 are the frames the standard decoder reads.
+		if marker >= 0xC0 && marker <= 0xC2 {
+			frame := data[at+4 : end]
+			if len(frame) < 6 {
+				break
+			}
+			count := int(frame[5])
+			if count < 1 || len(frame) < 6+3*count {
+				break
+			}
+			widest, tallest := 1, 1
+			for component := range count {
+				sampling := frame[7+3*component]
+				widest, tallest = max(widest, int(sampling>>4)), max(tallest, int(sampling&15))
+			}
+			planes := 0.0
+			for component := range count {
+				sampling := frame[7+3*component]
+				planes += float64(int(sampling>>4)*int(sampling&15)) / float64(widest*tallest)
+			}
+			return planes, marker == 0xC2
+		}
+		at = end
+	}
+	return 4, true
 }
 
 func isOpaque(img image.Image) bool {
@@ -140,7 +248,7 @@ func PrepareAsset(ctx context.Context, store ObjectStore, presentationID string,
 	if store == nil {
 		return Asset{}, errors.New("card document storage is not configured")
 	}
-	normalized, mimeType, width, height, err := normalizeImage(data)
+	normalized, mimeType, width, height, err := normalizeImage(ctx, data)
 	if err != nil {
 		return Asset{}, err
 	}

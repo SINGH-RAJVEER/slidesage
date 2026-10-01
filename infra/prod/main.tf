@@ -162,6 +162,12 @@ resource "google_cloud_run_v2_service" "api" {
         startup_cpu_boost = true
       }
 
+      # Collect garbage harder near the container limit; image decodes are
+      # budgeted to fit under it.
+      env {
+        name  = "GOMEMLIMIT"
+        value = "400MiB"
+      }
       env {
         name  = "NODE_ENV"
         value = "production"

@@ -9,7 +9,9 @@ import (
 	"image/color"
 	"image/jpeg"
 	"image/png"
+	"runtime"
 	"testing"
+	"time"
 )
 
 func encodedPNG(t *testing.T, width, height int, alpha uint8) []byte {
@@ -114,5 +116,99 @@ func TestCommitTxRefusesImagesThePresentationDoesNotHave(t *testing.T) {
 	assets, err := AssetsFor(ctx, database, presentationID, []string{asset.SHA256})
 	if err != nil || assets[asset.SHA256].Width != 64 {
 		t.Fatalf("assets = %+v, err = %v", assets, err)
+	}
+}
+
+func TestShrinkAveragesTheAreaEachPixelCovers(t *testing.T) {
+	src := image.NewRGBA(image.Rect(0, 0, 9, 4))
+	for y := range 4 {
+		for x := range 9 {
+			// Left third black, the rest white.
+			value := uint8(255)
+			if x < 3 {
+				value = 0
+			}
+			src.Set(x, y, color.RGBA{R: value, G: value, B: value, A: 255})
+		}
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, 2, 3))
+	shrink(dst, src)
+	for y := range 3 {
+		// The left pixel covers 4.5 columns, three of them black.
+		if left, right := dst.RGBAAt(0, y), dst.RGBAAt(1, y); left.R != 85 || right.R != 255 || left.A != 255 || right.A != 255 {
+			t.Fatalf("row %d = %v %v", y, left, right)
+		}
+	}
+}
+
+func TestNormalizeImageHoldsLittleBesidesTheDecodedPhoto(t *testing.T) {
+	if testing.Short() {
+		t.Skip("encodes a 24 megapixel photo")
+	}
+	var encoded bytes.Buffer
+	if err := jpeg.Encode(&encoded, image.NewYCbCr(image.Rect(0, 0, 6000, 4000), image.YCbCrSubsampleRatio420), nil); err != nil {
+		t.Fatal(err)
+	}
+	runtime.GC()
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	_, _, width, height, err := normalizeImage(context.Background(), encoded.Bytes())
+	runtime.ReadMemStats(&after)
+	if err != nil || width != 2400 || height != 1600 {
+		t.Fatalf("normalized = %dx%d, err = %v", width, height, err)
+	}
+	// 36 MB of decoded planes and a 15 MB canvas; a kernel scaler adds 300 MB.
+	if allocated := (after.TotalAlloc - before.TotalAlloc) >> 20; allocated > 80 {
+		t.Fatalf("normalizing allocated %d MB", allocated)
+	}
+}
+
+func TestDecodeCostCountsSubsamplingAndProgressiveScans(t *testing.T) {
+	var baseline bytes.Buffer
+	if err := jpeg.Encode(&baseline, image.NewYCbCr(image.Rect(0, 0, 64, 32), image.YCbCrSubsampleRatio420), nil); err != nil {
+		t.Fatal(err)
+	}
+	if planes, progressive := jpegLayout(baseline.Bytes()); planes != 1.5 || progressive {
+		t.Fatalf("baseline 4:2:0 = %v planes, progressive %v", planes, progressive)
+	}
+	// A progressive 4:4:4 frame header: three full planes.
+	header := []byte{0xFF, 0xD8, 0xFF, 0xC2, 0x00, 0x11, 0x08, 0x2E, 0xE0, 0x2E, 0xE0, 0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01}
+	if planes, progressive := jpegLayout(header); planes != 3 || !progressive {
+		t.Fatalf("progressive 4:4:4 = %v planes, progressive %v", planes, progressive)
+	}
+	if planes, progressive := jpegLayout([]byte{0xFF, 0xD8, 0x00}); planes != 4 || !progressive {
+		t.Fatalf("unreadable header = %v planes, progressive %v", planes, progressive)
+	}
+	// Twelve thousand pixels square of progressive 4:4:4 would need gigabytes;
+	// it is refused before anything is allocated.
+	config := image.Config{Width: 12000, Height: 12000}
+	if cost := decodeCost(header, "jpeg", config); cost <= decodeBudgetBytes {
+		t.Fatalf("cost = %d", cost)
+	}
+}
+
+func TestNormalizeImageWaitsForTheDecodeBudget(t *testing.T) {
+	if err := decodeBudget.Acquire(context.Background(), decodeBudgetBytes); err != nil {
+		t.Fatal(err)
+	}
+	defer decodeBudget.Release(decodeBudgetBytes)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, _, _, _, err := normalizeImage(ctx, encodedPNG(t, 40, 30, 255)); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("error while the budget is spent = %v", err)
+	}
+}
+
+func TestDecodeCostCountsInterlacedPNGPasses(t *testing.T) {
+	data := encodedPNG(t, 4, 4, 255)
+	config, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := decodeCost(data, format, config)
+	interlaced := append([]byte(nil), data...)
+	interlaced[28] = 1
+	if cost := decodeCost(interlaced, format, config); cost <= plain {
+		t.Fatalf("interlaced cost %d, plain %d", cost, plain)
 	}
 }

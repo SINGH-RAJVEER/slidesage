@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/stockimages"
+	"golang.org/x/sync/semaphore"
 )
 
 // StockSource describes a stock photo for asset records and attribution.
@@ -184,6 +185,10 @@ func (handler Handler) addStockPhoto(writer http.ResponseWriter, request *http.R
 	handler.respondAsset(writer, request, asset, alt)
 }
 
+// uploadSlots bounds how many uploads are held in memory at once, since each
+// may be MaxSourceImageBytes before its decode is budgeted.
+var uploadSlots = semaphore.NewWeighted(4)
+
 // uploadPhoto stores an image the user uploaded. It is decoded and re-encoded
 // like every other asset, so the stored file carries pixels and nothing else.
 func (handler Handler) uploadPhoto(writer http.ResponseWriter, request *http.Request) {
@@ -191,21 +196,19 @@ func (handler Handler) uploadPhoto(writer http.ResponseWriter, request *http.Req
 	if !ok {
 		return
 	}
+	if err := uploadSlots.Acquire(request.Context(), 1); err != nil {
+		return
+	}
+	defer uploadSlots.Release(1)
 	request.Body = http.MaxBytesReader(writer, request.Body, MaxSourceImageBytes+64<<10)
-	file, _, err := request.FormFile("file")
+	data, err := uploadedFile(request)
 	if err != nil {
 		writeError(writer, http.StatusBadRequest, "Choose an image of at most 15 MB to upload")
 		return
 	}
-	defer file.Close()
-	data, err := io.ReadAll(io.LimitReader(file, MaxSourceImageBytes+1))
-	if err != nil {
-		writeError(writer, http.StatusBadRequest, "The upload could not be read")
-		return
-	}
 	asset, err := PrepareAsset(request.Context(), handler.Store, presentationID, data, AssetSource{Type: "upload"})
 	if errors.Is(err, ErrUnsupportedImage) {
-		writeError(writer, http.StatusUnprocessableEntity, "Upload a PNG, JPEG, WebP, or GIF image no larger than 12000 pixels on a side")
+		writeError(writer, http.StatusUnprocessableEntity, "Upload a PNG, JPEG, WebP, or GIF image of at most 12000 pixels on a side. Very large images, especially progressive JPEGs, may need to be scaled down first")
 		return
 	}
 	if err != nil {
@@ -213,4 +216,30 @@ func (handler Handler) uploadPhoto(writer http.ResponseWriter, request *http.Req
 		return
 	}
 	handler.respondAsset(writer, request, asset, "")
+}
+
+// uploadedFile reads the form's file field straight from the request, so the
+// upload is held once rather than buffered by the form parser and copied.
+func uploadedFile(request *http.Request) ([]byte, error) {
+	reader, err := request.MultipartReader()
+	if err != nil {
+		return nil, err
+	}
+	for {
+		part, err := reader.NextPart()
+		if err != nil {
+			return nil, err
+		}
+		if part.FormName() != "file" {
+			continue
+		}
+		data, err := io.ReadAll(io.LimitReader(part, MaxSourceImageBytes+1))
+		if err != nil {
+			return nil, err
+		}
+		if len(data) > MaxSourceImageBytes {
+			return nil, ErrUnsupportedImage
+		}
+		return data, nil
+	}
 }

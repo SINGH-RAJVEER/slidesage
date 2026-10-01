@@ -149,7 +149,7 @@ func (handler Handler) readHotlink(request *http.Request, asset Asset) ([]byte, 
 	if err != nil {
 		return nil, "", 0, 0, err
 	}
-	return normalizeImage(data)
+	return normalizeImage(request.Context(), data)
 }
 
 // contentDisposition names the download after the deck, with an ASCII
