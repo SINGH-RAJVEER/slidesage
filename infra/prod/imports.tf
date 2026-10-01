@@ -2,8 +2,11 @@
 # dev-to-main PR is merged. Import blocks are evaluated by plan; apply writes
 # their results into state and may also change resource settings.
 #
-# The revision bucket, its runtime IAM, and registry reader IAM are planned
-# additions. Secret values and the GCS state bucket are provisioned
+# The image/backfill bucket, its runtime IAM, and registry reader IAM are planned
+# additions only if not already managed. Preserve their legacy resource addresses
+# and names. If the bucket already exists outside state, import it at
+# google_storage_bucket.presentation_revisions before applying; do not replace it.
+# Secret values and the GCS state bucket are provisioned
 # separately before the first approved apply.
 
 import {

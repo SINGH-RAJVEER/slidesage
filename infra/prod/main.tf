@@ -509,48 +509,59 @@ resource "google_cloud_run_v2_service_iam_member" "api_public_invoker" {
 }
 
 resource "google_cloud_run_v2_job" "migrate" {
-  name     = local.migrate_name
-  location = var.gcp_region
+	name     = local.migrate_name
+	location = var.gcp_region
 
-  template {
-    template {
-      service_account = google_service_account.runtime.email
-      timeout         = "600s"
-      max_retries     = 3
+	template {
+		template {
+			# Legacy bodies are fetched and committed serially. Allow 20 minutes per
+			# attempt; retries resume at the remaining NULL bodies rather than restart.
+			service_account = google_service_account.runtime.email
+			timeout         = "1200s"
+			max_retries     = 3
 
-      containers {
-        image = var.migrate_image
+			containers {
+				image = var.migrate_image
 
-        volume_mounts {
-          name       = "cloudsql"
-          mount_path = "/cloudsql"
-        }
+				env {
+					name  = "PRESENTATION_GCS_BUCKET"
+					value = local.presentation_gcs_bucket
+				}
 
-        env {
-          name = "DATABASE_URL"
-          value_source {
-            secret_key_ref {
-              secret  = data.google_secret_manager_secret.runtime["DATABASE_URL"].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
+				volume_mounts {
+					name       = "cloudsql"
+					mount_path = "/cloudsql"
+				}
 
-      volumes {
-        name = "cloudsql"
-        cloud_sql_instance {
-          instances = [google_sql_database_instance.primary.connection_name]
-        }
-      }
-    }
-  }
+				env {
+					name = "DATABASE_URL"
+					value_source {
+						secret_key_ref {
+							secret  = data.google_secret_manager_secret.runtime["DATABASE_URL"].secret_id
+							version = "latest"
+						}
+					}
+				}
+			}
 
-  lifecycle {
-    ignore_changes = [client, client_version]
-  }
+			volumes {
+				name = "cloudsql"
+				cloud_sql_instance {
+					instances = [google_sql_database_instance.primary.connection_name]
+				}
+			}
+		}
+	}
 
-  depends_on = [google_secret_manager_secret_iam_member.runtime_accessor]
+	lifecycle {
+		ignore_changes = [client, client_version]
+	}
+
+	# Include source-bucket read IAM in the targeted migration-job apply.
+	depends_on = [
+		google_secret_manager_secret_iam_member.runtime_accessor,
+		google_storage_bucket_iam_member.runtime_revision_viewer,
+	]
 }
 
 # Wake signalling ------------------------------------------------------------
