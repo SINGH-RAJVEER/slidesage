@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivermigrate"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/migrations"
 )
 
@@ -51,6 +54,9 @@ func main() {
 	if err := goose.UpContext(ctx, database, "."); err != nil {
 		log.Fatal(err)
 	}
+	if err := backfillCardDocuments(ctx, database); err != nil {
+		log.Fatal(err)
+	}
 
 	migrator, err := rivermigrate.New(riverdatabasesql.New(database), nil)
 	if err != nil {
@@ -59,6 +65,27 @@ func main() {
 	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func backfillCardDocuments(ctx context.Context, database *sql.DB) error {
+	var missing bool
+	if err := database.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM card_revisions WHERE document IS NULL)`).Scan(&missing); err != nil {
+		return err
+	}
+	var store carddocument.ObjectStore
+	if missing {
+		bucket := strings.TrimSpace(os.Getenv("PRESENTATION_GCS_BUCKET"))
+		if bucket == "" {
+			return fmt.Errorf("unbackfilled card revisions remain: PRESENTATION_GCS_BUCKET must name their legacy source bucket")
+		}
+		gcs, err := carddocument.NewGCSBlobStore(ctx, bucket)
+		if err != nil {
+			return err
+		}
+		defer gcs.Close()
+		store = gcs
+	}
+	return carddocument.BackfillDocuments(ctx, database, store)
 }
 
 func envInt(key string, fallback int) int {
