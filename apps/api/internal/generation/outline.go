@@ -19,7 +19,7 @@ const outlineSchemaAllowanceTokens = 2000
 // the request context, and the schema allowance.
 func outlineAuthorizationMillis(input submitInput) int64 {
 	output := input.SlideCount*planTokensPerCard + 300
-	return authorizationMillis(output, input.Topic, nil, input.Research, input.ResearchPayload, 0) + outlineSchemaAllowanceTokens
+	return authorizationMillis(output, input.Topic, input.Research, input.ResearchPayload, 0) + outlineSchemaAllowanceTokens
 }
 
 type duplicateOutline struct{}

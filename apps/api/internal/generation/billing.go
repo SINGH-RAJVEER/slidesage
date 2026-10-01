@@ -328,10 +328,10 @@ func recordLedger(tx *sql.Tx, userID, operationID, entryType string, delta, bala
 	return err
 }
 
-func authorizationMillis(outputBudget int, prompt string, current json.RawMessage, research any, payload *presentation.ResearchPayload, repairHeadroom int) int64 {
+func authorizationMillis(outputBudget int, prompt string, research any, payload *presentation.ResearchPayload, repairHeadroom int) int64 {
 	encodedResearch, _ := json.Marshal(research)
 	encodedSources, _ := json.Marshal(payload)
-	inputBytes := draftingPromptAllowanceBytes + len(prompt) + len(current) + len(encodedResearch) + len(encodedSources) + 256
+	inputBytes := draftingPromptAllowanceBytes + len(prompt) + len(encodedResearch) + len(encodedSources) + 256
 	// A slide that fails validation is repaired in a second call that resends the
 	// prompt, so the headroom is reserved once as extra input and once as extra
 	// output rather than only against the reply.
@@ -345,19 +345,6 @@ func authorizationMillis(outputBudget int, prompt string, current json.RawMessag
 
 // maxOutputCeilingTokens caps every output bound this package sends.
 const maxOutputCeilingTokens = 16000
-
-// maxOutputTokens bounds a completion by assuming a slide's worth of copy for
-// every requested slide.
-func maxOutputTokens(slideCount int) int {
-	outputTokens := slideCount * 1200
-	if outputTokens < 2000 {
-		return 2000
-	}
-	if outputTokens > maxOutputCeilingTokens {
-		return maxOutputCeilingTokens
-	}
-	return outputTokens
-}
 
 // repairHeadroomTokens covers the bounded repair passes drafting makes when a
 // generated slide fails validation. It is headroom, not a worst case:

@@ -14,8 +14,6 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-const passwordIterations = 210000
-
 func isLegacySHA256(hash string) bool {
 	if len(hash) != 64 {
 		return false

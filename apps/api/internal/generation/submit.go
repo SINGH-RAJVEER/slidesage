@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -410,22 +409,6 @@ type streamJob struct {
 	plan *cardPlan
 	// report sends a progress event for the job. It is set by the worker.
 	report func(eventType string, payload any)
-}
-
-func generationUserPrompt(job streamJob) string {
-	user := fmt.Sprintf("Create a %d-slide %s, %s presentation about: %s", job.slideCount, job.detailLevel, job.tonality, job.prompt)
-	if job.kind == "iteration" {
-		user = fmt.Sprintf("Revise this presentation to exactly %d slides according to: %s\n\nCurrent presentation: %s", job.slideCount, job.prompt, string(job.current))
-	}
-	if job.research != nil {
-		encoded, _ := json.Marshal(job.research)
-		user += "\n\nResearch constraints: " + string(encoded)
-	}
-	if job.researchPayload != nil {
-		encoded, _ := json.Marshal(job.researchPayload.Sources)
-		user += "\n\nUse these reviewed sources and preserve factual attribution: " + string(encoded)
-	}
-	return user
 }
 
 // existingSubmission resolves a reused job ID against the committed job row:

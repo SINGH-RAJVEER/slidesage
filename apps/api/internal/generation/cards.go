@@ -646,7 +646,7 @@ func (d *drafting) repair(ctx context.Context, background string, input carddocu
 // call resends.
 func cardAuthorizationMillis(slideCount int, prompt string, research any, payload *presentation.ResearchPayload) int64 {
 	output := slideCount * (planTokensPerCard + draftTokensPerCard)
-	base := authorizationMillis(output, prompt, nil, research, payload, repairHeadroomTokens(slideCount))
+	base := authorizationMillis(output, prompt, research, payload, repairHeadroomTokens(slideCount))
 	encodedSources, _ := json.Marshal(payload)
 	batches := (slideCount + cardBatchSize - 1) / cardBatchSize
 	perCall := (draftingPromptAllowanceBytes + len(prompt) + len(encodedSources) + slideCount*planBytesPerCard + 3) / 4

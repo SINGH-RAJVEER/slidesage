@@ -136,7 +136,7 @@ func TestRevisionPricingGrowsWithTargetsAndDocument(t *testing.T) {
 }
 
 func TestPointAccountingUsesMilliPoints(t *testing.T) {
-	quote := authorizationMillis(maxOutputTokens(5), "A concise topic", nil, nil, nil, 0)
+	quote := authorizationMillis(6000, "A concise topic", nil, nil, 0)
 	if quote <= 0 {
 		t.Fatalf("authorization = %v", quote)
 	}
