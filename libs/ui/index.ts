@@ -1,5 +1,3 @@
-export * from "./components/alert";
-export * from "./components/badge";
 export * from "./components/button";
 export * from "./components/card";
 export * from "./components/dialog";
@@ -8,7 +6,6 @@ export * from "./components/FloatingNotice";
 export * from "./components/Generate";
 export * from "./components/Header";
 export * from "./components/input";
-export * from "./components/label";
 export * from "./components/loading-screen";
 export * from "./components/Presentations";
 export * from "./components/progress";

@@ -57,30 +57,8 @@ export interface AIConfigurationResponse {
 	selection: AIModelSelection | null;
 }
 
-export interface UpsertAIConnectionRequest {
-	provider: AIProvider;
-	apiKey: string;
-}
-
-export interface UpdateAISelectionRequest extends AIModelSelection {}
-
 export interface UpdateAIConnectionEnabledRequest {
 	enabled: boolean;
-}
-
-export { buildResearchSystemMessage, estimateMessageInputTokens } from "./research-context";
-
-export type ResearchFreshness = "day" | "week" | "month" | "year";
-
-export interface ResearchOptions {
-	enabled: boolean;
-	freshness?: ResearchFreshness;
-	maxResults?: number;
-	includeDomains?: string[];
-	excludeDomains?: string[];
-	startPublishedDate?: string;
-	endPublishedDate?: string;
-	maxAgeHours?: number;
 }
 
 export interface PresentationData {
@@ -88,7 +66,6 @@ export interface PresentationData {
 	totalSlides: number;
 	sources?: Source[];
 	tokens_used?: number;
-	outline_cache_status?: "bypass" | "exact-hit" | "semantic-hit" | "miss";
 }
 
 export type PresentationStatus = "generating" | "ready" | "failed";
@@ -122,119 +99,7 @@ export interface PresentationJSON {
 	totalSlides?: number;
 	tokens_used?: number;
 	sources?: Source[];
-	outline_cache_status?: "bypass" | "exact-hit" | "semantic-hit" | "miss";
 	[key: string]: unknown;
-}
-
-export interface StreamStartEvent {
-	event: "start";
-	data: { status: string };
-}
-
-export interface StreamCreatedEvent {
-	event: "created";
-	data: { job_id?: string; presentation_id: string | number };
-}
-
-export type GenerationJobStatus =
-	| "queued"
-	| "running"
-	| "retrying"
-	| "succeeded"
-	| "failed"
-	| "cancelled";
-
-export interface GenerationJob {
-	id: string;
-	presentation_id: string;
-	kind: "generation" | "iteration";
-	status: GenerationJobStatus;
-	stage?: PresentationGenerationStage;
-	progress: { completed: number; total: number };
-	error?: string;
-	created_at: string;
-	updated_at: string;
-}
-
-export interface StreamResearchEvent {
-	event: "research";
-	data: {
-		status: "searching" | "ready" | "generating";
-		sources?: Source[];
-	};
-}
-
-export interface StreamStageEvent {
-	event: "stage";
-	data: {
-		stage: PresentationGenerationStage;
-		message: string;
-		completed: number;
-		total: number;
-	};
-}
-
-export interface StreamRetryEvent {
-	event: "retry";
-	data: {
-		attempt: number;
-		max_attempts: number;
-		delay_ms: number;
-		reason: string;
-	};
-}
-
-export interface StreamCompleteEvent {
-	event: "complete";
-	data: PresentationJSON;
-}
-
-export interface StreamSavedEvent {
-	event: "saved";
-	data: {
-		presentation_id: string | number;
-		success?: boolean;
-		slide_tokens_remaining?: number | null;
-		slide_tokens_charged?: number;
-	};
-}
-
-export interface StreamErrorEvent {
-	event: "error";
-	data: {
-		error: string;
-		presentation_id?: string | number;
-		details?: unknown;
-		[key: string]: unknown;
-	};
-}
-
-export type PresentationStreamEvent =
-	| StreamStartEvent
-	| StreamCreatedEvent
-	| StreamResearchEvent
-	| StreamStageEvent
-	| StreamRetryEvent
-	| StreamCompleteEvent
-	| StreamSavedEvent
-	| StreamErrorEvent;
-
-export type StreamEvent = PresentationStreamEvent;
-
-export interface OpenRouterMessage {
-	role: string;
-	content: string;
-}
-
-export interface StreamChunk {
-	choices?: Array<{
-		delta?: {
-			content?: string;
-		};
-	}>;
-	usage?: {
-		total_tokens?: number;
-	};
 }
 
 export interface ApiErrorResponse {
