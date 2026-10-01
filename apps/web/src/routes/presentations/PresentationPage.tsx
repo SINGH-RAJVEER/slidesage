@@ -16,6 +16,8 @@ type LoadState =
 	| { status: "generating" }
 	| {
 			status: "ready";
+			/** The deck this document belongs to, which the route may have left. */
+			presentationId: string;
 			document: CardDocument;
 			revision: number;
 			sources: Source[];
@@ -44,8 +46,13 @@ export default function PresentationPage() {
 	const { streamingState, cancelGeneration } = useStreaming();
 	const [state, setState] = useState<LoadState>({ status: "loading" });
 	const [notice, setNotice] = useState<string | null>(null);
+	// A document loaded for another deck is never shown or edited here.
+	const ready = state.status === "ready" && state.presentationId === presentationId;
 	const shown = useRef(false);
-	shown.current = state.status === "ready";
+	shown.current = ready;
+	// Only the latest load may update the page, so a slow answer for the deck
+	// the user left cannot replace the one they opened.
+	const latestLoad = useRef(0);
 	// An AI revision keeps the deck on screen; only a generation replaces it
 	// with progress.
 	const jobHere = streamingState.isStreaming && streamingState.presentationId === presentationId;
@@ -67,10 +74,13 @@ export default function PresentationPage() {
 	);
 
 	const load = useCallback(async () => {
+		const request = ++latestLoad.current;
+		const current = () => request === latestLoad.current;
 		try {
 			const detailResponse = await fetch(`${API_URL}/presentations/${presentationId}`, {
 				credentials: "include",
 			});
+			if (!current()) return;
 			if (!detailResponse.ok) {
 				fail(await errorMessage(detailResponse, "Presentation not found"));
 				return;
@@ -90,6 +100,7 @@ export default function PresentationPage() {
 			const documentResponse = await fetch(`${API_URL}/presentations/${presentationId}/document`, {
 				credentials: "include",
 			});
+			if (!current()) return;
 			if (!documentResponse.ok) {
 				fail(
 					documentResponse.status === NO_CARD_DOCUMENT
@@ -103,6 +114,7 @@ export default function PresentationPage() {
 				revision: { revision: number };
 				assets?: Record<string, CardAsset>;
 			};
+			if (!current()) return;
 			// The document is checked against the same schema the converter
 			// enforced, so a malformed object is reported rather than rendered.
 			const assets = body.assets ?? {};
@@ -115,13 +127,14 @@ export default function PresentationPage() {
 			}
 			setState({
 				status: "ready",
+				presentationId,
 				document: validated.value,
 				revision: body.revision.revision,
 				sources: summary.sources ?? [],
 				assets,
 			});
 		} catch {
-			fail("Unable to load the presentation. Check your connection.");
+			if (current()) fail("Unable to load the presentation. Check your connection.");
 		}
 	}, [fail, navigate, presentationId]);
 
@@ -145,7 +158,7 @@ export default function PresentationPage() {
 		setIsCancelling(false);
 	};
 
-	if (state.status === "loading") {
+	if (state.status === "loading" || (state.status === "ready" && !ready)) {
 		return <CenteredStatusScreen message="Loading presentation..." />;
 	}
 
@@ -186,7 +199,7 @@ export default function PresentationPage() {
 		<>
 			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
 			<DeckWorkspace
-				key={state.revision}
+				key={`${state.presentationId}:${state.revision}`}
 				presentationId={presentationId}
 				document={state.document}
 				revision={state.revision}
