@@ -54,6 +54,8 @@ const PT_PER_CQW = CQW * 72;
 const FONT = "Arial";
 /** Text never shrinks below this fraction of its designed size. */
 const MIN_SCALE = 0.5;
+/** How stock photo libraries are named in photo credits. */
+const STOCK_LIBRARIES: Record<string, string> = { pexels: "Pexels", unsplash: "Unsplash" };
 
 type Rgb = [number, number, number];
 
@@ -678,7 +680,7 @@ function footer(
 	}
 	const credit = asset?.source;
 	if (credit?.type === "stock" && credit.photographer) {
-		const provider = credit.provider === "pexels" ? "Pexels" : (credit.provider ?? "");
+		const provider = STOCK_LIBRARIES[credit.provider ?? ""] ?? credit.provider ?? "";
 		runs.push({ text: `Photo by ${credit.photographer} on ${provider}` });
 	}
 	const options = {

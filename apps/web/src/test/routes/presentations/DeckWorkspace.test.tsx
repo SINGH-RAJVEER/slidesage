@@ -124,20 +124,27 @@ describe("DeckWorkspace", () => {
 		expect(view.queryByRole("textbox", { name: "Card heading" })).not.toBeInTheDocument();
 	}, 15000);
 
-	it("adds a searched photo to a card and saves it", async () => {
+	it("adds a photo searched in another library to a card and saves it", async () => {
 		const assetId = "e".repeat(64);
 		const requests: Array<{ url: string; body?: string }> = [];
 		globalThis.fetch = mock(async (input: string | URL | Request, init?: RequestInit) => {
 			const url = String(input);
 			requests.push({ url, body: typeof init?.body === "string" ? init.body : undefined });
 			if (url.includes("/images/search")) {
+				const provider = new URL(url, "http://localhost").searchParams.get("provider") ?? "pexels";
+				const photo =
+					provider === "unsplash"
+						? { id: "Ab_1", alt: "Solar farm" }
+						: { id: "7", alt: "Wind farm" };
 				return Response.json({
+					provider,
+					providers: ["pexels", "unsplash"],
 					photos: [
 						{
-							id: 7,
+							...photo,
+							provider,
 							width: 1600,
 							height: 900,
-							alt: "Solar farm",
 							photographer: "Ada",
 							thumbnail: "/t.jpg",
 						},
@@ -153,7 +160,7 @@ describe("DeckWorkspace", () => {
 							mimeType: "image/jpeg",
 							width: 1600,
 							height: 900,
-							source: { type: "stock", provider: "pexels", photographer: "Ada" },
+							source: { type: "stock", provider: "unsplash", photographer: "Ada" },
 						},
 					},
 					{ status: 201 },
@@ -167,6 +174,9 @@ describe("DeckWorkspace", () => {
 		fireEvent.click(view.getByRole("button", { name: "Add photo" }));
 		expect(await view.findByRole("textbox", { name: "Search photos" })).toHaveValue("Grid storage");
 		fireEvent.click(view.getByRole("button", { name: "Search" }));
+		expect(await view.findByRole("img", { name: "Wind farm" })).toBeInTheDocument();
+		expect(view.getByRole("link", { name: "Photos provided by Pexels" })).toBeInTheDocument();
+		fireEvent.click(view.getByRole("button", { name: "Unsplash" }));
 		fireEvent.click(await view.findByRole("img", { name: "Solar farm" }));
 
 		await waitForElementToBeRemoved(() => view.queryByRole("dialog", { hidden: true }), {
@@ -182,7 +192,8 @@ describe("DeckWorkspace", () => {
 		expect(
 			JSON.parse(requests.find((request) => request.url.endsWith("/assets/stock"))?.body ?? "{}"),
 		).toEqual({
-			photoId: 7,
+			provider: "unsplash",
+			photoId: "Ab_1",
 			query: "Grid storage",
 		});
 		await waitFor(

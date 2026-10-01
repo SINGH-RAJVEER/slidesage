@@ -678,11 +678,13 @@ function CardImage({
 	);
 }
 
+const STOCK_LIBRARIES: Record<string, string> = { pexels: "Pexels", unsplash: "Unsplash" };
+
 /** Photo credit in the form the stock provider asks for. */
 function Attribution({ asset, className }: { asset?: CardAsset; className?: string }) {
 	const source = asset?.source;
 	if (source?.type !== "stock" || !source.photographer) return null;
-	const provider = source.provider === "pexels" ? "Pexels" : source.provider;
+	const provider = STOCK_LIBRARIES[source.provider ?? ""] ?? source.provider;
 	return (
 		<span className={className}>
 			Photo by{" "}

@@ -14,6 +14,7 @@ import {
 	type CardAsset,
 	CardToolbar,
 	PhotoPicker,
+	type PhotoSearch,
 	type StockPhoto,
 } from "@slidesage/ui/components/Cards";
 import {
@@ -187,12 +188,12 @@ export function DeckWorkspace({
 		setPhotoCard(null);
 	};
 
-	const searchPhotos = async (query: string): Promise<StockPhoto[]> => {
-		const response = await fetch(`${API_URL}/images/search?q=${encodeURIComponent(query)}`, {
-			credentials: "include",
-		});
+	const searchPhotos = async (query: string, provider?: string): Promise<PhotoSearch> => {
+		const params = new URLSearchParams({ q: query });
+		if (provider) params.set("provider", provider);
+		const response = await fetch(`${API_URL}/images/search?${params}`, { credentials: "include" });
 		if (!response.ok) throw new Error(await readError(response, "Photo search failed."));
-		return ((await response.json()) as { photos: StockPhoto[] }).photos;
+		return (await response.json()) as PhotoSearch;
 	};
 
 	const choosePhoto = async (photo: StockPhoto, query: string) => {
@@ -200,7 +201,7 @@ export function DeckWorkspace({
 			method: "POST",
 			credentials: "include",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ photoId: photo.id, query }),
+			body: JSON.stringify({ provider: photo.provider, photoId: photo.id, query }),
 		});
 		await placePhoto(response, query || "Photo");
 	};

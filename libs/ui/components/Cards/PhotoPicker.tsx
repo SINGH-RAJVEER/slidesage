@@ -13,7 +13,9 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 
 /** A stock photo offered for a card. */
 export interface StockPhoto {
-	id: number;
+	/** The library the photo comes from, such as "pexels" or "unsplash". */
+	provider: string;
+	id: string;
 	width: number;
 	height: number;
 	alt: string;
@@ -21,19 +23,37 @@ export interface StockPhoto {
 	thumbnail: string;
 }
 
+/** One page of search results and the libraries that can be searched. */
+export interface PhotoSearch {
+	photos: StockPhoto[];
+	provider: string;
+	providers: string[];
+}
+
+/** How each library asks to be credited where its search results appear. */
+const LIBRARIES: Record<string, { label: string; credit: string; url: string }> = {
+	pexels: { label: "Pexels", credit: "Photos provided by Pexels", url: "https://www.pexels.com" },
+	unsplash: {
+		label: "Unsplash",
+		credit: "Photos from Unsplash",
+		url: "https://unsplash.com/?utm_source=slidesage&utm_medium=referral",
+	},
+};
+
 export interface PhotoPickerProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	/** Suggested search, usually the card's heading. */
 	initialQuery: string;
-	search: (query: string) => Promise<StockPhoto[]>;
+	/** Searches one library, or the default one when none is named. */
+	search: (query: string, provider?: string) => Promise<PhotoSearch>;
 	choose: (photo: StockPhoto, query: string) => Promise<void>;
 	upload: (file: File) => Promise<void>;
 }
 
 /**
- * Finds a photo for a card, from Pexels or the user's own files. Pexels asks
- * apps that search its library to link to it wherever results appear.
+ * Finds a photo for a card, from a stock library or the user's own files.
+ * Each library asks apps that search it to link to it wherever results appear.
  */
 export function PhotoPicker({
 	open,
@@ -44,7 +64,7 @@ export function PhotoPicker({
 	upload,
 }: PhotoPickerProps) {
 	const [query, setQuery] = useState(initialQuery);
-	const [photos, setPhotos] = useState<StockPhoto[] | null>(null);
+	const [results, setResults] = useState<PhotoSearch | null>(null);
 	const [busy, setBusy] = useState<"search" | "add" | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const fileInput = useRef<HTMLInputElement>(null);
@@ -54,7 +74,7 @@ export function PhotoPicker({
 	useEffect(() => {
 		if (!open) return;
 		setQuery(initialQuery);
-		setPhotos(null);
+		setResults(null);
 		setError(null);
 	}, [open, initialQuery]);
 
@@ -70,12 +90,19 @@ export function PhotoPicker({
 		}
 	};
 
-	const submit = (event: FormEvent) => {
-		event.preventDefault();
+	const find = (provider?: string) => {
 		const trimmed = query.trim();
 		if (!trimmed) return;
-		void run("search", async () => setPhotos(await search(trimmed)));
+		void run("search", async () => setResults(await search(trimmed, provider)));
 	};
+
+	const submit = (event: FormEvent) => {
+		event.preventDefault();
+		find(results?.provider);
+	};
+
+	const photos = results?.photos;
+	const library = results ? LIBRARIES[results.provider] : undefined;
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -83,15 +110,20 @@ export function PhotoPicker({
 				<DialogHeader>
 					<DialogTitle>Choose a photo</DialogTitle>
 					<DialogDescription className="text-white/60">
-						Search free stock photos or upload your own.{" "}
-						<a
-							href="https://www.pexels.com"
-							target="_blank"
-							rel="noreferrer noopener"
-							className="underline"
-						>
-							Photos provided by Pexels
-						</a>
+						Search free stock photos or upload your own.
+						{library && (
+							<>
+								{" "}
+								<a
+									href={library.url}
+									target="_blank"
+									rel="noreferrer noopener"
+									className="underline"
+								>
+									{library.credit}
+								</a>
+							</>
+						)}
 					</DialogDescription>
 				</DialogHeader>
 				<form onSubmit={submit} className="flex gap-2">
@@ -129,6 +161,27 @@ export function PhotoPicker({
 						}}
 					/>
 				</form>
+				{results && results.providers.length > 1 && (
+					<div role="group" aria-label="Photo library" className="flex gap-1">
+						{results.providers.map((provider) => (
+							<Button
+								key={provider}
+								type="button"
+								size="sm"
+								variant={provider === results.provider ? "secondary" : "ghost"}
+								aria-pressed={provider === results.provider}
+								disabled={busy !== null}
+								onClick={() => find(provider)}
+								className={cn(
+									provider !== results.provider &&
+										"text-white/70 hover:bg-white/10 hover:text-white",
+								)}
+							>
+								{LIBRARIES[provider]?.label ?? provider}
+							</Button>
+						))}
+					</div>
+				)}
 				{error && (
 					<p role="alert" className="text-sm text-amber-200">
 						{error}
@@ -145,7 +198,7 @@ export function PhotoPicker({
 						className="grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3"
 					>
 						{photos.map((photo) => (
-							<li key={photo.id}>
+							<li key={`${photo.provider}:${photo.id}`}>
 								<button
 									type="button"
 									disabled={busy !== null}

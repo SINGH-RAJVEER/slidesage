@@ -6,6 +6,6 @@ export {
 	type DocumentEdit,
 	RichTextView,
 } from "./CardView";
-export { PhotoPicker, type StockPhoto } from "./PhotoPicker";
+export { PhotoPicker, type PhotoSearch, type StockPhoto } from "./PhotoPicker";
 export { htmlToRuns, RichTextEditable, runsToHtml } from "./RichTextEditable";
 export { CARD_THEMES, type CardTheme } from "./themes";
