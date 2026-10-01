@@ -15,3 +15,6 @@ otel_exporter_otlp_endpoint = "https://otlp.us5.datadoghq.com"
 otel_service_version        = "<commit-sha>"
 # Set to "none" if the Datadog GCP integration already collects Cloud Run logs.
 otel_logs_exporter = "otlp"
+
+# Create UNSPLASH_ACCESS_KEY in Secret Manager before enabling Unsplash photos.
+unsplash_enabled = false

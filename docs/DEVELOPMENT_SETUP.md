@@ -13,7 +13,7 @@ bun install
 just dev
 ```
 
-Set `AUTH_SECRET` and `OPEN_ROUTER_API_KEY` in `.env`. Add `PEXELS_API_KEY` for stock photos, `EXA_API_KEY` for research, `RESEND_API_KEY` for email delivery, OAuth credentials for social sign-in, and Razorpay credentials for purchases.
+Set `AUTH_SECRET` and `OPEN_ROUTER_API_KEY` in `.env`. Add `PEXELS_API_KEY` or `UNSPLASH_ACCESS_KEY` for stock photos, `EXA_API_KEY` for research, `RESEND_API_KEY` for email delivery, OAuth credentials for social sign-in, and Razorpay credentials for purchases.
 
 ## Startup
 

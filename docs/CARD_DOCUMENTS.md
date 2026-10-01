@@ -72,18 +72,20 @@ The user can reword points, reorder, add, or remove cards, and change layouts an
 
 ## Photos
 
-Stock photos come from Pexels, whose license allows download and modification. The API searches and downloads by photo ID only, from allowlisted Pexels hosts, and refuses redirects off the allowlist. Uploads are accepted up to 15 MB.
+Stock photos come from Pexels and Unsplash, whose licenses allow download and modification. Each library is enabled by its API key; with both, Pexels is the default and generation tries it first, falling back to Unsplash when Pexels finds nothing suitable. The picker shows results from one library at a time, with a link to that library and a switch to the other. The API looks photos up by library and photo ID only, downloads from that library's allowlisted hosts, and refuses redirects off the allowlist. Unsplash counts a photo as used only when its download endpoint is called, so the API calls it before downloading the file, and skips the photo if the call fails. Uploads are accepted up to 15 MB.
 
-Every image is normalized before storage: decoding is bounded, the image is scaled down to at most 2400 pixels wide, and it is re-encoded as JPEG, or PNG when it has transparency. The result is stored immutably under `presentations/{id}/assets/{sha256}` and recorded in `card_assets` with its size, dimensions, MIME type, and source. A stock photo keeps its photographer and page so the card can show "Photo by X on Pexels" with a link.
+Unsplash's API guidelines ask apps to show its photos from Unsplash's own image URLs. SlideSage stores a copy instead, because cards, share links, and PPTX exports need the file. Unsplash reviews apps before raising them from the demo limit of 50 requests an hour, and may not approve this, so production enables it separately (see [Production Infrastructure](PRODUCTION_INFRASTRUCTURE.md)).
+
+Every image is normalized before storage: decoding is bounded, the image is scaled down to at most 2400 pixels wide, and it is re-encoded as JPEG, or PNG when it has transparency. The result is stored immutably under `presentations/{id}/assets/{sha256}` and recorded in `card_assets` with its size, dimensions, MIME type, and source. A stock photo keeps its library, photographer, page, and license so the card can show "Photo by X on Pexels" or "on Unsplash" with links. Unsplash links carry its referral parameters.
 
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
-| `GET`  | `/images/search?q=` | Searches stock photos |
-| `POST` | `/presentations/{id}/assets/stock` | Stores a stock photo named by `photoId` |
+| `GET`  | `/images/search?q=&provider=` | Searches one library, the default when `provider` is omitted, and lists the configured libraries |
+| `POST` | `/presentations/{id}/assets/stock` | Stores a stock photo named by `provider` and `photoId` |
 | `POST` | `/presentations/{id}/assets/upload` | Stores an uploaded photo (multipart `file`) |
 | `GET`  | `/presentations/{id}/assets/{sha256}` | Serves a stored photo to the owner, cached as immutable |
 
-Without `PEXELS_API_KEY` the stock routes return `503` and generation drafts without photos. AI image generation sits behind the same image source interface but is disabled until it has a per-image price.
+Without `PEXELS_API_KEY` or `UNSPLASH_ACCESS_KEY` the stock routes return `503` and generation drafts without photos. AI image generation sits behind the same image source interface but is disabled until it has a per-image price.
 
 ## Storage
 

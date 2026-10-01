@@ -27,7 +27,7 @@ The API, worker, and migration job connect through the Cloud SQL Unix socket at 
 
 Terraform creates the revision bucket and grants the Cloud Run runtime account bucket-scoped object creator and viewer access. Override `presentation_gcs_bucket` when its name differs from the default. The existing template-origin bucket is not managed or deleted by this configuration. The URL map no longer routes `/pptx-templates/*` to the CDN backend. If the old backend bucket and bucket IAM grant are in Terraform state, the plan will propose destroying them. If they were never imported, they remain unused outside state and need separate cleanup.
 
-Both Cloud Run services receive `CARD_CONVERTER_URL=http://127.0.0.1:8090`. Each converter listens on port 8090 for its startup probe, but only the Go container has an ingress port. Terraform injects `PEXELS_API_KEY` into the API and worker for stock-photo search and drafting. The converter has no secrets, public URL, or Cloud Run invoker binding of its own.
+Both Cloud Run services receive `CARD_CONVERTER_URL=http://127.0.0.1:8090`. Each converter listens on port 8090 for its startup probe, but only the Go container has an ingress port. Terraform injects `PEXELS_API_KEY` into the API and worker for stock-photo search and drafting. Setting `unsplash_enabled` (the `UNSPLASH_ENABLED` repository variable in the plan workflow) also injects `UNSPLASH_ACCESS_KEY`, which must exist in Secret Manager first. The converter has no secrets, public URL, or Cloud Run invoker binding of its own.
 
 The API has `internal-and-cloud-load-balancing` ingress. Preserve the existing DNS-only API record and load balancer route. The URL map uses the live `api-matcher` name. The HTTPS proxy uses the API certificate.
 

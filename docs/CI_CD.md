@@ -160,7 +160,7 @@ API invocation policy is defined by `google_cloud_run_v2_service_iam_member.api_
 
 ## Secret Manager
 
-`DATABASE_URL`, `AUTH_SECRET`, `RATE_LIMIT_HASH_SECRET`, OAuth credentials, `EXA_API_KEY`, `OPEN_ROUTER_API_KEY`, `PEXELS_API_KEY`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` are referenced by the pipeline and must exist as Secret Manager secrets (secret name + `:latest` version):
+`DATABASE_URL`, `AUTH_SECRET`, `RATE_LIMIT_HASH_SECRET`, OAuth credentials, `EXA_API_KEY`, `OPEN_ROUTER_API_KEY`, `PEXELS_API_KEY`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` are referenced by the pipeline and must exist as Secret Manager secrets (secret name + `:latest` version). `UNSPLASH_ACCESS_KEY` is needed only when `unsplash_enabled` is set:
 
 ```bash
 printf "postgresql://user:pass@.../slidesage" | \
