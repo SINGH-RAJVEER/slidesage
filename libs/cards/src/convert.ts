@@ -57,7 +57,11 @@ function hash(value: string): string {
 // or reorder text, so none survive conversion.
 // biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point
 const UNSAFE_CHARACTERS = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁩﻿]/g;
-const MARKUP_TAG = /<\/?[a-zA-Z][^>]*>/g;
+// Only HTML tags a model might emit are stripped, and only with name="value"
+// attributes, so comparisons such as "a<b and c>d" stay as text. Text is
+// always escaped when rendered; the stripping keeps stray markup out of view.
+const MARKUP_TAG =
+	/<\/?(?:a|b|big|blockquote|br|code|del|div|em|embed|font|h[1-6]|hr|i|iframe|img|ins|li|mark|object|ol|p|pre|s|script|small|span|strike|strong|style|sub|sup|svg|table|tbody|td|th|thead|tr|u|ul)(?:\s+[\w:-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>=`]+))*\s*\/?>/gi;
 
 /** Normalizes model text: no tags, no control characters, single spaces. */
 export function cleanText(value: string): string {

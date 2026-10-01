@@ -32,7 +32,7 @@ A document may only reference assets the caller says the presentation owns (`kno
 
 Conversion, assembly, and validation take `assetIds`, the assets the presentation owns; an image node naming any other asset is an issue.
 
-Conversion strips markup tags, control characters, zero-width characters, and bidirectional overrides, and parses `**bold**` and `*italic*` into runs. IDs are derived from the operation ID and card position, so repeating a conversion produces identical IDs.
+Conversion strips HTML formatting tags such as `<b>` and `<span class="x">` (but not text like `a<b and c>d`), control characters, zero-width characters, and bidirectional overrides, and parses `**bold**` and `*italic*` into runs. IDs are derived from the operation ID and card position, so repeating a conversion produces identical IDs.
 
 Run it with `just converter`, or bundle it with `just converter-bundle` for the `converter` bake target. It listens on `127.0.0.1:8090` unless `CARD_CONVERTER_HOST` or `CARD_CONVERTER_PORT` say otherwise. Production builds the bundle in the release workflow and runs a converter sidecar in each API and worker Cloud Run instance. Both Go containers use `CARD_CONVERTER_URL=http://127.0.0.1:8090`; the sidecar has no public ingress port.
 

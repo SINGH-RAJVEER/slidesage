@@ -81,6 +81,13 @@ describe("convertCards", () => {
 describe("text cleaning", () => {
 	it("strips tags, control characters, and bidirectional overrides", () => {
 		expect(cleanText("  <b>Hi</b>‮ there\n\tfriend ")).toBe("Hi there friend");
+		expect(cleanText('<SPAN class="note">Hi</SPAN><br/>there')).toBe("Hithere");
+		expect(cleanText("<svg onload=alert(1)>Hi</svg>")).toBe("Hi");
+	});
+
+	it("keeps comparisons that look like tags", () => {
+		expect(cleanText("If a<b and c>d then a<d")).toBe("If a<b and c>d then a<d");
+		expect(cleanText("x<y, p<q but q>r")).toBe("x<y, p<q but q>r");
 	});
 
 	it("leaves unpaired asterisks literal", () => {
