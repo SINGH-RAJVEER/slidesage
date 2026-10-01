@@ -11,6 +11,7 @@ import {
 	type QuoteNode,
 	type RichText,
 	removeListItem,
+	STOCK_LIBRARIES,
 	type StatNode,
 	type StepsNode,
 	setItemText,
@@ -614,11 +615,13 @@ export function citationsFor(sources: Source[]) {
 	);
 }
 
-/** What the server knows about a stored image. */
+/** What the server knows about an image a card shows. */
 export interface CardAsset {
 	mimeType: string;
 	width: number;
 	height: number;
+	/** Set for a photo shown hotlinked from its library rather than stored. */
+	url?: string;
 	source?: {
 		type?: string;
 		provider?: string;
@@ -655,19 +658,19 @@ const COVER_TEXT: CardTheme = {
 
 function CardImage({
 	node,
-	assetUrl,
+	src,
 	className,
 }: {
 	node: ImageNode;
-	assetUrl?: (assetId: string) => string;
+	src?: string;
 	className?: string;
 }) {
 	const focus = node.focus ?? { x: 0.5, y: 0.5 };
-	if (!assetUrl) return null;
+	if (!src) return null;
 	return (
 		<img
 			data-node-id={node.id}
-			src={assetUrl(node.assetId)}
+			src={src}
 			alt={node.alt}
 			loading="lazy"
 			decoding="async"
@@ -678,13 +681,13 @@ function CardImage({
 	);
 }
 
-const STOCK_LIBRARIES: Record<string, string> = { pexels: "Pexels", unsplash: "Unsplash" };
-
 /** Photo credit in the form the stock provider asks for. */
 function Attribution({ asset, className }: { asset?: CardAsset; className?: string }) {
 	const source = asset?.source;
 	if (source?.type !== "stock" || !source.photographer) return null;
-	const provider = STOCK_LIBRARIES[source.provider ?? ""] ?? source.provider;
+	const library = STOCK_LIBRARIES[source.provider ?? ""];
+	const provider = library?.name ?? source.provider;
+	const providerUrl = library?.url ?? source.pageUrl;
 	return (
 		<span className={className}>
 			Photo by{" "}
@@ -701,9 +704,9 @@ function Attribution({ asset, className }: { asset?: CardAsset; className?: stri
 				source.photographer
 			)}{" "}
 			on{" "}
-			{source.pageUrl ? (
+			{providerUrl ? (
 				<a
-					href={source.pageUrl}
+					href={providerUrl}
 					target="_blank"
 					rel="noreferrer noopener"
 					className="underline-offset-2 hover:underline"
@@ -763,6 +766,7 @@ export function CardView({
 	const [textScale, setTextScale] = useState(1);
 	const [image] = nodesOf(card, "image");
 	const asset = image ? assets?.[image.assetId] : undefined;
+	const imageSrc = image ? (asset?.url ?? assetUrl?.(image.assetId)) : undefined;
 	const split = card.layout === "image-left" || card.layout === "image-right";
 	const cover = card.layout === "cover";
 	const textTheme = cover ? COVER_TEXT : theme;
@@ -823,7 +827,7 @@ export function CardView({
 				{cover && image && (
 					<>
 						<div className="absolute inset-0">
-							<CardImage node={image} assetUrl={assetUrl} />
+							<CardImage node={image} src={imageSrc} />
 						</div>
 						<div
 							aria-hidden
@@ -834,7 +838,7 @@ export function CardView({
 				{split && image && (
 					<div className="relative w-1/2 shrink-0 self-stretch">
 						<div className="absolute inset-0">
-							<CardImage node={image} assetUrl={assetUrl} />
+							<CardImage node={image} src={imageSrc} />
 						</div>
 					</div>
 				)}

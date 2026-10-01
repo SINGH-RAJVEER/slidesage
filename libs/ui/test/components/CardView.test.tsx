@@ -160,13 +160,49 @@ describe("image cards", () => {
 		expect(photo).toHaveStyle({ objectFit: "cover" });
 		expect(view.getAllByRole("link", { name: "Pexels" })[0]).toHaveAttribute(
 			"href",
-			"https://www.pexels.com/photo/1",
+			"https://www.pexels.com",
 		);
 		const [split, cover] = view.getAllByRole("article");
 		expect(split).toHaveAttribute("data-layout", "image-right");
 		expect(
 			within(cover as HTMLElement).getByRole("img", { name: "City at night" }),
 		).toBeInTheDocument();
+	});
+
+	it("shows a hotlinked photo from its library with a linked credit", () => {
+		const document = assembleDocument({
+			title: "Grid storage",
+			theme: "slate",
+			cards: imageCards,
+			assetIds: [assetId],
+		});
+		const hotlink = "https://images.unsplash.com/photo-1?w=2400";
+		const view = render(
+			<CardList
+				document={document}
+				assetUrl={(id) => `/assets/${id}`}
+				assets={{
+					[assetId]: {
+						mimeType: "image/jpeg",
+						width: 2400,
+						height: 1350,
+						url: hotlink,
+						source: {
+							type: "stock",
+							provider: "unsplash",
+							photographer: "Ada",
+							photographerUrl: "https://unsplash.com/@ada?utm_source=slidesage&utm_medium=referral",
+						},
+					},
+				}}
+			/>,
+		);
+
+		expect(view.getByRole("img", { name: "Battery racks" })).toHaveAttribute("src", hotlink);
+		expect(view.getAllByRole("link", { name: "Unsplash" })[0]).toHaveAttribute(
+			"href",
+			"https://unsplash.com/?utm_source=slidesage&utm_medium=referral",
+		);
 	});
 });
 

@@ -1,3 +1,4 @@
+import { STOCK_LIBRARIES } from "@slidesage/cards";
 import { Button } from "@slidesage/ui/components/button";
 import {
 	Dialog,
@@ -20,6 +21,7 @@ export interface StockPhoto {
 	height: number;
 	alt: string;
 	photographer: string;
+	photographerUrl?: string;
 	thumbnail: string;
 }
 
@@ -30,16 +32,6 @@ export interface PhotoSearch {
 	providers: string[];
 }
 
-/** How each library asks to be credited where its search results appear. */
-const LIBRARIES: Record<string, { label: string; credit: string; url: string }> = {
-	pexels: { label: "Pexels", credit: "Photos provided by Pexels", url: "https://www.pexels.com" },
-	unsplash: {
-		label: "Unsplash",
-		credit: "Photos from Unsplash",
-		url: "https://unsplash.com/?utm_source=slidesage&utm_medium=referral",
-	},
-};
-
 export interface PhotoPickerProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -49,6 +41,39 @@ export interface PhotoPickerProps {
 	search: (query: string, provider?: string) => Promise<PhotoSearch>;
 	choose: (photo: StockPhoto, query: string) => Promise<void>;
 	upload: (file: File) => Promise<void>;
+}
+
+const creditLink = "underline-offset-2 hover:text-white hover:underline";
+
+/** "Photo by X on Library", each linked, as the libraries ask beside every result. */
+function PhotoCredit({ photo }: { photo: StockPhoto }) {
+	const library = STOCK_LIBRARIES[photo.provider];
+	return (
+		<p className="mt-1 truncate text-xs text-white/50">
+			Photo by{" "}
+			{photo.photographerUrl ? (
+				<a
+					href={photo.photographerUrl}
+					target="_blank"
+					rel="noreferrer noopener"
+					className={creditLink}
+				>
+					{photo.photographer}
+				</a>
+			) : (
+				photo.photographer
+			)}
+			{library && (
+				<>
+					{" "}
+					on{" "}
+					<a href={library.url} target="_blank" rel="noreferrer noopener" className={creditLink}>
+						{library.name}
+					</a>
+				</>
+			)}
+		</p>
+	);
 }
 
 /**
@@ -102,7 +127,7 @@ export function PhotoPicker({
 	};
 
 	const photos = results?.photos;
-	const library = results ? LIBRARIES[results.provider] : undefined;
+	const library = results ? STOCK_LIBRARIES[results.provider] : undefined;
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -120,7 +145,7 @@ export function PhotoPicker({
 									rel="noreferrer noopener"
 									className="underline"
 								>
-									{library.credit}
+									Photos provided by {library.name}
 								</a>
 							</>
 						)}
@@ -162,7 +187,7 @@ export function PhotoPicker({
 					/>
 				</form>
 				{results && results.providers.length > 1 && (
-					<div role="group" aria-label="Photo library" className="flex gap-1">
+					<fieldset aria-label="Photo library" className="flex gap-1">
 						{results.providers.map((provider) => (
 							<Button
 								key={provider}
@@ -177,10 +202,10 @@ export function PhotoPicker({
 										"text-white/70 hover:bg-white/10 hover:text-white",
 								)}
 							>
-								{LIBRARIES[provider]?.label ?? provider}
+								{STOCK_LIBRARIES[provider]?.name ?? provider}
 							</Button>
 						))}
-					</div>
+					</fieldset>
 				)}
 				{error && (
 					<p role="alert" className="text-sm text-amber-200">
@@ -203,10 +228,7 @@ export function PhotoPicker({
 									type="button"
 									disabled={busy !== null}
 									onClick={() => void run("add", () => choose(photo, query.trim()))}
-									className={cn(
-										"group flex w-full flex-col gap-1 text-left outline-none",
-										busy !== null && "opacity-50",
-									)}
+									className={cn("group block w-full outline-none", busy !== null && "opacity-50")}
 								>
 									<img
 										src={photo.thumbnail}
@@ -214,8 +236,8 @@ export function PhotoPicker({
 										loading="lazy"
 										className="aspect-video w-full rounded-md object-cover ring-sky-400 transition group-hover:ring-2 group-focus-visible:ring-2"
 									/>
-									<span className="truncate text-xs text-white/50">{photo.photographer}</span>
 								</button>
+								<PhotoCredit photo={photo} />
 							</li>
 						))}
 					</ul>
