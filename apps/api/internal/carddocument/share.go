@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 )
@@ -226,13 +227,40 @@ func (handler Handler) shared(writer http.ResponseWriter, request *http.Request)
 	writeJSON(writer, http.StatusOK, map[string]any{"document": document, "assets": assets, "sources": sources})
 }
 
-// sharedAsset serves an image of a shared presentation. It is cached like the
-// owner's route, but only privately, so revoking a link is not undone by a
-// shared cache.
+// sharedAsset serves an image the shared deck currently shows. Images the
+// owner removed stay recorded for undo and older revisions, but a link holder
+// cannot fetch them even with the asset ID. It is cached like the owner's
+// route, but only privately, so revoking a link is not undone by a shared
+// cache.
 func (handler Handler) sharedAsset(writer http.ResponseWriter, request *http.Request) {
-	presentationID, _, ok := handler.sharedPresentation(writer, request)
+	presentationID, ownerID, ok := handler.sharedPresentation(writer, request)
 	if !ok {
 		return
 	}
-	handler.serveAsset(writer, request, presentationID, request.PathValue("sha256"))
+	ctx := request.Context()
+	digest := request.PathValue("sha256")
+	revision, err := CurrentRevision(ctx, handler.DB, presentationID, ownerID)
+	if errors.Is(err, ErrPresentationMissing) || errors.Is(err, ErrNoRevision) {
+		writeError(writer, http.StatusNotFound, "Image not found")
+		return
+	}
+	if err != nil {
+		handler.fail(ctx, writer, "load shared revision", err)
+		return
+	}
+	document, err := Load(revision)
+	if err != nil {
+		handler.fail(ctx, writer, "load shared document", err)
+		return
+	}
+	ids, err := ReferencedAssets(document)
+	if err != nil {
+		handler.fail(ctx, writer, "read shared document assets", err)
+		return
+	}
+	if !slices.Contains(ids, digest) {
+		writeError(writer, http.StatusNotFound, "Image not found")
+		return
+	}
+	handler.serveAsset(writer, request, presentationID, digest)
 }

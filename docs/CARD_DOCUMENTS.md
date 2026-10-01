@@ -122,7 +122,7 @@ An owner can create one read-only link per presentation. The token has 256 rando
 | `POST`   | `/presentations/{id}/share` | Creates a link, replacing any earlier one, and returns its token |
 | `DELETE` | `/presentations/{id}/share` | Revokes the live link |
 | `GET`    | `/shared/{token}` | Returns the current document, its photos, and the source titles and URLs its citations need |
-| `GET`    | `/shared/{token}/assets/{sha256}` | Serves a photo of the shared presentation |
+| `GET`    | `/shared/{token}/assets/{sha256}` | Serves a photo the shared deck currently shows; removed photos are not served |
 
 The shared routes need no sign-in. They serve only ready presentations, and they never return the revision's provenance, author, or prompt. A viewer always sees the latest saved revision. A malformed, unknown, or revoked token returns `404`. Photos are cached privately by the browser, so a viewer who already loaded one keeps it after the link is revoked.
 

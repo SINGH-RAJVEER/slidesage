@@ -86,6 +86,29 @@ func TestShareLinksServeTheCurrentDocumentUntilRevoked(t *testing.T) {
 		t.Fatalf("malformed token = %d", status)
 	}
 
+	// An image the presentation still records but the deck no longer shows
+	// stays private, even to someone who knows its ID.
+	removed, err := RemoteAsset(presentationID, "https://images.unsplash.com/photo-removed", 800, 600, AssetSource{Type: "stock", Provider: "unsplash", ProviderID: "removed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, _ = database.BeginTx(ctx, nil)
+	if err := RecordAssetsTx(ctx, tx, []Asset{removed}); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	noRedirect := http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	response, err := noRedirect.Get(server.URL + "/shared/" + token + "/assets/" + removed.SHA256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("unshown asset through the link = %d", response.StatusCode)
+	}
+
 	// Only the owner manages the link.
 	caller = "someone-else"
 	if status, _, _ := call(http.MethodDelete, sharePath); status != http.StatusNotFound {

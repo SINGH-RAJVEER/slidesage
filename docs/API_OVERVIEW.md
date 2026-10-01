@@ -58,7 +58,7 @@ The profile carries a `landingPage` preference (`generate` or `presentations`, d
 | `POST`  | `/presentations/:id/share`     | Create a read-only link, replacing any earlier one                                                      |
 | `DELETE` | `/presentations/:id/share`    | Revoke an owned deck's read-only link                                                                   |
 | `GET`   | `/shared/:token`               | Get the deck behind a read-only link, without signing in                                                |
-| `GET`   | `/shared/:token/assets/:sha256` | Get a photo of a deck behind a read-only link                                                          |
+| `GET`   | `/shared/:token/assets/:sha256` | Get a photo the deck behind a read-only link shows; removed photos are not served                    |
 | `PATCH` | `/presentations/:id`           | Apply persistent presentation mutations                                                                 |
 | `DELETE` | `/presentations/:id`           | Delete one owned deck and its associated memory                                                         |
 
