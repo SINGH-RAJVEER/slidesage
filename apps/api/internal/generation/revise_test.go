@@ -33,7 +33,7 @@ func baseDeck(t *testing.T, converter *carddocument.Converter, store *memoryObje
 	inputs := []carddocument.DraftInput{
 		{Position: 1, Takeaway: "Storage matters", Role: "opening", Draft: json.RawMessage(`{"layout": "title", "nodes": [{"type": "heading", "text": "Grid storage"}]}`)},
 		{Position: 2, Takeaway: "Batteries scale", Role: "evidence", Draft: json.RawMessage(`{"layout": "image-left", "nodes": [
-			{"type": "image", "assetId": "` + asset.SHA256 + `", "alt": "Battery warehouse", "fit": "cover"},
+			{"type": "image", "assetId": "` + asset.SHA256 + `", "alt": "Battery warehouse", "fit": "contain", "focus": {"x": 0.2, "y": 0.7}},
 			{"type": "heading", "text": "Batteries scale"}, {"type": "paragraph", "text": "Warehouses of cells back up grids."}]}`)},
 		{Position: 3, Takeaway: "Costs fell", Role: "evidence", Draft: json.RawMessage(bulletsCard(3))},
 		{Position: 4, Takeaway: "What comes next", Role: "closing", Draft: json.RawMessage(`{"layout": "title", "nodes": [{"type": "heading", "text": "What comes next"}]}`)},
@@ -143,6 +143,10 @@ func TestCardDrafterRevisesOnlyTheRequestedCardsInPlace(t *testing.T) {
 		Nodes    []struct {
 			Type    string `json:"type"`
 			AssetID string `json:"assetId"`
+			Fit     string `json:"fit"`
+			Focus   *struct {
+				X, Y float64
+			} `json:"focus"`
 		} `json:"nodes"`
 	}
 	if err := json.Unmarshal(revised.Cards[second], &photoCard); err != nil {
@@ -150,6 +154,10 @@ func TestCardDrafterRevisesOnlyTheRequestedCardsInPlace(t *testing.T) {
 	}
 	if photoCard.ID != second || photoCard.Takeaway != "Batteries now anchor city grids" || photoCard.Nodes[0].Type != "image" || photoCard.Nodes[0].AssetID != deck.asset.SHA256 {
 		t.Fatalf("revised photo card = %+v", photoCard)
+	}
+	// Rewriting the text leaves the photo framed the way it was.
+	if image := photoCard.Nodes[0]; image.Fit != "contain" || image.Focus == nil || image.Focus.X != 0.2 || image.Focus.Y != 0.7 {
+		t.Fatalf("revised photo framing = %+v", image)
 	}
 	if !strings.Contains(string(revised.Cards[third]), `"id":"`+third+`"`) || string(revised.Cards[third]) == string(deck.document.Cards[third]) {
 		t.Fatalf("revised bullets card = %s", revised.Cards[third])

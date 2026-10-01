@@ -97,10 +97,13 @@ var textFallbackLayouts = map[string]string{
 	"cover":       "title",
 }
 
-// placedImage is an image resolved for one card.
+// placedImage is an image resolved for one card. A revised card keeps the
+// framing its image already had; a new one fills its frame from the center.
 type placedImage struct {
 	asset carddocument.Asset
 	alt   string
+	fit   string
+	focus json.RawMessage
 }
 
 type citedSource struct {
@@ -406,7 +409,14 @@ func (d *drafting) withImage(position int, draft json.RawMessage) json.RawMessag
 		return draft
 	}
 	nodes, _ := card["nodes"].([]any)
-	kept := []any{map[string]any{"type": "image", "assetId": image.asset.SHA256, "alt": image.alt, "fit": "cover"}}
+	placed := map[string]any{"type": "image", "assetId": image.asset.SHA256, "alt": image.alt, "fit": "cover"}
+	if image.fit != "" {
+		placed["fit"] = image.fit
+	}
+	if len(image.focus) > 0 {
+		placed["focus"] = image.focus
+	}
+	kept := []any{placed}
 	for _, node := range nodes {
 		if object, ok := node.(map[string]any); ok && object["type"] == "image" {
 			continue

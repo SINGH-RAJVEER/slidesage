@@ -164,8 +164,8 @@ func (drafter *cardDrafter) revise(ctx context.Context, job streamJob) (draftRes
 }
 
 // revisionTargets resolves the requested card IDs, in deck order, to their
-// positions and current drafts. A card showing a photo keeps it: the photo is
-// placed back into whatever the model drafts for it.
+// positions and current drafts. A card showing a photo keeps it, with its fit
+// and focus: the photo is placed back into whatever the model drafts for it.
 func (d *drafting) revisionTargets(order []string, cards map[string]json.RawMessage, drafts map[string]json.RawMessage, assets map[string]carddocument.Asset) ([]revisionTarget, error) {
 	wanted, missing := map[string]bool{}, map[string]bool{}
 	for _, id := range d.job.cardIDs {
@@ -182,9 +182,11 @@ func (d *drafting) revisionTargets(order []string, cards map[string]json.RawMess
 			Takeaway string `json:"takeaway"`
 			Role     string `json:"role"`
 			Nodes    []struct {
-				Type    string `json:"type"`
-				AssetID string `json:"assetId"`
-				Alt     string `json:"alt"`
+				Type    string          `json:"type"`
+				AssetID string          `json:"assetId"`
+				Alt     string          `json:"alt"`
+				Fit     string          `json:"fit"`
+				Focus   json.RawMessage `json:"focus"`
 			} `json:"nodes"`
 		}
 		if err := json.Unmarshal(cards[id], &card); err != nil {
@@ -192,7 +194,7 @@ func (d *drafting) revisionTargets(order []string, cards map[string]json.RawMess
 		}
 		for _, node := range card.Nodes {
 			if asset, ok := assets[node.AssetID]; ok && node.Type == "image" {
-				d.images[index+1] = placedImage{asset: asset, alt: node.Alt}
+				d.images[index+1] = placedImage{asset: asset, alt: node.Alt, fit: node.Fit, focus: node.Focus}
 			}
 		}
 		targets = append(targets, revisionTarget{id: id, position: index + 1, takeaway: card.Takeaway, role: card.Role, draft: drafts[id]})
