@@ -71,7 +71,7 @@ variable "open_router_api_base" {
 }
 
 variable "presentation_gcs_bucket" {
-  description = "Private GCS bucket for image assets and legacy document backfill. Preserve the existing name; defaults to <project-id>-presentation-revisions."
+  description = "Private GCS bucket for card image assets. Preserve the existing name; defaults to <project-id>-presentation-revisions."
   type        = string
   default     = null
   nullable    = true

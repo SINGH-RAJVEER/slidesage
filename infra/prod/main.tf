@@ -520,8 +520,9 @@ resource "google_cloud_run_v2_job" "migrate" {
 
   template {
     template {
-      # Legacy bodies are fetched and committed serially. Allow 20 minutes per
-      # attempt; retries resume at the remaining NULL bodies rather than restart.
+      # After the schema, the job deletes the legacy objects the retired
+      # pipelines left in the bucket. Allow 20 minutes per attempt; a retry
+      # starts from whatever is left.
       service_account = google_service_account.runtime.email
       timeout         = "1200s"
       max_retries     = 3
@@ -563,10 +564,12 @@ resource "google_cloud_run_v2_job" "migrate" {
     ignore_changes = [client, client_version]
   }
 
-  # Include source-bucket read IAM in the targeted migration-job apply.
+  # Include the bucket IAM the legacy object purge needs in the targeted
+  # migration-job apply.
   depends_on = [
     google_secret_manager_secret_iam_member.runtime_accessor,
     google_storage_bucket_iam_member.runtime_revision_viewer,
+    google_storage_bucket_iam_member.runtime_legacy_object_cleaner,
   ]
 }
 

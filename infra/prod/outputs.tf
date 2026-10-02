@@ -19,6 +19,6 @@ output "cloud_sql_connection_name" {
 }
 
 output "presentation_gcs_bucket" {
-  description = "Private bucket for image assets and legacy document backfill; documents are stored in PostgreSQL JSONB."
+  description = "Private bucket for card image assets; documents are stored in PostgreSQL JSONB."
   value       = google_storage_bucket.presentation_revisions.name
 }

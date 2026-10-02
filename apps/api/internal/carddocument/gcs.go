@@ -14,6 +14,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/googleapis/gax-go/v2/apierror"
 	"google.golang.org/api/googleapi"
+	"google.golang.org/api/iterator"
 )
 
 var errGCSObjectAlreadyExists = errors.New("GCS object already exists")
@@ -112,6 +113,8 @@ type immutableGCSBackend interface {
 	Create(context.Context, string, io.Reader, int64, string, string) error
 	Attributes(context.Context, string) (gcsObjectAttributes, error)
 	Open(context.Context, string) (io.ReadCloser, error)
+	EachKey(context.Context, string, func(string) error) error
+	Delete(context.Context, string) error
 	Close() error
 }
 
@@ -192,6 +195,30 @@ func (backend *googleStorageBackend) Attributes(ctx context.Context, key string)
 		ContentType: attributes.ContentType,
 		SHA256:      attributes.Metadata["sha256"],
 	}, nil
+}
+
+func (backend *googleStorageBackend) EachKey(ctx context.Context, prefix string, visit func(string) error) error {
+	objects := backend.bucket.Objects(ctx, &storage.Query{Prefix: prefix, Projection: storage.ProjectionNoACL})
+	for {
+		attributes, err := objects.Next()
+		if errors.Is(err, iterator.Done) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := visit(attributes.Name); err != nil {
+			return err
+		}
+	}
+}
+
+func (backend *googleStorageBackend) Delete(ctx context.Context, key string) error {
+	err := backend.bucket.Object(key).Delete(ctx)
+	if errors.Is(err, storage.ErrObjectNotExist) {
+		return nil
+	}
+	return err
 }
 
 func (backend *googleStorageBackend) Open(ctx context.Context, key string) (io.ReadCloser, error) {

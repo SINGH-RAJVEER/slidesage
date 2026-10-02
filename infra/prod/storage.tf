@@ -2,8 +2,7 @@ locals {
   presentation_gcs_bucket = coalesce(var.presentation_gcs_bucket, "${var.gcp_project_id}-presentation-revisions")
 }
 
-# Keep the legacy resource address and bucket name. Images still live here;
-# cmd/migrate also reads existing document objects for the JSONB backfill.
+# Keep the legacy resource address and bucket name. Card images live here.
 resource "google_storage_bucket" "presentation_revisions" {
   project                     = var.gcp_project_id
   name                        = local.presentation_gcs_bucket
@@ -23,9 +22,24 @@ resource "google_storage_bucket_iam_member" "runtime_revision_creator" {
   member = "serviceAccount:${google_service_account.runtime.email}"
 }
 
-# API/worker image reads and migration-job legacy document reads.
+# API/worker image reads, and the listing the migration job's purge walks.
 resource "google_storage_bucket_iam_member" "runtime_revision_viewer" {
   bucket = google_storage_bucket.presentation_revisions.name
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${google_service_account.runtime.email}"
+}
+
+# The migration job deletes what the retired pipelines left: PPTX revisions,
+# their preview renders, and card bodies stored before PostgreSQL. The runtime
+# account may delete only under those prefixes, so images stay create-and-read.
+resource "google_storage_bucket_iam_member" "runtime_legacy_object_cleaner" {
+  bucket = google_storage_bucket.presentation_revisions.name
+  role   = "roles/storage.objectUser"
+  member = "serviceAccount:${google_service_account.runtime.email}"
+
+  condition {
+    title       = "legacy-presentation-objects"
+    description = "PPTX revisions, preview renders, and pre-PostgreSQL card bodies"
+    expression  = "resource.name.matches('^projects/_/buckets/[^/]+/objects/presentations/[^/]+/(objects|revisions|cards)/')"
+  }
 }

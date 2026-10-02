@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivermigrate"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/migrations"
 )
 
@@ -55,6 +57,30 @@ func main() {
 	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
 		log.Fatal(err)
 	}
+	purgeLegacyObjects(ctx)
+}
+
+// purgeLegacyObjects deletes what the retired pipelines left in the image
+// bucket. A failure is logged rather than fatal: the schema is already
+// migrated, a failed release would leave services paused, and the next run
+// tries again.
+func purgeLegacyObjects(ctx context.Context) {
+	bucket := strings.TrimSpace(os.Getenv("PRESENTATION_GCS_BUCKET"))
+	if bucket == "" {
+		return
+	}
+	store, err := carddocument.NewGCSBlobStore(ctx, bucket)
+	if err != nil {
+		log.Printf("legacy objects were not purged: %v", err)
+		return
+	}
+	defer store.Close()
+	deleted, err := store.DeleteLegacyObjects(ctx)
+	if err != nil {
+		log.Printf("legacy objects were not all purged (%d deleted): %v", deleted, err)
+		return
+	}
+	log.Printf("deleted %d legacy objects", deleted)
 }
 
 func envInt(key string, fallback int) int {
