@@ -128,9 +128,7 @@ Set `VITE_API_URL=https://api.slidesage.app` for the `slidesage.app` production 
 | `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
 | `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
 | `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |
-| `PEXELS_API_KEY` | Stock photos | Yes | Pexels API key. Production Terraform requires this Secret Manager secret for the API and worker. Without it photo search returns `503` and generation drafts without photos |
-| `PEXELS_API_BASE` | No | No | Pexels API base URL; defaults to `https://api.pexels.com`. Only for tests and local stubs |
-| `UNSPLASH_ACCESS_KEY` | Stock photos | Yes | Unsplash application access key. Adds Unsplash as a second photo library, searched after Pexels. Production Terraform reads this Secret Manager secret only when `unsplash_enabled` is true |
+| `UNSPLASH_ACCESS_KEY` | Production; local stock photos | Yes | Unsplash application access key for the only stock-photo provider. Production Terraform requires this Secret Manager secret for the API and worker. Locally, without it stock routes return `503` and generation drafts text-only decks; uploads remain available |
 | `UNSPLASH_API_BASE` | No | No | Unsplash API base URL; defaults to `https://api.unsplash.com`. Only for tests and local stubs |
 
 The removed template fetcher and thumbnail routes were the only users of the Cloud CDN signing variables (`CDN_URL`, `CDN_SIGNING_KEY_NAME`, `CDN_SIGNING_KEY_SECRET`, `CDN_SIGNED_URL_TTL_SECONDS`). Production Terraform no longer passes them to Cloud Run or manages the template CDN route.

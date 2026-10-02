@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -116,5 +119,50 @@ func TestFoundImageIsStoredUnlessItIsHotlinked(t *testing.T) {
 	stored, err := foundImage{Data: photoPNG(t, 1600, 900), Source: carddocument.AssetSource{Type: "stock", Provider: "pexels"}}.asset(ctx, store, "presentation-1")
 	if err != nil || stored.URL != "" || len(store.objects) != 1 {
 		t.Fatalf("stored asset = %+v, err = %v, stored %d objects", stored, err, len(store.objects))
+	}
+}
+
+func TestStockSourceFromEnvUsesUnsplashHotlinksAndTracksSelection(t *testing.T) {
+	var uses int
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/search/photos":
+			fmt.Fprintf(writer, `{"results": [{"id": "Ab_1", "width": 4000, "height": 2500,
+				"alt_description": "Battery racks", "urls": {"raw": "https://images.unsplash.com/photo-1?ixid=x"},
+				"links": {"download_location": "%s/photos/Ab_1/download", "html": "https://unsplash.com/photos/Ab_1"},
+				"user": {"name": "Ada", "links": {"html": "https://unsplash.com/@ada"}}}]}`, server.URL)
+		case "/photos/Ab_1/download":
+			uses++
+			if uses > 1 {
+				writer.WriteHeader(http.StatusTooManyRequests)
+				return
+			}
+			fmt.Fprint(writer, `{}`)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+	t.Setenv("PEXELS_API_KEY", "retired-key")
+	t.Setenv("UNSPLASH_ACCESS_KEY", "")
+	if source := stockSourceFromEnv(); source != nil {
+		t.Fatal("photo generation should be disabled without an Unsplash key")
+	}
+	t.Setenv("UNSPLASH_ACCESS_KEY", "access-key")
+	t.Setenv("UNSPLASH_API_BASE", server.URL)
+	source := stockSourceFromEnv()
+	if source == nil {
+		t.Fatal("Unsplash photo generation is not configured")
+	}
+	image, err := source.Find(context.Background(), imageRequest{Query: "batteries"})
+	if err != nil || uses != 1 || image.Data != nil || image.Hotlink != "https://images.unsplash.com/photo-1?fit=max&fm=jpg&ixid=x&q=80&w=2400" {
+		t.Fatalf("image = %+v, uses = %d, err = %v", image, uses, err)
+	}
+	if image.Source.Provider != "unsplash" || image.Source.PhotographerURL != "https://unsplash.com/@ada?utm_source=slidesage&utm_medium=referral" {
+		t.Fatalf("source = %+v", image.Source)
+	}
+	if _, err := source.Find(context.Background(), imageRequest{Query: "batteries"}); err != errNoImage || uses != 2 {
+		t.Fatalf("failed download tracking should fall back to text, uses = %d, err = %v", uses, err)
 	}
 }

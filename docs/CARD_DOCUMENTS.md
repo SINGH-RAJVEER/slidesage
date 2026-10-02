@@ -72,24 +72,24 @@ The user can reword points, reorder, add, or remove cards, and change layouts an
 
 ## Photos
 
-Stock photos come from Pexels and Unsplash, whose licenses allow download and modification. Each library is enabled by its API key; with both, Pexels is the default and generation tries it first, falling back to Unsplash when Pexels finds nothing suitable. The picker shows results from one library at a time, with a link to that library and a switch to the other, and credits every result as "Photo by X on Library" with both names linked. The API looks photos up by library and photo ID only, downloads from that library's allowlisted hosts, and refuses redirects off the allowlist. Uploads are accepted up to 15 MB, 50 megapixels, and 12000 pixels on a side, though formats that are costly to decode are refused well below 50 megapixels. Every image, uploaded or downloaded, is decoded within a 192 MB budget per process: decodes wait for each other rather than run the API out of memory, at most four uploads are read at once, and an image that alone would need more than the budget, such as a very large progressive JPEG, is refused. Images are shrunk by area averaging, which needs only a few source rows besides the result.
+Stock search and generation use Unsplash only, whose license allows download and modification. The picker shows only Unsplash results, links to Unsplash, and credits every result as "Photo by X on Unsplash" with both names linked. The API looks photos up by photo ID through Unsplash; there is no new Pexels search or download. Remote image downloads use allowlisted hosts and refuse redirects off the allowlist. Uploads are accepted up to 15 MB, 50 megapixels, and 12000 pixels on a side, though formats that are costly to decode are refused well below 50 megapixels. Every image, uploaded or downloaded, is decoded within a 192 MB budget per process: decodes wait for each other rather than run the API out of memory, at most four uploads are read at once, and an image that alone would need more than the budget, such as a very large progressive JPEG, is refused. Images are shrunk by area averaging, which needs only a few source rows besides the result.
 
-Pexels photos and uploads are stored. Every stored image is normalized first: decoding is bounded, the image is scaled down to at most 2400 pixels wide, and it is re-encoded as JPEG, or PNG when it has transparency. The result is stored immutably under `presentations/{id}/assets/{sha256}` and recorded in `card_assets` with its size, dimensions, MIME type, and source.
+Uploads are stored. Every stored image is normalized first: decoding is bounded, the image is scaled down to at most 2400 pixels wide, and it is re-encoded as JPEG, or PNG when it has transparency. The result is stored immutably under `presentations/{id}/assets/{sha256}` and recorded in `card_assets` with its size, dimensions, MIME type, and source. Previously stored Pexels assets remain available to old decks.
 
 Unsplash photos are hotlinked, as Unsplash's API guidelines require: nothing is downloaded or stored. When a photo is chosen in the picker or during generation, the API calls the photo's Unsplash download endpoint, which is how Unsplash counts a use, and skips the photo if that call fails. It then records the photo in `card_assets` with a `remote_url` on `images.unsplash.com` in place of an object: the photo's raw URL with Unsplash's sizing parameters for a JPEG at most 2400 pixels wide. Its asset ID is the SHA-256 of `unsplash:<photo ID>`, so choosing the same photo again finds the same asset. The browser loads the photo from that URL, including on share links, and the asset routes redirect to it. A PPTX export downloads it into the file without keeping it (see [PPTX export](#pptx-export)).
 
-A stock photo keeps its library, photographer, page, and license so the card can show "Photo by X on Pexels" or "on Unsplash", with the photographer linked to their profile and the library to its home page. Unsplash links carry its referral parameters. The library names and links come from `STOCK_LIBRARIES` in `libs/cards`, shared by the browser and the converter.
+A stock photo keeps its library, photographer, page, and license so the card can show "Photo by X on Unsplash", with the photographer linked to their profile and the library to its home page. Historical Pexels credits and links are retained for old decks. Unsplash links carry its referral parameters. The library names and links come from `STOCK_LIBRARIES` in `libs/cards`, shared by the browser and the converter.
 
-Unsplash keeps new apps at 50 requests an hour until it reviews them; production enables Unsplash separately (see [Production Infrastructure](PRODUCTION_INFRASTRUCTURE.md)).
+Unsplash keeps new apps at 50 requests an hour until it reviews them. Production requires `UNSPLASH_ACCESS_KEY` for both the API and worker (see [Production Infrastructure](PRODUCTION_INFRASTRUCTURE.md)).
 
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
-| `GET`  | `/images/search?q=&provider=` | Searches one library, the default when `provider` is omitted, and lists the configured libraries |
-| `POST` | `/presentations/{id}/assets/stock` | Adds a stock photo named by `provider` and `photoId`, stored or hotlinked |
+| `GET`  | `/images/search?q=&provider=` | Searches Unsplash, the default when `provider` is omitted; no other search provider is available |
+| `POST` | `/presentations/{id}/assets/stock` | Adds a hotlinked Unsplash photo named by `provider` and `photoId` |
 | `POST` | `/presentations/{id}/assets/upload` | Stores an uploaded photo (multipart `file`) |
 | `GET`  | `/presentations/{id}/assets/{sha256}` | Serves a stored photo to the owner, cached as immutable, or redirects to a hotlinked one |
 
-Without `PEXELS_API_KEY` or `UNSPLASH_ACCESS_KEY` the stock routes return `503` and generation drafts without photos. AI image generation sits behind the same image source interface but is disabled until it has a per-image price.
+Locally, without `UNSPLASH_ACCESS_KEY` the stock routes return `503` and generation drafts text-only decks. Image uploads remain available. AI image generation sits behind the same image source interface but is disabled until it has a per-image price.
 
 ## Storage
 

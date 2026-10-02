@@ -95,3 +95,16 @@ func TestFetchHotlinkStaysOnUnsplashImageHosts(t *testing.T) {
 		}
 	}
 }
+
+func TestFromEnvUsesOnlyUnsplash(t *testing.T) {
+	t.Setenv("PEXELS_API_KEY", "retired-key")
+	t.Setenv("UNSPLASH_ACCESS_KEY", "")
+	if sources := FromEnv(); len(sources) != 0 {
+		t.Fatalf("sources without an Unsplash key = %v", sources)
+	}
+	t.Setenv("UNSPLASH_ACCESS_KEY", "access-key")
+	sources := FromEnv()
+	if len(sources) != 1 || sources[0].Name() != "unsplash" {
+		t.Fatalf("sources = %v, want only Unsplash", sources)
+	}
+}

@@ -123,8 +123,6 @@ jobs:
       TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.DATADOG_OTLP_ENDPOINT }}
       TF_VAR_otel_logs_exporter: ${{ vars.OTEL_LOGS_EXPORTER || 'otlp' }}
       TF_VAR_otel_service_version: ${{ github.sha }}
-      # Must match the plan workflow, or each release strips the Unsplash secret.
-      TF_VAR_unsplash_enabled: ${{ vars.UNSPLASH_ENABLED || 'false' }}
     steps:
       - uses: actions/checkout@v4
 

@@ -14,8 +14,8 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 
 /** A stock photo offered for a card. */
 export interface StockPhoto {
-	/** The library the photo comes from, such as "pexels" or "unsplash". */
-	provider: string;
+	/** Stock search uses Unsplash exclusively. */
+	provider: "unsplash";
 	id: string;
 	width: number;
 	height: number;
@@ -28,8 +28,8 @@ export interface StockPhoto {
 /** One page of search results and the libraries that can be searched. */
 export interface PhotoSearch {
 	photos: StockPhoto[];
-	provider: string;
-	providers: string[];
+	provider: "unsplash";
+	providers: "unsplash"[];
 }
 
 export interface PhotoPickerProps {
@@ -37,8 +37,8 @@ export interface PhotoPickerProps {
 	onOpenChange: (open: boolean) => void;
 	/** Suggested search, usually the card's heading. */
 	initialQuery: string;
-	/** Searches one library, or the default one when none is named. */
-	search: (query: string, provider?: string) => Promise<PhotoSearch>;
+	/** Searches Unsplash. */
+	search: (query: string, provider?: "unsplash") => Promise<PhotoSearch>;
 	choose: (photo: StockPhoto, query: string) => Promise<void>;
 	upload: (file: File) => Promise<void>;
 }
@@ -115,19 +115,19 @@ export function PhotoPicker({
 		}
 	};
 
-	const find = (provider?: string) => {
+	const find = () => {
 		const trimmed = query.trim();
 		if (!trimmed) return;
-		void run("search", async () => setResults(await search(trimmed, provider)));
+		void run("search", async () => setResults(await search(trimmed, "unsplash")));
 	};
 
 	const submit = (event: FormEvent) => {
 		event.preventDefault();
-		find(results?.provider);
+		find();
 	};
 
 	const photos = results?.photos;
-	const library = results ? STOCK_LIBRARIES[results.provider] : undefined;
+	const library = STOCK_LIBRARIES["unsplash"];
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
@@ -186,27 +186,6 @@ export function PhotoPicker({
 						}}
 					/>
 				</form>
-				{results && results.providers.length > 1 && (
-					<fieldset aria-label="Photo library" className="flex gap-1">
-						{results.providers.map((provider) => (
-							<Button
-								key={provider}
-								type="button"
-								size="sm"
-								variant={provider === results.provider ? "secondary" : "ghost"}
-								aria-pressed={provider === results.provider}
-								disabled={busy !== null}
-								onClick={() => find(provider)}
-								className={cn(
-									provider !== results.provider &&
-										"text-white/70 hover:bg-white/10 hover:text-white",
-								)}
-							>
-								{STOCK_LIBRARIES[provider]?.name ?? provider}
-							</Button>
-						))}
-					</fieldset>
-				)}
 				{error && (
 					<p role="alert" className="text-sm text-amber-200">
 						{error}

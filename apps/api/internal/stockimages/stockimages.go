@@ -1,10 +1,7 @@
-// Package stockimages searches free stock photo libraries, Pexels and
-// Unsplash, and records each use of a photo chosen from them.
+// Package stockimages searches Unsplash and records each use of a chosen photo.
 //
-// Both licenses permit using photos commercially and modifying them. Both ask
-// for credit to the photographer and the library, which callers record with
-// each photo and show beside it. Pexels photos are downloaded and stored;
-// Unsplash photos are shown hotlinked from Unsplash, as its API requires.
+// Callers record credit to the photographer and Unsplash with each photo and
+// show it beside the photo. Photos are hotlinked from Unsplash, as its API requires.
 package stockimages
 
 import (
@@ -33,7 +30,7 @@ var (
 
 // Photo is one photo from a stock library.
 type Photo struct {
-	// Provider names the library the photo came from, such as "pexels".
+	// Provider names the library the photo came from, "unsplash".
 	Provider        string `json:"provider"`
 	ID              string `json:"id"`
 	Width           int    `json:"width"`
@@ -47,15 +44,14 @@ type Photo struct {
 	License   string `json:"-"`
 	// Hotlink is set for libraries that require showing the photo from
 	// their own servers. Such a photo is never stored.
-	Hotlink  string `json:"-"`
-	download string
+	Hotlink string `json:"-"`
 	// track is a library URL to call when the photo is used.
 	track string
 }
 
 // Source is one stock photo library.
 type Source interface {
-	// Name is the provider recorded with each photo, such as "pexels".
+	// Name is the provider recorded with each photo, "unsplash".
 	Name() string
 	// Search returns landscape photos for a query.
 	Search(ctx context.Context, query string, perPage int) ([]Photo, error)
@@ -67,13 +63,9 @@ type Source interface {
 	Use(ctx context.Context, photo Photo) ([]byte, error)
 }
 
-// FromEnv returns the libraries with API keys set, Pexels first. None set
-// disables photos.
+// FromEnv configures Unsplash when its access key is set. No key disables photos.
 func FromEnv() []Source {
 	var sources []Source
-	if pexels := PexelsFromEnv(); pexels != nil {
-		sources = append(sources, pexels)
-	}
 	if unsplash := UnsplashFromEnv(); unsplash != nil {
 		sources = append(sources, unsplash)
 	}

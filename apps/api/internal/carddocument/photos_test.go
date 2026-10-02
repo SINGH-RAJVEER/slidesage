@@ -10,44 +10,26 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/stockimages"
 )
 
-func stubPexels(t *testing.T) []stockimages.Source {
-	t.Helper()
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		switch request.URL.Path {
-		case "/v1/search":
-			fmt.Fprintf(writer, `{"photos": [{"id": 7, "width": 1600, "height": 900, "alt": "Solar farm",
-				"photographer": "Ada", "src": {"large2x": "%[1]s/7.png", "medium": "%[1]s/7-small.png"}}]}`, server.URL)
-		case "/v1/photos/7":
-			fmt.Fprintf(writer, `{"id": 7, "width": 1600, "height": 900, "alt": "Solar farm", "url": "https://www.pexels.com/photo/7",
-				"photographer": "Ada", "src": {"large2x": "%s/7.png"}}`, server.URL)
-		case "/7.png":
-			_, _ = writer.Write(encodedPNG(t, 320, 180, 255))
-		default:
-			http.NotFound(writer, request)
-		}
-	}))
-	t.Cleanup(server.Close)
-	host, _ := url.Parse(server.URL)
-	return []stockimages.Source{stockimages.NewPexels("key", server.URL, []string{host.Host})}
-}
-
 func stubUnsplash(t *testing.T, used *int) stockimages.Source {
 	t.Helper()
 	var server *httptest.Server
+	photoJSON := func() string {
+		return fmt.Sprintf(`{"id": "Ab_1", "width": 4800, "height": 2400, "alt_description": "Wind farm",
+			"urls": {"raw": "https://images.unsplash.com/photo-1?ixid=x", "small": "https://images.unsplash.com/photo-1?w=400"},
+			"links": {"html": "https://unsplash.com/photos/Ab_1", "download_location": "%s/photos/Ab_1/download"},
+			"user": {"name": "Grace", "links": {"html": "https://unsplash.com/@grace"}}}`, server.URL)
+	}
 	server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
+		case "/search/photos":
+			fmt.Fprintf(writer, `{"results": [%s]}`, photoJSON())
 		case "/photos/Ab_1":
-			fmt.Fprintf(writer, `{"id": "Ab_1", "width": 4800, "height": 2400, "alt_description": "Wind farm",
-				"urls": {"raw": "https://images.unsplash.com/photo-1?ixid=x"},
-				"links": {"download_location": "%s/photos/Ab_1/download"},
-				"user": {"name": "Grace", "links": {"html": "https://unsplash.com/@grace"}}}`, server.URL)
+			fmt.Fprint(writer, photoJSON())
 		case "/photos/Ab_1/download":
 			*used++
 			fmt.Fprint(writer, `{}`)
@@ -69,7 +51,7 @@ func TestPhotoRoutesStoreOnlyVerifiedImagesForTheOwner(t *testing.T) {
 	store := &memoryStore{}
 	var unsplashUses int
 	mux := http.NewServeMux()
-	stock := append(stubPexels(t), stubUnsplash(t, &unsplashUses))
+	stock := []stockimages.Source{stubUnsplash(t, &unsplashUses)}
 	RegisterRoutes(mux, Handler{DB: database, Store: store, Stock: stock, Identity: func(*http.Request) (string, error) { return caller, nil }})
 	server := httptest.NewServer(mux)
 	defer server.Close()
@@ -86,11 +68,11 @@ func TestPhotoRoutesStoreOnlyVerifiedImagesForTheOwner(t *testing.T) {
 	}
 	_ = json.NewDecoder(response.Body).Decode(&search)
 	response.Body.Close()
-	if len(search.Photos) != 1 || search.Photos[0].ID != "7" || search.Provider != "pexels" || len(search.Providers) != 2 {
+	if len(search.Photos) != 1 || search.Photos[0].ID != "Ab_1" || search.Provider != "unsplash" || len(search.Providers) != 1 || search.Providers[0] != "unsplash" || unsplashUses != 0 {
 		t.Fatalf("search = %+v", search)
 	}
 
-	response, err = http.Post(base+"/assets/stock", "application/json", bytes.NewReader([]byte(`{"provider": "flickr", "photoId": "7"}`)))
+	response, err = http.Post(base+"/assets/stock", "application/json", bytes.NewReader([]byte(`{"provider": "pexels", "photoId": "7"}`)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,44 +81,30 @@ func TestPhotoRoutesStoreOnlyVerifiedImagesForTheOwner(t *testing.T) {
 		t.Fatalf("photo from an unconfigured library = %d", response.StatusCode)
 	}
 
-	response, err = http.Post(base+"/assets/stock", "application/json", bytes.NewReader([]byte(`{"provider": "pexels", "photoId": "7", "query": "solar"}`)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var added struct {
-		AssetID string `json:"assetId"`
-		Alt     string `json:"alt"`
-		Asset   Asset  `json:"asset"`
-	}
-	_ = json.NewDecoder(response.Body).Decode(&added)
-	response.Body.Close()
-	if response.StatusCode != http.StatusCreated || len(added.AssetID) != 64 || added.Alt != "Solar farm" {
-		t.Fatalf("stock add = %d %+v", response.StatusCode, added)
-	}
-	var source AssetSource
-	_ = json.Unmarshal(added.Asset.Source, &source)
-	if source.Provider != "pexels" || source.ProviderID != "7" || source.Photographer != "Ada" || source.License != "Pexels License" {
-		t.Fatalf("source = %+v", source)
-	}
-
 	// An Unsplash photo is hotlinked: its use is recorded with Unsplash, and
 	// nothing is stored.
 	objects := len(store.objects)
-	response, err = http.Post(base+"/assets/stock", "application/json", bytes.NewReader([]byte(`{"provider": "unsplash", "photoId": "Ab_1"}`)))
+	response, err = http.Post(base+"/assets/stock", "application/json", bytes.NewReader([]byte(`{"provider": "unsplash", "photoId": "Ab_1", "query": "solar"}`)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var hotlinked struct {
 		AssetID string `json:"assetId"`
+		Alt     string `json:"alt"`
 		Asset   Asset  `json:"asset"`
 	}
 	_ = json.NewDecoder(response.Body).Decode(&hotlinked)
 	response.Body.Close()
-	if response.StatusCode != http.StatusCreated || unsplashUses != 1 || len(store.objects) != objects {
+	if response.StatusCode != http.StatusCreated || len(hotlinked.AssetID) != 64 || hotlinked.Alt != "Wind farm" || unsplashUses != 1 || len(store.objects) != objects {
 		t.Fatalf("hotlinked add = %d %+v, uses %d, objects %d -> %d", response.StatusCode, hotlinked, unsplashUses, objects, len(store.objects))
 	}
 	if hotlinked.Asset.URL != "https://images.unsplash.com/photo-1?fit=max&fm=jpg&ixid=x&q=80&w=2400" || hotlinked.Asset.Width != 2400 || hotlinked.Asset.Height != 1200 {
 		t.Fatalf("hotlinked asset = %+v", hotlinked.Asset)
+	}
+	var source AssetSource
+	_ = json.Unmarshal(hotlinked.Asset.Source, &source)
+	if source.Provider != "unsplash" || source.ProviderID != "Ab_1" || source.Photographer != "Grace" || source.License != "Unsplash License" || source.Query != "solar" || source.PhotographerURL != "https://unsplash.com/@grace?utm_source=slidesage&utm_medium=referral" {
+		t.Fatalf("source = %+v", source)
 	}
 	noRedirects := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	response, err = noRedirects.Get(base + "/assets/" + hotlinked.AssetID)
@@ -171,7 +139,7 @@ func TestPhotoRoutesStoreOnlyVerifiedImagesForTheOwner(t *testing.T) {
 	}
 
 	ids, err := AssetIDsFor(context.Background(), database, presentationID)
-	if err != nil || len(ids) != 3 {
+	if err != nil || len(ids) != 2 {
 		t.Fatalf("recorded assets = %v, %v", ids, err)
 	}
 

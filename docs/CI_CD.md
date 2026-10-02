@@ -168,7 +168,7 @@ API invocation policy is defined by `google_cloud_run_v2_service_iam_member.api_
 
 ## Secret Manager
 
-`DATABASE_URL`, `AUTH_SECRET`, `RATE_LIMIT_HASH_SECRET`, OAuth credentials, `EXA_API_KEY`, `OPEN_ROUTER_API_KEY`, `PEXELS_API_KEY`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` are referenced by the pipeline and must exist as Secret Manager secrets (secret name + `:latest` version). `UNSPLASH_ACCESS_KEY` is needed only when `unsplash_enabled` is set, which both the plan and deploy workflows read from the `UNSPLASH_ENABLED` repository variable:
+`DATABASE_URL`, `AUTH_SECRET`, `RATE_LIMIT_HASH_SECRET`, OAuth credentials, `EXA_API_KEY`, `OPEN_ROUTER_API_KEY`, `UNSPLASH_ACCESS_KEY`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` are referenced by the pipeline and must exist as Secret Manager secrets (secret name + `:latest` version). `UNSPLASH_ACCESS_KEY` is required unconditionally for the API and worker; stock search and generation use Unsplash only, with no repository opt-in variable:
 
 ```bash
 printf "postgresql://user:pass@.../slidesage" | \
@@ -189,8 +189,8 @@ printf "<Exa API key>" | \
   gcloud secrets create EXA_API_KEY --data-file=- --project=$PROJECT_ID
 printf "<OpenRouter API key>" | \
   gcloud secrets create OPEN_ROUTER_API_KEY --data-file=- --project=$PROJECT_ID
-printf "<Pexels API key>" | \
-  gcloud secrets create PEXELS_API_KEY --data-file=- --project=$PROJECT_ID
+printf "<Unsplash application access key>" | \
+	gcloud secrets create UNSPLASH_ACCESS_KEY --data-file=- --project=$PROJECT_ID
 printf "<Resend API key>" | \
   gcloud secrets create RESEND_API_KEY --data-file=- --project=$PROJECT_ID
 printf "<verified SlideSage sender on slidesage.app>" | \

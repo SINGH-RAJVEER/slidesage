@@ -235,28 +235,28 @@ describe("DeckWorkspace", () => {
 		expect(view.queryByRole("textbox", { name: "Card heading" })).not.toBeInTheDocument();
 	}, 15000);
 
-	it("adds a photo searched in another library to a card and saves it", async () => {
+	it("adds an Unsplash photo to a card and saves it", async () => {
 		const assetId = "e".repeat(64);
+		const hotlink = "https://images.unsplash.com/photo-1?ixid=x&w=2400";
+		const photographerUrl = "https://unsplash.com/@ada?utm_source=slidesage&utm_medium=referral";
 		const requests: Array<{ url: string; body?: string }> = [];
 		globalThis.fetch = mock(async (input: string | URL | Request, init?: RequestInit) => {
 			const url = String(input);
 			requests.push({ url, body: typeof init?.body === "string" ? init.body : undefined });
 			if (url.includes("/images/search")) {
-				const provider = new URL(url, "http://localhost").searchParams.get("provider") ?? "pexels";
-				const photo =
-					provider === "unsplash"
-						? { id: "Ab_1", alt: "Solar farm" }
-						: { id: "7", alt: "Wind farm" };
+				const provider = new URL(url, "http://localhost").searchParams.get("provider");
 				return Response.json({
 					provider,
-					providers: ["pexels", "unsplash"],
+					providers: ["unsplash"],
 					photos: [
 						{
-							...photo,
+							id: "Ab_1",
+							alt: "Solar farm",
 							provider,
 							width: 1600,
 							height: 900,
 							photographer: "Ada",
+							photographerUrl,
 							thumbnail: "/t.jpg",
 						},
 					],
@@ -268,10 +268,11 @@ describe("DeckWorkspace", () => {
 						assetId,
 						alt: "Solar farm",
 						asset: {
+							url: hotlink,
 							mimeType: "image/jpeg",
 							width: 1600,
 							height: 900,
-							source: { type: "stock", provider: "unsplash", photographer: "Ada" },
+							source: { type: "stock", provider: "unsplash", photographer: "Ada", photographerUrl },
 						},
 					},
 					{ status: 201 },
@@ -285,9 +286,13 @@ describe("DeckWorkspace", () => {
 		fireEvent.click(view.getByRole("button", { name: "Add photo" }));
 		expect(await view.findByRole("textbox", { name: "Search photos" })).toHaveValue("Grid storage");
 		fireEvent.click(view.getByRole("button", { name: "Search" }));
-		expect(await view.findByRole("img", { name: "Wind farm" })).toBeInTheDocument();
-		expect(view.getByRole("link", { name: "Photos provided by Pexels" })).toBeInTheDocument();
-		fireEvent.click(view.getByRole("button", { name: "Unsplash" }));
+		expect(await view.findByRole("img", { name: "Solar farm" })).toBeInTheDocument();
+		expect(view.getByRole("link", { name: "Photos provided by Unsplash" })).toHaveAttribute(
+			"href",
+			"https://unsplash.com/?utm_source=slidesage&utm_medium=referral",
+		);
+		expect(view.queryByRole("group", { name: "Photo library" })).not.toBeInTheDocument();
+		expect(view.getByRole("link", { name: "Ada" })).toHaveAttribute("href", photographerUrl);
 		fireEvent.click(await view.findByRole("img", { name: "Solar farm" }));
 
 		await waitForElementToBeRemoved(() => view.queryByRole("dialog", { hidden: true }), {
@@ -298,7 +303,7 @@ describe("DeckWorkspace", () => {
 		const carousel = view.getByRole("listbox", { name: "Slides carousel", hidden: true });
 		const article = within(carousel).getByRole("article", { hidden: true });
 		const photo = within(article).getByRole("img", { name: "Solar farm", hidden: true });
-		expect(photo.getAttribute("src")).toEndWith(`/presentations/pres_1/assets/${assetId}`);
+		expect(photo).toHaveAttribute("src", hotlink);
 		expect(article).toHaveAttribute("data-layout", "cover");
 		expect(
 			JSON.parse(requests.find((request) => request.url.endsWith("/assets/stock"))?.body ?? "{}"),

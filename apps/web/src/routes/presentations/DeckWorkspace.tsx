@@ -214,9 +214,12 @@ export function DeckWorkspace({
 		setPhotoCard(null);
 	};
 
-	const searchPhotos = async (query: string, provider?: string): Promise<PhotoSearch> => {
+	const searchPhotos = async (
+		query: string,
+		provider: StockPhoto["provider"] = "unsplash",
+	): Promise<PhotoSearch> => {
 		const params = new URLSearchParams({ q: query });
-		if (provider) params.set("provider", provider);
+		params.set("provider", provider);
 		const response = await fetch(`${API_URL}/images/search?${params}`, { credentials: "include" });
 		if (!response.ok) throw new Error(await readError(response, "Photo search failed."));
 		return (await response.json()) as PhotoSearch;
