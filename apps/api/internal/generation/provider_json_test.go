@@ -14,7 +14,7 @@ import (
 
 func TestModelUsesConfiguredOpenRouterDefault(t *testing.T) {
 	t.Setenv("OPEN_ROUTER_MODEL", "")
-	if got := model(); got != "google/gemini-3.8-flash" {
+	if got := model(); got != "openrouter/free" {
 		t.Fatalf("default model = %q", got)
 	}
 }

@@ -61,7 +61,7 @@ variable "converter_image" {
 variable "open_router_model" {
   description = "Server-owned OpenRouter generation model."
   type        = string
-  default     = "google/gemini-3.8-flash"
+  default     = "openrouter/free"
 }
 
 variable "open_router_api_base" {

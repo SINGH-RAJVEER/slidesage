@@ -20,7 +20,7 @@ import (
 )
 
 // defaultModel is used when no model is configured and no per-user AI selection exists.
-const defaultModel = "google/gemini-3.8-flash"
+const defaultModel = "openrouter/free"
 
 // streamIdleTimeout bounds the gap between two chunks of an accepted stream. A
 // stalled upstream would otherwise cost the whole three-minute request timeout
