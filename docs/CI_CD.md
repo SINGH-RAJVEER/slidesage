@@ -166,9 +166,11 @@ Create secrets in Settings -> Secrets and variables -> Actions:
 
 API invocation policy is defined by `google_cloud_run_v2_service_iam_member.api_public_invoker`. The old `API_AUTH_FLAG` variable is no longer used. Application authentication still protects private routes.
 
+Both plan and deploy workflows pass the `UNSPLASH_ENABLED` repository variable as `TF_VAR_unsplash_enabled`, defaulting to `false` when it is unset. Terraform's `unsplash_enabled` is a boolean with default `false`. Leave it false for now; Terraform does not look up or inject `UNSPLASH_ACCESS_KEY` into the API or worker while disabled.
+
 ## Secret Manager
 
-`DATABASE_URL`, `AUTH_SECRET`, `RATE_LIMIT_HASH_SECRET`, OAuth credentials, `EXA_API_KEY`, `OPEN_ROUTER_API_KEY`, `UNSPLASH_ACCESS_KEY`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` are referenced by the pipeline and must exist as Secret Manager secrets (secret name + `:latest` version). `UNSPLASH_ACCESS_KEY` is required unconditionally for the API and worker; stock search and generation use Unsplash only, with no repository opt-in variable:
+`DATABASE_URL`, `AUTH_SECRET`, `RATE_LIMIT_HASH_SECRET`, OAuth credentials, `EXA_API_KEY`, `OPEN_ROUTER_API_KEY`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` are referenced by the pipeline and must exist as Secret Manager secrets (secret name + `:latest` version). Leave `UNSPLASH_ACCESS_KEY` out for now. Without the key, generation drafts text-only decks and stock routes return `503`; image uploads remain available. Unsplash remains the only stock-photo provider.
 
 ```bash
 printf "postgresql://user:pass@.../slidesage" | \
@@ -189,13 +191,13 @@ printf "<Exa API key>" | \
   gcloud secrets create EXA_API_KEY --data-file=- --project=$PROJECT_ID
 printf "<OpenRouter API key>" | \
   gcloud secrets create OPEN_ROUTER_API_KEY --data-file=- --project=$PROJECT_ID
-printf "<Unsplash application access key>" | \
-	gcloud secrets create UNSPLASH_ACCESS_KEY --data-file=- --project=$PROJECT_ID
 printf "<Resend API key>" | \
   gcloud secrets create RESEND_API_KEY --data-file=- --project=$PROJECT_ID
 printf "<verified SlideSage sender on slidesage.app>" | \
   gcloud secrets create RESEND_FROM_EMAIL --data-file=- --project=$PROJECT_ID
 ```
+
+To enable stock photos later, first provision `UNSPLASH_ACCESS_KEY` in Secret Manager with an enabled version available as `latest`. Then set the `UNSPLASH_ENABLED` repository variable to `true` and deploy. Terraform looks up the secret, grants runtime access, and injects it into both the API and worker only when `unsplash_enabled=true`.
 
 Billing additionally needs the three Razorpay secrets. `terraform plan` fails with a "secret not found" error until all three exist:
 

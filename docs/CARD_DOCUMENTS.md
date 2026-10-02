@@ -80,7 +80,7 @@ Unsplash photos are hotlinked, as Unsplash's API guidelines require: nothing is 
 
 A stock photo keeps its library, photographer, page, and license so the card can show "Photo by X on Unsplash", with the photographer linked to their profile and the library to its home page. Historical Pexels credits and links are retained for old decks. Unsplash links carry its referral parameters. The library names and links come from `STOCK_LIBRARIES` in `libs/cards`, shared by the browser and the converter.
 
-Unsplash keeps new apps at 50 requests an hour until it reviews them. Production requires `UNSPLASH_ACCESS_KEY` for both the API and worker (see [Production Infrastructure](PRODUCTION_INFRASTRUCTURE.md)).
+Unsplash keeps new apps at 50 requests an hour until it reviews them. Production stock photos are disabled for now. Terraform's `unsplash_enabled` boolean defaults to `false`, and both plan and deploy workflows use the `UNSPLASH_ENABLED` repository variable with the same default. While false, Terraform neither looks up `UNSPLASH_ACCESS_KEY` nor injects it into the API or worker. To enable stock photos later, first provision the key with an enabled Secret Manager version available as `latest`, then set `UNSPLASH_ENABLED=true` and deploy (see [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md)). Unsplash remains the only stock-photo provider.
 
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
@@ -89,7 +89,7 @@ Unsplash keeps new apps at 50 requests an hour until it reviews them. Production
 | `POST` | `/presentations/{id}/assets/upload` | Stores an uploaded photo (multipart `file`) |
 | `GET`  | `/presentations/{id}/assets/{sha256}` | Serves a stored photo to the owner, cached as immutable, or redirects to a hotlinked one |
 
-Locally, without `UNSPLASH_ACCESS_KEY` the stock routes return `503` and generation drafts text-only decks. Image uploads remain available. AI image generation sits behind the same image source interface but is disabled until it has a per-image price.
+Without `UNSPLASH_ACCESS_KEY`, in production or locally, the stock routes return `503` and generation drafts text-only decks. Image uploads remain available. AI image generation sits behind the same image source interface but is disabled until it has a per-image price.
 
 ## Storage
 

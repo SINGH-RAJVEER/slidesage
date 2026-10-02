@@ -77,6 +77,12 @@ variable "presentation_gcs_bucket" {
   nullable    = true
 }
 
+variable "unsplash_enabled" {
+  description = "Enable Unsplash stock photos. Requires the UNSPLASH_ACCESS_KEY Secret Manager secret; otherwise generation stays text-only."
+  type        = bool
+  default     = false
+}
+
 variable "otel_exporter_otlp_endpoint" {
   description = "Common Datadog OTLP intake endpoint. Leave empty to disable telemetry export."
   type        = string

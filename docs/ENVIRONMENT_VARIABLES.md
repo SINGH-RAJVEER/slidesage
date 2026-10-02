@@ -128,8 +128,10 @@ Set `VITE_API_URL=https://api.slidesage.app` for the `slidesage.app` production 
 | `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
 | `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
 | `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |
-| `UNSPLASH_ACCESS_KEY` | Production; local stock photos | Yes | Unsplash application access key for the only stock-photo provider. Production Terraform requires this Secret Manager secret for the API and worker. Locally, without it stock routes return `503` and generation drafts text-only decks; uploads remain available |
+| `UNSPLASH_ACCESS_KEY` | Stock photos when enabled | Yes | Unsplash application access key for the only stock-photo provider. Production Terraform looks up and injects this Secret Manager secret into the API and worker only when `unsplash_enabled=true`. Without the key, stock routes return `503` and generation drafts text-only decks; uploads remain available |
 | `UNSPLASH_API_BASE` | No | No | Unsplash API base URL; defaults to `https://api.unsplash.com`. Only for tests and local stubs |
+
+`UNSPLASH_ENABLED` is a GitHub repository variable, not an application environment variable. Both plan and deploy workflows pass it as `TF_VAR_unsplash_enabled`, defaulting to `false` when unset. Terraform's `unsplash_enabled` boolean also defaults to `false`; no Unsplash key is looked up or injected while false. Leave the key out for now. To enable stock photos later, first provision `UNSPLASH_ACCESS_KEY` with an enabled Secret Manager version available as `latest`, then set `UNSPLASH_ENABLED=true` and deploy.
 
 The removed template fetcher and thumbnail routes were the only users of the Cloud CDN signing variables (`CDN_URL`, `CDN_SIGNING_KEY_NAME`, `CDN_SIGNING_KEY_SECRET`, `CDN_SIGNED_URL_TTL_SECONDS`). Production Terraform no longer passes them to Cloud Run or manages the template CDN route.
 

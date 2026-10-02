@@ -3,7 +3,9 @@ locals {
   worker_name  = "worker"
   migrate_name = "slidesage-migrate"
 
-  api_secret_names = toset([
+  unsplash_secret_names = var.unsplash_enabled ? toset(["UNSPLASH_ACCESS_KEY"]) : toset([])
+
+  api_secret_names = setunion(toset([
     "DATABASE_URL",
     "AUTH_SECRET",
     "RATE_LIMIT_HASH_SECRET",
@@ -13,20 +15,18 @@ locals {
     "GITHUB_CLIENT_SECRET",
     "EXA_API_KEY",
     "OPEN_ROUTER_API_KEY",
-    "UNSPLASH_ACCESS_KEY",
     "RESEND_API_KEY",
     "RESEND_FROM_EMAIL",
     "RAZORPAY_KEY_ID",
     "RAZORPAY_KEY_SECRET",
     "RAZORPAY_WEBHOOK_SECRET",
-  ])
+  ]), local.unsplash_secret_names)
 
-  worker_secret_names = toset([
+  worker_secret_names = setunion(toset([
     "DATABASE_URL",
     "EXA_API_KEY",
     "OPEN_ROUTER_API_KEY",
-    "UNSPLASH_ACCESS_KEY",
-  ])
+  ]), local.unsplash_secret_names)
 
   # Telemetry export is opt-in: with no endpoint the services keep their local
   # loggers and Terraform never asks for the Datadog headers secret.
