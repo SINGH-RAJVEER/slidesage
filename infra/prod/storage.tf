@@ -40,6 +40,16 @@ resource "google_storage_bucket_iam_member" "runtime_legacy_object_cleaner" {
   condition {
     title       = "legacy-presentation-objects"
     description = "PPTX revisions, preview renders, and pre-PostgreSQL card bodies"
-    expression  = "resource.name.matches('^projects/_/buckets/[^/]+/objects/presentations/[^/]+/(objects|revisions|cards)/')"
+    # IAM Conditions supports extract(), not regular-expression matches().
+    # Equal captures require the legacy directory immediately after one ID.
+    expression = <<-EOT
+      resource.name.startsWith('projects/_/buckets/${google_storage_bucket.presentation_revisions.name}/objects/presentations/') &&
+      resource.name.extract('/objects/presentations/{id}/') != '' &&
+      (
+        resource.name.extract('/objects/presentations/{id}/') == resource.name.extract('/objects/presentations/{id}/objects/') ||
+        resource.name.extract('/objects/presentations/{id}/') == resource.name.extract('/objects/presentations/{id}/revisions/') ||
+        resource.name.extract('/objects/presentations/{id}/') == resource.name.extract('/objects/presentations/{id}/cards/')
+      )
+    EOT
   }
 }
