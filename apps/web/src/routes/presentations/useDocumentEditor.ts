@@ -74,6 +74,9 @@ export function useDocumentEditor(options: {
 	const pendingOperation = useRef<Operation | null>(null);
 	const present = useRef(history.present);
 	present.current = history.present;
+	// A save that may have landed without an answer is unsaved until it is
+	// confirmed, even when the edits it carried were undone.
+	const unsaved = () => present.current !== saved.current || pendingOperation.current !== null;
 
 	const edit = useCallback((update: (document: CardDocument) => CardDocument) => {
 		setHistory((current) => {
@@ -204,7 +207,7 @@ export function useDocumentEditor(options: {
 		if (blocked.current) return undefined;
 		// Undoing back to the saved document leaves nothing to save, and clears
 		// whatever the abandoned edits reported.
-		if (history.present === saved.current) {
+		if (history.present === saved.current && !pendingOperation.current) {
 			setStatus((current) => (current.state === "saving" ? current : { state: "saved" }));
 			return undefined;
 		}
@@ -219,7 +222,7 @@ export function useDocumentEditor(options: {
 	latestFlush.current = flush;
 	useEffect(
 		() => () => {
-			if (present.current !== saved.current) void latestFlush.current();
+			if (unsaved()) void latestFlush.current();
 		},
 		[],
 	);
@@ -227,7 +230,7 @@ export function useDocumentEditor(options: {
 	// Unsaved edits would be lost with the tab, so leaving asks first.
 	useEffect(() => {
 		const warn = (event: BeforeUnloadEvent) => {
-			if (present.current !== saved.current) event.preventDefault();
+			if (unsaved()) event.preventDefault();
 		};
 		window.addEventListener("beforeunload", warn);
 		return () => window.removeEventListener("beforeunload", warn);
@@ -243,7 +246,7 @@ export function useDocumentEditor(options: {
 		status,
 		flush,
 		savedRevision: () => base.current,
-		isSaved: () => present.current === saved.current && !blocked.current,
+		isSaved: () => !unsaved() && !blocked.current,
 	};
 }
 

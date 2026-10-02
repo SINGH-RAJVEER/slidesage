@@ -119,6 +119,34 @@ describe("DeckWorkspace", () => {
 		expect(await view.findByText("All changes saved")).toBeInTheDocument();
 	}, 20000);
 
+	it("restores the loaded document when a lost save is undone", async () => {
+		const bodies: Array<{ baseRevision: number; operationId: string; document: unknown }> = [];
+		globalThis.fetch = mock(async (_input: string | URL | Request, init?: RequestInit) => {
+			bodies.push(JSON.parse(String(init?.body)));
+			if (bodies.length === 1) throw new TypeError("network");
+			return Response.json({ revision: { revision: bodies.length === 2 ? 4 : 5 } });
+		}) as unknown as typeof fetch;
+
+		const view = open();
+		fireEvent.click(view.getByRole("button", { name: "Edit" }));
+		typeHeading(view, "Grid batteries");
+		expect(
+			await view.findByText(
+				"Unable to save changes. Check your connection.",
+				{},
+				{ timeout: 8000 },
+			),
+		).toBeInTheDocument();
+		fireEvent.click(view.getByRole("button", { name: "Undo" }));
+
+		// The lost save may have landed, so it is confirmed, then undone on the server too.
+		await waitFor(() => expect(bodies).toHaveLength(3), { timeout: 8000 });
+		expect(bodies[1]).toEqual(bodies[0] as (typeof bodies)[number]);
+		expect(bodies[2]).toMatchObject({ baseRevision: 4 });
+		expect(JSON.stringify(bodies[2]?.document)).not.toContain("Grid batteries");
+		expect(await view.findByText("All changes saved")).toBeInTheDocument();
+	}, 20000);
+
 	it("saves edits the timer has not yet saved before leaving the deck", async () => {
 		const bodies: Array<{ document: unknown }> = [];
 		globalThis.fetch = mock(async (_input: string | URL | Request, init?: RequestInit) => {
