@@ -86,15 +86,9 @@ func (service *Service) SignIn(ctx context.Context, email, password string) (JWT
 	if err != nil {
 		return JWTAuth{}, User{}, ErrInvalidCredentials
 	}
-	accountID, hash, err := service.repository.CredentialByUserID(ctx, user.ID)
+	_, hash, err := service.repository.CredentialByUserID(ctx, user.ID)
 	if err != nil || !verifyPassword(hash, password) {
 		return JWTAuth{}, User{}, ErrInvalidCredentials
-	}
-	if needsPasswordUpgrade(hash) {
-		upgradedHash, upgradeErr := hashPassword(password)
-		if upgradeErr == nil {
-			_ = service.repository.UpdateCredentialPassword(ctx, accountID, upgradedHash)
-		}
 	}
 	if !user.EmailVerified {
 		return JWTAuth{}, User{}, ErrEmailUnverified

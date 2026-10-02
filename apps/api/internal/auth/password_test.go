@@ -28,3 +28,16 @@ func TestHashPasswordUsesBetterAuthFormat(t *testing.T) {
 		t.Fatal("generated hash did not verify")
 	}
 }
+
+func TestVerifyPasswordRefusesRemovedFormats(t *testing.T) {
+	// SHA-256 and PBKDF2 hashes of "password", and the marker that replaced them.
+	for _, hash := range []string{
+		"5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+		"pbkdf2-sha256$100000$c2FsdHNhbHRzYWx0c2FsdA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		"reset-required",
+	} {
+		if verifyPassword(hash, "password") {
+			t.Fatalf("%q verified", hash)
+		}
+	}
+}
