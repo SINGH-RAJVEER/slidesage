@@ -46,10 +46,9 @@ const (
 type Revision struct {
 	PresentationID string          `json:"-"`
 	Number         int             `json:"revision"`
-	ObjectKey      string          `json:"-"`
 	Document       json.RawMessage `json:"-"`
-	// SHA256 and ByteSize describe the compact submitted JSON bytes, or the
-	// original GCS bytes for imported revisions. They are audit metadata, not
+	// SHA256 and ByteSize describe the compact submitted JSON bytes. They are
+	// audit metadata, not
 	// hashes of PostgreSQL's JSONB serialization, which changes whitespace,
 	// key order and number formatting. OperationID provides idempotency.
 	SHA256        string          `json:"sha256"`

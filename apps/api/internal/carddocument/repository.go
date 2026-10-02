@@ -45,8 +45,8 @@ func CommitTx(ctx context.Context, tx *sql.Tx, expected int, revision Revision) 
 	if expected != current {
 		return CommitResult{}, ErrRevisionConflict
 	}
-	if len(revision.Document) == 0 || !json.Valid(revision.Document) || revision.ObjectKey != "" {
-		return CommitResult{}, fmt.Errorf("%w: new revisions require a JSONB body and no object key", ErrInvalidDocument)
+	if len(revision.Document) == 0 || !json.Valid(revision.Document) {
+		return CommitResult{}, fmt.Errorf("%w: new revisions require a JSONB body", ErrInvalidDocument)
 	}
 	if err := checkAssetsTx(ctx, tx, revision); err != nil {
 		return CommitResult{}, err
@@ -63,9 +63,9 @@ func CommitTx(ctx context.Context, tx *sql.Tx, expected int, revision Revision) 
 		provenance = json.RawMessage(`{}`)
 	}
 	err = tx.QueryRowContext(ctx, `INSERT INTO card_revisions (
-			presentation_id, revision, object_key, sha256, byte_size, card_count, schema_version,
+			presentation_id, revision, sha256, byte_size, card_count, schema_version,
 			author_id, operation_kind, operation_id, base_revision, provenance, document
-		) VALUES ($1, $2, NULL, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb)
 		RETURNING created_at`,
 		revision.PresentationID, revision.Number, revision.SHA256, revision.ByteSize,
 		revision.CardCount, revision.SchemaVersion, revision.AuthorID, revision.OperationKind,
@@ -113,7 +113,7 @@ func findByOperation(ctx context.Context, database querier, presentationID, oper
 }
 
 func prefixed(prefix string) string {
-	columns := []string{"presentation_id", "revision", "object_key", "sha256", "byte_size", "card_count", "schema_version",
+	columns := []string{"presentation_id", "revision", "sha256", "byte_size", "card_count", "schema_version",
 		"author_id", "operation_kind", "operation_id", "base_revision", "provenance", "created_at", "document"}
 	result := ""
 	for index, column := range columns {
@@ -129,9 +129,8 @@ func scanRevision(row *sql.Row) (Revision, error) {
 	var revision Revision
 	var base sql.NullInt64
 	var provenance []byte
-	var key sql.NullString
 	var document []byte
-	err := row.Scan(&revision.PresentationID, &revision.Number, &key, &revision.SHA256, &revision.ByteSize,
+	err := row.Scan(&revision.PresentationID, &revision.Number, &revision.SHA256, &revision.ByteSize,
 		&revision.CardCount, &revision.SchemaVersion, &revision.AuthorID, &revision.OperationKind, &revision.OperationID,
 		&base, &provenance, &revision.CreatedAt, &document)
 	if err != nil {
@@ -142,7 +141,6 @@ func scanRevision(row *sql.Row) (Revision, error) {
 		revision.BaseRevision = &number
 	}
 	revision.Provenance = append(json.RawMessage(nil), provenance...)
-	revision.ObjectKey = key.String
 	revision.Document = append(json.RawMessage(nil), document...)
 	return revision, nil
 }

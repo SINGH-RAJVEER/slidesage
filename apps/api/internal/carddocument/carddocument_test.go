@@ -78,9 +78,6 @@ func TestPrepareCopiesCompactDocumentWithoutObjectStorage(t *testing.T) {
 	if revision.CardCount != 1 || revision.SchemaVersion != 2 {
 		t.Fatalf("revision = %+v", revision)
 	}
-	if revision.ObjectKey != "" {
-		t.Fatalf("object key = %s", revision.ObjectKey)
-	}
 	stored := revision.Document
 	input.Document[0] = 'x'
 	if stored[0] != '{' {
@@ -224,7 +221,7 @@ func TestCommitTxAdvancesOnceAndRefusesStaleBases(t *testing.T) {
 	if _, err := CurrentRevision(ctx, database, presentationID, "someone-else"); !errors.Is(err, ErrPresentationMissing) {
 		t.Fatalf("foreign owner error = %v", err)
 	}
-	if current.ObjectKey != "" || !json.Valid(current.Document) || current.SHA256 != revision.SHA256 {
+	if !json.Valid(current.Document) || current.SHA256 != revision.SHA256 {
 		t.Fatalf("JSONB round trip = %+v", current)
 	}
 	// A later failure in the caller's transaction rolls back both the body
