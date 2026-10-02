@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -17,7 +15,6 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverdatabasesql"
 	"github.com/riverqueue/river/rivermigrate"
 
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/migrations"
 )
 
@@ -43,18 +40,11 @@ func main() {
 	if _, err := database.ExecContext(ctx, `SET lock_timeout = '30s'`); err != nil {
 		log.Fatal(err)
 	}
-	if err := baselineExistingSchema(ctx, database); err != nil {
-		log.Fatal(err)
-	}
-
 	goose.SetBaseFS(migrations.Files)
 	if err := goose.SetDialect("postgres"); err != nil {
 		log.Fatal(err)
 	}
 	if err := goose.UpContext(ctx, database, "."); err != nil {
-		log.Fatal(err)
-	}
-	if err := backfillCardDocuments(ctx, database); err != nil {
 		log.Fatal(err)
 	}
 
@@ -67,93 +57,10 @@ func main() {
 	}
 }
 
-func backfillCardDocuments(ctx context.Context, database *sql.DB) error {
-	var missing bool
-	if err := database.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM card_revisions WHERE document IS NULL)`).Scan(&missing); err != nil {
-		return err
-	}
-	var store carddocument.ObjectStore
-	if missing {
-		bucket := strings.TrimSpace(os.Getenv("PRESENTATION_GCS_BUCKET"))
-		if bucket == "" {
-			return fmt.Errorf("unbackfilled card revisions remain: PRESENTATION_GCS_BUCKET must name their legacy source bucket")
-		}
-		gcs, err := carddocument.NewGCSBlobStore(ctx, bucket)
-		if err != nil {
-			return err
-		}
-		defer gcs.Close()
-		store = gcs
-	}
-	return carddocument.BackfillDocuments(ctx, database, store)
-}
-
 func envInt(key string, fallback int) int {
 	value, err := strconv.Atoi(os.Getenv(key))
 	if err != nil || value <= 0 {
 		return fallback
 	}
 	return value
-}
-
-// baselineExistingSchema adopts databases created before Goose was introduced.
-// Version 14 still runs because it is the explicit pre-launch accounting reset.
-func baselineExistingSchema(ctx context.Context, database *sql.DB) error {
-	var gooseTable, baselineSchema bool
-	if err := database.QueryRowContext(ctx, `SELECT to_regclass('public.goose_db_version') IS NOT NULL`).Scan(&gooseTable); err != nil {
-		return err
-	}
-	if err := database.QueryRowContext(ctx, `
-		SELECT to_regclass('public.users') IS NOT NULL
-			AND to_regclass('public.presentations') IS NOT NULL
-			AND to_regclass('public.ai_provider_connections') IS NOT NULL
-			AND to_regclass('public.generation_point_operations') IS NOT NULL
-			AND to_regclass('public.api_rate_limits') IS NOT NULL
-			AND to_regclass('public.payments') IS NOT NULL
-			AND EXISTS (
-				SELECT 1
-				FROM information_schema.columns
-				WHERE table_schema = 'public'
-					AND table_name = 'presentations'
-					AND column_name = 'revision'
-			)
-			AND EXISTS (
-				SELECT 1
-				FROM information_schema.columns
-				WHERE table_schema = 'public'
-					AND table_name = 'payments'
-					AND column_name = 'amount_paise'
-			)
-			AND EXISTS (
-				SELECT 1
-				FROM information_schema.columns
-				WHERE table_schema = 'public'
-					AND table_name = 'payments'
-					AND column_name = 'status'
-			)
-	`).Scan(&baselineSchema); err != nil {
-		return err
-	}
-	if gooseTable || !baselineSchema {
-		return nil
-	}
-	tx, err := database.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `
-		CREATE TABLE goose_db_version (
-			id serial PRIMARY KEY,
-			version_id bigint NOT NULL,
-			is_applied boolean NOT NULL,
-			tstamp timestamp NOT NULL DEFAULT NOW()
-		);
-		INSERT INTO goose_db_version (version_id, is_applied) VALUES (0, true);
-		INSERT INTO goose_db_version (version_id, is_applied)
-		SELECT version, true FROM generate_series(1, 13) AS version;
-	`); err != nil {
-		return err
-	}
-	return tx.Commit()
 }

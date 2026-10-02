@@ -2,7 +2,6 @@ package carddocument
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -81,43 +80,5 @@ func TestPrepareRejectsJSONBIncompatibleProvenance(t *testing.T) {
 	input.Provenance = json.RawMessage(`{"source":"\u0000"}`)
 	if _, err := Prepare(input); !errors.Is(err, ErrInvalidDocument) || !strings.Contains(err.Error(), "provenance: JSONB compatibility") {
 		t.Fatalf("error = %v", err)
-	}
-}
-
-func TestLegacyJSONBCompatibilityAfterSourceVerification(t *testing.T) {
-	for _, fragment := range []string{`"\u0000"`, `"\ud800"`, `"\udc00"`, "\"\xff\"", `1e131072`, `1e-16384`} {
-		t.Run(fragment, func(t *testing.T) {
-			body := jsonbDocument(fragment)
-			revision := Revision{ObjectKey: "legacy.json", SHA256: sha256Hex(body), ByteSize: int64(len(body)), CardCount: 1, SchemaVersion: 2}
-			store := &memoryStore{objects: map[string][]byte{revision.ObjectKey: body}}
-			imported, err := readLegacyDocument(context.Background(), store, revision)
-			if imported != nil || !errors.Is(err, ErrInvalidDocument) {
-				t.Fatalf("import = %s, %v", imported, err)
-			}
-			for _, message := range []string{"JSONB compatibility", revision.ObjectKey, "source object and revision metadata preserved", "resolve compatibility explicitly", "do not normalize or delete historical content"} {
-				if !strings.Contains(err.Error(), message) {
-					t.Fatalf("error lacks %q: %v", message, err)
-				}
-			}
-			if !bytes.Equal(store.objects[revision.ObjectKey], body) {
-				t.Fatal("legacy source changed")
-			}
-			wrongDigest := revision
-			wrongDigest.SHA256 = strings.Repeat("0", 64)
-			if _, err := readLegacyDocument(context.Background(), store, wrongDigest); !errors.Is(err, ErrObjectDigest) {
-				t.Fatalf("compatibility checked before digest: %v", err)
-			}
-			wrongSize := revision
-			wrongSize.ByteSize++
-			if _, err := readLegacyDocument(context.Background(), store, wrongSize); !errors.Is(err, ErrObjectSize) {
-				t.Fatalf("compatibility checked before size: %v", err)
-			}
-		})
-	}
-	body := jsonbDocument(`"\\u0000 \ud83d\ude00"`)
-	revision := Revision{ObjectKey: "safe.json", SHA256: sha256Hex(body), ByteSize: int64(len(body)), CardCount: 1, SchemaVersion: 2}
-	store := &memoryStore{objects: map[string][]byte{revision.ObjectKey: body}}
-	if imported, err := readLegacyDocument(context.Background(), store, revision); err != nil || !bytes.Equal(imported, body) {
-		t.Fatalf("safe legacy bytes changed: %s, %v", imported, err)
 	}
 }
