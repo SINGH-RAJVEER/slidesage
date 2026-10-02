@@ -61,7 +61,7 @@ variable "converter_image" {
 variable "open_router_model" {
   description = "Server-owned OpenRouter generation model."
   type        = string
-  default     = "openrouter/free"
+  default     = "google/gemini-3.8-flash"
 }
 
 variable "open_router_api_base" {
@@ -113,9 +113,9 @@ variable "maintenance_mode" {
 }
 
 variable "worker_min_instances" {
-  description = "Floor for worker instances. Keep one during the first request-lease rollout, then set zero after production drain delivery is verified."
+  description = "Floor for worker instances. Zero lets authenticated Cloud Tasks requests start workers only while generation work exists."
   type        = number
-  default     = 1
+  default     = 0
 }
 
 variable "worker_wake_deadline_seconds" {
