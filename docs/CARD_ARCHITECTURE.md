@@ -18,7 +18,7 @@ Still to build:
 
 Also open:
 
-- The converter is configured as a localhost sidecar in both Cloud Run services, but this workspace has not been deployed or verified against the live environment.
+- The converter is configured as a localhost sidecar in both Cloud Run services, but the card pipeline has not been deployed or verified against the live environment.
 - Provenance is recorded only on successful revisions. A failed run keeps its error and retry settings but not the model, prompt version, or source IDs it used.
 - At their schema limits most layouts need more room than one 16:9 slide. Cards never change shape: the browser and export both shrink their text to fit, down to half size. Tighter per-layout limits would keep more cards at their designed size.
 
