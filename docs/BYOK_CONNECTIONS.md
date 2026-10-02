@@ -6,7 +6,7 @@ SlideSage supports direct presentation generation through user-owned OpenAI, Goo
 
 Users must have strictly more than 50 SlideSage points to connect or replace a key or change the selected model. Existing connections remain visible, usable, and removable below this threshold.
 
-Direct model usage is billed by the selected provider and does not consume SlideSage generation points. Each successful SlideSage web research request still costs one point, while OpenRouter embedding work continues to use SlideSage infrastructure without receiving the user's provider key.
+Direct model usage is billed by the selected provider and does not consume SlideSage generation points. Each successful SlideSage web research request still costs one point and never receives the user's provider key.
 
 ## Credential Handling
 
@@ -41,4 +41,4 @@ Creating a connection returns `201`. Replacing one returns `200`, and deleting o
 
 Apply committed database migrations before deploying the Go API. BYOK requires `00010_add_ai_provider_connections.sql`, per-provider switches require `00019_add_ai_provider_connections_enabled.sql`, and production needs the `BYOK_ENCRYPTION_KEY_CURRENT_VERSION` and versioned encryption-key secrets.
 
-Research uses Exa. Source, presentation, and retrieval embeddings always use the server-owned OpenRouter embedding configuration and never a user BYOK key.
+Research uses Exa with the server-owned key, never a user BYOK key.

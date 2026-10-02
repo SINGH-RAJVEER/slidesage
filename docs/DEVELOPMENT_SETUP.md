@@ -19,10 +19,10 @@ Set `AUTH_SECRET` and `OPEN_ROUTER_API_KEY` in `.env`. Add `PEXELS_API_KEY` or `
 
 `just dev`:
 
-1. Starts devenv PostgreSQL with pgvector.
+1. Starts devenv PostgreSQL with pgvector. Early migrations still create vector tables; migration 35 drops them and, when the role owns it, the extension.
 2. Ensures the local role, database, and vector extension exist.
-3. Starts `fake-gcs-server` on port `4443` and waits for its health check before migrations. Devenv points the migration command, API, and worker at it with `STORAGE_EMULATOR_HOST` and retains the bucket name `slidesage-dev-revisions`. Image bytes and legacy document objects stay on disk under `.devenv/state/gcs`; new document bodies live in PostgreSQL JSONB.
-4. Runs `cmd/migrate`, which applies embedded Goose application migrations, backfills missing document bodies from the emulator, validates the required-body constraint, and applies River migrations.
+3. Starts `fake-gcs-server` on port `4443` and waits for its health check before migrations. Devenv points the migration command, API, and worker at it with `STORAGE_EMULATOR_HOST` and the bucket name `slidesage-dev-revisions`. Image bytes stay on disk under `.devenv/state/gcs`; document bodies live in PostgreSQL JSONB.
+4. Runs `cmd/migrate`, which applies embedded Goose application migrations and River migrations, then deletes objects left in the bucket by retired document formats.
 5. Starts the card converter on port `8090` and waits for `/health`.
 6. Starts the Go API on port `8000` after the converter and waits for `/health`.
 7. Starts the durable generation worker after the converter and waits for `/ready` on port `8080`.
@@ -45,7 +45,7 @@ Run these from the repository root inside `devenv shell`.
 | `bun run dev:worker`      | Start the durable generation worker                           |
 | `just web`                | Start Vite web server                                         |
 | `just db-shell`           | Open a PostgreSQL shell                                       |
-| `just migrate`            | Apply Goose, resumable document backfill, and River migrations |
+| `just migrate`            | Apply Goose and River migrations, purge retired objects       |
 | `just db-generate <name>` | Create a Goose SQL migration                                  |
 | `just test`               | Run all tests                                                 |
 | `just test-api`           | Run Go API tests                                              |
@@ -81,11 +81,9 @@ The former TypeScript API has been removed. `apps/api` is the only API implement
 just db-generate add_example_table
 ```
 
-Write the SQL, then apply it with `just migrate`, which runs `go -C apps/api run ./cmd/migrate` directly. The command applies Goose, runs the document backfill, and then applies River migrations. The migration runner applies all migrations to an empty database. If Goose history is absent but the current Go API schema is already present, the runner records the supported baseline before applying migrations. Application and River migration histories must be advanced together, so only an upward pass is exposed; there is no down or redo entry point.
+Write the SQL, then apply it with `just migrate`, which runs `go -C apps/api run ./cmd/migrate` directly. The command applies Goose and then River migrations to the database, including an empty one. Application and River migration histories must be advanced together, so only an upward pass is exposed; there is no down or redo entry point. With `PRESENTATION_GCS_BUCKET` set, it then deletes the objects retired document formats left under `presentations/<id>/objects/`, `revisions/`, and `cards/`; image assets are kept. A failed sweep is logged and does not fail the command. `just migrate` does not start services, so start the storage emulator first or unset the bucket to skip the sweep. See [Card storage](CARD_DOCUMENTS.md#storage).
 
-For a standalone `just migrate` against legacy card rows, keep the local storage process running and retain `PRESENTATION_GCS_BUCKET` and `STORAGE_EMULATOR_HOST` from the development environment. `just migrate` does not start services. A fresh database or a completed backfill does not need GCS access. Do not clear `.devenv/state/gcs` before backfill: missing source objects, size/digest mismatches, or invalid bodies fail migration. Rerun the command after fixing the source; completed rows are skipped. See [Card storage](CARD_DOCUMENTS.md#storage).
-
-Legacy strings or numbers that PostgreSQL JSONB cannot represent also fail backfill. The source object and revision metadata remain intact. Preserve the original and resolve the incompatibility through explicit manual remediation before retrying; the runner does not silently normalize or discard historical content. New edits with JSONB-incompatible content return `422`. See [Card storage](CARD_DOCUMENTS.md#storage) for the checks and remediation requirements.
+Migration 35 deletes every presentation without a card document and refuses to downgrade. Migration 36 replaces unsalted SHA-256 and PBKDF2 password hashes with a marker, so those accounts must reset their password. See [Card storage](CARD_DOCUMENTS.md#storage) and [Auth API](AUTH_API.md#password-and-email-changes).
 
 Migration `00016_remove_database_sessions.sql` removes the old database-backed session table. Authentication now uses only signed JWTs, carried in the `slidesage_token` HTTP-only cookie or an `Authorization: Bearer` header.
 

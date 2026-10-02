@@ -76,11 +76,11 @@ The web application uses the endpoints listed above plus `POST /auth/sign-in/soc
 `PUT /profile` keeps account-security mutations behind a valid JWT and current-password verification:
 
 - A password-only request must include non-empty `currentPassword` and `newPassword`. The route verifies the current password, writes an scrypt hash. Existing JWTs remain valid until they expire. Password changes cannot be combined with name or email changes in the same request.
-- Starting an email change must include `currentPassword`. The route calls the compatible password verifier, leaves the existing verified email unchanged, and sends a user-bound six-digit code to the normalized new address. The response returns `pending_email` and `verification_required`. A successfully delivered replacement invalidates every older pending email-change code for that user.
+- Starting an email change must include `currentPassword`. The route verifies the current password, leaves the existing verified email unchanged, and sends a user-bound six-digit code to the normalized new address. The response returns `pending_email` and `verification_required`. A successfully delivered replacement invalidates every older pending email-change code for that user.
 - `POST /profile/email/verify` accepts that pending `email` and `otp` from the authenticated JWT. It atomically consumes the code, changes the email, keeps the account verified because the new address has just been proven, and invalidates sign-in, reset, and verification OTPs for the old and new address.
 - A user who cannot verify the current password must first complete the password-reset OTP flow. Reset verifies the emailed OTP before accepting a new password. Existing JWTs remain valid until they expire. The new password can then be used as the current-password proof for an email change.
 
-For older accounts, the password verifier can read a 64-character SHA-256 hash or a legacy `pbkdf2-sha256` hash. A successful email/password sign-in lazily replaces that hash with a new scrypt hash. It also converts the old `email` provider account record to the `credential` provider format when necessary. Failed password checks never trigger an upgrade.
+Passwords are stored only as salted scrypt hashes on `credential` accounts. Migration 36 replaced every remaining unsalted SHA-256 or `pbkdf2-sha256` hash with a marker no password matches, and converted accounts in the old `email` provider format to `credential` accounts with the same marker. Those users sign in again after the password-reset OTP flow.
 
 ## OTP delivery
 

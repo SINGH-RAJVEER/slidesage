@@ -4,7 +4,7 @@
 
 This is the architecture of SlideSage presentations. It describes the target design; the part already built is listed under "Implemented so far". The defining decision is that an editable card document becomes the authoritative presentation. Browser presentation and PPTX export derive from a saved card revision.
 
-The PPTX-first pipeline this replaces has been removed: the template-slot compiler, the template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. Production Terraform now drops the template CDN route and deploys the converter with the API and worker. Migration 34 drops the legacy `presentation_revisions` table and the `current_pptx_revision` column. The PPTX objects those rows pointed at stay in the bucket.
+The PPTX-first pipeline this replaces has been removed: the template-slot compiler, the template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. Production Terraform now drops the template CDN route and deploys the converter with the API and worker. Migration 34 drops the legacy `presentation_revisions` table and the `current_pptx_revision` column, and `cmd/migrate` deletes the PPTX objects those rows pointed at.
 
 ### Implemented so far
 
@@ -36,7 +36,7 @@ Define a versioned `CardDocument` with document ID, schema version, theme refere
 
 One presentation-document module owns `create`, `get`, `revise`, `saveEdit`, and `exportPPTX`. Its interface guarantees card-count checks, schema validation, operation idempotency, optimistic revision checks, immutable storage, and asset ownership. Callers do not manipulate editor JSON, ZIP entries, or GCS object keys directly. Internally, a card-layout module and a PPTX-export module can change independently behind that interface.
 
-Store immutable card bodies as JSONB alongside revision metadata in PostgreSQL, and advance the current-revision pointer in the same transaction. Use compare-and-swap on manual and AI saves. Keep image bytes in GCS under immutable identifiers with MIME, size, digest, license or source metadata, and ownership checks. Migration 33 and `cmd/migrate` backfill legacy GCS document bodies before runtime rollout; see [Card documents](CARD_DOCUMENTS.md#storage). An export records the card revision, exporter version, dimensions, and output digest that produced it. Repeat downloads of the same export return the same bytes.
+Store immutable card bodies as JSONB alongside revision metadata in PostgreSQL, and advance the current-revision pointer in the same transaction. Use compare-and-swap on manual and AI saves. Keep image bytes in GCS under immutable identifiers with MIME, size, digest, license or source metadata, and ownership checks. Migration 35 deletes every deck without a card body and `cmd/migrate` deletes the retired GCS document objects; see [Card documents](CARD_DOCUMENTS.md#storage). An export records the card revision, exporter version, dimensions, and output digest that produced it. Repeat downloads of the same export return the same bytes.
 
 ## Generation and editing flow
 

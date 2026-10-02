@@ -123,8 +123,8 @@ Set `VITE_API_URL=https://api.slidesage.app` for the `slidesage.app` production 
 
 | Variable                  | Required | Secret | Purpose |
 | ------------------------- | -------- | ------ | ------- |
-| `PRESENTATION_GCS_BUCKET` | Stored images; migration with legacy rows | No | Private bucket for image assets and legacy document backfill. API/worker retain it for images; `cmd/migrate` requires the original source bucket while any revision body is missing. Document bodies live in PostgreSQL JSONB; text-only generation and document reads need no bucket |
-| `STORAGE_EMULATOR_HOST` | Local image storage/backfill | No | GCS emulator URL. Devenv and `.env.example` use `http://127.0.0.1:4443`; the emulator must be ready before a legacy backfill. Leave unset in production so clients use real GCS |
+| `PRESENTATION_GCS_BUCKET` | Stored images | No | Private bucket for card image assets. `cmd/migrate` deletes objects left in it by retired document formats and skips that sweep when the variable is unset. Document bodies live in PostgreSQL JSONB; text-only generation and document reads need no bucket |
+| `STORAGE_EMULATOR_HOST` | Local image storage | No | GCS emulator URL. Devenv and `.env.example` use `http://127.0.0.1:4443`. Leave unset in production so clients use real GCS |
 | `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
 | `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
 | `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |

@@ -11,7 +11,7 @@ Presentation generation and iteration run as durable PostgreSQL-backed jobs. The
 | `cmd/worker`            | Fetch generation jobs, call the selected provider, normalize output, settle or refund points, persist the presentation, and append events |
 | `generation_jobs`       | User-visible job identity, payload, ownership, lifecycle, progress, cancellation, and error state                                         |
 | `generation_job_events` | Ordered, replayable SSE events for each application job                                                                                   |
-| `cmd/migrate`           | Apply Goose, backfill missing legacy document bodies into JSONB, validate the required-body constraint, then apply River migrations |
+| `cmd/migrate`           | Apply Goose and River migrations, then delete objects left in the image bucket by retired document formats                                |
 
 Migration `00015_add_generation_jobs.sql` creates `generation_jobs` and `generation_job_events`. River maintains its own queue tables. The application job ID is the public identifier; the River job ID is an internal scheduling reference.
 
@@ -137,10 +137,10 @@ Cloud Run does not scale on PostgreSQL queue depth. Cloud Tasks request count dr
 | `worker`  | `/app/worker`  | Cloud Run service |
 | `migrate` | `/app/migrate` | One-off migration job |
 
-Run the `migrate` target successfully before starting or updating either runtime. `cmd/migrate` applies Goose, imports missing legacy card bodies into JSONB, validates the required-body constraint, and then applies River migrations. Legacy rows require the original `PRESENTATION_GCS_BUCKET` and readable source objects; retries skip completed imports. See [Card storage](CARD_DOCUMENTS.md#storage). It also recognizes the legacy Go API schema and baselines migrations 1-13 before applying migration 14. Migration 14 is an intentional pre-launch accounting reset that removes existing user-owned data, so do not run it against a database containing data that must be retained. Migration 25 is a second intentional deletion: it removes every presentation without a committed PPTX revision, which discards semantic-pipeline decks and any generation that is still in flight when it runs. Migration 26 is a third: it drops the semantic memory and outline cache tables, whose embeddings have had no producer or consumer since the canonical pipeline replaced that path and cannot be rebuilt. The required deployment order is therefore:
+Run the `migrate` target successfully before starting or updating either runtime. `cmd/migrate` applies Goose and then River migrations, and afterwards deletes the objects retired document formats left in `PRESENTATION_GCS_BUCKET`; see [Card storage](CARD_DOCUMENTS.md#storage). Migration 14 is an intentional pre-launch accounting reset that removes existing user-owned data, so do not run it against a database containing data that must be retained. Migration 25 is a second intentional deletion: it removes every presentation without a committed PPTX revision, which discards semantic-pipeline decks and any generation that is still in flight when it runs. Migration 26 is a third: it drops the semantic memory and outline cache tables, whose embeddings have had no producer or consumer since the canonical pipeline replaced that path and cannot be rebuilt. Migration 35 is the last: it deletes every presentation without a card document and drops the remaining pgvector tables, and it cannot be downgraded. The required deployment order is therefore:
 
 ```text
-PostgreSQL and local storage emulator ready -> Goose, document backfill, and River succeed -> API and worker start
+PostgreSQL and local storage emulator ready -> Goose, River, and the retired-object sweep finish -> API and worker start
 ```
 
 Do not rely on API or worker startup to apply schema changes.

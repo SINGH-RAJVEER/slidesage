@@ -7,10 +7,10 @@ The repository deploys its Go API and generation worker to Google Cloud Run, eac
 1. GitHub Actions compiles three Go release binaries and bundles the Bun converter on the runner, then builds four image targets with one `docker buildx bake` over `docker-bake.hcl`. The Go images are `FROM scratch` and copy one binary each out of `dist/`:
    - `api` (web server, port 8000) -> Cloud Run **service** `api`
    - `worker` (River queue consumer with a health server, port 8080) -> Cloud Run **service** `worker`
-   - `migrate` (Goose, resumable legacy document backfill into JSONB, then River migrations) -> Cloud Run **job** `slidesage-migrate`
+   - `migrate` (Goose and River migrations, then a sweep of retired bucket objects) -> Cloud Run **job** `slidesage-migrate`
    - `converter` (card schema conversion and validation, port 8090) -> localhost **sidecar** in both `api` and `worker`
 2. Each image is tagged with the full git commit SHA (e.g. `api:a1b2c3d...`) plus `latest` and pushed to Artifact Registry.
-3. `terraform apply -target=google_cloud_run_v2_job.migrate` updates the migration job and its dependencies, including source-bucket viewer IAM. After pausing services and verifying the pre-migration backup, `gcloud run jobs execute` runs Goose, document backfill, required-body validation, and River migrations against the database and waits.
+3. `terraform apply -target=google_cloud_run_v2_job.migrate` updates the migration job and its dependencies, including the bucket viewer and conditional delete IAM. After pausing services and verifying the pre-migration backup, `gcloud run jobs execute` runs Goose and River migrations against the database, deletes the retired objects from the image bucket, and waits.
 4. A fresh full plan and `terraform apply` point both Cloud Run services and their converter sidecars at SHA-tagged images. Cloud Run creates new revisions and routes traffic to them. Previous revisions remain available for rollback.
 
 After the card-document changes reach main and the documented bootstrap is complete, Terraform will own the Cloud Run services, the job, the load balancer, and supporting IAM. The currently deployed services were created with gcloud; no adoption has been applied yet. The workflow supplies `TF_VAR_api_image`, `TF_VAR_worker_image`, `TF_VAR_migrate_image`, and `TF_VAR_converter_image`. It needs the `TF_STATE_BUCKET`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` repository secrets alongside the existing workload-identity secrets. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
@@ -212,7 +212,7 @@ Payments are not optional. Terraform lists these secrets unconditionally, and th
 
 The API deployment sets `BASE_URL=https://api.slidesage.app` and trusts `https://slidesage.app`, `https://www.slidesage.app`, and `https://slide-sage.pages.dev` for browser authentication callbacks. Configure the provider callback URLs as `https://api.slidesage.app/auth/callback/google` and `https://api.slidesage.app/auth/callback/github`.
 
-`PRESENTATION_GCS_BUCKET` reaches the API and worker for image storage and the migration job for legacy document backfill from `infra/prod/main.tf`. Document bodies live in PostgreSQL JSONB. Set the `PRESENTATION_GCS_BUCKET` repository variable if the existing bucket differs from `<project-id>-presentation-revisions`; both plan and deploy workflows pass the same value to Terraform. Preserve the existing bucket name and resource addresses. `CARD_CONVERTER_URL` reaches the API and worker; the Go containers reach their colocated converter over localhost, and only the Go ports receive Cloud Run ingress. Change runtime configuration in Terraform, since a direct `gcloud run deploy` replaces the whole container specification and the next Terraform plan reverts it.
+`PRESENTATION_GCS_BUCKET` reaches the API and worker for image storage and the migration job, which deletes the retired objects from it, from `infra/prod/main.tf`. Document bodies live in PostgreSQL JSONB. Set the `PRESENTATION_GCS_BUCKET` repository variable if the existing bucket differs from `<project-id>-presentation-revisions`; both plan and deploy workflows pass the same value to Terraform. Preserve the existing bucket name and resource addresses. `CARD_CONVERTER_URL` reaches the API and worker; the Go containers reach their colocated converter over localhost, and only the Go ports receive Cloud Run ingress. Change runtime configuration in Terraform, since a direct `gcloud run deploy` replaces the whole container specification and the next Terraform plan reverts it.
 
 The Cloud SQL socket mount and the `roles/cloudsql.client` grant on the runtime service account are declared in `infra/prod`.
 
@@ -254,7 +254,7 @@ gcloud run services update worker \
   --invoker-iam-check
 ```
 
-The gcloud equivalent below is for manual recovery only. Normal releases update the job through Terraform and execute it with `gcloud run jobs execute`. Before using this command, verify the backup, pause API/worker and the maintenance scheduler, and confirm the runtime account has viewer access to the original source bucket. Set `PRESENTATION_GCS_BUCKET` explicitly if the existing bucket differs from the project default:
+The gcloud equivalent below is for manual recovery only. Normal releases update the job through Terraform and execute it with `gcloud run jobs execute`. Before using this command, verify the backup, pause API/worker and the maintenance scheduler, and confirm the runtime account has the bucket viewer and conditional delete grants; without them the sweep only logs its failure. Set `PRESENTATION_GCS_BUCKET` explicitly if the existing bucket differs from the project default:
 
 ```bash
 gcloud run jobs deploy slidesage-migrate \
@@ -289,7 +289,7 @@ gcloud run services update-traffic worker \
 
 or atomically in the console: Cloud Run -> service -> Revisions -> select revision -> Manage traffic.
 
-After migration 33, GCS-only writers are incompatible with the required JSONB bodies. Do not route traffic to those revisions. Migration 33's down migration refuses to discard authoritative document bodies; recovery needs an explicit database restore or export plan while services stay paused.
+After migration 33, GCS-only writers are incompatible with the required JSONB bodies, and after migration 35 any writer that sets `object_key` fails. Do not route traffic to those revisions. Migrations 33 and 35 refuse to downgrade; recovery needs a database restore while services stay paused.
 
 ## Manual equivalents
 
@@ -322,8 +322,8 @@ Every production release takes an on-demand Cloud SQL backup before running migr
 
 The full release apply restores automatic scaling with the new API and generation-worker images. If migration or release apply fails, services remain paused; inspect the failure before retrying rather than restarting an old binary against a changed schema.
 
-Migration 33 immediately rejects new card revisions without JSONB bodies, so old writers must remain paused during cutover. The migration job has 20 minutes per attempt and retains three retries. It imports only missing bodies, checks the original GCS size, SHA-256, schema version, and card count, then validates that all bodies exist before running River migrations. Missing or invalid source objects fail the release. Fix the source and rerun; completed rows remain committed. No GCS objects are deleted, and images still need the bucket after backfill. See [Card storage](CARD_DOCUMENTS.md#storage).
+Old writers must remain paused during cutover. The migration job has 20 minutes per attempt and retains three retries. After the migrations it deletes every object under `presentations/<id>/objects/`, `revisions/`, and `cards/`; image assets stay. A failed sweep is logged and does not fail the release; the next run deletes what is left. See [Card storage](CARD_DOCUMENTS.md#storage).
 
 Cloud SQL settings remain unchanged for this cutover. The optional automated-backup, PITR, and disk-growth changes were removed because PITR enablement would restart the database during the migration-job apply, before runtimes were paused. The pause apply also depends on Cloud SQL, so moving it earlier would not isolate that restart. A future restart-producing database change requires a separate rollout with successful backup verification and an independent API/worker/scheduler pause before any database apply. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
 
-Migration 25 deletes presentations without a committed PPTX revision, as required by the canonical-only transition. The backup preserves the pre-release database for recovery; it does not make the deletion reversible through a schema downgrade. Migration 34 drops the legacy PPTX revision table the same way: its downgrade restores the schema but not the rows.
+Migration 25 deletes presentations without a committed PPTX revision, as required by the canonical-only transition. The backup preserves the pre-release database for recovery; it does not make the deletion reversible through a schema downgrade. Migration 34 drops the legacy PPTX revision table the same way: its downgrade restores the schema but not the rows. Migration 35 deletes every presentation without a card document, the pgvector tables, and the extension, and has no downgrade. Migration 36 overwrites unsalted SHA-256 and PBKDF2 password hashes, so those users must reset their password. For all of these, the pre-release backup is the only copy.

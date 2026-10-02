@@ -18,7 +18,7 @@ The Go API is the only application HTTP API. It owns authentication and JWT toke
 The local stack is coordinated by devenv:
 
 ```text
-PostgreSQL and storage emulator ready -> Goose, document backfill, and River migrations complete -> API and worker ready -> Vite web ready
+PostgreSQL and storage emulator ready -> Goose and River migrations and the retired-object sweep complete -> API and worker ready -> Vite web ready
 ```
 
 The API entry point is `apps/api/cmd/api/main.go`. It exposes:
@@ -36,7 +36,7 @@ The API entry point is `apps/api/cmd/api/main.go`. It exposes:
 
 The worker entry point is `apps/api/cmd/worker/main.go`. It consumes River v0.43 jobs from PostgreSQL, executes generation and iteration, and exposes `/live`, `/ready`, and the authenticated `/drain` lease endpoint. The durable job payload stays in PostgreSQL; Cloud Tasks carries only the request that wakes and protects a scaled-to-zero instance.
 
-The API and worker use `database/sql` with PostgreSQL and pgvector. The migration entry point, `apps/api/cmd/migrate/main.go`, applies embedded Goose migrations from `apps/api/migrations`, backfills missing card document bodies from GCS into PostgreSQL JSONB, validates the required-body constraint, and then applies River's migrations. Legacy rows require `PRESENTATION_GCS_BUCKET` and readable source objects. Migrations must complete before either runtime starts; see [Card storage](CARD_DOCUMENTS.md#storage).
+The API and worker use `database/sql` with PostgreSQL. The migration entry point, `apps/api/cmd/migrate/main.go`, applies embedded Goose migrations from `apps/api/migrations` and then River's migrations. When `PRESENTATION_GCS_BUCKET` is set, it then deletes the objects retired document formats left in the bucket. Migrations must complete before either runtime starts; see [Card storage](CARD_DOCUMENTS.md#storage).
 
 ## Generation
 
