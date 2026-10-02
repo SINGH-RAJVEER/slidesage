@@ -116,7 +116,7 @@ jobs:
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
       TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_gcp_region: asia-south1
-      # Keep the image bucket name; migrations also read legacy document bodies.
+      # Keep the image bucket name; the migration job also deletes retired document objects from it.
       TF_VAR_presentation_gcs_bucket: ${{ vars.PRESENTATION_GCS_BUCKET || format('{0}-presentation-revisions', secrets.GCP_PROJECT_ID) }}
       TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -224,7 +224,7 @@ jobs:
             "${args[@]}" -out=maintenance.tfplan
           terraform apply -input=false -lock-timeout=5m -no-color maintenance.tfplan
 
-      - name: Run migrations and resumable document backfill
+      - name: Run migrations and purge retired objects
         run: |
           gcloud run jobs execute slidesage-migrate \
             --project="$PROJECT_ID" --region="$RUN_REGION" --wait

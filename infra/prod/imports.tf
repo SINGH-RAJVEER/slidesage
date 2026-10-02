@@ -2,7 +2,7 @@
 # dev-to-main PR is merged. Import blocks are evaluated by plan; apply writes
 # their results into state and may also change resource settings.
 #
-# The image/backfill bucket, its runtime IAM, and registry reader IAM are planned
+# The image bucket, its runtime IAM, and registry reader IAM are planned
 # additions only if not already managed. Preserve their legacy resource addresses
 # and names. If the bucket already exists outside state, import it at
 # google_storage_bucket.presentation_revisions before applying; do not replace it.

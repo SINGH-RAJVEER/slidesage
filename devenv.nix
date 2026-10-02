@@ -169,7 +169,7 @@
 		WORKER_DATABASE_POOL_MAX = "5";
 
 		STORAGE_EMULATOR_HOST = "http://127.0.0.1:4443";
-		# Preserve the image bucket and legacy document objects for JSONB backfill.
+		# Image bucket; cmd/migrate also deletes retired document objects from it.
 		PRESENTATION_GCS_BUCKET = "slidesage-dev-revisions";
 		CARD_CONVERTER_URL = "http://127.0.0.1:8090";
     };

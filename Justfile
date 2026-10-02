@@ -12,8 +12,8 @@ dev:
 db-shell:
     psql -h 127.0.0.1 -p "${PGPORT:-${POSTGRES_PORT:-5432}}" -U "${POSTGRES_USER:-slidesage}" -d "${POSTGRES_DB:-slidesage}"
 
-# Apply Goose, resumable document backfill, and River migrations.
-# Start local storage first when legacy bodies remain; retain bucket/emulator env.
+# Apply Goose and River migrations, then delete retired objects from the image
+# bucket when PRESENTATION_GCS_BUCKET is set.
 migrate:
 	CGO_ENABLED=0 go -C apps/api run ./cmd/migrate
 
