@@ -29,11 +29,6 @@ export interface LibraryNotice {
 	notice: string;
 }
 
-/** The server's answer when a finished presentation has no card document. */
-const NO_CARD_DOCUMENT = 409;
-const EARLIER_VERSION =
-	"This presentation was made with an earlier version of SlideSage and can no longer be opened.";
-
 async function errorMessage(response: Response, fallback: string): Promise<string> {
 	const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
 	return body?.error?.message ?? fallback;
@@ -102,11 +97,7 @@ export default function PresentationPage() {
 			});
 			if (!current()) return;
 			if (!documentResponse.ok) {
-				fail(
-					documentResponse.status === NO_CARD_DOCUMENT
-						? EARLIER_VERSION
-						: await errorMessage(documentResponse, "Unable to load the presentation"),
-				);
+				fail(await errorMessage(documentResponse, "Unable to load the presentation"));
 				return;
 			}
 			const body = (await documentResponse.json()) as {

@@ -36,7 +36,7 @@ function Library() {
 	return <p>Library: {state?.notice}</p>;
 }
 
-function serve(status: string, document: unknown, documentStatus = 200) {
+function serve(status: string, document: unknown) {
 	globalThis.fetch = mock(async (input: string | URL | Request) => {
 		const url = String(input);
 		if (url.endsWith("/presentations/pres_1")) {
@@ -49,12 +49,6 @@ function serve(status: string, document: unknown, documentStatus = 200) {
 			});
 		}
 		if (url.endsWith("/presentations/pres_1/document")) {
-			if (documentStatus !== 200) {
-				return Response.json(
-					{ error: { message: "This presentation has no saved document yet" } },
-					{ status: documentStatus },
-				);
-			}
 			return Response.json({ revision: { revision: 1 }, document });
 		}
 		return new Response(null, { status: 404 });
@@ -102,13 +96,6 @@ describe("PresentationPage", () => {
 			await view.findByText("Library: This presentation's saved document could not be read."),
 		).toBeInTheDocument();
 		expect(view.queryByRole("article")).not.toBeInTheDocument();
-	});
-
-	it("returns to the library when the presentation predates card documents", async () => {
-		serve("ready", null, 409);
-		const view = open();
-
-		expect(await view.findByText(/Library: .*made with an earlier version/)).toBeInTheDocument();
 	});
 
 	it("never saves one deck's edits into another deck at the same revision", async () => {
