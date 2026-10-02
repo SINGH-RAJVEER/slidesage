@@ -2,8 +2,11 @@
 # dev-to-main PR is merged. Import blocks are evaluated by plan; apply writes
 # their results into state and may also change resource settings.
 #
-# The revision bucket, its runtime IAM, and registry reader IAM are planned
-# additions. Secret values and the GCS state bucket are provisioned
+# The image bucket, its runtime IAM, and registry reader IAM are planned
+# additions only if not already managed. Preserve their legacy resource addresses
+# and names. If the bucket already exists outside state, import it at
+# google_storage_bucket.presentation_revisions before applying; do not replace it.
+# Secret values and the GCS state bucket are provisioned
 # separately before the first approved apply.
 
 import {
@@ -35,7 +38,6 @@ import {
 import {
   for_each = toset([
     "AUTH_SECRET",
-    "CDN_SIGNING_KEY_SECRET",
     "DATABASE_URL",
     "EXA_API_KEY",
     "GITHUB_CLIENT_ID",
@@ -97,11 +99,6 @@ import {
 }
 
 import {
-  to = google_storage_bucket_iam_member.cdn_template_viewer
-  id = "b/${var.template_gcs_bucket} roles/storage.objectViewer serviceAccount:service-${data.google_project.current.number}@cloud-cdn-fill.iam.gserviceaccount.com"
-}
-
-import {
   to = google_compute_global_address.api
   id = "projects/${var.gcp_project_id}/global/addresses/slidesage-api-ip"
 }
@@ -114,11 +111,6 @@ import {
 import {
   to = google_compute_backend_service.api
   id = "projects/${var.gcp_project_id}/global/backendServices/slidesage-api-backend"
-}
-
-import {
-  to = google_compute_backend_bucket.templates
-  id = "projects/${var.gcp_project_id}/global/backendBuckets/templates"
 }
 
 import {

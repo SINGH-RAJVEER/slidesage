@@ -13,7 +13,7 @@ Every transient error or confirmation the web app shows is rendered through a si
 
 An error renders with `role="alert"`, a warning icon, and red text on a red border; a warning renders with `role="status"`, the same icon, and amber text on an amber border; a success renders with `role="status"`, a check icon, and emerald text on an emerald border. All are `aria-live="polite"`. Rendering nothing when every message is empty is the component's own responsibility, so callers pass state through unconditionally.
 
-A warning is for a state the reader can correct before the action succeeds, rather than one that already failed. Asking for a deck on `/generate` without a template selected raises "Select a template before generating." there.
+A warning is for a state the reader can correct before the action succeeds, rather than one that already failed. A generation submission the API refuses is an error: `/generate` and `/generate/research` report it on the notice and stay on the page.
 
 ## Usage
 
@@ -33,7 +33,7 @@ Mount it once per page, directly after `<Header />`, and feed it the page's mess
 
 Because it is `position: fixed`, it does not need to sit near the control that failed. Do not add page-local error boxes, inline red text under a form, or `Alert` blocks for action feedback.
 
-Where the message is owned upstream and the component cannot clear it — `IterateModal` receives its error from the streaming state — track the acknowledged message locally and derive what is visible from it, rather than adding a clear callback to the parent.
+Where the message is owned upstream and the component cannot clear it, such as an error in the streaming state, copy it into local state when it changes and clear that copy on dismiss, rather than adding a clear callback to the parent.
 
 ## What stays inline
 
@@ -41,8 +41,5 @@ The notice replaces feedback that follows a user action. Blocking states that ow
 
 - `PresentationErrorPage`, the dedicated route for a failed generation (its retry failure message uses the notice)
 - The research failure block on `GenerateResearchPage`, which offers **Retry research**
-- The template preview failure on `MarketplaceThemePreviewPage`, which offers **Retry**
 - The "AI settings could not be loaded" state in `AISettings`, which replaces the whole panel. It is tracked separately from the panel's confirmations, which do go to the notice
 - The "Email verified" block on `VerifyEmailPage`, which replaces the form for the terminal state of the flow
-- The preview rendering status in the viewer, which carries its own retry link
-- The standing template problems on `GeneratePPTPage`: a retry naming a template this build no longer offers, and a selected template that is not ready for generation. Both describe a condition that persists until the reader changes the selection, so a self-dismissing pill would hide a message that is still true

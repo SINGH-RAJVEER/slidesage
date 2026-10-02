@@ -23,8 +23,6 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/middleware"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/observability"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templateasset"
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templatecatalog"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -101,17 +99,8 @@ func main() {
 	generation.RegisterRoutes(mux, database, func(_ context.Context, request *http.Request) (string, error) {
 		return identity(request)
 	}, ai.ConnectionService{DB: database}, generation.RouteConfig{StreamContext: streamContext, Research: researchService})
-	if err := registerDocumentRoutes(mux, database, service); err != nil {
+	if err := registerDocumentRoutes(mux, database, identity); err != nil {
 		fatal(logger, err)
-	}
-	if templateasset.CDNConfigured() {
-		thumbnails, err := templateasset.NewCDNFetcherFromEnv()
-		if err != nil {
-			log.Fatal(err)
-		}
-		templateasset.RegisterRoutes(mux, templateasset.Handler{Fetcher: thumbnails, Published: templatecatalog.Published})
-	} else {
-		log.Print("template thumbnails are disabled: CDN signing is not configured")
 	}
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("/", notFoundHandler)

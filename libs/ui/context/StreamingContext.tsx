@@ -1,9 +1,9 @@
 import type {
 	AIModelSelection,
+	DraftPreview,
+	Outline,
 	PresentationData,
 	PresentationGenerationStage,
-	PresentationRevision,
-	PresentationTemplateReference,
 	ResearchPayload,
 	Source,
 } from "@slidesage/types";
@@ -22,7 +22,6 @@ interface StoredGeneration {
 	operation: "generation" | "iteration";
 	prompt?: string;
 	requestedSlides: number;
-	template?: PresentationTemplateReference;
 	lastEventId: number;
 }
 
@@ -50,17 +49,6 @@ function readStoredGeneration(): StoredGeneration | null {
 		) {
 			inMemoryGeneration = null;
 			window.localStorage.removeItem(ACTIVE_GENERATION_KEY);
-			return null;
-		}
-		// New generations need a stored template; iterations can inherit deck metadata.
-		const template = value.template;
-		if (
-			(template === undefined && value.operation !== "iteration") ||
-			(template !== undefined &&
-				(!template || typeof template.id !== "string" || typeof template.version !== "number"))
-		) {
-			window.localStorage.removeItem(ACTIVE_GENERATION_KEY);
-			inMemoryGeneration = null;
 			return null;
 		}
 		inMemoryGeneration = value as StoredGeneration;
@@ -101,9 +89,10 @@ function updateStoredCursor(jobId: string, lastEventId: number) {
 
 export interface StreamingState {
 	isStreaming: boolean;
-	/** Slides finished so far. The deck itself is the committed revision. */
+	/** True once the server has accepted the job, as opposed to while it is being submitted. */
+	accepted?: boolean;
+	/** Slides finished so far. */
 	slideCount: number;
-	template?: PresentationTemplateReference;
 	title: string;
 	totalSlides: number;
 	requestedSlides: number;
@@ -118,8 +107,9 @@ export interface StreamingState {
 	generationStage?: PresentationGenerationStage;
 	generationMessage?: string;
 	generationProgress?: { completed: number; total: number };
-	revision?: PresentationRevision;
 	completedDocument?: PresentationData;
+	/** Cards drafted so far; a preview until the revision commits. */
+	preview?: DraftPreview;
 }
 
 export interface GenerateOptions {
@@ -130,10 +120,14 @@ export interface GenerateOptions {
 	researchEnabled?: boolean;
 	researchPayload?: ResearchPayload;
 	parentPresentationId?: string;
-	baseRevision?: number;
 	retryPresentationId?: string;
 	ai?: AIModelSelection;
-	template?: PresentationTemplateReference;
+	/** An outline the user approved; drafting follows it instead of planning. */
+	plan?: Outline;
+	/** For an AI revision: the card revision being revised. */
+	baseRevision?: number;
+	/** For an AI revision: the cards to rewrite; omitted means every card. */
+	cardIds?: string[];
 }
 
 type ResearchPreviewStatus = "idle" | "loading" | "ready" | "error";
@@ -375,22 +369,50 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				setStreamingState((prev) => ({
 					...prev,
 					slideCount: 0,
-					revision: undefined,
 					isComplete: false,
 					error: undefined,
+					preview: undefined,
 				}));
 				break;
 
-			case "revision": {
-				// The worker committed a revision; its slide count is the deck's
-				// real length, not a running total of streamed slides.
-				const revision = data as PresentationRevision;
+			case "plan": {
+				const plan = data as { title: string; cards: DraftPreview["entries"] };
 				setStreamingState((prev) => ({
 					...prev,
-					revision,
-					slideCount: revision.slideCount,
-					totalSlides: revision.slideCount,
+					title: plan.title || prev.title,
+					preview: {
+						title: plan.title,
+						entries: plan.cards,
+						cards: {},
+						assets: {},
+						completed: 0,
+						total: plan.cards.length,
+					},
 				}));
+				break;
+			}
+
+			case "cards": {
+				const batch = data as {
+					cards: Record<string, unknown>;
+					assets: Record<string, unknown>;
+					completed: number;
+					total: number;
+				};
+				setStreamingState((prev) =>
+					prev.preview
+						? {
+								...prev,
+								preview: {
+									...prev.preview,
+									cards: { ...prev.preview.cards, ...batch.cards },
+									assets: { ...prev.preview.assets, ...batch.assets },
+									completed: batch.completed,
+									total: batch.total,
+								},
+							}
+						: prev,
+				);
 				break;
 			}
 
@@ -399,9 +421,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				setStreamingState((prev) => ({
 					...prev,
 					completedDocument: document,
-					template: document.template,
 					title: document.title || prev.title,
-					revision: document.currentRevision ?? prev.revision,
 					slideCount: document.totalSlides || prev.slideCount,
 					totalSlides: document.totalSlides || prev.totalSlides,
 				}));
@@ -542,10 +562,6 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 	const generate = useCallback(
 		async (options: GenerateOptions): Promise<boolean> => {
 			if (activeStreamRef.current) return false;
-			if (!options.parentPresentationId && !options.template) return false;
-			const template = options.template
-				? { id: options.template.id, version: options.template.version }
-				: undefined;
 			activeStreamRef.current = true;
 			const jobId = crypto.randomUUID();
 			const operation = options.parentPresentationId ? "iteration" : "generation";
@@ -556,7 +572,6 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				isStreaming: true,
 				jobId,
 				requestedSlides: options.slideCount,
-				template,
 				operation,
 				prompt: options.prompt,
 				presentationId: targetPresentationId || undefined,
@@ -568,7 +583,6 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				operation,
 				prompt: options.prompt,
 				requestedSlides: options.slideCount,
-				template,
 				lastEventId: 0,
 			};
 			storeGeneration(stored);
@@ -583,6 +597,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				setStreamingState((prev) => ({
 					...prev,
 					jobId,
+					accepted: true,
 					presentationId: attachedPresentationId || prev.presentationId,
 				}));
 				// Release the stream slot no matter how consumption ends, so later
@@ -610,10 +625,11 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 						research: { enabled: Boolean(options.researchEnabled) },
 						research_payload: options.researchPayload,
 						parent_presentation_id: options.parentPresentationId,
-						base_revision: options.parentPresentationId ? options.baseRevision : undefined,
 						retry_presentation_id: options.retryPresentationId,
 						ai: options.ai,
-						template,
+						plan: options.plan,
+						base_revision: options.baseRevision,
+						card_ids: options.cardIds,
 					}),
 					signal: controller.signal,
 				});
@@ -827,9 +843,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 		if (!completed) return null;
 		return {
 			...completed,
-			template: completed.template,
 			title: streamingState.title,
-			currentRevision: streamingState.revision ?? completed.currentRevision,
 			totalSlides: streamingState.slideCount || completed.totalSlides,
 		};
 	}, [streamingState]);
@@ -845,12 +859,12 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 		setStreamingState({
 			...initialState,
 			isStreaming: true,
+			accepted: true,
 			jobId: initialStored.jobId,
 			presentationId: initialStored.presentationId || undefined,
 			operation: initialStored.operation,
 			prompt: initialStored.prompt,
 			requestedSlides: initialStored.requestedSlides,
-			template: initialStored.template,
 		});
 
 		void consumeJobEvents(

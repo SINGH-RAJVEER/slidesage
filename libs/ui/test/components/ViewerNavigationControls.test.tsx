@@ -16,7 +16,6 @@ const renderControls = (
 		onPrev: mock(),
 		onNext: mock(),
 		onLast: mock(),
-		showDownload: false,
 		onDeleteSlide,
 		...overrides,
 	};

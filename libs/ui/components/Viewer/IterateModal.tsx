@@ -1,31 +1,34 @@
 import { Button } from "@slidesage/ui/components/button";
 import { DialogHeader } from "@slidesage/ui/components/dialog";
-import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
-import { Slider, SliderThumb } from "@slidesage/ui/components/slider";
 import { Textarea } from "@slidesage/ui/components/textarea";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
-import { Globe, Sparkles, X } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+/** What a revision rewrites: every card, or the slide on screen. */
+export type IterateScope = "deck" | "slide";
 
 interface IterateModalProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onIterate: (
-		prompt: string,
-		slideCount: number,
-		detailLevel: string,
-		tonality: string,
-		useWebResearch: boolean,
-	) => boolean | void | Promise<boolean | void>;
-	currentSlideCount?: number;
-	error?: string;
+	onIterate: (instruction: string, scope: IterateScope) => boolean | void | Promise<boolean | void>;
+	/** The scope chosen when the panel opens. */
+	initialScope?: IterateScope;
+	/** One-based number of the slide on screen. */
+	currentSlide: number;
 	isStreaming: boolean;
 }
 
 const panelClassName =
 	"flex h-dvh w-full flex-col gap-0 overflow-hidden border-l border-white/10 bg-[hsl(222_27%_12%)] bg-[radial-gradient(circle_at_top,hsl(220_20%_18%),hsl(222_27%_12%)_60%)] text-white shadow-2xl";
-const detailLevels = ["brief", "concise", "balanced", "detailed", "comprehensive"];
-const tonalities = ["professional", "casual", "enthusiastic", "persuasive"];
+const QUICK_INSTRUCTIONS = [
+	"Make it more concise",
+	"Add more detail and examples",
+	"Make it more persuasive",
+	"Use simpler language",
+];
+/** The server's limit on a revision instruction. */
+const INSTRUCTION_LIMIT = 400;
 const optionClassName =
 	"rounded-lg border px-3 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -34,23 +37,16 @@ export default function IterateModal({
 	onOpenChange,
 	onIterate,
 	isStreaming,
-	currentSlideCount,
-	error,
+	initialScope = "deck",
+	currentSlide,
 }: IterateModalProps) {
 	const [iteratePrompt, setIteratePrompt] = useState("");
-	const [slideCount, setSlideCount] = useState(String(currentSlideCount ?? 5));
-	const [detailLevel, setDetailLevel] = useState("balanced");
-	const [tonality, setTonality] = useState("professional");
-	const [useWebResearch, setUseWebResearch] = useState(false);
-	const [dismissedError, setDismissedError] = useState<string | null>(null);
+	const [scope, setScope] = useState<IterateScope>(initialScope);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-	// The error is owned by the streaming state upstream, so dismissal is tracked
-	// locally against the message that was last acknowledged.
-	const visibleError = open && error && error !== dismissedError ? error : null;
 
 	useEffect(() => {
-		if (open) setSlideCount(String(currentSlideCount ?? 5));
-	}, [open, currentSlideCount]);
+		if (open) setScope(initialScope);
+	}, [open, initialScope]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -72,13 +68,14 @@ export default function IterateModal({
 		el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
 	};
 
-	const handleSubmit = async () => {
-		if (iteratePrompt.trim() && !isStreaming) {
-			const count = Math.min(40, Math.max(1, parseInt(slideCount, 10) || 1));
-			const accepted = await onIterate(iteratePrompt, count, detailLevel, tonality, useWebResearch);
+	const submit = async (instruction: string) => {
+		const trimmed = instruction.trim();
+		if (trimmed && !isStreaming) {
+			const accepted = await onIterate(trimmed, scope);
 			if (accepted === true) setIteratePrompt("");
 		}
 	};
+	const handleSubmit = () => submit(iteratePrompt);
 
 	const panelContent = (
 		<>
@@ -98,8 +95,10 @@ export default function IterateModal({
 					<Textarea
 						id="iteratePrompt"
 						ref={textareaRef}
-						placeholder="e.g., 'Add more details to slide 3', 'Make it more casual', 'Rewrite the conclusion'"
+						aria-label="What should change"
+						placeholder="e.g., 'Tighten the wording and lead with the numbers', 'Make it more casual'"
 						value={iteratePrompt}
+						maxLength={INSTRUCTION_LIMIT}
 						onChange={(e) => handlePromptChange(e.target.value)}
 						onKeyDown={(e) => {
 							if (e.key === "Enter" && !e.shiftKey && iteratePrompt.trim()) {
@@ -114,84 +113,52 @@ export default function IterateModal({
 
 				<div className="border-t border-white/10 pt-6">
 					<div className="grid gap-6">
-						<Button
-							type="button"
-							variant="ghost"
-							disabled={isStreaming}
-							aria-pressed={useWebResearch}
-							onClick={() => setUseWebResearch((prev) => !prev)}
-							className={`h-10 self-start rounded-md border px-4 transition-colors ${
-								useWebResearch
-									? "border-white/20 bg-white/10 text-white"
-									: "border-transparent bg-transparent text-white/60 hover:bg-white/5 hover:text-white"
-							}`}
-						>
-							<span className="flex items-center gap-2 text-sm font-medium">
-								<Globe className="h-4 w-4" />
-								Web Research
-							</span>
-						</Button>
 						<div className="space-y-3">
-							<p className="text-sm font-medium text-white/60">Detail level</p>
+							<p className="text-sm font-medium text-white/60">Revise</p>
 							<div className="grid grid-cols-2 gap-2">
-								{detailLevels.map((level) => (
+								{(
+									[
+										["deck", "Every slide"],
+										["slide", `Slide ${currentSlide}`],
+									] as const
+								).map(([value, label]) => (
 									<button
-										key={level}
+										key={value}
 										type="button"
 										disabled={isStreaming}
-										aria-pressed={detailLevel === level}
-										onClick={() => setDetailLevel(level)}
+										aria-pressed={scope === value}
+										onClick={() => setScope(value)}
 										className={`${optionClassName} ${
-											detailLevel === level
+											scope === value
 												? "border-white/20 bg-white/10 text-white"
 												: "border-white/5 bg-black/10 text-white/55 hover:border-white/10 hover:bg-white/5 hover:text-white/80"
 										}`}
 									>
-										{level.charAt(0).toUpperCase() + level.slice(1)}
+										{label}
 									</button>
 								))}
 							</div>
 						</div>
 
 						<div className="space-y-3">
-							<p className="text-sm font-medium text-white/60">Tone</p>
+							<p className="text-sm font-medium text-white/60">Quick changes</p>
 							<div className="grid grid-cols-2 gap-2">
-								{tonalities.map((tone) => (
+								{QUICK_INSTRUCTIONS.map((quick) => (
 									<button
-										key={tone}
+										key={quick}
 										type="button"
 										disabled={isStreaming}
-										aria-pressed={tonality === tone}
-										onClick={() => setTonality(tone)}
-										className={`${optionClassName} ${
-											tonality === tone
-												? "border-white/20 bg-white/10 text-white"
-												: "border-white/5 bg-black/10 text-white/55 hover:border-white/10 hover:bg-white/5 hover:text-white/80"
-										}`}
+										onClick={() => void submit(quick)}
+										className={`${optionClassName} border-white/5 bg-black/10 text-left text-white/55 hover:border-white/10 hover:bg-white/5 hover:text-white/80`}
 									>
-										{tone.charAt(0).toUpperCase() + tone.slice(1)}
+										{quick}
 									</button>
 								))}
 							</div>
-						</div>
-
-						<div className="flex items-center gap-3">
-							<p className="text-sm font-light whitespace-nowrap text-white/50">Slide count</p>
-							<Slider
-								value={[Number(slideCount)]}
-								min={1}
-								max={40}
-								step={1}
-								disabled={isStreaming}
-								className="flex-1"
-								onValueChange={(values) => setSlideCount(values[0]?.toString() ?? "5")}
-							>
-								<SliderThumb aria-label="Slide count">{slideCount}</SliderThumb>
-							</Slider>
 						</div>
 						<p className="text-sm text-white/50">
-							Fewer slides condenses the content. Leave the count unchanged to keep the same number
-							of slides.
+							A revision keeps the number and order of slides. Everything outside the chosen slides
+							stays as it is, and the result is saved as a new version.
 						</p>
 					</div>
 				</div>
@@ -238,7 +205,6 @@ export default function IterateModal({
 			>
 				{panelContent}
 			</aside>
-			<FloatingNotice error={visibleError} onDismiss={() => setDismissedError(error ?? null)} />
 		</>
 	);
 }

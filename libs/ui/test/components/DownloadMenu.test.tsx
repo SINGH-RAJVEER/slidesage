@@ -1,29 +1,15 @@
 /// <reference lib="dom" />
 
 import { beforeEach, describe, expect, it, mock } from "bun:test";
-import type { PresentationData } from "@slidesage/types";
 import DownloadMenu, {
 	type PresentationExporter,
 } from "@slidesage/ui/components/Viewer/DownloadMenu";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 
-const exportPptx = mock(async (_presentation: PresentationData) => {});
+const exportPptx = mock(async () => {});
 
-const exportPresentation: PresentationExporter = async (presentation) => {
-	await exportPptx(presentation);
-};
-
-const presentation: PresentationData = {
-	title: "Structured deck",
-	template: { id: "simple-business-proposal", version: 1 },
-	totalSlides: 1,
-	currentRevision: {
-		revision: 1,
-		slideCount: 1,
-		byteSize: 2048,
-		sha256: "a".repeat(64),
-		createdAt: "2026-01-01T00:00:00Z",
-	},
+const exportPresentation: PresentationExporter = async () => {
+	await exportPptx();
 };
 
 const openMenu = (button: HTMLElement) => {
@@ -37,23 +23,17 @@ describe("DownloadMenu", () => {
 	});
 
 	it("downloads the current presentation as PPTX", async () => {
-		const view = render(<DownloadMenu presentation={presentation} onExport={exportPresentation} />);
+		const view = render(<DownloadMenu onExport={exportPresentation} />);
 		openMenu(view.getByRole("button", { name: /Download/ }));
 		fireEvent.click(await view.findByText("PowerPoint"));
 
 		await waitFor(() => expect(exportPptx).toHaveBeenCalledTimes(1));
-		expect(exportPptx.mock.calls[0]?.[0]?.title).toBe("Structured deck");
 	});
 
-	// Download serves the bytes of a committed revision, so a deck that has not
-	// produced one yet has nothing to hand over.
-	it("disables downloads until a revision exists", () => {
-		const view = render(
-			<DownloadMenu
-				presentation={{ ...presentation, currentRevision: undefined }}
-				onExport={exportPresentation}
-			/>,
-		);
+	// Export is built from a saved revision, so a deck with unsaved edits or
+	// none at all has nothing to hand over.
+	it("disables downloads while there is no saved revision", () => {
+		const view = render(<DownloadMenu onExport={exportPresentation} disabled />);
 		expect(view.getByRole("button", { name: /Download/ })).toBeDisabled();
 	});
 
@@ -65,7 +45,7 @@ describe("DownloadMenu", () => {
 					release = resolve;
 				}),
 		);
-		const view = render(<DownloadMenu presentation={presentation} onExport={exportPresentation} />);
+		const view = render(<DownloadMenu onExport={exportPresentation} />);
 		openMenu(view.getByRole("button", { name: /Download/ }));
 		fireEvent.click(await view.findByText("PowerPoint"));
 		await waitFor(() => expect(exportPptx).toHaveBeenCalledTimes(1));
@@ -80,7 +60,7 @@ describe("DownloadMenu", () => {
 		exportPptx.mockImplementation(async () => {
 			throw new Error("export boom");
 		});
-		const view = render(<DownloadMenu presentation={presentation} onExport={exportPresentation} />);
+		const view = render(<DownloadMenu onExport={exportPresentation} />);
 		openMenu(view.getByRole("button", { name: /Download/ }));
 		fireEvent.click(await view.findByText("PowerPoint"));
 

@@ -1,11 +1,9 @@
-import type { PresentationData } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
 import { ChevronLeft, ChevronRight, SkipBack, SkipForward, Trash2, X } from "lucide-react";
 import type React from "react";
 import DownloadMenu, { type PresentationExporter } from "./DownloadMenu";
 
 interface ViewerNavigationControlsProps {
-	presentation?: PresentationData;
 	currentSlide: number;
 	totalSlides: number;
 	onFirst: () => void;
@@ -14,15 +12,15 @@ interface ViewerNavigationControlsProps {
 	onLast: () => void;
 	onCancelGeneration?: () => void;
 	cancelDisabled?: boolean;
-	showDownload?: boolean;
+	/** Omitted where there is nothing to download, such as a shared deck. */
 	onExport?: PresentationExporter;
+	downloadDisabled?: boolean;
 	/** Removes the slide on screen. Omitted where a deck cannot be edited. */
 	onDeleteSlide?: () => void;
 	deleteDisabled?: boolean;
 }
 
 export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> = ({
-	presentation,
 	currentSlide,
 	totalSlides,
 	onFirst,
@@ -31,8 +29,8 @@ export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> =
 	onLast,
 	onCancelGeneration,
 	cancelDisabled = false,
-	showDownload = true,
 	onExport,
+	downloadDisabled = false,
 	onDeleteSlide,
 	deleteDisabled = false,
 }) => {
@@ -42,9 +40,9 @@ export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> =
 			aria-label="Slide navigation"
 			style={{ minHeight: 36, fontSize: "0.95rem" }}
 		>
-			{showDownload && presentation && (
+			{onExport && (
 				<div className="viewer-navigation__download absolute left-0 top-1/2 -translate-y-1/2">
-					<DownloadMenu presentation={presentation} onExport={onExport} />
+					<DownloadMenu onExport={onExport} disabled={downloadDisabled} />
 				</div>
 			)}
 

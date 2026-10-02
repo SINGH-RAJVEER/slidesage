@@ -1,9 +1,10 @@
+export { CardSlide } from "./CardSlide";
 export { CenteredStatusScreen } from "./CenteredStatusScreen";
 export type { PresentationExporter } from "./DownloadMenu";
 export { default as DownloadMenu } from "./DownloadMenu";
+export { deckFromDocument, deckFromPreview, type ViewerDeck, type ViewerSlide } from "./deck";
 export { GenerationProgress } from "./GenerationProgress";
-export { default as IterateModal } from "./IterateModal";
-export { PreviewSlide } from "./PreviewSlide";
+export { default as IterateModal, type IterateScope } from "./IterateModal";
 export { ViewerFullscreenOverlayControls } from "./ViewerFullscreenOverlayControls";
 export { ViewerHeaderControls } from "./ViewerHeaderControls";
 export { ViewerNavigationControls } from "./ViewerNavigationControls";

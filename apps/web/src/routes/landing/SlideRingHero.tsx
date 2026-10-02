@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { CARD_THEMES, CardView } from "@slidesage/ui/components/Cards";
+import { memo, useEffect, useRef, useState } from "react";
 import { type LandingPlate, landingPlateCount, randomLandingPool } from "./landing-plates";
 import { WordmarkOrb } from "./WordmarkOrb";
 
@@ -18,28 +19,6 @@ const THROW_TRANSFER = 0.52;
 const THROW_FRICTION = 0.52;
 const MAX_GESTURE_VELOCITY = 4;
 const MAX_RING_VELOCITY = 2.6;
-/* slides fetched ahead of the plate that will show them */
-const PRELOAD_AHEAD = 4;
-
-/**
- * Plates that carry an image on the first paint.
- *
- * The ring still mounts its full count, so the belt's layout, spacing and
- * motion are exactly what they were - only the network is sequenced. A cold
- * visit opens this many image connections, and the remaining plates take theirs
- * once the opening batch has settled, which keeps the slowest plate in a crowd
- * of thirty parallel requests from being one of the ones you are looking at.
- */
-export const LANDING_FIRST_PAINT_PLATES = 16;
-
-/**
- * How long the rest of the ring waits on the opening batch.
- *
- * A plate whose image never settles must not strand the other half of the belt
- * empty, so the wait is bounded rather than conditional on the batch alone.
- */
-export const LANDING_FIRST_PAINT_DEADLINE_MS = 1200;
-
 /* Plate size as a fraction of the ring's major radius. Small enough that the
    ring can carry a crowd without the plates fusing into a solid band. */
 const PLATE_WIDTH = 0.26;
@@ -230,101 +209,12 @@ function plateSpread(index: number) {
 }
 
 /**
- * Loads a slide off-screen so it is ready to paint before it reaches a plate.
- *
- * `decode()` rather than the load event: a loaded image is downloaded, not yet
- * rasterised, and handing one to a plate leaves the decode to happen on the
- * frame it first paints - which is exactly the hitch this preloading exists to
- * avoid. Browsers without `decode()` fall back to the load event.
- *
- * Resolves null for a slide the CDN will not serve, which drops it from the
- * pool: a template published before slide previews existed contributes its
- * cover and nothing else, instead of putting a broken plate on the ring.
+ * The card a plate carries. Memoised because the ring repaints whenever one
+ * plate is refilled, and the other plates' cards have not changed.
  */
-function preloadSlide(entry: LandingPlate): Promise<LandingPlate | null> {
-	return new Promise((resolve) => {
-		const image = new Image();
-		image.decoding = "async";
-		const settle = () => {
-			if (typeof image.decode !== "function") {
-				resolve(entry);
-				return;
-			}
-			image.decode().then(
-				() => resolve(entry),
-				/* decoded-but-broken is still unusable on a plate */
-				() => resolve(null),
-			);
-		};
-		image.onload = settle;
-		image.onerror = () => resolve(null);
-		image.src = entry.slideUrl;
-	});
-}
-
-/* How long the reveal will wait on a decode before showing the plate regardless. */
-const REVEAL_DEADLINE_MS = 700;
-
-/**
- * Fades a plate up once its slide can actually paint, so it arrives rather than
- * pops.
- *
- * The shell rather than the image, because a plate is not just its slide: it
- * carries a hairline ring and a drop shadow, and fading the image alone would
- * leave an empty outlined box sitting in the ring until the slide landed -
- * trading one artifact for another. Both live on the shell, so both arrive
- * together.
- *
- * A CSS transition rather than the frame loop, because the plate's own opacity
- * is written every frame from its depth in the ring. The two nest, so they
- * multiply, and the reveal does not depend on the loop running.
- */
-function revealSlide(image: HTMLImageElement) {
-	const shell = image.parentElement;
-	if (!shell) return;
-	const show = () => {
-		shell.style.opacity = "1";
-	};
-	if (typeof image.decode !== "function") {
-		show();
-		return;
-	}
-	/* Waiting on the decode means the fade cannot start over a bitmap that is
-	   not ready yet, which would pop mid-fade. But nothing may hold a plate
-	   hostage to a promise: a decode that rejects, or that a browser declines to
-	   settle, must not leave a hole in the ring - so the fade starts anyway
-	   shortly after. */
-	image.decode().then(show, show);
-	setTimeout(show, REVEAL_DEADLINE_MS);
-}
-
-/**
- * Settles a plate's image the moment it is mounted.
- *
- * A cached image is already complete before React can attach a load handler,
- * and `load` does not bubble, so the handler never fires - which on a warm
- * cache means every plate sits at zero and the ring is simply not there. The
- * mount is the only place that case can be caught.
- */
-function attachSlide(image: HTMLImageElement | null, plate: LandingPlate, settled: () => void) {
-	if (!image?.complete) return;
-	settled();
-	if (image.naturalWidth > 0) revealSlide(image);
-	/* complete with no pixels is a failure the error handler will not be told
-	   about either, for the same reason */ else onSlideError({ currentTarget: image }, plate);
-}
-
-/* A slide preview that will not load shows its template's cover instead. */
-function onSlideError(event: { currentTarget: HTMLImageElement }, plate: LandingPlate) {
-	const image = event.currentTarget;
-	if (image.getAttribute("data-fallback") === "true") {
-		/* the cover failed too: leave the plate hidden rather than parade an
-		   empty outlined box round the ring */
-		return;
-	}
-	image.setAttribute("data-fallback", "true");
-	image.src = plate.coverUrl;
-}
+const PlateCard = memo(function PlateCard({ plate }: { plate: LandingPlate }) {
+	return <CardView card={plate.card} theme={CARD_THEMES[plate.theme]} position={plate.position} />;
+});
 
 export function SlideRingHero() {
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -344,26 +234,6 @@ export function SlideRingHero() {
 	);
 	/* what the frame loop reads; `ring` is only what React paints */
 	const ringRef = useRef(ring);
-	/* plates carrying an image right now: the opening batch, then all of them */
-	const [staged, setStaged] = useState(() => Math.min(ring.length, LANDING_FIRST_PAINT_PLATES));
-	/* counted once per plate, since a failed slide settles again on its cover */
-	const paintedPlates = useRef(new Set<number>());
-
-	const platePainted = (index: number) => {
-		const painted = paintedPlates.current;
-		if (painted.has(index) || index >= LANDING_FIRST_PAINT_PLATES) return;
-		painted.add(index);
-		if (painted.size >= Math.min(ringRef.current.length, LANDING_FIRST_PAINT_PLATES)) {
-			setStaged(ringRef.current.length);
-		}
-	};
-
-	useEffect(() => {
-		if (staged >= ring.length) return undefined;
-		const timer = window.setTimeout(() => setStaged(ring.length), LANDING_FIRST_PAINT_DEADLINE_MS);
-		return () => window.clearTimeout(timer);
-	}, [staged, ring.length]);
-
 	useEffect(() => {
 		const root = rootRef.current;
 		if (!root) return undefined;
@@ -389,7 +259,6 @@ export function SlideRingHero() {
 		let last = performance.now();
 		let frameId = 0;
 		let visible = true;
-		let disposed = false;
 
 		/* Whether the ring is going anywhere. A plate only needs to duck out for
 		   its refill if it is going to come back; on the single static frame a
@@ -406,45 +275,22 @@ export function SlideRingHero() {
 		let lastPointerTime = 0;
 		let gestureVelocity = 0;
 
-		/* Slides waiting their turn, and the ones already decoded. A plate that
-		   leaves the ring goes back on the queue, so the pool cycles rather
-		   than running dry — and its second time round costs no bytes. */
+		/* Cards waiting their turn. A plate that leaves the ring goes back on
+		   the queue, so the pool cycles rather than running dry. */
 		const queue = pool.slice(count);
-		const ready: LandingPlate[] = [];
-		let loading = 0;
 
-		const pump = () => {
-			while (ready.length + loading < PRELOAD_AHEAD && queue.length) {
-				const entry = queue.shift();
-				if (!entry) break;
-				loading += 1;
-				void preloadSlide(entry).then((loaded) => {
-					loading -= 1;
-					if (disposed) return;
-					if (loaded) ready.push(loaded);
-					pump();
-				});
-			}
-		};
-
-		/* Refills one plate with the next decoded slide. Called as the plate
-		   passes the back of the ring, where the orb hides it and it is at its
-		   smallest and faintest, so the change never happens in plain sight. */
+		/* Refills one plate with the next card. Called as the plate passes the
+		   back of the ring, where the orb hides it and it is at its smallest and
+		   faintest, so the change never happens in plain sight. */
 		const recycle = (index: number) => {
-			const next = ready.shift();
-			if (!next) {
-				/* nothing decoded yet: the plate keeps its slide and takes the
-				   next pass instead */
-				pump();
-				return;
-			}
+			const next = queue.shift();
+			if (!next) return;
 			const outgoing = ringRef.current[index];
 			if (outgoing) queue.push(outgoing);
 			const updated = ringRef.current.slice();
 			updated[index] = next;
 			ringRef.current = updated;
 			setRing(updated);
-			pump();
 		};
 
 		/* completed turns per plate, counted from the back of the ring; NaN
@@ -772,7 +618,6 @@ export function SlideRingHero() {
 
 		layout();
 		settleReducedMotion();
-		pump();
 		observer?.observe(root);
 		intersection?.observe(root);
 		root.addEventListener("pointerdown", onPointerDown);
@@ -784,7 +629,6 @@ export function SlideRingHero() {
 		start();
 
 		return () => {
-			disposed = true;
 			stop();
 			observer?.disconnect();
 			intersection?.disconnect();
@@ -819,7 +663,7 @@ export function SlideRingHero() {
 		<div
 			ref={rootRef}
 			role="img"
-			aria-label="Presentation templates orbiting a black hole"
+			aria-label="Presentation slides orbiting a black hole"
 			className="relative h-full w-full cursor-grab select-none overflow-hidden active:cursor-grabbing"
 			style={{
 				background:
@@ -840,46 +684,14 @@ export function SlideRingHero() {
 						}}
 						className="pointer-events-auto absolute top-0 left-0 aspect-video will-change-transform"
 					>
-						{/* the plate's visible body: slide, ring and shadow together, so
-						    the whole plate fades up as one once the slide can paint.
-						    Keyed by position, not by slide: once revealed it stays
-						    revealed, and a refill is hidden by the plate's dip through
-						    the back of the ring rather than by fading the body again. */}
+						{/* The plate's visible body: its card, hairline ring, and shadow.
+						    A card is drawn, not downloaded, so it paints with the ring's
+						    first frame and needs no reveal. */}
 						<div
-							style={{
-								opacity: 0,
-								transition: "opacity 420ms ease-out",
-								boxShadow: "0 18px 44px rgba(0, 0, 0, 0.45)",
-							}}
+							style={{ boxShadow: "0 18px 44px rgba(0, 0, 0, 0.45)" }}
 							className="absolute inset-0 overflow-hidden rounded-[4%] ring-1 ring-white/10"
 						>
-							{/* a plate past the opening batch has no image yet: its shell
-							    sits at zero opacity, which is where every plate starts */}
-							{index < staged && (
-								<img
-									/* keyed by the slide, so a refill mounts a clean element
-								   rather than inheriting the last slide's fallback state */
-									key={plate.key}
-									ref={(el) => attachSlide(el, plate, () => platePainted(index))}
-									src={plate.slideUrl}
-									alt=""
-									/* Eager, deliberately. A plate is never at rest: it orbits
-								   through the viewport whether or not it started there, so
-								   deferring the fetch until it arrives guarantees it pops in
-								   mid-flight. The whole ring is around a megabyte. */
-									decoding="async"
-									draggable={false}
-									onLoad={(event) => {
-										platePainted(index);
-										revealSlide(event.currentTarget);
-									}}
-									onError={(event) => {
-										platePainted(index);
-										onSlideError(event, plate);
-									}}
-									className="h-full w-full object-cover"
-								/>
-							)}
+							<PlateCard plate={plate} />
 						</div>
 					</div>
 				))}
@@ -893,7 +705,7 @@ export function SlideRingHero() {
 				<div
 					role="dialog"
 					aria-modal="true"
-					aria-label={`Template preview: ${preview.name}`}
+					aria-label={`Sample slide: ${preview.deck}, slide ${preview.position}`}
 					className="absolute inset-0 z-30 flex items-center justify-center"
 				>
 					<button
@@ -905,21 +717,19 @@ export function SlideRingHero() {
 						}`}
 					/>
 					<div
-						className={`relative z-10 aspect-video w-[68%] max-w-[880px] transition-all duration-300 ease-out ${
+						className={`relative z-10 w-[68%] max-w-[880px] transition-all duration-300 ease-out ${
 							previewShown ? "scale-100 opacity-100" : "scale-95 opacity-0"
 						}`}
 					>
-						<div className="h-full w-full overflow-hidden rounded-lg shadow-2xl ring-1 ring-white/15">
-							<img
-								/* the full render, not the plate's thumbnail-sized copy */
-								src={preview.fullUrl}
-								alt={`${preview.name}, slide ${preview.slideIndex + 1}`}
-								onError={(event) => onSlideError(event, preview)}
-								className="h-full w-full object-cover"
+						<div className="w-full overflow-hidden rounded-lg shadow-2xl ring-1 ring-white/15">
+							<CardView
+								card={preview.card}
+								theme={CARD_THEMES[preview.theme]}
+								position={preview.position}
 							/>
 						</div>
 						<p className="mt-4 text-center text-xs tracking-wide text-white/50">
-							{preview.name} · Slide {preview.slideIndex + 1}
+							{preview.deck} · Slide {preview.position}
 						</p>
 					</div>
 				</div>

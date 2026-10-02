@@ -1,7 +1,6 @@
 /// <reference lib="dom" />
 
 import { expect, it, mock } from "bun:test";
-import { BINARY_PPTX_TEMPLATE_CATALOG } from "@slidesage/types";
 import { StreamingProvider } from "@slidesage/ui";
 import { fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -43,55 +42,9 @@ it("prefills a failed presentation prompt and generation options", () => {
 	expect(view.getByText("Comprehensive")).toBeInTheDocument();
 	expect(view.getByText("Casual")).toBeInTheDocument();
 	expect(view.getByRole("button", { name: /Web Research/ })).toHaveClass("bg-white/10");
-	// Nothing stands in for a template the retry state never named, and the
-	// reader is only told so once they ask for a deck.
-	expect(view.getByRole("button", { name: /Template Select/ })).toBeInTheDocument();
-	expect(view.queryByText("Select a template before generating.")).not.toBeInTheDocument();
 });
 
-it("warns instead of generating when Generate is pressed with no template", async () => {
-	const originalFetch = globalThis.fetch;
-	const fetchMock = mock(
-		async (_input: string | URL | Request, _init?: RequestInit) =>
-			new Response(null, { status: 500 }),
-	);
-	globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-	try {
-		const view = render(
-			<MemoryRouter initialEntries={["/generate"]}>
-				<StreamingProvider>
-					<Routes>
-						<Route path="/generate" element={<GeneratePPTPage />} />
-						<Route path="/presentation" element={<div>Viewer</div>} />
-					</Routes>
-				</StreamingProvider>
-			</MemoryRouter>,
-		);
-
-		fireEvent.change(view.getByRole("textbox", { name: "Prompt" }), {
-			target: { value: "A deck with no template picked" },
-		});
-		fireEvent.click(view.getByRole("button", { name: "Generate" }));
-
-		await waitFor(() =>
-			expect(view.getByText("Select a template before generating.")).toBeInTheDocument(),
-		);
-		// The warning belongs on the floating notice below the header, in amber,
-		// not inline under the options bar.
-		const notice = view.getByText("Select a template before generating.").closest("div");
-		expect(notice).toHaveClass("fixed", "top-[4.5rem]", "right-4", "text-amber-200");
-		expect(notice).toHaveAttribute("role", "status");
-		expect(
-			fetchMock.mock.calls.some(([input]) => String(input).includes("/presentation-jobs")),
-		).toBe(false);
-		expect(view.queryByText("Viewer")).not.toBeInTheDocument();
-	} finally {
-		globalThis.fetch = originalFetch;
-	}
-});
-
-it("selects the template a retried presentation was generated from", () => {
+it("takes the retried settings to the outline", async () => {
 	const view = render(
 		<MemoryRouter
 			initialEntries={[
@@ -100,12 +53,13 @@ it("selects the template a retried presentation was generated from", () => {
 					state: {
 						retry: {
 							prompt: "Retry this market analysis",
-							slide_count: 12,
-							detail_level: "comprehensive",
-							tonality: "casual",
+							slide_count: 7,
+							detail_level: "balanced",
+							tonality: "professional",
 							research_enabled: false,
-							template: { id: "5s-training", version: 1 },
+							ai: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
 						},
+						retryPresentationId: "failed_1",
 					},
 				},
 			]}
@@ -113,218 +67,59 @@ it("selects the template a retried presentation was generated from", () => {
 			<StreamingProvider>
 				<Routes>
 					<Route path="/generate" element={<GeneratePPTPage />} />
+					<Route path="/generate/outline" element={<RouteStateProbe />} />
 				</Routes>
 			</StreamingProvider>
 		</MemoryRouter>,
 	);
 
-	expect(view.getByRole("button", { name: /5S Training/ })).toBeInTheDocument();
-	expect(view.getByRole("button", { name: "Generate" })).not.toBeDisabled();
-});
+	fireEvent.click(view.getByRole("button", { name: "Generate" }));
 
-it("opens the viewer immediately while generation waits for the stream", async () => {
-	const originalFetch = globalThis.fetch;
-	const fetchMock = mock((input: string | URL | Request, _init?: RequestInit) =>
-		String(input).includes("/ai/config")
-			? Promise.resolve(
-					new Response(
-						JSON.stringify({
-							generation: {
-								mode: "openrouter",
-								model: "openrouter/default",
-								billing: "points",
-							},
-							eligibility: {
-								eligible: false,
-								slideTokens: 10,
-								minimumPointsExclusive: 50,
-							},
-							connections: [],
-							models: [],
-							selection: null,
-						}),
-						{ headers: { "Content-Type": "application/json" } },
-					),
-				)
-			: new Promise<Response>(() => {}),
-	);
-	globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-	try {
-		const view = render(
-			<MemoryRouter
-				initialEntries={[
-					{
-						pathname: "/generate",
-						state: {
-							retry: {
-								prompt: "Immediate viewer navigation, with launch risks\nand pricing",
-								slide_count: 5,
-								detail_level: "balanced",
-								tonality: "professional",
-								research_enabled: false,
-								ai: {
-									provider: "anthropic",
-									model: "claude-sonnet-4-20250514",
-								},
-								template: { id: "5s-training", version: 1 },
-							},
-						},
-					},
-				]}
-			>
-				<StreamingProvider>
-					<Routes>
-						<Route path="/generate" element={<GeneratePPTPage />} />
-						<Route path="/presentation" element={<div>Viewer waiting for stream</div>} />
-					</Routes>
-				</StreamingProvider>
-			</MemoryRouter>,
-		);
-
-		fireEvent.click(view.getByRole("button", { name: "Generate" }));
-
-		await waitFor(() =>
-			expect(
-				fetchMock.mock.calls.some(([input]) => String(input).includes("/presentation-jobs")),
-			).toBe(true),
-		);
-		expect(view.getByText("Viewer waiting for stream")).toBeInTheDocument();
-		const generationRequest = fetchMock.mock.calls.find(([input]) =>
-			String(input).includes("/presentation-jobs"),
-		);
-		const requestBody = JSON.parse(
-			String((generationRequest?.[1] as RequestInit | undefined)?.body),
-		) as Record<string, unknown>;
-		expect(requestBody["topic"]).toBe(
-			"Immediate viewer navigation, with launch risks\nand pricing",
-		);
-		expect(requestBody["ai"]).toEqual({
-			provider: "anthropic",
-			model: "claude-sonnet-4-20250514",
-		});
-		expect(requestBody["template"]).toEqual({ id: "5s-training", version: 1 });
-	} finally {
-		globalThis.fetch = originalFetch;
-	}
-});
-
-it("disables generation when retry state names an unavailable template", () => {
-	const template = BINARY_PPTX_TEMPLATE_CATALOG.find(
-		(entry) => entry.id === "strategic-media-planning",
-	);
-	if (!template) throw new Error("Missing fixture template");
-	const publishedAsset = template.asset;
-	template.asset = { status: "pending-upload" };
-	try {
-		const view = render(
-			<MemoryRouter
-				initialEntries={[
-					{
-						pathname: "/generate",
-						state: {
-							retry: {
-								prompt: "Retry with an unavailable template",
-								slide_count: 5,
-								detail_level: "balanced",
-								tonality: "professional",
-								research_enabled: false,
-								template: { id: "strategic-media-planning", version: 1 },
-							},
-						},
-					},
-				]}
-			>
-				<StreamingProvider>
-					<Routes>
-						<Route path="/generate" element={<GeneratePPTPage />} />
-					</Routes>
-				</StreamingProvider>
-			</MemoryRouter>,
-		);
-
-		expect(view.getByRole("textbox", { name: "Prompt" })).toBeEnabled();
-		expect(view.getByRole("button", { name: "Generate" })).toBeDisabled();
-	} finally {
-		template.asset = publishedAsset;
-	}
+	const state = JSON.parse((await view.findByText(/"prompt"/)).textContent ?? "{}");
+	expect(state).toEqual({
+		prompt: "Retry this market analysis",
+		slideCount: 7,
+		detailLevel: "balanced",
+		tonality: "professional",
+		retryPresentationId: "failed_1",
+		ai: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+	});
 });
 
 it("starts generation on Enter even when focus sits on an options-bar control", async () => {
 	const originalFetch = globalThis.fetch;
-	const fetchMock = mock(async (input: string | URL | Request, init?: RequestInit) => {
-		if (String(input).includes("/ai/config")) {
-			return Response.json({
-				generation: { mode: "openrouter", model: "openrouter/default", billing: "points" },
-				eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
-				connections: [],
-				models: [],
-				selection: null,
-			});
-		}
-		if (String(input).includes("/presentation-jobs")) {
-			generationBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
-			return Response.json(
-				{ job_id: "job_1", presentation_id: "pres_1", status: "queued" },
-				{ status: 202 },
-			);
-		}
-		return new Response('id: 1\nevent: saved\ndata: {"presentation_id":"pres_1"}\n\n', {
-			status: 200,
-			headers: { "Content-Type": "text/event-stream" },
-		});
-	});
-	globalThis.fetch = fetchMock as unknown as typeof fetch;
-	let generationBody: Record<string, unknown> | undefined;
+	globalThis.fetch = mock(async () =>
+		Response.json({
+			generation: { mode: "openrouter", model: "openrouter/default", billing: "points" },
+			eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
+			connections: [],
+			models: [],
+			selection: null,
+		}),
+	) as unknown as typeof fetch;
 
 	try {
 		const view = render(
-			<MemoryRouter
-				initialEntries={[
-					{
-						pathname: "/generate",
-						state: {
-							retry: {
-								prompt: "Enter submits from anywhere",
-								slide_count: 5,
-								detail_level: "balanced",
-								tonality: "professional",
-								research_enabled: false,
-								template: { id: "5s-training", version: 1 },
-							},
-						},
-					},
-				]}
-			>
+			<MemoryRouter initialEntries={["/generate"]}>
 				<StreamingProvider>
 					<Routes>
 						<Route path="/generate" element={<GeneratePPTPage />} />
-						<Route path="/presentation" element={<div>Viewer waiting for stream</div>} />
+						<Route path="/generate/outline" element={<RouteStateProbe />} />
 					</Routes>
 				</StreamingProvider>
 			</MemoryRouter>,
 		);
 
-		// Generation is gated on the eligibility response, so waiting for the
-		// prompt alone can fire Enter while the form is still disabled.
-		await waitFor(() => expect(document.getElementById("prompt")).toBeInTheDocument());
-		await waitFor(() => expect(view.getByRole("button", { name: "Generate" })).not.toBeDisabled());
-
-		// Focus the slide count slider as if the user had just moved it. The
-		// options bar mounts after the eligibility response, so the control has to
-		// be awaited rather than queried synchronously.
+		fireEvent.change(view.getByRole("textbox", { name: "Prompt" }), {
+			target: { value: "Enter submits from anywhere" },
+		});
 		const slider = await view.findByRole("slider", { name: "Slide count" });
 		fireEvent.focus(slider);
 		fireEvent.keyDown(slider, { key: "Enter" });
 
-		// The submit goes through the streaming context and a queued job request,
-		// which is slower than the default budget when the whole suite is running.
-		await waitFor(() => expect(generationBody?.["topic"]).toBe("Enter submits from anywhere"), {
-			timeout: 5000,
-		});
-		// Navigation happens after the job request resolves, so the viewer route
-		// has to be awaited rather than asserted synchronously.
-		expect(await view.findByText("Viewer waiting for stream")).toBeInTheDocument();
+		expect(
+			await view.findByText(/Enter submits from anywhere/, {}, { timeout: 5000 }),
+		).toBeInTheDocument();
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
@@ -388,7 +183,6 @@ it("preserves retry AI selection when routing through research", async () => {
 								tonality: "professional",
 								research_enabled: true,
 								ai: { provider: "openai", model: "gpt-4.1" },
-								template: { id: "5s-training", version: 1 },
 							},
 							retryPresentationId: "failed_1",
 						},

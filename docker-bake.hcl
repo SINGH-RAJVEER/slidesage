@@ -1,9 +1,7 @@
 # Bake definition for the runtime images.
 #
-# Each image copies one prebuilt binary from dist/ onto scratch, so a bake is
-# three trivial builds sharing a certificate stage. Baking them together still
-# beats three sequential build-push-action steps, which re-entered the builder
-# each time.
+# The Go images copy prebuilt binaries from dist/. The converter image copies a
+# Bun bundle from the same directory. One bake publishes the whole release.
 
 variable "REGISTRY" {
 	default = "asia-south1-docker.pkg.dev"
@@ -28,7 +26,7 @@ function "image" {
 }
 
 group "default" {
-	targets = ["api", "worker", "migrate"]
+	targets = ["api", "worker", "migrate", "converter"]
 }
 
 target "common" {
@@ -60,5 +58,15 @@ target "migrate" {
 	tags = [
 		"${image("migrate")}:${IMAGE_VERSION}",
 		"${image("migrate")}:latest",
+	]
+}
+
+target "converter" {
+	context    = "."
+	dockerfile = "apps/converter/Dockerfile"
+	target     = "converter"
+	tags = [
+		"${image("converter")}:${IMAGE_VERSION}",
+		"${image("converter")}:latest",
 	]
 }

@@ -20,7 +20,6 @@ Copy `.env.example` to `.env`. Devenv loads it for the Go API, generation worker
 | `CORS_ORIGIN`                 | No         | Default CORS origins                                                                                       | Single-origin fallback; trailing slashes are normalized                             |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | No         | Local frontend, `https://slidesage.pages.dev`, `https://slidesage.app`, and `https://www.slidesage.app`    | Comma-separated auth callback origins; trailing slashes are normalized              |
 | `VITE_API_URL`                | No         | `http://localhost:8000`                                                                                    | Browser API origin without a path suffix; set production to `https://api.slidesage.app` |
-| `PRESENTATION_GCS_BUCKET`      | Canonical PPTX revisions | None | Private GCS bucket configuration for the canonical revision flow |
 | `NODE_ENV`                    | No         | `development` in devenv                                                                                    | Controls production auth and email-delivery safeguards; OTP values are never logged |
 
 Devenv also supplies `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, and `POSTGRES_PORT` for its local PostgreSQL process. Their defaults are all `slidesage`, except `POSTGRES_PORT=5432`. The running PostgreSQL process exposes its active port as `PGPORT`.
@@ -81,13 +80,13 @@ it.
 | Variable                        | Required                                  | Default                              | Purpose                                                                                                                                    |
 | ------------------------------- | ----------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `OPEN_ROUTER_API_KEY`           | Yes for default generation                | None                                 | Server OpenRouter authentication; BYOK replaces only generation calls                                                                      |
-| `OPEN_ROUTER_MODEL`             | No                                        | `google/gemini-3.8-flash`            | Server-owned OpenRouter generation model                                                                                                   |
+| `OPEN_ROUTER_MODEL`             | No                                        | `openrouter/free`                    | Server-owned OpenRouter generation model                                                                                                   |
 | `OPEN_ROUTER_API_BASE`          | No                                        | OpenRouter chat completions endpoint | Chat endpoint override                                                                                                                     |
 | `OPEN_ROUTER_MAX_OUTPUT_TOKENS` | No                                        | Not used                             | Generation enforces a server-owned 2,000-16,000 output-token ceiling based on requested slide count so point authorizations remain bounded |
 | `PROVIDER_VALIDATION_TIMEOUT_MS` | No                                        | `15000`                              | Total timeout for listing models from a user-connected BYOK provider                                                                       |
 | `EXA_API_KEY`                   | For web research                          | None                                 | Exa search authentication                                                                                                                  |
 | `EXA_REQUEST_TIMEOUT_MS`        | No                                        | `10000`                              | Maximum Exa request duration; caller cancellation can stop it earlier                                                                      |
-Presentation requests without a valid user provider connection use OpenRouter JSON output and consume SlideSage points. The server pins `google/gemini-3.8-flash` so generation uses a known text model instead of the variable `openrouter/free` route. Set `OPEN_ROUTER_MODEL` explicitly to test another model. Valid BYOK connections replace this generation path.
+Presentation requests without a valid user provider connection use OpenRouter JSON output and consume SlideSage points. The server defaults to the `openrouter/free` route, which OpenRouter resolves to one of its free models per request, so the model behind a generation can vary. Set `OPEN_ROUTER_MODEL` to pin a specific model. Valid BYOK connections replace this generation path.
 
 ## Authentication and email
 
@@ -120,23 +119,21 @@ Do not commit `.env`. Keep secrets in the deployment platform's secret store in 
 
 Set `VITE_API_URL=https://api.slidesage.app` for the `slidesage.app` production build. The client sends requests directly to each endpoint. As a deployment safeguard, production builds ignore loopback values such as `localhost` and `127.0.0.1` and fall back to same-origin routes instead.
 
-## GCS and Cloud CDN
+## Card documents and image storage
 
-| Variable                     | Required | Secret | Purpose |
-| ---------------------------- | -------- | ------ | ------- |
-| `PRESENTATION_GCS_BUCKET`    | Canonical revisions | No | Private bucket receiving create-only canonical PPTX objects |
-| `CDN_URL`                    | Signed template delivery | No | HTTPS origin used when signing template URLs; templates are served by the API load balancer under `/pptx-templates/` |
-| `CDN_SIGNING_KEY_NAME`       | Signed template delivery | No | Active Cloud CDN signing-key identifier sent as `KeyName` |
-| `CDN_SIGNING_KEY_SECRET`     | Signed template delivery | Yes | Base64url-encoded 128-bit shared key used by the server-side signer |
-| `CDN_SIGNED_URL_TTL_SECONDS` | No | No | Signed template URL lifetime; defaults to `900` seconds |
+| Variable                  | Required | Secret | Purpose |
+| ------------------------- | -------- | ------ | ------- |
+| `PRESENTATION_GCS_BUCKET` | Stored images | No | Private bucket for card image assets. `cmd/migrate` deletes objects left in it by retired document formats and skips that sweep when the variable is unset. Document bodies live in PostgreSQL JSONB; text-only generation and document reads need no bucket |
+| `STORAGE_EMULATOR_HOST` | Local image storage | No | GCS emulator URL. Devenv and `.env.example` use `http://127.0.0.1:4443`. Leave unset in production so clients use real GCS |
+| `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
+| `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
+| `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |
+| `UNSPLASH_ACCESS_KEY` | Stock photos when enabled | Yes | Unsplash application access key for the only stock-photo provider. Production Terraform looks up and injects this Secret Manager secret into the API and worker only when `unsplash_enabled=true`. Without the key, stock routes return `503` and generation drafts text-only decks; uploads remain available |
+| `UNSPLASH_API_BASE` | No | No | Unsplash API base URL; defaults to `https://api.unsplash.com`. Only for tests and local stubs |
 
-Set `CDN_URL` to the API load balancer host, `https://api.slidesage.app`. Only that host rule routes `/pptx-templates/*` to the template backend bucket; any other subdomain is unrouted. Development processes use the same production origin, because signing happens on the server and a process on `localhost` mints valid URLs with the same key. The API reads these variables once at startup: with none of them set it logs that template thumbnails are disabled and skips the route, and with a partial or malformed set it exits.
+`UNSPLASH_ENABLED` is a GitHub repository variable, not an application environment variable. Both plan and deploy workflows pass it as `TF_VAR_unsplash_enabled`, defaulting to `false` when unset. Terraform's `unsplash_enabled` boolean also defaults to `false`; no Unsplash key is looked up or injected while false. Leave the key out for now. To enable stock photos later, first provision `UNSPLASH_ACCESS_KEY` with an enabled Secret Manager version available as `latest`, then set `UNSPLASH_ENABLED=true` and deploy.
 
-`CDN_SIGNED_URL_TTL_SECONDS` applies to both consumers of the signer, the generation template fetch and the marketplace thumbnail route.
-
-`CDN_SIGNING_KEY_NAME` is only an identifier and cannot create a valid signed URL by itself. The signer must retain the corresponding 16-byte secret because Google does not return key values through its APIs after configuration. Keep `CDN_SIGNING_KEY_SECRET` in Secret Manager and never expose it through a `VITE_` variable. See Google's [Cloud CDN signed URL documentation](https://cloud.google.com/cdn/docs/using-signed-urls#createkeys).
-
-When the canonical revision flow is wired into Cloud Run, it will use the attached service account through Application Default Credentials; do not deploy a service-account JSON key. Grant the runtime account bucket-scoped `roles/storage.objectCreator` and `roles/storage.objectViewer` for the private revision bucket. The GCS adapter uses the `DoesNotExist` generation precondition so retries cannot overwrite an object. See Google's [generation preconditions](https://cloud.google.com/storage/docs/request-preconditions#special-match) and [Cloud Storage IAM roles](https://cloud.google.com/storage/docs/access-control/iam-roles#storage.objectCreator).
+The removed template fetcher and thumbnail routes were the only users of the Cloud CDN signing variables (`CDN_URL`, `CDN_SIGNING_KEY_NAME`, `CDN_SIGNING_KEY_SECRET`, `CDN_SIGNED_URL_TTL_SECONDS`). Production Terraform no longer passes them to Cloud Run or manages the template CDN route.
 
 The API refuses to initialize authentication on an HTTPS base URL without a sufficiently strong `AUTH_SECRET`.
 

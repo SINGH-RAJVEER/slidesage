@@ -68,6 +68,16 @@ jobs:
             test -x "$GITHUB_WORKSPACE/dist/$component"
           done
 
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - name: Bundle the card converter
+        run: |
+          bun install --frozen-lockfile
+          bun build apps/converter/src/main.ts --target bun --outfile dist/converter.js
+          test -s dist/converter.js
+
       - id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -106,11 +116,14 @@ jobs:
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
       TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_gcp_region: asia-south1
+      # Keep the image bucket name; the migration job also deletes retired document objects from it.
+      TF_VAR_presentation_gcs_bucket: ${{ vars.PRESENTATION_GCS_BUCKET || format('{0}-presentation-revisions', secrets.GCP_PROJECT_ID) }}
       TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.DATADOG_OTLP_ENDPOINT }}
       TF_VAR_otel_logs_exporter: ${{ vars.OTEL_LOGS_EXPORTER || 'otlp' }}
       TF_VAR_otel_service_version: ${{ github.sha }}
+      TF_VAR_unsplash_enabled: ${{ vars.UNSPLASH_ENABLED || 'false' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -145,7 +158,7 @@ jobs:
           : "${TF_VAR_gcp_project_id:?Set GCP_PROJECT_ID}"
           : "${TF_VAR_cloudflare_account_id:?Set CLOUDFLARE_ACCOUNT_ID}"
           : "${TF_VAR_cloudflare_api_token:?Set CLOUDFLARE_API_TOKEN}"
-          for component in api worker migrate; do
+          for component in api worker migrate converter; do
             echo "TF_VAR_${component}_image=$REGISTRY_LOCATION-docker.pkg.dev/$PROJECT_ID/$REGISTRY_REPOSITORY/$component:$IMAGE_VERSION" >> "$GITHUB_ENV"
           done
 
@@ -160,6 +173,25 @@ jobs:
       - name: Plan the release
         working-directory: infra/prod
         run: terraform plan -input=false -lock-timeout=5m -no-color
+
+      # Verify the recovery point before any apply. Cloud SQL settings stay
+      # unchanged in this cutover; PITR enablement needs a separate rollout.
+      - name: Wait for the pre-migration database backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${BACKUP_OPERATION:?The backup was never started}"
+          gcloud sql operations wait "$BACKUP_OPERATION" \
+            --project="$PROJECT_ID" --timeout=1800 || true
+          operation=$(gcloud sql operations describe "$BACKUP_OPERATION" \
+            --project="$PROJECT_ID" --format=json)
+          status=$(jq -r '.status // empty' <<<"$operation")
+          error=$(jq -r '.error // empty' <<<"$operation")
+          if [ "$status" != "DONE" ] || [ -n "$error" ]; then
+            echo "The pre-migration backup did not complete cleanly:" >&2
+            jq . <<<"$operation" >&2
+            exit 1
+          fi
 
       - name: Update the migration job
         working-directory: infra/prod
@@ -191,24 +223,7 @@ jobs:
             "${args[@]}" -out=maintenance.tfplan
           terraform apply -input=false -lock-timeout=5m -no-color maintenance.tfplan
 
-      - name: Wait for the pre-migration database backup
-        shell: bash
-        run: |
-          set -euo pipefail
-          : "${BACKUP_OPERATION:?The backup was never started}"
-          gcloud sql operations wait "$BACKUP_OPERATION" \
-            --project="$PROJECT_ID" --timeout=1800 || true
-          operation=$(gcloud sql operations describe "$BACKUP_OPERATION" \
-            --project="$PROJECT_ID" --format=json)
-          status=$(jq -r '.status // empty' <<<"$operation")
-          error=$(jq -r '.error // empty' <<<"$operation")
-          if [ "$status" != "DONE" ] || [ -n "$error" ]; then
-            echo "The pre-migration backup did not complete cleanly:" >&2
-            jq . <<<"$operation" >&2
-            exit 1
-          fi
-
-      - name: Run migrations
+      - name: Run migrations and purge retired objects
         run: |
           gcloud run jobs execute slidesage-migrate \
             --project="$PROJECT_ID" --region="$RUN_REGION" --wait

@@ -6,17 +6,16 @@ import { ROUTES } from "./router/paths";
 export default function ActiveGenerationIndicator() {
 	const navigate = useNavigate();
 	const location = useLocation();
-
-	const onViewerRoute =
-		location.pathname === ROUTES.presentation ||
-		(location.pathname.startsWith(`${ROUTES.presentations}/`) &&
-			location.pathname !== ROUTES.presentations);
+	// The presentation page shows its own progress.
+	const onPresentationPage =
+		location.pathname.startsWith(`${ROUTES.presentations}/`) &&
+		location.pathname !== ROUTES.presentations;
 
 	return (
 		<IndicatorView
-			hidden={onViewerRoute}
+			hidden={onPresentationPage}
 			onOpen={(presentationId) =>
-				navigate(presentationId ? ROUTES.presentationById(presentationId) : ROUTES.presentation)
+				navigate(presentationId ? ROUTES.presentationById(presentationId) : ROUTES.presentations)
 			}
 		/>
 	);

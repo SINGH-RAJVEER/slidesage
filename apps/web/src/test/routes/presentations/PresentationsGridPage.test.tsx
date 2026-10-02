@@ -3,7 +3,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { StreamingProvider } from "@slidesage/ui";
 import { PRESENTATIONS_UPDATED_EVENT } from "@slidesage/ui/lib/presentation-events";
-import { act, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor, waitForElementToBeRemoved } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import GenerateResearchPage from "../../../routes/presentations/GenerateResearchPage";
 import PresentationsGridPage from "../../../routes/presentations/PresentationsGridPage";
@@ -147,7 +147,6 @@ describe("failed presentation retries", () => {
 									],
 									estimated_tokens: 9.2,
 								},
-								template: { id: "soft-skills-training", version: 1 },
 								ai: { provider: "google", model: "gemini-2.5-pro" },
 							},
 						},
@@ -353,9 +352,34 @@ it("removes a presentation after an empty 204 delete response", async () => {
 		fireEvent.click(deleteButton as HTMLButtonElement);
 		fireEvent.click(view.getByRole("button", { name: "Delete" }));
 
-		await waitFor(() => expect(view.queryByText("Delete this deck")).toBeNull());
+		await waitForElementToBeRemoved(() => view.queryByText("Delete this deck"));
 		expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(true);
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
-}, 15000);
+});
+
+it("shows why a presentation could not be opened", async () => {
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = mock(async () =>
+		Response.json({ presentations: [], total: 0, limit: 20, offset: 0, has_more: false }),
+	) as unknown as typeof fetch;
+
+	try {
+		const view = render(
+			<MemoryRouter
+				initialEntries={[
+					{ pathname: "/presentations", state: { notice: "This deck can no longer be opened." } },
+				]}
+			>
+				<Routes>
+					<Route path="/presentations" element={<PresentationsGridPage />} />
+				</Routes>
+			</MemoryRouter>,
+		);
+
+		expect(await view.findByRole("alert")).toHaveTextContent("This deck can no longer be opened.");
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});

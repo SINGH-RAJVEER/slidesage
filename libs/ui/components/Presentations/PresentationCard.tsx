@@ -44,6 +44,7 @@ export const PresentationCard: React.FC<PresentationCardProps> = ({
 						variant="ghost"
 						size="icon"
 						className="h-8 w-8 text-white/40 hover:text-red-400 hover:bg-red-500/10 flex-shrink-0 ml-2 -mt-0.5"
+						aria-label="Delete presentation"
 						onClick={(e) => onDelete(e, presentation.id)}
 						disabled={isDeleting}
 					>

@@ -1,16 +1,6 @@
-import {
-	BINARY_PPTX_TEMPLATE_CATALOG,
-	type PresentationRetryOptions,
-	type PresentationTemplateReference,
-} from "@slidesage/types";
+import type { PresentationRetryOptions } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
-import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { GenerateForm, GenerateOptionsBar } from "@slidesage/ui/components/Generate";
-import type { InstalledTemplateOption } from "@slidesage/ui/components/Generate/TemplateSelector";
-import { useInstalledMarketplaceThemes } from "@slidesage/ui/hooks/useInstalledMarketplaceThemes";
-import { requestGenerationNotificationPermission } from "@slidesage/ui/lib/generation-notifications";
-import { removeMarketplaceTheme } from "@slidesage/ui/lib/marketplace-themes";
-import { templateIsSelectable } from "@slidesage/ui/lib/template-selection";
 import { useDebouncedCallback } from "@tanstack/react-pacer/debouncer";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -21,21 +11,6 @@ import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
 interface GenerateRouteState {
 	retry?: PresentationRetryOptions;
 	retryPresentationId?: string;
-}
-
-// A retried presentation names the template it was generated from. Standing a
-// default in for one this build does not carry would generate the retry in a
-// template the reader never chose, so an unknown reference leaves the selector
-// empty and says so.
-function templateSelection(
-	reference: PresentationRetryOptions["template"],
-): PresentationTemplateReference | undefined {
-	if (!reference) return undefined;
-	const template = BINARY_PPTX_TEMPLATE_CATALOG.find(
-		(candidate) => candidate.id === reference.id && candidate.version === reference.version,
-	);
-	if (!template) return undefined;
-	return { id: template.id, version: template.version };
 }
 
 export default function GeneratePPTPage() {
@@ -51,51 +26,8 @@ export default function GeneratePPTPage() {
 	const [detailLevel, setDetailLevel] = useState(retry?.detail_level ?? "balanced");
 	const [tonality, setTonality] = useState(retry?.tonality ?? "professional");
 	const [useWebResearch, setUseWebResearch] = useState(retry?.research_enabled ?? false);
-	const [selectedTemplate, setSelectedTemplate] = useState(() =>
-		templateSelection(retry?.template),
-	);
-	// Raised by pressing Generate with nothing selected. Nothing is preselected
-	// and nothing stands in for a choice, so the reader is told at the moment
-	// they ask for a deck rather than prompted before they have asked. It is
-	// transient, so it goes to the floating notice rather than the inline one
-	// that describes a standing template problem.
-	const [templateWarning, setTemplateWarning] = useState(false);
 	const navigate = useNavigate();
-	const { streamingState, generate } = useStreaming();
-	const installedThemes = useInstalledMarketplaceThemes();
-	const templateSelectable = selectedTemplate ? templateIsSelectable(selectedTemplate) : false;
-	const generationDisabled = Boolean(selectedTemplate) && !templateSelectable;
-	const templateNotice =
-		retry?.template && !selectedTemplate
-			? "This presentation was generated with a template this build no longer offers. Choose a template to retry it."
-			: selectedTemplate && !templateSelectable
-				? "The selected template is not ready for generation yet."
-				: "";
-
-	const handleTemplateChange = (template: PresentationTemplateReference) => {
-		setTemplateWarning(false);
-		setSelectedTemplate(template);
-	};
-
-	// Removing the theme a deck was about to be generated with leaves nothing
-	// selected. Quietly moving to another one would generate in a template the
-	// reader did not choose.
-	const handleTemplateRemove = (theme: InstalledTemplateOption) => {
-		if (!removeMarketplaceTheme(theme.marketplaceId)) return;
-		if (
-			selectedTemplate?.id === theme.templateReference.id &&
-			selectedTemplate.version === theme.templateReference.version
-		) {
-			setSelectedTemplate(undefined);
-		}
-	};
-
-	useEffect(() => {
-		if (streamingState.error) {
-			console.error("Presentation generation failed:", streamingState.error);
-			setLoading(false);
-		}
-	}, [streamingState.error]);
+	const { streamingState } = useStreaming();
 
 	useEffect(() => {
 		const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -121,8 +53,7 @@ export default function GeneratePPTPage() {
 
 	const handleGenerateInternal = async (selectedPrompt: string) => {
 		const normalizedPrompt = selectedPrompt.trim();
-		if (!normalizedPrompt || streamingState.isStreaming || generationDisabled || !selectedTemplate)
-			return;
+		if (!normalizedPrompt || streamingState.isStreaming) return;
 
 		setLoading(true);
 
@@ -136,30 +67,22 @@ export default function GeneratePPTPage() {
 					detailLevel,
 					tonality,
 					retryPresentationId,
-					template: selectedTemplate,
 					...(retry?.ai ? { ai: retry.ai } : {}),
 				},
 			});
 			return;
 		}
 
-		const streamingRequest = generate({
-			prompt: normalizedPrompt,
-			slideCount: count,
-			detailLevel,
-			tonality,
-			retryPresentationId,
-			ai: retry?.ai,
-			template: selectedTemplate,
+		navigate(ROUTES.outline, {
+			state: {
+				prompt: normalizedPrompt,
+				slideCount: count,
+				detailLevel,
+				tonality,
+				retryPresentationId,
+				...(retry?.ai ? { ai: retry.ai } : {}),
+			},
 		});
-		navigate(ROUTES.presentation, {
-			state: { isStreaming: true },
-		});
-
-		const success = await streamingRequest;
-		if (!success) {
-			setLoading(false);
-		}
 	};
 
 	const debouncedGenerate = useDebouncedCallback(handleGenerateInternal, {
@@ -168,14 +91,8 @@ export default function GeneratePPTPage() {
 	});
 
 	const handleGenerate = () => {
-		if (!prompt.trim() || generationDisabled) return;
-		if (!selectedTemplate) {
-			setTemplateWarning(true);
-			return;
-		}
+		if (!prompt.trim()) return;
 
-		setTemplateWarning(false);
-		requestGenerationNotificationPermission();
 		debouncedGenerate(prompt);
 	};
 
@@ -185,7 +102,7 @@ export default function GeneratePPTPage() {
 			document.getElementById("prompt")?.focus();
 			return;
 		}
-		if (!loading && !streamingState.isStreaming && !generationDisabled) {
+		if (!loading && !streamingState.isStreaming) {
 			handleGenerate();
 		}
 	};
@@ -211,10 +128,6 @@ export default function GeneratePPTPage() {
 	return (
 		<div className="flex min-h-dvh w-full flex-col overflow-x-hidden bg-transparent">
 			<Header />
-			<FloatingNotice
-				warning={templateWarning ? "Select a template before generating." : null}
-				onDismiss={() => setTemplateWarning(false)}
-			/>
 
 			<div
 				data-horizon-reveal
@@ -226,20 +139,11 @@ export default function GeneratePPTPage() {
 					tonality={tonality}
 					useWebResearch={useWebResearch}
 					slideCount={slideCount}
-					selectedTemplate={selectedTemplate}
-					installedThemes={installedThemes}
 					onDetailLevelChange={setDetailLevel}
 					onTonalityChange={setTonality}
 					onUseWebResearchChange={setUseWebResearch}
 					onSlideCountChange={setSlideCount}
-					onTemplateChange={handleTemplateChange}
-					onTemplateRemove={handleTemplateRemove}
 				/>
-				{templateNotice && (
-					<p className="mt-3 text-sm text-amber-200/70" role="status">
-						{templateNotice}
-					</p>
-				)}
 			</div>
 
 			<main
@@ -251,7 +155,6 @@ export default function GeneratePPTPage() {
 						<GenerateForm
 							prompt={prompt}
 							loading={loading || streamingState.isStreaming}
-							generationDisabled={generationDisabled}
 							onPromptChange={setPrompt}
 							onGenerate={handleGenerate}
 						/>

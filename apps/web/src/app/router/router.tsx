@@ -36,6 +36,11 @@ export const router = createBrowserRouter([
 			{ path: "sign-up/verify-email", element: <VerifyEmailPage /> },
 			{ path: "forgot-password", element: <ForgotPasswordPage /> },
 			{ path: "reset-password", element: <ResetPasswordPage /> },
+			/* share links open without an account */
+			{
+				path: "s/:token",
+				lazy: lazyRoute(() => import("../../routes/presentations/SharedPresentationPage")),
+			},
 			{
 				element: <RequireSignedInLayout />,
 				children: [
@@ -46,16 +51,12 @@ export const router = createBrowserRouter([
 						lazy: lazyRoute(() => import("../../routes/presentations/GeneratePPTPage")),
 					},
 					{
+						path: "generate/outline",
+						lazy: lazyRoute(() => import("../../routes/presentations/OutlinePage")),
+					},
+					{
 						path: "generate/research",
 						lazy: lazyRoute(() => import("../../routes/presentations/GenerateResearchPage")),
-					},
-					{
-						path: "marketplace",
-						lazy: lazyRoute(() => import("../../routes/marketplace/MarketplacePage")),
-					},
-					{
-						path: "marketplace/:marketplaceId/preview",
-						lazy: lazyRoute(() => import("../../routes/marketplace/MarketplaceThemePreviewPage")),
 					},
 					{
 						path: "presentations",
@@ -63,12 +64,7 @@ export const router = createBrowserRouter([
 					},
 					{
 						path: "presentations/:presentationId",
-						lazy: lazyRoute(() => import("../../routes/presentations/PresentationViewer")),
-					},
-					// Streaming / legacy route (kept because generation navigates here before an id exists)
-					{
-						path: "presentation",
-						lazy: lazyRoute(() => import("../../routes/presentations/PresentationViewer")),
+						lazy: lazyRoute(() => import("../../routes/presentations/PresentationPage")),
 					},
 					{
 						path: "presentation-error",

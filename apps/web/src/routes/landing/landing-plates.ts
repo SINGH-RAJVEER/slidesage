@@ -1,41 +1,26 @@
 import {
-	MARKETPLACE_ITEMS,
-	type MarketplaceItem,
-	presentableSlideCount,
-} from "@slidesage/ui/lib/catalog";
-import {
-	templateSlidePreviewUrl,
-	templateThumbnailUrl,
-} from "@slidesage/ui/lib/template-thumbnails";
+	assembleDocument,
+	type Card,
+	type CardDraftInput,
+	convertCards,
+	type NarrativeRole,
+	type ThemeId,
+} from "@slidesage/cards";
 
 /**
- * A plate orbiting the wordmark. Each one is a single rendered slide of a real
- * published template - a cover, a section divider, or a content page - shown
- * through the same full-slide previews the marketplace viewer reads, so the
- * landing page ships no slide fixtures of its own.
+ * A plate orbiting the wordmark: one card of a sample deck, drawn with the
+ * same card renderer the viewer uses, so the landing page shows exactly what
+ * SlideSage makes and ships no images of its own.
  */
 export interface LandingPlate {
-	/** Stable identity of this slide, unique across the pool. */
+	/** Stable identity of this card, unique across the pool. */
 	key: string;
-	templateId: string;
-	name: string;
-	/** Zero-based, in package slide order. */
-	slideIndex: number;
-	/**
-	 * The plate's own image: the small variant, because a plate is painted
-	 * around 140 CSS pixels wide and a full 1600 pixel render costs megabytes
-	 * of decoded bitmap to fill it.
-	 */
-	slideUrl: string;
-	/** The full-size render, for the preview a plate opens into. */
-	fullUrl: string;
-	/**
-	 * The template's cover, which every published template has. A slide preview
-	 * that will not load falls back to it rather than leaving a hole in the
-	 * ring, which also means the page degrades to its old all-covers look if
-	 * previews are ever unpublished.
-	 */
-	coverUrl: string;
+	/** Title of the sample deck the card belongs to. */
+	deck: string;
+	theme: ThemeId;
+	card: Card;
+	/** One-based, in deck order. */
+	position: number;
 }
 
 /**
@@ -60,39 +45,544 @@ export function landingPlateCount(viewportWidth: number): number {
 	return LANDING_PLATE_COUNT;
 }
 
-/**
- * Slides drawn per visit.
- *
- * The ring holds thirty, so the rest are the queue a plate is refilled from as
- * it passes behind the orb. Bounding the draw bounds what the page downloads:
- * one pass through the pool takes a few minutes, after which every image is
- * already in the browser cache and the ring costs nothing to keep turning.
- */
-export const LANDING_POOL_SIZE = 72;
+type SampleCard = [NarrativeRole, string, Record<string, unknown>];
 
-type PublishedTemplate = MarketplaceItem & { sha256: string };
-
-/**
- * Templates the ring can draw from: published, wide enough that a 16:9 plate
- * does not letterbox, and carrying at least one slide worth showing.
- */
-function ringTemplates(): PublishedTemplate[] {
-	return MARKETPLACE_ITEMS.filter(
-		(item): item is PublishedTemplate =>
-			item.available &&
-			item.aspectRatio.label === "16:9" &&
-			typeof item.sha256 === "string" &&
-			presentableSlideCount(item) > 0,
-	);
+interface SampleDeck {
+	title: string;
+	theme: ThemeId;
+	cards: SampleCard[];
 }
+
+const heading = (text: string) => ({ type: "heading", text });
+const paragraph = (text: string) => ({ type: "paragraph", text });
+
+/* Written in the draft format the model writes, and converted by the same
+   converter, so a sample that stops fitting the schema fails its test. */
+const SAMPLE_DECKS: SampleDeck[] = [
+	{
+		title: "Grid-scale storage",
+		theme: "slate",
+		cards: [
+			[
+				"opening",
+				"Storage is now cheap",
+				{
+					layout: "title",
+					nodes: [
+						heading("Grid **storage** comes of age"),
+						paragraph("What falling battery prices mean for the next decade of power"),
+					],
+				},
+			],
+			[
+				"evidence",
+				"Prices fell fast",
+				{
+					layout: "stats",
+					nodes: [
+						heading("Costs fell faster than forecast"),
+						{ type: "stat", value: "-89%", label: "Pack price since 2010" },
+						{ type: "stat", value: "$139", label: "Per kWh in 2023" },
+						{ type: "stat", value: "42 GW", label: "Added last year" },
+					],
+				},
+			],
+			[
+				"comparison",
+				"Options differ",
+				{
+					layout: "comparison",
+					nodes: [
+						heading("Two ways to hold a grid steady"),
+						{
+							type: "columns",
+							columns: [
+								{
+									heading: "Lithium-ion",
+									items: ["Responds in milliseconds", "Four hours or less"],
+								},
+								{ heading: "Pumped hydro", items: ["Runs for days", "Needs the right valley"] },
+							],
+						},
+					],
+				},
+			],
+			[
+				"process",
+				"Projects follow four steps",
+				{
+					layout: "process",
+					nodes: [
+						heading("From permit to power"),
+						{
+							type: "steps",
+							items: [
+								{ title: "Site", detail: "Near a substation" },
+								{ title: "Connect", detail: "Queue for the grid" },
+								{ title: "Build", detail: "Containers, not concrete" },
+								{ title: "Dispatch", detail: "Charge low, sell high" },
+							],
+						},
+					],
+				},
+			],
+			[
+				"insight",
+				"Storage changes the peak",
+				{
+					layout: "statement",
+					nodes: [
+						heading("The evening peak is now a design choice"),
+						paragraph(
+							"Solar at noon, released at seven. Storage turns cheap daytime power into the most valuable hour of the day.",
+						),
+					],
+				},
+			],
+			[
+				"closing",
+				"Plan for storage first",
+				{
+					layout: "bullets",
+					nodes: [
+						heading("What to do next"),
+						{
+							type: "bullets",
+							items: [
+								"Model storage in every new plant",
+								"Price flexibility, not capacity",
+								"Retire peakers on a schedule",
+							],
+						},
+					],
+				},
+			],
+		],
+	},
+	{
+		title: "Remote work, measured",
+		theme: "paper",
+		cards: [
+			[
+				"opening",
+				"Remote work is settled",
+				{
+					layout: "title",
+					nodes: [
+						heading("Remote work, *measured*"),
+						paragraph("Four years of data from 1,200 teams"),
+					],
+				},
+			],
+			[
+				"evidence",
+				"Output held up",
+				{
+					layout: "stats",
+					nodes: [
+						heading("Output held; commutes did not"),
+						{ type: "stat", value: "+4%", label: "Tasks shipped per person" },
+						{ type: "stat", value: "72 min", label: "Saved each day" },
+					],
+				},
+			],
+			[
+				"context",
+				"Meetings expanded",
+				{
+					layout: "bullets",
+					nodes: [
+						heading("Where the time went"),
+						{
+							type: "bullets",
+							items: [
+								"Meetings grew by a third",
+								"Chat replaced hallway questions",
+								"Focus blocks became rare",
+							],
+						},
+					],
+				},
+			],
+			[
+				"insight",
+				"Writing wins",
+				{
+					layout: "quote",
+					nodes: [
+						{
+							type: "quote",
+							text: "The teams that wrote things down stopped needing the meeting.",
+							attribution: "Engineering lead, survey response",
+						},
+					],
+				},
+			],
+			[
+				"comparison",
+				"Hybrid needs rules",
+				{
+					layout: "comparison",
+					nodes: [
+						heading("Hybrid by default or by design"),
+						{
+							type: "columns",
+							columns: [
+								{ heading: "By default", items: ["Empty office days", "Uneven meetings"] },
+								{ heading: "By design", items: ["Anchor days", "Remote-first rituals"] },
+							],
+						},
+					],
+				},
+			],
+			[
+				"closing",
+				"Set anchor days",
+				{
+					layout: "statement",
+					nodes: [
+						heading("Pick two anchor days"),
+						paragraph(
+							"Bring people together on purpose, and protect the other three for deep work.",
+						),
+					],
+				},
+			],
+		],
+	},
+	{
+		title: "Launching in a new market",
+		theme: "ember",
+		cards: [
+			[
+				"opening",
+				"We are ready to launch",
+				{
+					layout: "title",
+					nodes: [
+						heading("Going to **Lisbon**"),
+						paragraph("A launch plan for our first market abroad"),
+					],
+				},
+			],
+			[
+				"evidence",
+				"Demand is there",
+				{
+					layout: "stats",
+					nodes: [
+						heading("The demand is already here"),
+						{ type: "stat", value: "18k", label: "Waitlist sign-ups" },
+						{ type: "stat", value: "3.1x", label: "Search growth" },
+						{ type: "stat", value: "0", label: "Local competitors" },
+					],
+				},
+			],
+			[
+				"process",
+				"Launch in stages",
+				{
+					layout: "process",
+					nodes: [
+						heading("Ninety days to launch"),
+						{
+							type: "steps",
+							items: [
+								{ title: "Hire", detail: "A local lead" },
+								{ title: "Localise", detail: "Product and support" },
+								{ title: "Pilot", detail: "Two hundred customers" },
+								{ title: "Open", detail: "Public launch" },
+							],
+						},
+					],
+				},
+			],
+			[
+				"context",
+				"Risks are known",
+				{
+					layout: "bullets",
+					nodes: [
+						heading("Risks we are planning for"),
+						{
+							type: "bullets",
+							items: ["Payments rules differ", "Support hours stretch", "Pricing needs testing"],
+						},
+					],
+				},
+			],
+			[
+				"insight",
+				"Start small",
+				{
+					layout: "statement",
+					nodes: [
+						heading("Win one city first"),
+						paragraph(
+							"A dense, loyal base in Lisbon is worth more than a thin launch across the country.",
+						),
+					],
+				},
+			],
+			[
+				"closing",
+				"Approve the pilot",
+				{
+					layout: "title",
+					nodes: [heading("Approve the pilot"), paragraph("Budget, hire, and a date in March")],
+				},
+			],
+		],
+	},
+	{
+		title: "How coral reefs recover",
+		theme: "slate",
+		cards: [
+			[
+				"opening",
+				"Reefs can recover",
+				{
+					layout: "title",
+					nodes: [
+						heading("How **coral reefs** recover"),
+						paragraph("Field notes from a decade of restoration"),
+					],
+				},
+			],
+			[
+				"evidence",
+				"Bleaching is frequent",
+				{
+					layout: "stats",
+					nodes: [
+						heading("Bleaching now comes every few years"),
+						{ type: "stat", value: "6 yrs", label: "Between events, down from 25" },
+						{ type: "stat", value: "14%", label: "Of reef lost since 2009" },
+					],
+				},
+			],
+			[
+				"process",
+				"Restoration has steps",
+				{
+					layout: "process",
+					nodes: [
+						heading("Growing a reef back"),
+						{
+							type: "steps",
+							items: [
+								{ title: "Collect", detail: "Heat-tolerant fragments" },
+								{ title: "Nurse", detail: "Grow on underwater trees" },
+								{ title: "Plant", detail: "Fix to bare rock" },
+							],
+						},
+					],
+				},
+			],
+			[
+				"insight",
+				"Fish drive recovery",
+				{
+					layout: "quote",
+					nodes: [
+						heading("What the divers saw"),
+						{
+							type: "quote",
+							text: "Where the parrotfish came back, the coral followed within two seasons.",
+							attribution: "Restoration survey, 2024",
+						},
+					],
+				},
+			],
+			[
+				"closing",
+				"Protect the grazers",
+				{
+					layout: "bullets",
+					nodes: [
+						heading("Three things that work"),
+						{
+							type: "bullets",
+							items: ["Protect grazing fish", "Plant resilient corals", "Cut runoff at the source"],
+						},
+					],
+				},
+			],
+		],
+	},
+	{
+		title: "Onboarding that sticks",
+		theme: "paper",
+		cards: [
+			[
+				"opening",
+				"Onboarding decides retention",
+				{
+					layout: "title",
+					nodes: [
+						heading("Onboarding that *sticks*"),
+						paragraph("Why the first week decides the first year"),
+					],
+				},
+			],
+			[
+				"evidence",
+				"Early wins retain",
+				{
+					layout: "stats",
+					nodes: [
+						heading("The first week predicts the first year"),
+						{ type: "stat", value: "2.4x", label: "Retention with a first-week win" },
+						{ type: "stat", value: "58%", label: "Leave before month six" },
+					],
+				},
+			],
+			[
+				"comparison",
+				"Buddies beat binders",
+				{
+					layout: "comparison",
+					nodes: [
+						heading("Binders or buddies"),
+						{
+							type: "columns",
+							columns: [
+								{ heading: "Binder", items: ["Read everything", "Ask no one"] },
+								{ heading: "Buddy", items: ["Ship on day three", "Ask anyone"] },
+							],
+						},
+					],
+				},
+			],
+			[
+				"process",
+				"A four-week plan",
+				{
+					layout: "process",
+					nodes: [
+						heading("The first month"),
+						{
+							type: "steps",
+							items: [
+								{ title: "Week 1", detail: "Ship something small" },
+								{ title: "Week 2", detail: "Meet every team" },
+								{ title: "Week 3", detail: "Own a real task" },
+								{ title: "Week 4", detail: "Set goals together" },
+							],
+						},
+					],
+				},
+			],
+			[
+				"closing",
+				"Start with a buddy",
+				{
+					layout: "statement",
+					nodes: [
+						heading("Give every hire a buddy"),
+						paragraph("One named person, one small first task, and a check-in every Friday."),
+					],
+				},
+			],
+		],
+	},
+	{
+		title: "The printing press",
+		theme: "ember",
+		cards: [
+			[
+				"opening",
+				"Print changed everything",
+				{
+					layout: "title",
+					nodes: [heading("The **printing press**"), paragraph("How movable type remade Europe")],
+				},
+			],
+			[
+				"evidence",
+				"Books multiplied",
+				{
+					layout: "stats",
+					nodes: [
+						heading("Books became ordinary"),
+						{ type: "stat", value: "20M", label: "Books printed by 1500" },
+						{ type: "stat", value: "270", label: "Cities with a press" },
+					],
+				},
+			],
+			[
+				"context",
+				"Ideas spread",
+				{
+					layout: "bullets",
+					nodes: [
+						heading("What spread with the books"),
+						{
+							type: "bullets",
+							items: ["Standard spelling", "Scientific journals", "Pamphlets and dissent"],
+						},
+					],
+				},
+			],
+			[
+				"insight",
+				"Speed mattered",
+				{
+					layout: "quote",
+					nodes: [
+						{
+							type: "quote",
+							text: "What once took a scribe a year, a press could make in a week.",
+							attribution: "Historian of the book",
+						},
+					],
+				},
+			],
+			[
+				"closing",
+				"Every medium repeats this",
+				{
+					layout: "statement",
+					nodes: [
+						heading("Every new medium repeats the story"),
+						paragraph("Cheaper copies, more voices, and a scramble to decide who is trusted."),
+					],
+				},
+			],
+		],
+	},
+];
+
+function convertDeck(deck: SampleDeck, index: number): LandingPlate[] {
+	const inputs: CardDraftInput[] = deck.cards.map(([role, takeaway, draft], position) => ({
+		position: position + 1,
+		takeaway,
+		role,
+		draft,
+	}));
+	const cards = convertCards({ operationId: `landing-${index}`, sourceIds: [], cards: inputs }).map(
+		(result) => {
+			if (!("card" in result)) throw new Error(`${deck.title}: ${result.issue.message}`);
+			return result.card;
+		},
+	);
+	const document = assembleDocument({ title: deck.title, theme: deck.theme, cards });
+	return document.cardOrder.flatMap((cardId, position) => {
+		const card = document.cards[cardId];
+		return card
+			? [{ key: cardId, deck: document.title, theme: document.theme, card, position: position + 1 }]
+			: [];
+	});
+}
+
+/** Every sample card, converted and validated once. */
+export const LANDING_CARDS: readonly LandingPlate[] = SAMPLE_DECKS.flatMap(convertDeck);
 
 function shuffle<T>(values: T[], random: () => number): T[] {
 	for (let index = values.length - 1; index > 0; index -= 1) {
 		const swap = Math.floor(random() * (index + 1));
 		const held = values[index];
 		const other = values[swap];
-		/* an index check, not a truthiness one: slide numbers are shuffled here
-		   too, and slide 0 is a perfectly good value that must still move */
 		if (held !== undefined && other !== undefined) {
 			values[index] = other;
 			values[swap] = held;
@@ -101,66 +591,33 @@ function shuffle<T>(values: T[], random: () => number): T[] {
 	return values;
 }
 
-function plate(item: PublishedTemplate, slideIndex: number): LandingPlate {
-	return {
-		key: `${item.id}:${slideIndex}`,
-		templateId: item.id,
-		name: item.name,
-		slideIndex,
-		slideUrl: templateSlidePreviewUrl(
-			item.id,
-			item.templateReference.version,
-			item.sha256,
-			slideIndex,
-			"small",
-		),
-		fullUrl: templateSlidePreviewUrl(
-			item.id,
-			item.templateReference.version,
-			item.sha256,
-			slideIndex,
-		),
-		coverUrl: templateThumbnailUrl(item.thumbnailPath),
-	};
-}
-
 /**
- * Draws the slides for one visit.
+ * Draws the plates for one visit.
  *
- * Templates and their slides are both shuffled, then taken one slide per
- * template per round. Round-robin rather than a flat shuffle because the
- * opening entries are what the ring paints first: taking a round at a time
- * spends every template before it shows a second page of any of them, where a
- * flat shuffle over four hundred odd slides would regularly seat three pages of
- * the same deck side by side - which reads far worse on a crowded ring than on
- * a sparse one.
+ * Decks and their cards are both shuffled, then taken one card per deck per
+ * round. Round-robin rather than a flat shuffle because the opening entries
+ * are what the ring shows first: taking a round at a time shows every deck
+ * before a second card of any of them, where a flat shuffle would regularly
+ * seat three cards of one deck side by side.
  *
  * `random` is injectable so tests can pin the draw.
  */
-export function randomLandingPool(
-	size: number = LANDING_POOL_SIZE,
-	random: () => number = Math.random,
-): LandingPlate[] {
-	const decks = shuffle(ringTemplates(), random).map((item) => ({
-		item,
-		slides: shuffle(
-			Array.from({ length: presentableSlideCount(item) }, (_, index) => index),
-			random,
+export function randomLandingPool(random: () => number = Math.random): LandingPlate[] {
+	const decks = shuffle(
+		SAMPLE_DECKS.map((deck) =>
+			shuffle(
+				LANDING_CARDS.filter((plate) => plate.deck === deck.title),
+				random,
+			),
 		),
-	}));
+		random,
+	);
 	const pool: LandingPlate[] = [];
-	for (let round = 0; pool.length < size; round += 1) {
-		let drew = false;
+	for (let round = 0; pool.length < LANDING_CARDS.length; round += 1) {
 		for (const deck of decks) {
-			if (pool.length >= size) break;
-			const slideIndex = deck.slides[round];
-			if (slideIndex === undefined) continue;
-			drew = true;
-			pool.push(plate(deck.item, slideIndex));
+			const plate = deck[round];
+			if (plate) pool.push(plate);
 		}
-		/* every deck is spent: the catalog simply holds fewer slides than asked
-		   for, and the ring cycles the shorter pool */
-		if (!drew) break;
 	}
 	return pool;
 }

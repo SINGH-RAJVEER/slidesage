@@ -12,9 +12,10 @@ dev:
 db-shell:
     psql -h 127.0.0.1 -p "${PGPORT:-${POSTGRES_PORT:-5432}}" -U "${POSTGRES_USER:-slidesage}" -d "${POSTGRES_DB:-slidesage}"
 
-# Apply Go API migrations
+# Apply Goose and River migrations, then delete retired objects from the image
+# bucket when PRESENTATION_GCS_BUCKET is set.
 migrate:
-    CGO_ENABLED=0 go -C apps/api run ./cmd/migrate
+	CGO_ENABLED=0 go -C apps/api run ./cmd/migrate
 
 # Create a new Goose SQL migration
 db-generate name:
@@ -57,6 +58,15 @@ binaries:
 			-mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" \
 			-o "$PWD/dist/$component" "./cmd/$component"; \
 	done
+
+# Bundle the card converter into the file its container image copies in
+converter-bundle:
+	mkdir -p dist
+	bun build apps/converter/src/main.ts --target bun --outfile dist/converter.js
+
+# Run the card converter only
+converter:
+	bun run dev:converter
 
 # Build a container image from the repo root context. Run `just binaries` first.
 image target="api": binaries

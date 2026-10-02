@@ -137,7 +137,7 @@ func recordTokenUsage(ctx context.Context, kind string, tokens int) {
 }
 
 func startProviderSpan(ctx context.Context, provider ai.Provider, model, promptName, system, user string, maxOutput int) (context.Context, trace.Span) {
-	hash := sha256.Sum256([]byte(promptVersionMaterial(promptName, system)))
+	hash := sha256.Sum256([]byte(system))
 	ctx, span := tracer.Start(ctx, "gen_ai.chat",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
@@ -157,17 +157,6 @@ func startProviderSpan(ctx context.Context, provider ai.Provider, model, promptN
 		})
 	}
 	return ctx, span
-}
-
-func promptVersionMaterial(name, system string) string {
-	switch name {
-	case "slot-draft":
-		return system + slotBatchPrompt
-	case "slot-repair":
-		return system + slotRepairPrompt
-	default:
-		return system
-	}
 }
 
 func finishProviderSpan(span trace.Span, document map[string]any, tokens int, err error) {

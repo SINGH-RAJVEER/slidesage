@@ -3,7 +3,9 @@ locals {
   worker_name  = "worker"
   migrate_name = "slidesage-migrate"
 
-  api_secret_names = toset([
+  unsplash_secret_names = var.unsplash_enabled ? toset(["UNSPLASH_ACCESS_KEY"]) : toset([])
+
+  api_secret_names = setunion(toset([
     "DATABASE_URL",
     "AUTH_SECRET",
     "RATE_LIMIT_HASH_SECRET",
@@ -15,18 +17,16 @@ locals {
     "OPEN_ROUTER_API_KEY",
     "RESEND_API_KEY",
     "RESEND_FROM_EMAIL",
-    "CDN_SIGNING_KEY_SECRET",
     "RAZORPAY_KEY_ID",
     "RAZORPAY_KEY_SECRET",
     "RAZORPAY_WEBHOOK_SECRET",
-  ])
+  ]), local.unsplash_secret_names)
 
-  worker_secret_names = toset([
+  worker_secret_names = setunion(toset([
     "DATABASE_URL",
     "EXA_API_KEY",
     "OPEN_ROUTER_API_KEY",
-    "CDN_SIGNING_KEY_SECRET",
-  ])
+  ]), local.unsplash_secret_names)
 
   # Telemetry export is opt-in: with no endpoint the services keep their local
   # loggers and Terraform never asks for the Datadog headers secret.
@@ -137,7 +137,9 @@ resource "google_cloud_run_v2_service" "api" {
     }
 
     containers {
-      image = var.api_image
+      name       = "api"
+      image      = var.api_image
+      depends_on = ["converter"]
 
       volume_mounts {
         name       = "cloudsql"
@@ -157,6 +159,12 @@ resource "google_cloud_run_v2_service" "api" {
         startup_cpu_boost = true
       }
 
+      # Collect garbage harder near the container limit; image decodes are
+      # budgeted to fit under it.
+      env {
+        name  = "GOMEMLIMIT"
+        value = "400MiB"
+      }
       env {
         name  = "NODE_ENV"
         value = "production"
@@ -190,16 +198,8 @@ resource "google_cloud_run_v2_service" "api" {
         value = local.presentation_gcs_bucket
       }
       env {
-        name  = "CDN_URL"
-        value = var.cdn_url
-      }
-      env {
-        name  = "CDN_SIGNING_KEY_NAME"
-        value = var.cdn_signing_key_name
-      }
-      env {
-        name  = "CDN_SIGNED_URL_TTL_SECONDS"
-        value = tostring(var.cdn_signed_url_ttl_seconds)
+        name  = "CARD_CONVERTER_URL"
+        value = "http://127.0.0.1:8090"
       }
       env {
         name  = "WORKER_WAKE_URL"
@@ -264,6 +264,39 @@ resource "google_cloud_run_v2_service" "api" {
       }
     }
 
+    containers {
+      name  = "converter"
+      image = var.converter_image
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle          = true
+        startup_cpu_boost = true
+      }
+
+      env {
+        name  = "CARD_CONVERTER_HOST"
+        value = "0.0.0.0"
+      }
+      env {
+        name  = "CARD_CONVERTER_PORT"
+        value = "8090"
+      }
+
+      startup_probe {
+        http_get {
+          path = "/health"
+          port = 8090
+        }
+        failure_threshold = 10
+        period_seconds    = 3
+        timeout_seconds   = 1
+      }
+    }
+
     volumes {
       name = "cloudsql"
       cloud_sql_instance {
@@ -312,8 +345,9 @@ resource "google_cloud_run_v2_service" "worker" {
     }
 
     containers {
-      name  = "worker-1"
-      image = var.worker_image
+      name       = "worker-1"
+      image      = var.worker_image
+      depends_on = ["converter"]
 
       volume_mounts {
         name       = "cloudsql"
@@ -370,16 +404,8 @@ resource "google_cloud_run_v2_service" "worker" {
         value = local.presentation_gcs_bucket
       }
       env {
-        name  = "CDN_URL"
-        value = var.cdn_url
-      }
-      env {
-        name  = "CDN_SIGNING_KEY_NAME"
-        value = var.cdn_signing_key_name
-      }
-      env {
-        name  = "CDN_SIGNED_URL_TTL_SECONDS"
-        value = tostring(var.cdn_signed_url_ttl_seconds)
+        name  = "CARD_CONVERTER_URL"
+        value = "http://127.0.0.1:8090"
       }
 
       dynamic "env" {
@@ -428,6 +454,39 @@ resource "google_cloud_run_v2_service" "worker" {
       }
     }
 
+    containers {
+      name  = "converter"
+      image = var.converter_image
+
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "512Mi"
+        }
+        cpu_idle          = false
+        startup_cpu_boost = true
+      }
+
+      env {
+        name  = "CARD_CONVERTER_HOST"
+        value = "0.0.0.0"
+      }
+      env {
+        name  = "CARD_CONVERTER_PORT"
+        value = "8090"
+      }
+
+      startup_probe {
+        http_get {
+          path = "/health"
+          port = 8090
+        }
+        failure_threshold = 10
+        period_seconds    = 3
+        timeout_seconds   = 1
+      }
+    }
+
     volumes {
       name = "cloudsql"
       cloud_sql_instance {
@@ -458,12 +517,20 @@ resource "google_cloud_run_v2_job" "migrate" {
 
   template {
     template {
+      # After the schema, the job deletes the legacy objects the retired
+      # pipelines left in the bucket. Allow 20 minutes per attempt; a retry
+      # starts from whatever is left.
       service_account = google_service_account.runtime.email
-      timeout         = "600s"
+      timeout         = "1200s"
       max_retries     = 3
 
       containers {
         image = var.migrate_image
+
+        env {
+          name  = "PRESENTATION_GCS_BUCKET"
+          value = local.presentation_gcs_bucket
+        }
 
         volume_mounts {
           name       = "cloudsql"
@@ -494,7 +561,13 @@ resource "google_cloud_run_v2_job" "migrate" {
     ignore_changes = [client, client_version]
   }
 
-  depends_on = [google_secret_manager_secret_iam_member.runtime_accessor]
+  # Include the bucket IAM the legacy object purge needs in the targeted
+  # migration-job apply.
+  depends_on = [
+    google_secret_manager_secret_iam_member.runtime_accessor,
+    google_storage_bucket_iam_member.runtime_revision_viewer,
+    google_storage_bucket_iam_member.runtime_legacy_object_cleaner,
+  ]
 }
 
 # Wake signalling ------------------------------------------------------------

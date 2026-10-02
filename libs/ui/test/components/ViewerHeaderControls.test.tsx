@@ -40,13 +40,9 @@ it("disables Present until slides are available", () => {
 	expect(onPresent).not.toHaveBeenCalled();
 });
 
-it("names the template and omits generation controls in preview mode", () => {
-	const { view } = renderHeader({
-		templateLabel: "Midnight Signal",
-		showIterate: false,
-	});
+it("omits generation controls in read-only mode", () => {
+	const { view } = renderHeader({ showIterate: false });
 
-	expect(view.getByText("Midnight Signal")).toBeInTheDocument();
 	expect(view.queryByRole("button", { name: "Iterate presentation" })).toBeNull();
 	expect(view.queryByRole("combobox")).toBeNull();
 });

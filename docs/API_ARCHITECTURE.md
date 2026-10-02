@@ -18,7 +18,7 @@ The Go API is the only application HTTP API. It owns authentication and JWT toke
 The local stack is coordinated by devenv:
 
 ```text
-PostgreSQL ready -> Goose and River migrations complete -> API and worker ready -> Vite web ready
+PostgreSQL and storage emulator ready -> Goose and River migrations and the retired-object sweep complete -> API and worker ready -> Vite web ready
 ```
 
 The API entry point is `apps/api/cmd/api/main.go`. It exposes:
@@ -36,7 +36,7 @@ The API entry point is `apps/api/cmd/api/main.go`. It exposes:
 
 The worker entry point is `apps/api/cmd/worker/main.go`. It consumes River v0.43 jobs from PostgreSQL, executes generation and iteration, and exposes `/live`, `/ready`, and the authenticated `/drain` lease endpoint. The durable job payload stays in PostgreSQL; Cloud Tasks carries only the request that wakes and protects a scaled-to-zero instance.
 
-The API and worker use `database/sql` with PostgreSQL and pgvector. The migration entry point, `apps/api/cmd/migrate/main.go`, applies embedded Goose migrations from `apps/api/migrations` and then River's migrations. Migrations must complete before either runtime starts.
+The API and worker use `database/sql` with PostgreSQL. The migration entry point, `apps/api/cmd/migrate/main.go`, applies embedded Goose migrations from `apps/api/migrations` and then River's migrations. When `PRESENTATION_GCS_BUCKET` is set, it then deletes the objects retired document formats left in the bucket. Migrations must complete before either runtime starts; see [Card storage](CARD_DOCUMENTS.md#storage).
 
 ## Generation
 
@@ -54,9 +54,7 @@ Authentication is implemented in `apps/api/internal/auth`. The API supports emai
 
 ## Presentation Documents
 
-Presentation contracts shared with the web application live in `libs/types`. A presentation is a stored reference to its template plus the immutable PPTX revisions committed for it; the document itself carries identity and retry state, not slide content.
-
-The viewer renders the current revision's exact PPTX bytes in the browser. Download returns those same bytes; the API creates no image or PDF derivative for generated presentations. See [PPTX_CANONICAL_FLOW.md](PPTX_CANONICAL_FLOW.md).
+Presentation contracts shared with the web application live in `libs/types`. The stored document carries identity, status, and retry state. Presentation content is a card document stored as immutable revisions by `internal/carddocument`; see [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md). The owner can download the current revision as an editable PPTX that the converter writes; see the PPTX export section of that document.
 
 ## Persistence
 

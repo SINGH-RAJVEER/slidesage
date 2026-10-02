@@ -13,11 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/observability"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentationrevision"
-	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/templateasset"
 )
 
 const (
@@ -60,17 +59,22 @@ func RegisterRoutes(mux *http.ServeMux, database *sql.DB, identity Identity, con
 		panic(fmt.Sprintf("create generation worker waker: %v", err))
 	}
 	handler := &handler{
-		database:      database,
-		identity:      identity,
-		connections:   connections,
-		client:        &http.Client{Timeout: 3 * time.Minute, Transport: observability.HTTPTransport(nil)},
-		queue:         queue,
-		waker:         waker,
-		streamContext: config.StreamContext,
-		streams:       newStreamLimiter(config.MaxStreams, config.MaxStreamsPerUser),
-		research:      config.Research,
+		database:        database,
+		identity:        identity,
+		connections:     connections,
+		client:          &http.Client{Timeout: 3 * time.Minute, Transport: observability.HTTPTransport(nil)},
+		queue:           queue,
+		waker:           waker,
+		streamContext:   config.StreamContext,
+		streams:         newStreamLimiter(config.MaxStreams, config.MaxStreamsPerUser),
+		research:        config.Research,
+		draftingEnabled: carddocument.Configured(),
+	}
+	if handler.draftingEnabled {
+		handler.planner = newCardDrafter(carddocument.ConverterFromEnv(), nil, handler.generateJSON, stockSourceFromEnv())
 	}
 	mux.HandleFunc("POST /presentation-jobs", handler.submit)
+	mux.HandleFunc("POST /presentation-outlines", handler.outline)
 	mux.HandleFunc("GET /generation-jobs/{id}", handler.jobStatus)
 	mux.HandleFunc("GET /generation-jobs/{id}/events", handler.jobEvents)
 	mux.HandleFunc("POST /generation-jobs/{id}/cancel", handler.cancelJob)
@@ -105,10 +109,11 @@ func RecoverExpired(ctx context.Context, database *sql.DB) error {
 }
 
 type handler struct {
-	templates *templateasset.CDNFetcher
-	objects   presentationrevision.ObjectStore
-	revisions *presentationrevision.PostgresRepository
-
+	drafter documentDrafter
+	// draftingEnabled gates submission in the API process, which never drafts.
+	draftingEnabled bool
+	// planner writes outlines in the API process; it drafts nothing.
+	planner       *cardDrafter
 	database      *sql.DB
 	identity      Identity
 	client        *http.Client

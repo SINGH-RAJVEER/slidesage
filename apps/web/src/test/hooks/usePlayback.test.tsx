@@ -1,8 +1,8 @@
 /// <reference lib="dom" />
 
 import { describe, expect, it, mock } from "bun:test";
-import { act, renderHook } from "@testing-library/react";
 import { usePlayback } from "@slidesage/ui/hooks/usePlayback";
+import { act, renderHook } from "@testing-library/react";
 
 describe("usePlayback", () => {
 	it("does not start playback for a single-slide deck", () => {

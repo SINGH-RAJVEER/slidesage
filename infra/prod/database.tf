@@ -12,6 +12,8 @@ resource "google_sql_database_instance" "primary" {
     disk_autoresize             = false
     connector_enforcement       = "REQUIRED"
 
+    # Preserve existing settings during the JSONB cutover. PITR enablement
+    # restarts Cloud SQL and needs a separate, independently quiesced rollout.
     backup_configuration {
       enabled                        = false
       point_in_time_recovery_enabled = false

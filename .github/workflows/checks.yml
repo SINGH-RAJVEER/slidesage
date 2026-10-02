@@ -48,12 +48,15 @@ jobs:
           filters: |
             api:
               - 'apps/api/**'
+              - 'apps/converter/**'
+              - 'libs/cards/**'
               - 'libs/types/**'
               - '.github/workflows/checks.yml'
               - '.github/workflows/deploy.yml'
               - 'docker-bake.hcl'
             web:
               - 'apps/web/**'
+              - 'apps/converter/**'
               - 'libs/**'
               - 'package.json'
               - 'bun.lock'
@@ -108,8 +111,10 @@ jobs:
         run: bun run type-check
 
       - if: steps.scope.outputs.web == 'true'
-        run: bun test
-        working-directory: libs/types
+        run: bun run test:cards
+
+      - if: steps.scope.outputs.web == 'true'
+        run: bun run test:converter
 
       - if: steps.scope.outputs.web == 'true'
         run: bun run test:ui

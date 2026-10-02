@@ -59,7 +59,7 @@ func (repository *Repository) DeleteExpiredUnverifiedUsers(ctx context.Context, 
 			)
 			AND NOT EXISTS (
 				SELECT 1 FROM accounts AS a
-				WHERE a.user_id = u.id AND a.provider_id NOT IN ('credential', 'email')
+				WHERE a.user_id = u.id AND a.provider_id <> 'credential'
 			)
 			ORDER BY u.created_at
 			LIMIT 100

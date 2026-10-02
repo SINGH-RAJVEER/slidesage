@@ -53,10 +53,15 @@ variable "migrate_image" {
   type        = string
 }
 
+variable "converter_image" {
+  description = "Artifact Registry image for the Bun card converter sidecars. CI passes the same immutable commit tag to the API and worker."
+  type        = string
+}
+
 variable "open_router_model" {
   description = "Server-owned OpenRouter generation model."
   type        = string
-  default     = "google/gemini-3.8-flash"
+  default     = "openrouter/free"
 }
 
 variable "open_router_api_base" {
@@ -65,40 +70,17 @@ variable "open_router_api_base" {
   default     = "https://openrouter.ai/api/v1/chat/completions"
 }
 
-variable "template_gcs_bucket" {
-  description = "Existing private GCS bucket used as the Cloud CDN template origin."
-  type        = string
-  default     = "slidesage-504414-templates"
-}
-
 variable "presentation_gcs_bucket" {
-  description = "Private GCS bucket for immutable canonical presentation revisions. Defaults to <project-id>-presentation-revisions."
+  description = "Private GCS bucket for card image assets. Preserve the existing name; defaults to <project-id>-presentation-revisions."
   type        = string
   default     = null
   nullable    = true
 }
 
-variable "cdn_url" {
-  description = "HTTPS origin used when signing template URLs. Templates are served by the API load balancer under /pptx-templates/."
-  type        = string
-  default     = "https://api.slidesage.app"
-}
-
-variable "cdn_signing_key_name" {
-  description = "Active signing-key name configured on the template Cloud CDN backend bucket."
-  type        = string
-  default     = "templates-key-v2"
-}
-
-variable "cdn_signed_url_ttl_seconds" {
-  description = "Lifetime of generated Cloud CDN template URLs."
-  type        = number
-  default     = 900
-
-  validation {
-    condition     = var.cdn_signed_url_ttl_seconds >= 60 && var.cdn_signed_url_ttl_seconds <= 3600
-    error_message = "cdn_signed_url_ttl_seconds must be between 60 and 3600 seconds."
-  }
+variable "unsplash_enabled" {
+  description = "Enable Unsplash stock photos. Requires the UNSPLASH_ACCESS_KEY Secret Manager secret; otherwise generation stays text-only."
+  type        = bool
+  default     = false
 }
 
 variable "otel_exporter_otlp_endpoint" {

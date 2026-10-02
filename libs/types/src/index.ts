@@ -1,13 +1,3 @@
-export type {
-	BinaryPptxTemplate,
-	BinaryTemplateAspectRatio,
-	BinaryTemplateAssetStatus,
-	BinaryTemplateCategory,
-	BinaryTemplateDimensions,
-	PresentationTemplateReference,
-} from "./template-catalog";
-export { BINARY_PPTX_TEMPLATE_CATALOG, BINARY_TEMPLATE_CATEGORIES } from "./template-catalog";
-
 /** Stages the generation worker reports over SSE, in the order they occur. */
 export type PresentationGenerationStage = "planning" | "drafting" | "finalizing";
 
@@ -67,49 +57,15 @@ export interface AIConfigurationResponse {
 	selection: AIModelSelection | null;
 }
 
-export interface UpsertAIConnectionRequest {
-	provider: AIProvider;
-	apiKey: string;
-}
-
-export interface UpdateAISelectionRequest extends AIModelSelection {}
-
 export interface UpdateAIConnectionEnabledRequest {
 	enabled: boolean;
 }
 
-export { buildResearchSystemMessage, estimateMessageInputTokens } from "./research-context";
-
-export type ResearchFreshness = "day" | "week" | "month" | "year";
-
-export interface ResearchOptions {
-	enabled: boolean;
-	freshness?: ResearchFreshness;
-	maxResults?: number;
-	includeDomains?: string[];
-	excludeDomains?: string[];
-	startPublishedDate?: string;
-	endPublishedDate?: string;
-	maxAgeHours?: number;
-}
-
-/** One immutable PPTX revision used by the viewer and downloads. */
-export interface PresentationRevision {
-	revision: number;
-	slideCount: number;
-	byteSize: number;
-	sha256: string;
-	createdAt: string;
-}
-
 export interface PresentationData {
 	title: string;
-	template: import("./template-catalog").PresentationTemplateReference;
-	currentRevision?: PresentationRevision;
 	totalSlides: number;
 	sources?: Source[];
 	tokens_used?: number;
-	outline_cache_status?: "bypass" | "exact-hit" | "semantic-hit" | "miss";
 }
 
 export type PresentationStatus = "generating" | "ready" | "failed";
@@ -122,7 +78,6 @@ export interface PresentationRetryOptions {
 	research_enabled: boolean;
 	research_payload?: ResearchPayload;
 	ai?: AIModelSelection;
-	template?: import("./template-catalog").PresentationTemplateReference;
 }
 
 export interface PresentationFailure {
@@ -130,134 +85,21 @@ export interface PresentationFailure {
 	retry: PresentationRetryOptions;
 }
 
+/** The card revision a finished presentation currently points at. */
+export interface PresentationRevisionSummary {
+	revision: number;
+	cardCount: number;
+}
+
 export interface PresentationJSON {
 	title: string;
-	template?: import("./template-catalog").PresentationTemplateReference;
-	currentRevision?: PresentationRevision;
 	status?: PresentationStatus;
+	currentRevision?: PresentationRevisionSummary;
 	failure?: PresentationFailure;
 	totalSlides?: number;
 	tokens_used?: number;
 	sources?: Source[];
-	outline_cache_status?: "bypass" | "exact-hit" | "semantic-hit" | "miss";
 	[key: string]: unknown;
-}
-
-export interface StreamStartEvent {
-	event: "start";
-	data: { status: string };
-}
-
-export interface StreamCreatedEvent {
-	event: "created";
-	data: { job_id?: string; presentation_id: string | number };
-}
-
-export type GenerationJobStatus =
-	| "queued"
-	| "running"
-	| "retrying"
-	| "succeeded"
-	| "failed"
-	| "cancelled";
-
-export interface GenerationJob {
-	id: string;
-	presentation_id: string;
-	kind: "generation" | "iteration";
-	status: GenerationJobStatus;
-	stage?: PresentationGenerationStage;
-	progress: { completed: number; total: number };
-	error?: string;
-	created_at: string;
-	updated_at: string;
-}
-
-export interface StreamResearchEvent {
-	event: "research";
-	data: {
-		status: "searching" | "ready" | "generating";
-		sources?: Source[];
-	};
-}
-
-export interface StreamStageEvent {
-	event: "stage";
-	data: {
-		stage: PresentationGenerationStage;
-		message: string;
-		completed: number;
-		total: number;
-	};
-}
-
-export interface StreamRevisionEvent {
-	event: "revision";
-	data: PresentationRevision;
-}
-
-export interface StreamRetryEvent {
-	event: "retry";
-	data: {
-		attempt: number;
-		max_attempts: number;
-		delay_ms: number;
-		reason: string;
-	};
-}
-
-export interface StreamCompleteEvent {
-	event: "complete";
-	data: PresentationJSON;
-}
-
-export interface StreamSavedEvent {
-	event: "saved";
-	data: {
-		presentation_id: string | number;
-		success?: boolean;
-		slide_tokens_remaining?: number | null;
-		slide_tokens_charged?: number;
-	};
-}
-
-export interface StreamErrorEvent {
-	event: "error";
-	data: {
-		error: string;
-		presentation_id?: string | number;
-		details?: unknown;
-		[key: string]: unknown;
-	};
-}
-
-export type PresentationStreamEvent =
-	| StreamStartEvent
-	| StreamCreatedEvent
-	| StreamResearchEvent
-	| StreamStageEvent
-	| StreamRetryEvent
-	| StreamRevisionEvent
-	| StreamCompleteEvent
-	| StreamSavedEvent
-	| StreamErrorEvent;
-
-export type StreamEvent = PresentationStreamEvent;
-
-export interface OpenRouterMessage {
-	role: string;
-	content: string;
-}
-
-export interface StreamChunk {
-	choices?: Array<{
-		delta?: {
-			content?: string;
-		};
-	}>;
-	usage?: {
-		total_tokens?: number;
-	};
 }
 
 export interface ApiErrorResponse {
@@ -362,4 +204,41 @@ export interface BillingVerifyResponse {
 	success: true;
 	tokens_awarded: number;
 	new_balance: number;
+}
+
+/** One planned card in an outline the user reviews before drafting. */
+export interface OutlineEntry {
+	position: number;
+	takeaway: string;
+	role: string;
+	layout: string;
+	evidence?: string;
+	sourceIds?: string[];
+	/** Photo search for layouts that show a photo. */
+	imageQuery?: string;
+}
+
+export interface Outline {
+	title: string;
+	cards: OutlineEntry[];
+}
+
+export interface OutlineResponse {
+	plan: Outline;
+	/** Whether photo layouts may be chosen. */
+	photos: boolean;
+	slide_tokens_charged: number;
+	slide_tokens_remaining: number;
+}
+
+/** Cards drafted so far, streamed while a presentation generates. */
+export interface DraftPreview {
+	title: string;
+	entries: Array<Pick<OutlineEntry, "position" | "takeaway" | "layout">>;
+	/** Converted cards keyed by position. */
+	cards: Record<string, unknown>;
+	/** Stored photos those cards show, keyed by asset ID. */
+	assets: Record<string, unknown>;
+	completed: number;
+	total: number;
 }

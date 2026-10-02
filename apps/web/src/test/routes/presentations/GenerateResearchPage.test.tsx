@@ -3,8 +3,13 @@
 import { describe, expect, it, mock } from "bun:test";
 import { StreamingProvider } from "@slidesage/ui";
 import { fireEvent, render, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import GenerateResearchPage from "../../../routes/presentations/GenerateResearchPage";
+
+function OutlineStateProbe() {
+	const location = useLocation();
+	return <pre data-testid="outline-state">{JSON.stringify(location.state)}</pre>;
+}
 
 function AwayPage() {
 	const navigate = useNavigate();
@@ -36,7 +41,6 @@ describe("GenerateResearchPage", () => {
 								slideCount: 7,
 								detailLevel: "detailed",
 								tonality: "persuasive",
-								template: { id: "5s-training", version: 1 },
 								researchPayload: {
 									sources: [
 										{
@@ -72,14 +76,9 @@ describe("GenerateResearchPage", () => {
 		const originalFetch = globalThis.fetch;
 		let requestCount = 0;
 		let resolveResearch: ((response: Response) => void) | undefined;
-		let generationBody: Record<string, unknown> | undefined;
 
-		globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+		globalThis.fetch = mock(() => {
 			requestCount += 1;
-			if (String(input).includes("/presentation-jobs")) {
-				generationBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-			}
-
 			return new Promise<Response>((resolve) => {
 				resolveResearch = resolve;
 			});
@@ -97,11 +96,6 @@ describe("GenerateResearchPage", () => {
 								detailLevel: "balanced",
 								tonality: "professional",
 								ai: { provider: "google", model: "gemini-2.5-pro" },
-								template: {
-									id: "soft-skills-training",
-									version: 1,
-									previewThemeId: "terra-mesa",
-								},
 							},
 						},
 					]}
@@ -109,7 +103,7 @@ describe("GenerateResearchPage", () => {
 					<StreamingProvider>
 						<Routes>
 							<Route path="/generate/research" element={<GenerateResearchPage />} />
-							<Route path="/presentation" element={<div>Viewer waiting for stream</div>} />
+							<Route path="/generate/outline" element={<OutlineStateProbe />} />
 						</Routes>
 					</StreamingProvider>
 				</MemoryRouter>,
@@ -155,16 +149,18 @@ describe("GenerateResearchPage", () => {
 
 			fireEvent.keyDown(window, { key: "Enter" });
 
-			await waitFor(() => expect(requestCount).toBe(2));
-			expect(view.getByText("Viewer waiting for stream")).toBeInTheDocument();
-			expect(generationBody?.["ai"]).toEqual({
-				provider: "google",
-				model: "gemini-2.5-pro",
-			});
-			expect(generationBody?.["research"]).toEqual({ enabled: true });
-			expect(generationBody?.["template"]).toEqual({
-				id: "soft-skills-training",
-				version: 1,
+			const state = JSON.parse((await view.findByTestId("outline-state")).textContent ?? "{}");
+			expect(requestCount).toBe(1);
+			expect(state.ai).toEqual({ provider: "google", model: "gemini-2.5-pro" });
+			expect(state.researchPayload).toEqual({
+				sources: [
+					{
+						url: "https://example.com/storage",
+						title: "Battery storage outlook",
+						snippet: "A complete source preview.",
+					},
+				],
+				estimated_tokens: 5.8,
 			});
 		} finally {
 			globalThis.fetch = originalFetch;
@@ -205,7 +201,6 @@ describe("GenerateResearchPage", () => {
 								slideCount: 5,
 								detailLevel: "balanced",
 								tonality: "professional",
-								template: { id: "soft-skills-training", version: 1 },
 							},
 						},
 					]}
@@ -270,7 +265,6 @@ describe("GenerateResearchPage", () => {
 								slideCount: 6,
 								detailLevel: "balanced",
 								tonality: "professional",
-								template: { id: "5s-training", version: 1 },
 							},
 						},
 					]}
@@ -322,28 +316,14 @@ describe("GenerateResearchPage", () => {
 			globalThis.fetch = originalFetch;
 		}
 	});
-	// Generating from a default when the selection is gone would hand the user a
-	// deck in a template they never picked.
-	it("returns to the generate page when the route state names no template", async () => {
+	it("returns to the generate page when the route state is lost", async () => {
 		const originalFetch = globalThis.fetch;
 		const fetchMock = mock(async () => new Response(null, { status: 500 }));
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
 
 		try {
 			const view = render(
-				<MemoryRouter
-					initialEntries={[
-						{
-							pathname: "/generate/research",
-							state: {
-								prompt: "Grid storage policy",
-								slideCount: 6,
-								detailLevel: "balanced",
-								tonality: "professional",
-							},
-						},
-					]}
-				>
+				<MemoryRouter initialEntries={["/generate/research"]}>
 					<StreamingProvider>
 						<Routes>
 							<Route path="/generate" element={<span>Generate</span>} />

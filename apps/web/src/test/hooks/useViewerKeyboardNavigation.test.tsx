@@ -1,8 +1,6 @@
 /// <reference lib="dom" />
 
 import { afterEach, describe, expect, it, jest, mock } from "bun:test";
-import { act, render } from "@testing-library/react";
-import { useState } from "react";
 import {
 	KEYBOARD_NAVIGATION_REPEAT_DELAY_MS,
 	KEYBOARD_NAVIGATION_REPEAT_INTERVAL_MS,
@@ -11,6 +9,8 @@ import {
 	getViewerKeyboardDestination,
 	useViewerKeyboardNavigation,
 } from "@slidesage/ui/hooks/useViewerKeyboardNavigation";
+import { act, render } from "@testing-library/react";
+import { useState } from "react";
 
 afterEach(() => {
 	jest.useRealTimers();

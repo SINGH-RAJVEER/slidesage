@@ -1,9 +1,28 @@
 /// <reference lib="dom" />
 
 import { expect, it, mock } from "bun:test";
+import { assembleDocument, type Card, convertCards } from "@slidesage/cards";
+import { deckFromDocument } from "@slidesage/ui/components/Viewer/deck";
 import { ViewerThumbnails } from "@slidesage/ui/components/Viewer/ViewerThumbnails";
-import type { ViewerDocument } from "@slidesage/ui/lib/viewer-document";
 import { render, waitFor } from "@testing-library/react";
+
+function deck() {
+	const results = convertCards({
+		operationId: "thumbnails",
+		sourceIds: [],
+		cards: ["First point", "Second point", "Third point"].map((heading, index) => ({
+			position: index + 1,
+			takeaway: heading,
+			role: index === 0 ? "opening" : "insight",
+			draft: { layout: "title", nodes: [{ type: "heading", text: heading }] },
+		})),
+	});
+	const cards = results.map((result) => {
+		if (!("card" in result)) throw new Error(result.issue.message);
+		return result.card as Card;
+	});
+	return deckFromDocument(assembleDocument({ title: "Grid storage", theme: "slate", cards }));
+}
 
 it("keeps the active thumbnail in view when the current slide changes", async () => {
 	const originalScrollTo = HTMLElement.prototype.scrollTo;
@@ -12,14 +31,8 @@ it("keeps the active thumbnail in view when the current slide changes", async ()
 		configurable: true,
 		value: scrollTo,
 	});
-	const document: ViewerDocument = {
-		kind: "images",
-		slideCount: 3,
-		slides: ["/previews/0.webp", "/previews/1.webp", "/previews/2.webp"],
-	};
 	const props = {
-		document,
-		isStreamingMode: false,
+		deck: deck(),
 		isStreaming: false,
 		onSelect: mock(),
 	};
@@ -54,4 +67,14 @@ it("keeps the active thumbnail in view when the current slide changes", async ()
 			value: originalScrollTo,
 		});
 	}
+});
+
+it("draws each card read-only inside its thumbnail", () => {
+	const view = render(
+		<ViewerThumbnails deck={deck()} currentSlide={0} isStreaming={false} onSelect={mock()} />,
+	);
+
+	const thumbnail = view.getByRole("button", { name: "Go to slide 2" });
+	expect(thumbnail.querySelector("article")).toHaveAccessibleName("Card 2: Second point");
+	expect(thumbnail.querySelector("[contenteditable]")).toBeNull();
 });

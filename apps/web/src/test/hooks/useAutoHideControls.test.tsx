@@ -1,8 +1,8 @@
 /// <reference lib="dom" />
 
 import { describe, expect, it } from "bun:test";
-import { act, renderHook, waitFor } from "@testing-library/react";
 import { useAutoHideControls } from "@slidesage/ui/hooks/useAutoHideControls";
+import { act, renderHook, waitFor } from "@testing-library/react";
 
 describe("useAutoHideControls", () => {
 	it("keeps controls visible when disabled", async () => {

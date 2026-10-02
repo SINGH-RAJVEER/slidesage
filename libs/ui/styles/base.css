@@ -155,25 +155,3 @@ input.hide-number-spin::-webkit-inner-spin-button {
 input.hide-number-spin[type="number"] {
 	-moz-appearance: textfield;
 }
-
-/* Toolbar labels that are wider than their slot scroll their text instead of truncating. */
-@keyframes ss-marquee {
-	0%,
-	12% {
-		transform: translateX(0);
-	}
-	88%,
-	100% {
-		transform: translateX(var(--ss-marquee-distance, 0px));
-	}
-}
-
-.ss-marquee-track {
-	animation: ss-marquee var(--ss-marquee-duration, 8s) linear infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.ss-marquee-track {
-		animation: none;
-	}
-}

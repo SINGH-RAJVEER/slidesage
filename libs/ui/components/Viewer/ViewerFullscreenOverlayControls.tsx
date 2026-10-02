@@ -6,7 +6,15 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@slidesage/ui/components/select";
-import { ChevronLeft, ChevronRight, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import {
+	ChevronLeft,
+	ChevronRight,
+	NotebookText,
+	Pause,
+	Play,
+	SkipBack,
+	SkipForward,
+} from "lucide-react";
 import type React from "react";
 
 interface ViewerFullscreenOverlayControlsProps {
@@ -31,6 +39,8 @@ interface ViewerFullscreenOverlayControlsProps {
 	onLast: () => void;
 	onExit: () => void;
 	onMouseEnter: () => void;
+	/** Present when the slide on screen has speaker notes. */
+	notes?: { open: boolean; onToggle: () => void };
 }
 
 export const ViewerFullscreenOverlayControls: React.FC<ViewerFullscreenOverlayControlsProps> = ({
@@ -53,6 +63,7 @@ export const ViewerFullscreenOverlayControls: React.FC<ViewerFullscreenOverlayCo
 	onLast,
 	onExit,
 	onMouseEnter,
+	notes,
 }) => {
 	return (
 		<div
@@ -156,7 +167,9 @@ export const ViewerFullscreenOverlayControls: React.FC<ViewerFullscreenOverlayCo
 				</Button>
 			</div>
 
-			<div className="grid w-full grid-cols-5 gap-1 sm:flex sm:w-auto sm:items-center sm:gap-2">
+			<div
+				className={`grid w-full ${notes ? "grid-cols-6" : "grid-cols-5"} gap-1 sm:flex sm:w-auto sm:items-center sm:gap-2`}
+			>
 				<Button
 					variant="ghost"
 					onClick={onFirst}
@@ -193,6 +206,17 @@ export const ViewerFullscreenOverlayControls: React.FC<ViewerFullscreenOverlayCo
 				>
 					<SkipForward className="w-5 h-5" />
 				</Button>
+				{notes && (
+					<Button
+						variant="ghost"
+						onClick={notes.onToggle}
+						aria-pressed={notes.open}
+						className="size-11 text-white hover:bg-white/20"
+						aria-label="Speaker notes"
+					>
+						<NotebookText className="w-5 h-5" />
+					</Button>
+				)}
 				<Button
 					variant="ghost"
 					onClick={onExit}

@@ -1,18 +1,24 @@
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import type React from "react";
 import { useEffect, useRef } from "react";
-import type { ViewerDocument } from "../../lib/viewer-document";
-import { PreviewSlide } from "./PreviewSlide";
+import { CardView, citationsFor } from "../Cards/CardView";
+import { CARD_THEMES } from "../Cards/themes";
+import type { ViewerDeck } from "./deck";
 
 export const ViewerThumbnails: React.FC<{
-	document: ViewerDocument | null;
+	deck: ViewerDeck | null;
 	currentSlide: number;
-	isStreamingMode: boolean;
+	/** Shows a trailing placeholder for slides the deck does not list yet. */
 	isStreaming: boolean;
 	onSelect: (index: number) => void;
-}> = ({ document, currentSlide, isStreamingMode, isStreaming, onSelect }) => {
-	const slideCount = document?.slideCount ?? 0;
+}> = ({ deck, currentSlide, isStreaming, onSelect }) => {
+	const slideCount = deck?.slides.length ?? 0;
 	const thumbnailContainerRef = useRef<HTMLDivElement>(null);
+	const theme = deck ? CARD_THEMES[deck.theme] : undefined;
+	const citations = citationsFor(deck?.sources ?? []);
+	// Once a plan arrives every slide has a slot, so only an unplanned deck
+	// needs the trailing placeholder.
+	const showTail = isStreaming && slideCount === 0;
 
 	useEffect(() => {
 		const container = thumbnailContainerRef.current;
@@ -43,14 +49,15 @@ export const ViewerThumbnails: React.FC<{
 				ref={thumbnailContainerRef}
 				className="slide-thumbnails-container flex gap-3 overflow-x-auto py-6 px-4 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent"
 			>
-				{document &&
-					Array.from({ length: slideCount }, (_, index) => {
+				{deck &&
+					theme &&
+					deck.slides.map((slide, index) => {
 						const isFirstThumbnail = index === 0;
-						const isLastThumbnail = index === slideCount - 1 && !(isStreamingMode && isStreaming);
+						const isLastThumbnail = index === slideCount - 1;
 
 						return (
 							<button
-								key={index}
+								key={slide.key}
 								type="button"
 								data-slide-index={index}
 								aria-label={`Go to slide ${index + 1}`}
@@ -67,19 +74,33 @@ export const ViewerThumbnails: React.FC<{
 								}
                 backdrop-blur-sm relative`}
 							>
-								<div className="relative h-full w-full bg-white">
-									<PreviewSlide document={document} index={index} className="w-full" />
-									<span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
-										{index + 1}
-									</span>
-								</div>
+								{"card" in slide ? (
+									// The button names the slide; its miniature card is only a picture.
+									<div aria-hidden inert className="relative h-full w-full overflow-hidden">
+										<CardView
+											card={slide.card}
+											theme={theme}
+											position={index + 1}
+											sources={citations}
+											assets={deck.assets}
+											assetUrl={deck.assetUrl}
+										/>
+										<span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-medium text-white">
+											{index + 1}
+										</span>
+									</div>
+								) : (
+									<div className="flex h-full w-full items-center justify-center border border-dashed border-blue-400/50 bg-blue-500/10">
+										<ThinkingOrb size={20} />
+									</div>
+								)}
 							</button>
 						);
 					})}
 
-				{isStreamingMode && isStreaming && (
+				{showTail && (
 					<div
-						style={{ marginRight: "calc(50% - 64px)" }}
+						style={{ marginLeft: "calc(50% - 64px)", marginRight: "calc(50% - 64px)" }}
 						className="w-32 h-[4.5rem] border-2 border-dashed border-blue-400/50 rounded-lg flex-shrink-0 overflow-hidden backdrop-blur-sm bg-blue-500/10 flex items-center justify-center"
 					>
 						<ThinkingOrb size={20} />

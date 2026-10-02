@@ -1,22 +1,15 @@
 /// <reference lib="dom" />
 
 import { expect, it, mock } from "bun:test";
-import type { PresentationData } from "@slidesage/types";
 import { ViewerNavigationControls } from "@slidesage/ui/components/Viewer/ViewerNavigationControls";
 import { ViewerSlideCarousel } from "@slidesage/ui/components/Viewer/ViewerSlideCarousel";
 import { fireEvent, render } from "@testing-library/react";
 import { createRef } from "react";
 
-const emptyPresentation: PresentationData = {
-	title: "Generating presentation",
-	template: { id: "simple-business-proposal", version: 1 },
-	totalSlides: 0,
-};
-
 it("renders a blank loading slide before the deck is available", () => {
 	const view = render(
 		<ViewerSlideCarousel
-			document={null}
+			deck={null}
 			visibleSlide={0}
 			containerRef={createRef<HTMLDivElement>()}
 			onSelectSlide={mock()}
@@ -24,9 +17,7 @@ it("renders a blank loading slide before the deck is available", () => {
 		/>,
 	);
 
-	expect(
-		view.getByRole("option", { name: "Waiting for the rendered presentation" }),
-	).toBeInTheDocument();
+	expect(view.getByRole("option", { name: "Waiting for the presentation" })).toBeInTheDocument();
 	expect(view.getByRole("img", { name: "Loading" })).toBeInTheDocument();
 	expect(view.queryByRole("progressbar")).not.toBeInTheDocument();
 });
@@ -34,7 +25,7 @@ it("renders a blank loading slide before the deck is available", () => {
 it("reports the generation stage under the loading orb", () => {
 	const view = render(
 		<ViewerSlideCarousel
-			document={null}
+			deck={null}
 			visibleSlide={0}
 			containerRef={createRef<HTMLDivElement>()}
 			onSelectSlide={mock()}
@@ -53,7 +44,7 @@ it("reports the generation stage under the loading orb", () => {
 it("names the research stage before the worker reports one", () => {
 	const view = render(
 		<ViewerSlideCarousel
-			document={null}
+			deck={null}
 			visibleSlide={0}
 			containerRef={createRef<HTMLDivElement>()}
 			onSelectSlide={mock()}
@@ -68,7 +59,7 @@ it("names the research stage before the worker reports one", () => {
 it("waits at the queued position until the first stage event", () => {
 	const view = render(
 		<ViewerSlideCarousel
-			document={null}
+			deck={null}
 			visibleSlide={0}
 			containerRef={createRef<HTMLDivElement>()}
 			onSelectSlide={mock()}
@@ -83,13 +74,14 @@ it("waits at the queued position until the first stage event", () => {
 it("keeps empty-presentation controls visible and disabled", () => {
 	const view = render(
 		<ViewerNavigationControls
-			presentation={emptyPresentation}
 			currentSlide={0}
 			totalSlides={0}
 			onFirst={mock()}
 			onPrev={mock()}
 			onNext={mock()}
 			onLast={mock()}
+			onExport={mock(async () => {})}
+			downloadDisabled
 		/>,
 	);
 
@@ -102,7 +94,6 @@ it("offers cancellation while generation is pending", () => {
 	const onCancelGeneration = mock();
 	const view = render(
 		<ViewerNavigationControls
-			presentation={emptyPresentation}
 			currentSlide={0}
 			totalSlides={0}
 			onFirst={mock()}

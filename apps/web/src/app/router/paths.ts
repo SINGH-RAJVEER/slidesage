@@ -9,11 +9,11 @@ export const ROUTES = {
 	settings: "/settings",
 	generate: "/generate",
 	research: "/generate/research",
-	marketplace: "/marketplace",
-	marketplacePreview: (marketplaceId: string) => `/marketplace/${marketplaceId}/preview`,
+	outline: "/generate/outline",
 	presentations: "/presentations",
-	presentationById: (presentationId: number | string) => `/presentations/${presentationId}`,
-	presentation: "/presentation",
+	presentationById: (presentationId: string) =>
+		`/presentations/${encodeURIComponent(presentationId)}`,
 	presentationError: "/presentation-error",
+	shared: (token: string) => `/s/${encodeURIComponent(token)}`,
 	purchase: "/purchase",
 } as const;

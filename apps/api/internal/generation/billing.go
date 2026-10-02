@@ -148,7 +148,13 @@ func settleTx(ctx context.Context, tx *sql.Tx, job streamJob, data []byte, title
 	if job.selection != nil {
 		provider, selectedModel = string(job.selection.Provider), job.selection.Model
 	}
-	result, err = tx.ExecContext(ctx, `UPDATE presentations SET title = $1, prompt = $2, slides_data = $3::jsonb, ai_provider = $4, ai_model = $5, revision = revision + 1, updated_at = NOW() WHERE id = $6 AND user_id = $7 AND revision = $8`, title, job.prompt, data, provider, selectedModel, job.presentationID, job.userID, job.expectedRevision)
+	// An AI revision's instruction is not what the deck is about, so the
+	// presentation keeps the prompt it was generated from.
+	var prompt any = job.prompt
+	if job.kind == "iteration" {
+		prompt = nil
+	}
+	result, err = tx.ExecContext(ctx, `UPDATE presentations SET title = $1, prompt = COALESCE($2, prompt), slides_data = $3::jsonb, ai_provider = $4, ai_model = $5, revision = revision + 1, updated_at = NOW() WHERE id = $6 AND user_id = $7 AND revision = $8`, title, prompt, data, provider, selectedModel, job.presentationID, job.userID, job.expectedRevision)
 	if err != nil {
 		return 0, err
 	}
@@ -192,10 +198,6 @@ func generationFailureDocument(job streamJob, message string) map[string]any {
 		"slides":  []any{},
 		"status":  "failed",
 		"failure": map[string]any{"message": message, "retry": retry},
-	}
-	if job.template != nil {
-		retry["template"] = job.template
-		failed["template"] = job.template
 	}
 	return failed
 }
@@ -326,10 +328,10 @@ func recordLedger(tx *sql.Tx, userID, operationID, entryType string, delta, bala
 	return err
 }
 
-func authorizationMillis(outputBudget int, prompt string, current json.RawMessage, research any, payload *presentation.ResearchPayload, repairHeadroom int) int64 {
+func authorizationMillis(outputBudget int, prompt string, research any, payload *presentation.ResearchPayload, repairHeadroom int) int64 {
 	encodedResearch, _ := json.Marshal(research)
 	encodedSources, _ := json.Marshal(payload)
-	inputBytes := len(slotSystemPrompt) + len(prompt) + len(current) + len(encodedResearch) + len(encodedSources) + 256
+	inputBytes := draftingPromptAllowanceBytes + len(prompt) + len(encodedResearch) + len(encodedSources) + 256
 	// A slide that fails validation is repaired in a second call that resends the
 	// prompt, so the headroom is reserved once as extra input and once as extra
 	// output rather than only against the reply.
@@ -341,28 +343,11 @@ func authorizationMillis(outputBudget int, prompt string, current json.RawMessag
 	return int64(outputTokens + (inputTokens*12+9)/10)
 }
 
-// maxOutputCeilingTokens caps every output bound this package sends, whether it
-// was derived from a manifest or from a slide count.
+// maxOutputCeilingTokens caps every output bound this package sends.
 const maxOutputCeilingTokens = 16000
 
-// maxOutputTokens bounds a completion that has no manifest to size it: revising
-// an existing deck, whose output is replacement text for shapes the template
-// catalog never described, and pricing a submission whose template has not
-// resolved yet. Slot drafting uses slotOutputTokens instead, which reads the
-// assigned archetypes rather than assuming a slide's worth of copy.
-func maxOutputTokens(slideCount int) int {
-	outputTokens := slideCount * 1200
-	if outputTokens < 2000 {
-		return 2000
-	}
-	if outputTokens > maxOutputCeilingTokens {
-		return maxOutputCeilingTokens
-	}
-	return outputTokens
-}
-
-// repairHeadroomTokens covers the bounded repair passes the compiler makes when
-// a generated slide fails slot validation. It is headroom, not a worst case:
+// repairHeadroomTokens covers the bounded repair passes drafting makes when a
+// generated slide fails validation. It is headroom, not a worst case:
 // every slide could in principle be repaired twice, and reserving for that would
 // demand a balance far beyond what any real generation spends. Usage past the
 // authorization is clamped by actualCharge, so an underestimate costs SlideSage

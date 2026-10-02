@@ -1,13 +1,12 @@
 {
 	"name": "@slidesage/types",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"type": "module",
 	"main": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts"
 	},
 	"scripts": {
-		"test": "bun test --isolate",
 		"lint": "bunx --bun biome check .",
 		"lint:fix": "bunx --bun biome check --write .",
 		"format": "bunx --bun biome format --write ."

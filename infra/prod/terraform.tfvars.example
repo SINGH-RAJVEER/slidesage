@@ -3,8 +3,8 @@ cloudflare_account_id = "1f4b64abf5ce89626a42b88a12d71cdc"
 api_image     = "asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:<commit-sha>"
 worker_image  = "asia-south1-docker.pkg.dev/slidesage-504414/slidesage/worker:<commit-sha>"
 migrate_image = "asia-south1-docker.pkg.dev/slidesage-504414/slidesage/migrate:<commit-sha>"
+converter_image = "asia-south1-docker.pkg.dev/slidesage-504414/slidesage/converter:<commit-sha>"
 presentation_gcs_bucket = "slidesage-504414-presentation-revisions"
-template_gcs_bucket     = "slidesage-504414-templates"
 
 # Preserve the repository name returned by the existing Pages integration.
 github_repository = "slide-sage"
@@ -15,3 +15,6 @@ otel_exporter_otlp_endpoint = "https://otlp.us5.datadoghq.com"
 otel_service_version        = "<commit-sha>"
 # Set to "none" if the Datadog GCP integration already collects Cloud Run logs.
 otel_logs_exporter = "otlp"
+
+# Create UNSPLASH_ACCESS_KEY in Secret Manager before enabling stock photos.
+unsplash_enabled = false

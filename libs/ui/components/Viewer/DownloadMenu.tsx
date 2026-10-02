@@ -1,4 +1,3 @@
-import type { PresentationData } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
 import {
 	DropdownMenu,
@@ -13,13 +12,15 @@ import type React from "react";
 import { useRef, useState } from "react";
 
 interface Props {
-	presentation: PresentationData;
-	onExport?: PresentationExporter;
+	onExport: PresentationExporter;
+	/** Set while there is no saved revision to export. */
+	disabled?: boolean;
 }
 
-export type PresentationExporter = (presentation: PresentationData) => Promise<void>;
+/** Downloads the saved revision as a PowerPoint file. */
+export type PresentationExporter = () => Promise<void>;
 
-const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
+const DownloadMenu: React.FC<Props> = ({ onExport, disabled = false }) => {
 	const exportInProgress = useRef(false);
 	const [isExporting, setIsExporting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -30,8 +31,7 @@ const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
 		setIsExporting(true);
 		setError(null);
 		try {
-			if (!onExport) throw new Error("No presentation exporter was provided.");
-			await onExport(presentation);
+			await onExport();
 		} catch (exportError) {
 			console.error("Failed to export PPTX presentation", exportError);
 			setError("PPTX export failed. Please try again.");
@@ -47,7 +47,7 @@ const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
 				<DropdownMenuTrigger asChild>
 					<Button
 						type="button"
-						disabled={isExporting || !presentation.currentRevision}
+						disabled={isExporting || disabled}
 						variant="outline"
 						className="bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 shadow-none transition-colors duration-200"
 					>
@@ -66,7 +66,7 @@ const DownloadMenu: React.FC<Props> = ({ presentation, onExport }) => {
 					className="w-48 bg-gray-900/80 backdrop-blur-md border border-white/10 text-white shadow-xl"
 				>
 					<DropdownMenuItem
-						disabled={isExporting || !presentation.currentRevision}
+						disabled={isExporting || disabled}
 						onSelect={() => void download()}
 						className="focus:bg-white/10 focus:text-white cursor-pointer"
 					>

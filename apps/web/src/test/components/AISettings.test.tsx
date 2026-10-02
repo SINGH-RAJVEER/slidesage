@@ -23,7 +23,7 @@ it("shows point-funded OpenRouter until a provider is connected", async () => {
 			jsonResponse({
 				generation: {
 					mode: "openrouter",
-					model: "google/gemini-3.8-flash",
+					model: "openrouter/free",
 					billing: "points",
 				},
 				eligibility: {

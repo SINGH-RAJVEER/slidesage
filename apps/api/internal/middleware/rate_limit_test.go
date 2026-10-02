@@ -25,6 +25,24 @@ func TestPolicyForAvatarMutation(t *testing.T) {
 	}
 }
 
+func TestPolicyForShareLinks(t *testing.T) {
+	for _, item := range []struct {
+		method, path, scope string
+		authenticated       bool
+	}{
+		{http.MethodGet, "/shared/abc", "shared-document", false},
+		{http.MethodGet, "/shared/abc/assets/0f", "shared-asset", false},
+		{http.MethodPost, "/presentations/p1/share", "share-create", true},
+		{http.MethodGet, "/images/search", "photo-search", true},
+		{http.MethodGet, "/presentations/p1/export/pptx", "presentation-export", true},
+	} {
+		policy, ok := policyFor(item.method, item.path)
+		if !ok || policy.scope != item.scope || policy.authenticated != item.authenticated {
+			t.Fatalf("policy for %s %s: %#v", item.method, item.path, policy)
+		}
+	}
+}
+
 func TestHashKeyIsScopedAndStable(t *testing.T) {
 	first := hashKey("secret", "scope-a", "identity")
 	if len(first) != 64 || first != hashKey("secret", "scope-a", "identity") {

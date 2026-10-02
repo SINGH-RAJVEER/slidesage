@@ -1,12 +1,7 @@
-import type {
-	AIModelSelection,
-	PresentationTemplateReference,
-	ResearchPayload,
-} from "@slidesage/types";
+import type { AIModelSelection, ResearchPayload } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
-import { requestGenerationNotificationPermission } from "@slidesage/ui/lib/generation-notifications";
 import { ArrowLeft, ExternalLink, RefreshCw, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -21,7 +16,6 @@ interface ResearchRouteState {
 	researchPayload?: ResearchPayload;
 	retryPresentationId?: string;
 	ai?: AIModelSelection;
-	template: PresentationTemplateReference;
 }
 
 type ResearchStatus = "loading" | "ready" | "error";
@@ -29,7 +23,7 @@ type ResearchStatus = "loading" | "ready" | "error";
 export default function GenerateResearchPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { streamingState, researchPreviewState, previewResearch, generate } = useStreaming();
+	const { streamingState, researchPreviewState, previewResearch } = useStreaming();
 
 	const routeState = location.state as ResearchRouteState | null;
 	const prompt = routeState?.prompt?.trim() ?? "";
@@ -39,9 +33,6 @@ export default function GenerateResearchPage() {
 	const savedResearch = routeState?.researchPayload;
 	const retryPresentationId = routeState?.retryPresentationId;
 	const ai = routeState?.ai;
-	// Falling back to a default here would generate a deck in a template the
-	// user never chose, so a lost route state sends them back to pick one.
-	const template = routeState?.template;
 
 	const [isProceeding, setIsProceeding] = useState(false);
 	const [researchAttempt, setResearchAttempt] = useState(0);
@@ -78,29 +69,20 @@ export default function GenerateResearchPage() {
 	};
 
 	useEffect(() => {
-		if (!prompt || !slideCount || !template) {
+		if (!prompt || !slideCount) {
 			navigate(ROUTES.generate);
 		}
-	}, [navigate, prompt, slideCount, template]);
+	}, [navigate, prompt, slideCount]);
 
 	useEffect(() => {
-		if (!prompt || !slideCount || !template) return;
+		if (!prompt || !slideCount) return;
 		void previewResearch(researchRequest, savedResearch, researchAttempt > 0);
-	}, [
-		prompt,
-		slideCount,
-		template,
-		researchAttempt,
-		researchRequest,
-		savedResearch,
-		previewResearch,
-	]);
+	}, [prompt, slideCount, researchAttempt, researchRequest, savedResearch, previewResearch]);
 
 	const handleProceed = useCallback(async () => {
 		if (
 			!prompt ||
 			!slideCount ||
-			!template ||
 			researchStatus !== "ready" ||
 			streamingState.isStreaming ||
 			isProceedingRef.current
@@ -108,7 +90,6 @@ export default function GenerateResearchPage() {
 			return;
 		}
 
-		requestGenerationNotificationPermission();
 		isProceedingRef.current = true;
 		setIsProceeding(true);
 
@@ -117,36 +98,27 @@ export default function GenerateResearchPage() {
 			...(estimatedTokens === null ? {} : { estimated_tokens: estimatedTokens }),
 		};
 
-		const streamingRequest = generate({
-			prompt,
-			slideCount,
-			detailLevel,
-			tonality,
-			researchEnabled: true,
-			researchPayload: payload,
-			retryPresentationId,
-			ai,
-			template,
+		navigate(ROUTES.outline, {
+			state: {
+				prompt,
+				slideCount,
+				detailLevel,
+				tonality,
+				researchPayload: payload,
+				retryPresentationId,
+				...(ai ? { ai } : {}),
+			},
 		});
-		navigate(ROUTES.presentation, { state: { isStreaming: true } });
-
-		const success = await streamingRequest;
-		if (!success) {
-			isProceedingRef.current = false;
-			setIsProceeding(false);
-		}
 	}, [
+		navigate,
 		detailLevel,
 		estimatedTokens,
 		ai,
 		prompt,
 		researchStatus,
 		retryPresentationId,
-		template,
-		navigate,
 		slideCount,
 		sources,
-		generate,
 		streamingState.isStreaming,
 		tonality,
 	]);
