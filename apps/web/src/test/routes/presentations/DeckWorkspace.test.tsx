@@ -455,6 +455,7 @@ describe("workspace templates", () => {
 		const view = open();
 		fireEvent.click(view.getByRole("button", { name: "Edit" }));
 		fireEvent.click(view.getByRole("button", { name: "Templates" }));
+		const dialog = view.getByRole("dialog");
 		fireEvent.click(
 			within(
 				view
@@ -462,7 +463,7 @@ describe("workspace templates", () => {
 					.closest("section") as HTMLElement,
 			).getByRole("button", { name: "Replace all slides" }),
 		);
-		await waitFor(() => expect(view.queryByRole("dialog")).not.toBeInTheDocument());
+		await waitForElementToBeRemoved(dialog);
 		expect(calls[0]).toContain("/templates/ocean-proposal");
 		await waitFor(() => expect(saves).toHaveLength(1), { timeout: 5000 });
 		expect(JSON.stringify(saves[0])).toContain("A better place to work");
