@@ -365,7 +365,7 @@ func TestAnthropicGeneratePayloadEnablesExtendedThinking(t *testing.T) {
 }
 
 func TestOpenRouterPayloadReservesReasoningHeadroom(t *testing.T) {
-	payload := openRouterGeneratePayload("openrouter/free", "system", "user", 1500)
+	payload := openRouterGeneratePayload(defaultModel, "system", "user", 1500)
 	if payload["max_tokens"] != 1500+reasoningBudget {
 		t.Fatalf("completion bound was not padded: %v", payload["max_tokens"])
 	}
