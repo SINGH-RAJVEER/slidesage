@@ -78,6 +78,8 @@ export interface PresentationRetryOptions {
 	research_enabled: boolean;
 	research_payload?: ResearchPayload;
 	ai?: AIModelSelection;
+	/** The theme the deck was to be styled with; absent means the default. */
+	theme?: string;
 }
 
 export interface PresentationFailure {

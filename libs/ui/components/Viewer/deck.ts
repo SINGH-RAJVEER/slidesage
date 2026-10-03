@@ -3,6 +3,7 @@ import {
 	type Card,
 	type CardDocument,
 	DEFAULT_THEME,
+	THEMES,
 	type ThemeId,
 	validateCardDocument,
 } from "@slidesage/cards";
@@ -51,7 +52,9 @@ export function deckFromDocument(
 export function deckFromPreview(
 	preview: DraftPreview,
 	assetUrl?: (assetId: string) => string,
+	theme?: string,
 ): ViewerDeck {
+	const previewTheme = THEMES.includes(theme as ThemeId) ? (theme as ThemeId) : DEFAULT_THEME;
 	const assets = preview.assets as Record<string, CardAsset>;
 	const drafted = preview.entries.flatMap((entry) => {
 		const card = preview.cards[String(entry.position)];
@@ -63,7 +66,7 @@ export function deckFromPreview(
 					{
 						schemaVersion: CARD_SCHEMA_VERSION,
 						title: preview.title || "Untitled presentation",
-						theme: DEFAULT_THEME,
+						theme: previewTheme,
 						cardOrder: drafted.map((card) => card.id),
 						cards: Object.fromEntries(drafted.map((card) => [card.id, card])),
 					},
@@ -74,7 +77,7 @@ export function deckFromPreview(
 
 	return {
 		title: preview.title,
-		theme: DEFAULT_THEME,
+		theme: previewTheme,
 		slides: preview.entries.map((entry) => {
 			const id = (preview.cards[String(entry.position)] as { id?: string } | undefined)?.id;
 			const card = id ? written[id] : undefined;
