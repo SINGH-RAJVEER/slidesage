@@ -16,6 +16,8 @@ interface ResearchRouteState {
 	researchPayload?: ResearchPayload;
 	retryPresentationId?: string;
 	ai?: AIModelSelection;
+	/** The theme of the template chosen on the generate page. */
+	theme?: string;
 }
 
 type ResearchStatus = "loading" | "ready" | "error";
@@ -33,6 +35,7 @@ export default function GenerateResearchPage() {
 	const savedResearch = routeState?.researchPayload;
 	const retryPresentationId = routeState?.retryPresentationId;
 	const ai = routeState?.ai;
+	const theme = routeState?.theme;
 
 	const [isProceeding, setIsProceeding] = useState(false);
 	const [researchAttempt, setResearchAttempt] = useState(0);
@@ -107,10 +110,12 @@ export default function GenerateResearchPage() {
 				researchPayload: payload,
 				retryPresentationId,
 				...(ai ? { ai } : {}),
+				...(theme ? { theme } : {}),
 			},
 		});
 	}, [
 		navigate,
+		theme,
 		detailLevel,
 		estimatedTokens,
 		ai,

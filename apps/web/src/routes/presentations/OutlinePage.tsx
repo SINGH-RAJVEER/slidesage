@@ -36,6 +36,8 @@ interface OutlineRouteState {
 	researchPayload?: ResearchPayload;
 	retryPresentationId?: string;
 	ai?: AIModelSelection;
+	/** The theme of the template chosen on the generate page. */
+	theme?: string;
 }
 
 const MAX_CARDS = 40;
@@ -205,6 +207,7 @@ export default function OutlinePage() {
 			researchPayload: request.researchPayload,
 			retryPresentationId: request.retryPresentationId,
 			ai: request.ai,
+			theme: request.theme,
 			plan,
 		});
 		if (!accepted) {

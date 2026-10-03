@@ -1,18 +1,31 @@
-import { getCardTemplate } from "@slidesage/cards";
+import { CARD_TEMPLATES, getCardTemplate, TEMPLATE_CATEGORIES } from "@slidesage/cards";
 import { useSyncExternalStore } from "react";
 
 export const TEMPLATE_LIBRARY_KEY = "slidesage.template-library.v1";
 const UPDATED = "slidesage:template-library-updated";
 
-function snapshot(): string {
+/**
+ * The first template of every category. A reader who has never installed
+ * anything starts with these, so there is something to generate with.
+ *
+ * This is a seed, not a floor. An absent key is a reader who never installed
+ * anything; an empty list is one who removed everything, and stays empty.
+ */
+export const PREINSTALLED_TEMPLATE_IDS = TEMPLATE_CATEGORIES.flatMap((category) => {
+	const template = CARD_TEMPLATES.find((candidate) => candidate.category === category.id);
+	return template ? [template.id] : [];
+});
+
+function snapshot(): string | null {
 	try {
-		return localStorage.getItem(TEMPLATE_LIBRARY_KEY) ?? "[]";
+		return localStorage.getItem(TEMPLATE_LIBRARY_KEY);
 	} catch {
-		return "[]";
+		return null;
 	}
 }
 
-export function readTemplateLibrary(raw: string): string[] {
+export function readTemplateLibrary(raw: string | null): string[] {
+	if (raw === null) return PREINSTALLED_TEMPLATE_IDS;
 	try {
 		const value: unknown = JSON.parse(raw);
 		return Array.isArray(value)
@@ -37,7 +50,7 @@ function subscribe(notify: () => void) {
 }
 
 export function useTemplateLibrary() {
-	const raw = useSyncExternalStore(subscribe, snapshot, () => "[]");
+	const raw = useSyncExternalStore(subscribe, snapshot, () => null);
 	return {
 		ids: readTemplateLibrary(raw),
 		setInstalled(id: string, installed: boolean) {
