@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { assembleDocument, convertCards } from "@slidesage/cards";
+import { assembleDocument, convertCards, createTemplateDeck } from "@slidesage/cards";
 import { StreamingProvider } from "@slidesage/ui";
 import {
 	fireEvent,
@@ -414,5 +414,60 @@ describe("DeckWorkspace", () => {
 
 		await waitFor(() => expect(bodies).toHaveLength(1), { timeout: 8000 });
 		expect(bodies[0]?.document.cardOrder).toEqual(document.cardOrder.slice(1));
+	}, 15000);
+});
+
+describe("workspace templates", () => {
+	it("applies the chosen colors and fonts without replacing content", async () => {
+		const saves: Array<{ document: { theme: string } }> = [];
+		globalThis.fetch = mock(async (_input: unknown, init?: RequestInit) => {
+			saves.push(JSON.parse(String(init?.body)));
+			return Response.json({ revision: { revision: 4 } });
+		}) as unknown as typeof fetch;
+		const view = open();
+		fireEvent.click(view.getByRole("button", { name: "Edit" }));
+		fireEvent.click(view.getByRole("button", { name: "Templates" }));
+		const dialog = within(view.getByRole("dialog"));
+		fireEvent.click(
+			within(
+				dialog
+					.getByRole("heading", { name: "How a forest works", level: 3 })
+					.closest("section") as HTMLElement,
+			).getByRole("button", { name: "Apply theme" }),
+		);
+		fireEvent.click(view.getByRole("button", { name: "Done" }));
+		await waitFor(() => expect(saves).toHaveLength(1));
+		expect(saves[0]?.document.theme).toBe("grove");
+		expect(JSON.stringify(saves[0]?.document)).toContain("Grid storage");
+		expect(JSON.stringify(saves[0]?.document)).not.toContain("How a forest works");
+	});
+
+	it("registers template photos before saving a replacement and can undo it", async () => {
+		const calls: string[] = [];
+		const starter = createTemplateDeck("ocean-proposal");
+		const saves: unknown[] = [];
+		globalThis.fetch = mock(async (input: unknown, init?: RequestInit) => {
+			calls.push(String(input));
+			if (String(input).includes("/templates/")) return Response.json(starter);
+			saves.push(JSON.parse(String(init?.body)));
+			return Response.json({ revision: { revision: 4 + saves.length } });
+		}) as unknown as typeof fetch;
+		const view = open();
+		fireEvent.click(view.getByRole("button", { name: "Edit" }));
+		fireEvent.click(view.getByRole("button", { name: "Templates" }));
+		fireEvent.click(
+			within(
+				view
+					.getByRole("heading", { name: "A better place to work", level: 3 })
+					.closest("section") as HTMLElement,
+			).getByRole("button", { name: "Replace all slides" }),
+		);
+		await waitFor(() => expect(view.queryByRole("dialog")).not.toBeInTheDocument());
+		expect(calls[0]).toContain("/templates/ocean-proposal");
+		await waitFor(() => expect(saves).toHaveLength(1), { timeout: 5000 });
+		expect(JSON.stringify(saves[0])).toContain("A better place to work");
+		expect(JSON.stringify(saves[0])).toContain(Object.keys(starter.assets)[0] ?? "missing asset");
+		fireEvent.click(view.getByRole("button", { name: "Undo" }));
+		expect(view.getByRole("textbox", { name: "Card heading" }).textContent).toBe("Grid storage");
 	}, 15000);
 });

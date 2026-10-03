@@ -36,6 +36,18 @@ export const router = createBrowserRouter([
 			{ path: "sign-up/verify-email", element: <VerifyEmailPage /> },
 			{ path: "forgot-password", element: <ForgotPasswordPage /> },
 			{ path: "reset-password", element: <ResetPasswordPage /> },
+			{
+				path: "marketplace",
+				lazy: lazyRoute(() => import("../../routes/marketplace/MarketplacePage")),
+			},
+			{
+				path: "marketplace/library",
+				lazy: lazyRoute(() => import("../../routes/marketplace/MarketplacePage")),
+			},
+			{
+				path: "marketplace/templates/:templateId",
+				lazy: lazyRoute(() => import("../../routes/marketplace/TemplateDetailPage")),
+			},
 			/* share links open without an account */
 			{
 				path: "s/:token",

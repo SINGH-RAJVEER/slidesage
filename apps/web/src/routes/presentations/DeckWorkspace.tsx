@@ -1,5 +1,7 @@
 import {
+	CARD_THEME_DEFINITIONS,
 	type CardDocument,
+	type CardTemplate,
 	deleteCard,
 	setImage,
 	setTheme,
@@ -41,11 +43,10 @@ import { Check, Link2, Pencil, Redo2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBlocker, useNavigate } from "react-router-dom";
 import { ROUTES } from "../../app/router/paths";
+import { TemplatePicker } from "../marketplace/TemplatePicker";
 import { DeckViewer } from "./DeckViewer";
 import { ShareDialog } from "./ShareDialog";
 import { type SaveStatus, useDocumentEditor } from "./useDocumentEditor";
-
-const THEME_NAMES: Record<ThemeId, string> = { slate: "Slate", paper: "Paper", ember: "Ember" };
 
 const headerButtonClassName =
 	"bg-white/5 hover:bg-white/10 backdrop-blur-lg border border-white/5 text-white transition-all duration-300";
@@ -121,6 +122,8 @@ export function DeckWorkspace({
 	const navigate = useNavigate();
 	const [editing, setEditing] = useState(false);
 	const [sharing, setSharing] = useState(false);
+	const [templatesOpen, setTemplatesOpen] = useState(false);
+	const [applyingTemplate, setApplyingTemplate] = useState(false);
 	const [assets, setAssets] = useState(initialAssets);
 	const [photoCard, setPhotoCard] = useState<string | null>(null);
 	// The scope the iterate panel opened with; null while it is closed.
@@ -138,7 +141,7 @@ export function DeckWorkspace({
 	const editor = useDocumentEditor({ presentationId, initial: document, revision, assetIds });
 	const { status } = editor;
 	const blocked = status.state === "conflict";
-	const canEdit = !blocked && !revising;
+	const canEdit = !blocked && !revising && !applyingTemplate;
 	const deck = useMemo(
 		() =>
 			deckFromDocument(editor.document, {
@@ -250,6 +253,34 @@ export function DeckWorkspace({
 		await placePhoto(response, name.slice(0, 200) || "Uploaded image");
 	};
 
+	const replaceTemplate = async (template: CardTemplate) => {
+		if (!canEdit) return;
+		setApplyingTemplate(true);
+		setNotice(null);
+		try {
+			const response = await fetch(
+				`${presentationUrl}/templates/${encodeURIComponent(template.id)}`,
+				{
+					method: "POST",
+					credentials: "include",
+				},
+			);
+			if (!response.ok)
+				throw new Error(await readError(response, "The template could not be applied."));
+			const body = (await response.json()) as {
+				document: CardDocument;
+				assets: Record<string, CardAsset>;
+			};
+			setAssets((current) => ({ ...current, ...body.assets }));
+			editor.edit(() => body.document);
+			setTemplatesOpen(false);
+		} catch (error) {
+			setNotice(error instanceof Error ? error.message : "The template could not be applied.");
+		} finally {
+			setApplyingTemplate(false);
+		}
+	};
+
 	const photoCardHeading = (() => {
 		const card = photoCard ? editor.document.cards[photoCard] : undefined;
 		const heading = card?.nodes.find((node) => node.type === "heading");
@@ -347,7 +378,11 @@ export function DeckWorkspace({
 			headerTools={
 				editing ? (
 					<>
+						<Button variant="outline" disabled={!canEdit} onClick={() => setTemplatesOpen(true)}>
+							Templates
+						</Button>
 						<Select
+							disabled={!canEdit}
 							value={editor.document.theme}
 							onValueChange={(theme) =>
 								editor.edit((current) => setTheme(current, theme as ThemeId))
@@ -362,7 +397,7 @@ export function DeckWorkspace({
 							<SelectContent>
 								{THEMES.map((theme) => (
 									<SelectItem key={theme} value={theme}>
-										{THEME_NAMES[theme]}
+										{CARD_THEME_DEFINITIONS[theme].name}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -371,7 +406,7 @@ export function DeckWorkspace({
 							variant="ghost"
 							size="icon"
 							aria-label="Undo"
-							disabled={!editor.canUndo || blocked}
+							disabled={!editor.canUndo || !canEdit}
 							onClick={editor.undo}
 							className="text-white/70 hover:bg-white/10 hover:text-white"
 						>
@@ -381,7 +416,7 @@ export function DeckWorkspace({
 							variant="ghost"
 							size="icon"
 							aria-label="Redo"
-							disabled={!editor.canRedo || blocked}
+							disabled={!editor.canRedo || !canEdit}
 							onClick={editor.redo}
 							className="text-white/70 hover:bg-white/10 hover:text-white"
 						>
@@ -494,6 +529,19 @@ export function DeckWorkspace({
 				/>
 			}
 		>
+			<TemplatePicker
+				open={templatesOpen}
+				onOpenChange={setTemplatesOpen}
+				slideCount={editor.document.cardOrder.length}
+				busy={applyingTemplate}
+				disabled={!canEdit}
+				onTheme={(template) => {
+					if (!canEdit) return;
+					editor.edit((current) => setTheme(current, template.theme));
+					setTemplatesOpen(false);
+				}}
+				onReplace={replaceTemplate}
+			/>
 			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
 			<Dialog
 				open={slideToDelete !== undefined}

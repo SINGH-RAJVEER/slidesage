@@ -11,6 +11,9 @@ export const ROUTES = {
 	research: "/generate/research",
 	outline: "/generate/outline",
 	presentations: "/presentations",
+	marketplace: "/marketplace",
+	templateLibrary: "/marketplace/library",
+	templateById: (id: string) => `/marketplace/templates/${encodeURIComponent(id)}`,
 	presentationById: (presentationId: string) =>
 		`/presentations/${encodeURIComponent(presentationId)}`,
 	presentationError: "/presentation-error",

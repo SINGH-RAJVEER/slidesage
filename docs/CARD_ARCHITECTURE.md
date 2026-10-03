@@ -4,7 +4,7 @@
 
 This is the architecture of SlideSage presentations. It describes the target design; the part already built is listed under "Implemented so far". The defining decision is that an editable card document becomes the authoritative presentation. Browser presentation and PPTX export derive from a saved card revision.
 
-The PPTX-first pipeline this replaces has been removed: the template-slot compiler, the template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. Production Terraform now drops the template CDN route and deploys the converter with the API and worker. Migration 34 drops the legacy `presentation_revisions` table and the `current_pptx_revision` column, and `cmd/migrate` deletes the PPTX objects those rows pointed at.
+The PPTX-first pipeline this replaces has been removed: the template-slot compiler, the legacy PPTX template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. Production Terraform now drops the template CDN route and deploys the converter with the API and worker. Migration 34 drops the legacy `presentation_revisions` table and the `current_pptx_revision` column, and `cmd/migrate` deletes the PPTX objects those rows pointed at.
 
 ### Implemented so far
 
@@ -78,3 +78,11 @@ PPTX and PDF files are derived artifacts, not writable sources for the card docu
 - The benchmark records content support, repetition, render defects, export defects, first-attempt success, latency, and provider cost. No quality or speed improvement is assumed before measurement.
 
 The largest risk is export fidelity. A flexible browser document and a fixed-size PowerPoint slide obey different layout rules. If editable PPTX is the primary product promise, this architecture must prove that conversion before cards ship, because there is no PPTX-first path left to fall back on.
+
+## Theme templates and marketplace
+
+The card marketplace at `/marketplace` uses the shared catalog in `libs/cards/src/templates.ts`. Six five-slide starter decks include pre-placed photo nodes, image metadata and attribution, category tags, distinct color palettes, and heading/body font pairs. Their previews use `CardView`, so the marketplace, editor, landing ring, and native PPTX exporter use the same content and theme definitions. The landing ring draws from all six decks, shows 24 slides on desktop, and keeps its smaller mobile counts and reduced-motion behavior.
+
+Browse supports title/topic/theme search, category filters, full-deck previews and a saved library at `/marketplace/library`. Library installs are saved to this browser's local storage, not the account. On a template's detail page, Use template creates a separate, ready-to-edit presentation without an AI call or point charge. `POST /templates/{templateId}/presentations` requires authentication and a retry operation ID, then atomically records the presentation, its images, and its first card revision. The initial revision uses the existing generation operation kind with template provenance. Retries return the same presentation.
+
+In an existing presentation, Edit > Templates offers two actions. Apply theme changes only colors and fonts. Replace all slides replaces the deck with the starter slides after `POST /presentations/{id}/templates/{templateId}` registers the curated photos for the owner. Both edits use normal autosave and undo; replacement failures leave the current document intact. The API obtains the template from the private converter's `/v1/templates` endpoint and never accepts client-supplied asset URLs. Photos remain attributed Unsplash hotlinks in the browser and become embedded pictures in PPTX downloads. Browser display depends on photo availability and Google Fonts; fonts are referenced by name in PowerPoint, not embedded, so a machine without those fonts may substitute them.
