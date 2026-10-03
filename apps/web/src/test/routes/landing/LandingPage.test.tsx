@@ -155,7 +155,7 @@ describe("Landing plates", () => {
 
 		expect(new Set(opening.map((plate) => plate.deck)).size).toBe(decks.size);
 		expect(new Set(opening.map((plate) => plate.theme))).toEqual(
-			new Set(["slate", "paper", "ember"]),
+			new Set(["ocean", "grove", "orchid", "sand", "cobalt", "mono"]),
 		);
 	});
 

@@ -2,6 +2,7 @@ import { deflateSync } from "node:zlib";
 import type {
 	Card,
 	CardDocument,
+	CardThemeDefinition,
 	ColumnsNode,
 	ContentNode,
 	ImageNode,
@@ -10,9 +11,9 @@ import type {
 	RichText,
 	StatNode,
 	StepsNode,
-	ThemeId,
+	ThemePalette,
 } from "@slidesage/cards";
-import { STOCK_LIBRARIES } from "@slidesage/cards";
+import { CARD_THEME_DEFINITIONS, COVER_PALETTE, STOCK_LIBRARIES } from "@slidesage/cards";
 import PptxGenJS from "pptxgenjs";
 
 /**
@@ -52,79 +53,22 @@ const SLIDE_W = 13.333;
 const SLIDE_H = 7.5;
 const CQW = SLIDE_W / 100;
 const PT_PER_CQW = CQW * 72;
-const FONT = "Arial";
 /** Text never shrinks below this fraction of its designed size. */
 const MIN_SCALE = 0.5;
 
-type Rgb = [number, number, number];
-
-function rgb(hex: string): Rgb {
-	const value = Number.parseInt(hex, 16);
-	return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+interface Palette extends ThemePalette {
+	fonts: CardThemeDefinition["fonts"];
 }
 
-function hex(color: Rgb): string {
-	return color
-		.map((channel) => Math.round(channel).toString(16).padStart(2, "0"))
-		.join("")
-		.toUpperCase();
-}
-
-/** A translucent color flattened onto the surface it sits on. */
-function over(color: string, alpha: number, surface: string): string {
-	const top = rgb(color);
-	const bottom = rgb(surface);
-	return hex(
-		top.map((channel, index) => channel * alpha + (bottom[index] ?? 0) * (1 - alpha)) as Rgb,
-	);
-}
-
-interface Palette {
-	surface: string;
-	heading: string;
-	body: string;
-	muted: string;
-	accent: string;
-	rule: string;
-}
-
-function palette(
-	surface: string,
-	heading: string,
-	body: [string, number],
-	muted: [string, number],
-	accent: string,
-	rule: [string, number],
-): Palette {
+/** PPTX uses bare hex values while CSS uses # prefixes. */
+function exportPalette(palette: ThemePalette, fonts: Palette["fonts"]): Palette {
 	return {
-		surface,
-		heading,
-		body: over(body[0], body[1], surface),
-		muted: over(muted[0], muted[1], surface),
-		accent,
-		rule: over(rule[0], rule[1], surface),
+		...(Object.fromEntries(
+			Object.entries(palette).map(([key, color]) => [key, color.slice(1).toUpperCase()]),
+		) as ThemePalette),
+		fonts,
 	};
 }
-
-/** The web themes (libs/ui Cards/themes.ts) as solid colors. */
-const PALETTES: Record<ThemeId, Palette> = {
-	slate: palette("1B2130", "FFFFFF", ["FFFFFF", 0.8], ["FFFFFF", 0.45], "7DD3FC", ["FFFFFF", 0.1]),
-	paper: palette("F7F5F0", "1D1F24", ["3A3D44", 1], ["7A7D85", 1], "B4532A", ["000000", 0.1]),
-	ember: palette("231A17", "FBEEE4", ["F1D9C9", 0.85], ["F1D9C9", 0.45], "FF9B6A", [
-		"F1D9C9",
-		0.12,
-	]),
-};
-
-/** Text over a cover photo, whatever the deck theme. */
-const COVER_PALETTE: Palette = {
-	surface: "000000",
-	heading: "FFFFFF",
-	body: "F2F2F2",
-	muted: "D0D0D0",
-	accent: "FFFFFF",
-	rule: "FFFFFF",
-};
 
 // Text measurement. Widths are estimated from average glyph widths, and
 // words wrap greedily, which is close enough to size text conservatively.
@@ -158,6 +102,7 @@ function plain(text: RichText): string {
 }
 
 interface TextStyle {
+	fontFace: string;
 	/** Designed size in cqw. */
 	size: number;
 	color: string;
@@ -207,6 +152,7 @@ function textBlock(paragraphs: Paragraph[], gap: number, align: "left" | "center
 			const text: PptxGenJS.TextProps[] = paragraphs.flatMap((paragraph, index) => {
 				const sizePt = paragraph.style.size * PT_PER_CQW * scale;
 				const shared: PptxGenJS.TextPropsOptions = {
+					fontFace: paragraph.style.fontFace,
 					fontSize: round(sizePt),
 					color: paragraph.style.color,
 					lineSpacing: round(sizePt * paragraph.style.leading),
@@ -234,7 +180,6 @@ function textBlock(paragraphs: Paragraph[], gap: number, align: "left" | "center
 				h: measure(width, scale),
 				margin: 0,
 				valign: "top",
-				fontFace: FONT,
 				fit: "shrink",
 			});
 		},
@@ -319,7 +264,13 @@ function heading(card: Card, colors: Palette, large = false): Block[] {
 			[
 				{
 					runs: node.text,
-					style: { size: large ? 5.4 : 3.4, color: colors.heading, bold: true, leading: 1.1 },
+					style: {
+						fontFace: colors.fonts.heading.face,
+						size: large ? 5.4 : 3.4,
+						color: colors.heading,
+						bold: true,
+						leading: 1.1,
+					},
 				},
 			],
 			0,
@@ -330,7 +281,17 @@ function heading(card: Card, colors: Palette, large = false): Block[] {
 function paragraphs(card: Card, colors: Palette, large = false): Block[] {
 	return nodesOf(card, "paragraph").map((node) =>
 		textBlock(
-			[{ runs: node.text, style: { size: large ? 2.2 : 1.8, color: colors.body, leading: 1.3 } }],
+			[
+				{
+					runs: node.text,
+					style: {
+						fontFace: colors.fonts.body.face,
+						size: large ? 2.2 : 1.8,
+						color: colors.body,
+						leading: 1.3,
+					},
+				},
+			],
 			0,
 		),
 	);
@@ -342,7 +303,7 @@ function bullets(card: Card, colors: Palette): Block[] {
 			node.items.map((item) => ({
 				runs: item.text,
 				bullet: true,
-				style: { size: 1.9, color: colors.body, leading: 1.3 },
+				style: { fontFace: colors.fonts.body.face, size: 1.9, color: colors.body, leading: 1.3 },
 			})),
 			1.2,
 		),
@@ -358,7 +319,13 @@ function columns(node: ColumnsNode, colors: Palette): Block {
 						[
 							{
 								runs: [{ text: column.heading }],
-								style: { size: 2.1, color: colors.accent, bold: true, leading: 1.2 },
+								style: {
+									fontFace: colors.fonts.heading.face,
+									size: 2.1,
+									color: colors.accent,
+									bold: true,
+									leading: 1.2,
+								},
 							},
 						],
 						0,
@@ -366,7 +333,12 @@ function columns(node: ColumnsNode, colors: Palette): Block {
 					textBlock(
 						column.items.map((item) => ({
 							runs: item.text,
-							style: { size: 1.7, color: colors.body, leading: 1.3 },
+							style: {
+								fontFace: colors.fonts.body.face,
+								size: 1.7,
+								color: colors.body,
+								leading: 1.3,
+							},
 						})),
 						1,
 					),
@@ -388,7 +360,13 @@ function steps(node: StepsNode, colors: Palette): Block {
 						[
 							{
 								runs: [{ text: String(index + 1).padStart(2, "0") }],
-								style: { size: 1.6, color: colors.accent, bold: true, leading: 1.2 },
+								style: {
+									fontFace: colors.fonts.body.face,
+									size: 1.6,
+									color: colors.accent,
+									bold: true,
+									leading: 1.2,
+								},
 							},
 						],
 						0,
@@ -397,7 +375,13 @@ function steps(node: StepsNode, colors: Palette): Block {
 						[
 							{
 								runs: [{ text: step.title }],
-								style: { size: 1.9, color: colors.heading, bold: true, leading: 1.2 },
+								style: {
+									fontFace: colors.fonts.heading.face,
+									size: 1.9,
+									color: colors.heading,
+									bold: true,
+									leading: 1.2,
+								},
 							},
 						],
 						0,
@@ -405,7 +389,17 @@ function steps(node: StepsNode, colors: Palette): Block {
 					...(step.detail
 						? [
 								textBlock(
-									[{ runs: step.detail, style: { size: 1.5, color: colors.body, leading: 1.3 } }],
+									[
+										{
+											runs: step.detail,
+											style: {
+												fontFace: colors.fonts.body.face,
+												size: 1.5,
+												color: colors.body,
+												leading: 1.3,
+											},
+										},
+									],
 									0,
 								),
 							]
@@ -428,7 +422,13 @@ function stats(nodes: StatNode[], colors: Palette): Block {
 						[
 							{
 								runs: [{ text: stat.value }],
-								style: { size: 5, color: colors.accent, bold: true, leading: 1.1 },
+								style: {
+									fontFace: colors.fonts.heading.face,
+									size: 5,
+									color: colors.accent,
+									bold: true,
+									leading: 1.1,
+								},
 							},
 						],
 						0,
@@ -437,7 +437,12 @@ function stats(nodes: StatNode[], colors: Palette): Block {
 						[
 							{
 								runs: [{ text: stat.label }],
-								style: { size: 1.6, color: colors.body, leading: 1.3 },
+								style: {
+									fontFace: colors.fonts.body.face,
+									size: 1.6,
+									color: colors.body,
+									leading: 1.3,
+								},
 							},
 						],
 						0,
@@ -451,7 +456,12 @@ function stats(nodes: StatNode[], colors: Palette): Block {
 }
 
 function quote(node: QuoteNode, colors: Palette): Block {
-	const style: TextStyle = { size: 3.2, color: colors.heading, leading: 1.2 };
+	const style: TextStyle = {
+		fontFace: colors.fonts.heading.face,
+		size: 3.2,
+		color: colors.heading,
+		leading: 1.2,
+	};
 	const quoted: Paragraph = {
 		runs: [{ text: "“" }, ...node.text, { text: "”" }],
 		style,
@@ -463,7 +473,12 @@ function quote(node: QuoteNode, colors: Palette): Block {
 				[
 					{
 						runs: [{ text: node.attribution }],
-						style: { size: 1.7, color: colors.muted, leading: 1.3 },
+						style: {
+							fontFace: colors.fonts.body.face,
+							size: 1.7,
+							color: colors.muted,
+							leading: 1.3,
+						},
 					},
 				],
 				0,
@@ -694,7 +709,7 @@ function footer(
 		y,
 		h: height,
 		margin: 0,
-		fontFace: FONT,
+		fontFace: colors.fonts.body.face,
 		fontSize: sizePt,
 		color: colors.muted,
 	};
@@ -723,7 +738,7 @@ function addCard(
 	const asset = image ? assets[image.assetId] : undefined;
 	const split = card.layout === "image-left" || card.layout === "image-right";
 	const cover = card.layout === "cover";
-	const colors = cover ? COVER_PALETTE : theme;
+	const colors = cover ? exportPalette(COVER_PALETTE, theme.fonts) : theme;
 
 	let x = PAD_X * CQW;
 	let width = SLIDE_W - 2 * PAD_X * CQW;
@@ -762,8 +777,12 @@ export async function writePptx({ document, assets, sources }: ExportInput): Pro
 	const pptx = new PptxGenJS();
 	pptx.layout = "LAYOUT_WIDE";
 	pptx.title = document.title;
-	pptx.theme = { headFontFace: FONT, bodyFontFace: FONT };
-	const theme = PALETTES[document.theme];
+	const definition = CARD_THEME_DEFINITIONS[document.theme];
+	pptx.theme = {
+		headFontFace: definition.fonts.heading.face,
+		bodyFontFace: definition.fonts.body.face,
+	};
+	const theme = exportPalette(definition.palette, definition.fonts);
 	let scrim: string | undefined;
 	document.cardOrder.forEach((id, index) => {
 		const card = document.cards[id];

@@ -3,6 +3,7 @@ import { Globe } from "lucide-react";
 import type React from "react";
 import { DetailLevelSelector } from "./DetailLevelSelector";
 import { SlideCountSelector } from "./SlideCountSelector";
+import TemplateSelector from "./TemplateSelector";
 import { TonalitySelector } from "./TonalitySelector";
 
 interface GenerateOptionsBarProps {
@@ -10,10 +11,15 @@ interface GenerateOptionsBarProps {
 	tonality: string;
 	useWebResearch: boolean;
 	slideCount: string;
+	/** Undefined until the reader picks one; there is no default to assume. */
+	selectedTemplateId?: string;
+	installedTemplateIds?: string[];
 	onDetailLevelChange: (level: string) => void;
 	onTonalityChange: (tonality: string) => void;
 	onUseWebResearchChange: (enabled: boolean) => void;
 	onSlideCountChange: (count: string) => void;
+	onTemplateChange: (templateId: string) => void;
+	onTemplateRemove?: (templateId: string) => void;
 }
 
 export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
@@ -21,10 +27,14 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 	tonality,
 	useWebResearch,
 	slideCount,
+	selectedTemplateId,
+	installedTemplateIds = [],
 	onDetailLevelChange,
 	onTonalityChange,
 	onUseWebResearchChange,
 	onSlideCountChange,
+	onTemplateChange,
+	onTemplateRemove,
 }) => {
 	return (
 		<div className="mb-2 w-full flex items-center justify-center">
@@ -47,6 +57,12 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 					</Button>
 				</div>
 
+				<TemplateSelector
+					selectedTemplateId={selectedTemplateId}
+					onTemplateChange={onTemplateChange}
+					onTemplateRemove={onTemplateRemove}
+					installedTemplateIds={installedTemplateIds}
+				/>
 				<DetailLevelSelector detailLevel={detailLevel} onDetailLevelChange={onDetailLevelChange} />
 				<TonalitySelector tonality={tonality} onTonalityChange={onTonalityChange} />
 				<SlideCountSelector slideCount={slideCount} onSlideCountChange={onSlideCountChange} />

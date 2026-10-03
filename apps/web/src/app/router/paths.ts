@@ -11,6 +11,9 @@ export const ROUTES = {
 	research: "/generate/research",
 	outline: "/generate/outline",
 	presentations: "/presentations",
+	marketplace: "/marketplace",
+	marketplacePreview: (marketplaceId: string) =>
+		`/marketplace/${encodeURIComponent(marketplaceId)}/preview`,
 	presentationById: (presentationId: string) =>
 		`/presentations/${encodeURIComponent(presentationId)}`,
 	presentationError: "/presentation-error",

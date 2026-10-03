@@ -1,43 +1,34 @@
-import type { ThemeId } from "@slidesage/cards";
+import { CARD_THEME_DEFINITIONS, type ThemeId } from "@slidesage/cards";
+import type { CSSProperties } from "react";
 
+/** Class names kept compatible with existing CardView consumers. */
 export interface CardTheme {
-	/** The card surface. */
 	surface: string;
 	heading: string;
 	body: string;
 	muted: string;
 	accent: string;
-	/** Hairlines between columns and steps; never boxes around content. */
 	rule: string;
+	style?: CSSProperties;
 }
 
-/**
- * Named themes. A document picks one by ID, so no styling ever comes from
- * document content.
- */
-export const CARD_THEMES: Record<ThemeId, CardTheme> = {
-	slate: {
-		surface: "bg-[#1b2130] shadow-[0_24px_60px_rgba(0,0,0,0.35)]",
-		heading: "text-white",
-		body: "text-white/80",
-		muted: "text-white/45",
-		accent: "text-sky-300",
-		rule: "border-white/10",
-	},
-	paper: {
-		surface: "bg-[#f7f5f0] shadow-[0_24px_60px_rgba(0,0,0,0.25)]",
-		heading: "text-[#1d1f24]",
-		body: "text-[#3a3d44]",
-		muted: "text-[#7a7d85]",
-		accent: "text-[#b4532a]",
-		rule: "border-black/10",
-	},
-	ember: {
-		surface: "bg-[#231a17] shadow-[0_24px_60px_rgba(0,0,0,0.35)]",
-		heading: "text-[#fbeee4]",
-		body: "text-[#f1d9c9]/85",
-		muted: "text-[#f1d9c9]/45",
-		accent: "text-[#ff9b6a]",
-		rule: "border-[#f1d9c9]/12",
-	},
-};
+export const CARD_THEMES = Object.fromEntries(
+	Object.values(CARD_THEME_DEFINITIONS).map((theme) => [
+		theme.id,
+		{
+			surface: "bg-[var(--card-surface)] shadow-[0_24px_60px_rgba(0,0,0,0.25)]",
+			heading: "text-[color:var(--card-heading)] font-[family-name:var(--card-heading-font)]",
+			body: "text-[color:var(--card-body)]",
+			muted: "text-[color:var(--card-muted)]",
+			accent: "text-[color:var(--card-accent)]",
+			rule: "border-[color:var(--card-rule)]",
+			style: {
+				...Object.fromEntries(
+					Object.entries(theme.palette).map(([key, color]) => [`--card-${key}`, color]),
+				),
+				"--card-heading-font": theme.fonts.heading.cssFamily,
+				fontFamily: theme.fonts.body.cssFamily,
+			} as CSSProperties,
+		},
+	]),
+) as Record<ThemeId, CardTheme>;

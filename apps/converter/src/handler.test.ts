@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { CARD_TEMPLATES, THEMES } from "@slidesage/cards";
 import { handle, SCHEMA_VERSION_HEADER } from "./handler";
 
 function post(path: string, body: unknown, version = "2") {
@@ -17,6 +18,41 @@ const draft = {
 };
 
 describe("converter", () => {
+	it("accepts every shared theme in assembly and validation", async () => {
+		const template = CARD_TEMPLATES.find((template) => template.id === "mono-briefing");
+		if (!template) throw new Error("Missing briefing template");
+		for (const theme of THEMES) {
+			const response = await post("/v1/documents", {
+				title: template.name,
+				theme,
+				cards: Object.values(template.document.cards),
+				assetIds: Object.keys(template.assets),
+			});
+			expect(response.status).toBe(200);
+			const { document } = (await response.json()) as { document: unknown };
+			expect(
+				(await post("/v1/documents/validate", { document, assetIds: Object.keys(template.assets) }))
+					.status,
+			).toBe(200);
+		}
+	});
+
+	it("validates all starter decks and still rejects unregistered images", async () => {
+		for (const template of CARD_TEMPLATES) {
+			expect(
+				(
+					await post("/v1/documents/validate", {
+						document: template.document,
+						assetIds: Object.keys(template.assets),
+					})
+				).status,
+			).toBe(200);
+			expect(
+				(await post("/v1/documents/validate", { document: template.document, assetIds: [] }))
+					.status,
+			).toBe(422);
+		}
+	});
 	it("reports health with its schema version", async () => {
 		const response = await handle(new Request("http://converter/health"));
 		expect(await response.json()).toEqual({ status: "ok", schemaVersion: 2 });
@@ -127,5 +163,34 @@ describe("converter", () => {
 			sourceIds: [],
 			...draft,
 		});
+	});
+});
+
+describe("template catalog endpoint", () => {
+	it("serves the curated document and assets without trusting client URLs", async () => {
+		const response = await handle(
+			new Request("http://converter/v1/templates", {
+				method: "POST",
+				headers: { "Content-Type": "application/json", [SCHEMA_VERSION_HEADER]: "2" },
+				body: JSON.stringify({
+					templateId: "grove-lesson",
+					url: "https://example.com/untrusted.jpg",
+				}),
+			}),
+		);
+		expect(response.status).toBe(200);
+		const body = await response.json();
+		expect(body.document.theme).toBe("grove");
+		expect(body.document.cardOrder).toHaveLength(5);
+		expect(Object.values(body.assets)).toHaveLength(1);
+		expect(JSON.stringify(body)).not.toContain("example.com");
+		const missing = await handle(
+			new Request("http://converter/v1/templates", {
+				method: "POST",
+				headers: { [SCHEMA_VERSION_HEADER]: "2" },
+				body: JSON.stringify({ templateId: "missing" }),
+			}),
+		);
+		expect(missing.status).toBe(404);
 	});
 });

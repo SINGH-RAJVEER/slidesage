@@ -213,7 +213,15 @@ function plateSpread(index: number) {
  * plate is refilled, and the other plates' cards have not changed.
  */
 const PlateCard = memo(function PlateCard({ plate }: { plate: LandingPlate }) {
-	return <CardView card={plate.card} theme={CARD_THEMES[plate.theme]} position={plate.position} />;
+	return (
+		<CardView
+			card={plate.card}
+			theme={CARD_THEMES[plate.theme]}
+			position={plate.position}
+			assets={plate.assets}
+			assetUrl={(id) => plate.assets[id]?.url ?? ""}
+		/>
+	);
 });
 
 export function SlideRingHero() {
@@ -726,6 +734,8 @@ export function SlideRingHero() {
 								card={preview.card}
 								theme={CARD_THEMES[preview.theme]}
 								position={preview.position}
+								assets={preview.assets}
+								assetUrl={(id) => preview.assets[id]?.url ?? ""}
 							/>
 						</div>
 						<p className="mt-4 text-center text-xs tracking-wide text-white/50">

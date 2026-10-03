@@ -164,6 +164,7 @@ export default function PresentationPage() {
 								preview,
 								(assetId) =>
 									`${API_URL}/presentations/${encodeURIComponent(presentationId)}/assets/${assetId}`,
+								streamingState.theme,
 							)
 						: null
 				}

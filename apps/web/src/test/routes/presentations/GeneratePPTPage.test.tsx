@@ -58,6 +58,7 @@ it("takes the retried settings to the outline", async () => {
 							tonality: "professional",
 							research_enabled: false,
 							ai: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+							theme: "grove",
 						},
 						retryPresentationId: "failed_1",
 					},
@@ -82,8 +83,42 @@ it("takes the retried settings to the outline", async () => {
 		detailLevel: "balanced",
 		tonality: "professional",
 		retryPresentationId: "failed_1",
+		theme: "grove",
 		ai: { provider: "anthropic", model: "claude-sonnet-4-20250514" },
 	});
+});
+
+it("asks for a template before generating", async () => {
+	const view = render(
+		<MemoryRouter
+			initialEntries={[
+				{
+					pathname: "/generate",
+					state: {
+						retry: {
+							prompt: "Retry this market analysis",
+							slide_count: 7,
+							detail_level: "balanced",
+							tonality: "professional",
+							research_enabled: false,
+						},
+					},
+				},
+			]}
+		>
+			<StreamingProvider>
+				<Routes>
+					<Route path="/generate" element={<GeneratePPTPage />} />
+					<Route path="/generate/outline" element={<RouteStateProbe />} />
+				</Routes>
+			</StreamingProvider>
+		</MemoryRouter>,
+	);
+
+	fireEvent.click(view.getByRole("button", { name: "Generate" }));
+
+	expect(await view.findByText("Select a template before generating.")).toBeInTheDocument();
+	expect(view.queryByText(/"prompt"/)).toBeNull();
 });
 
 it("starts generation on Enter even when focus sits on an options-bar control", async () => {
@@ -183,6 +218,7 @@ it("preserves retry AI selection when routing through research", async () => {
 								tonality: "professional",
 								research_enabled: true,
 								ai: { provider: "openai", model: "gpt-4.1" },
+								theme: "grove",
 							},
 							retryPresentationId: "failed_1",
 						},
@@ -204,6 +240,7 @@ it("preserves retry AI selection when routing through research", async () => {
 			expect(view.getByText(/"retryPresentationId":"failed_1"/)).toBeInTheDocument(),
 		);
 		expect(view.getByText(/"provider":"openai","model":"gpt-4.1"/)).toBeInTheDocument();
+		expect(view.getByText(/"theme":"grove"/)).toBeInTheDocument();
 	} finally {
 		globalThis.fetch = originalFetch;
 	}

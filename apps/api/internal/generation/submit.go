@@ -25,6 +25,8 @@ type submitInput struct {
 	Research        any
 	ResearchPayload *presentation.ResearchPayload
 	AI              *ai.Selection
+	// Theme styles a new deck; empty means the default theme.
+	Theme string `json:",omitempty"`
 	// Plan is an outline the user approved; it fixes the card count.
 	Plan *cardPlan `json:",omitempty"`
 	// BaseRevision is the card revision an AI revision was asked against.
@@ -123,6 +125,17 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 	if !h.draftingEnabled {
 		writeError(writer, http.StatusServiceUnavailable, "Presentation generation is not available yet")
 		return
+	}
+	if input.Theme != "" && h.planner != nil {
+		known, err := h.planner.knowsTheme(request.Context(), input.Theme)
+		if err != nil {
+			writeError(writer, http.StatusServiceUnavailable, "Presentation generation is not available right now")
+			return
+		}
+		if !known {
+			writeError(writer, http.StatusBadRequest, "theme is not known")
+			return
+		}
 	}
 	if input.Plan != nil {
 		if h.planner == nil {
@@ -223,6 +236,16 @@ func parseSubmitInput(body map[string]any) (submitInput, error) {
 		return submitInput{}, err
 	}
 	input.Research = research
+	if value, found := body["theme"]; found && value != nil {
+		if input.ParentID != "" {
+			return submitInput{}, errors.New("a theme can only style a new presentation")
+		}
+		theme, ok := value.(string)
+		if !ok || theme == "" || len(theme) > 40 {
+			return submitInput{}, errors.New("theme must be a theme name")
+		}
+		input.Theme = theme
+	}
 	input.DetailLevel = choice(body["detail_level"], "balanced")
 	input.Tonality = choice(body["tonality"], "professional")
 	if !validDetail(input.DetailLevel) || !validTonality(input.Tonality) {
@@ -283,12 +306,15 @@ func (h *handler) generationJob(ctx context.Context, userID string, input submit
 	}
 	initial := generationPlaceholder(input)
 	placeholder, _ := json.Marshal(initial)
-	job := streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: presentationID, quote: quote, prompt: input.Topic, slideCount: input.SlideCount, detailLevel: input.DetailLevel, tonality: input.Tonality, research: input.Research, researchPayload: input.ResearchPayload, selection: selection, plan: input.Plan, kind: "generation"}
+	job := streamJob{jobID: jobID, userID: userID, operationID: operationID, presentationID: presentationID, quote: quote, prompt: input.Topic, slideCount: input.SlideCount, detailLevel: input.DetailLevel, tonality: input.Tonality, research: input.Research, researchPayload: input.ResearchPayload, selection: selection, plan: input.Plan, theme: input.Theme, kind: "generation"}
 	return job, placeholder, nil
 }
 
 func generationPlaceholder(input submitInput) map[string]any {
 	retry := map[string]any{"prompt": input.Topic, "slide_count": input.SlideCount, "detail_level": input.DetailLevel, "tonality": input.Tonality, "research_enabled": input.Research != nil || input.ResearchPayload != nil, "research_payload": input.ResearchPayload, "ai": input.AI}
+	if input.Theme != "" {
+		retry["theme"] = input.Theme
+	}
 	return map[string]any{"title": "Generating...", "slides": []any{}, "status": "generating", "failure": map[string]any{"retry": retry}}
 }
 
@@ -407,6 +433,8 @@ type streamJob struct {
 	requestHash                 string
 	// plan is an outline the user approved; drafting then skips planning.
 	plan *cardPlan
+	// theme styles the assembled deck; empty means the default theme.
+	theme string
 	// report sends a progress event for the job. It is set by the worker.
 	report func(eventType string, payload any)
 }

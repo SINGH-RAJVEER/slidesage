@@ -193,6 +193,9 @@ func generationFailureDocument(job streamJob, message string) map[string]any {
 		"research_payload": job.researchPayload,
 		"ai":               job.selection,
 	}
+	if job.theme != "" {
+		retry["theme"] = job.theme
+	}
 	failed := map[string]any{
 		"title":   "Generation failed",
 		"slides":  []any{},

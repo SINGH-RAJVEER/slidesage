@@ -23,6 +23,7 @@ interface StoredGeneration {
 	prompt?: string;
 	requestedSlides: number;
 	lastEventId: number;
+	theme?: string;
 }
 
 let inMemoryGeneration: StoredGeneration | null = null;
@@ -110,6 +111,8 @@ export interface StreamingState {
 	completedDocument?: PresentationData;
 	/** Cards drafted so far; a preview until the revision commits. */
 	preview?: DraftPreview;
+	/** The theme a new deck is drafted in, so its preview shows those colors. */
+	theme?: string;
 }
 
 export interface GenerateOptions {
@@ -124,6 +127,8 @@ export interface GenerateOptions {
 	ai?: AIModelSelection;
 	/** An outline the user approved; drafting follows it instead of planning. */
 	plan?: Outline;
+	/** The theme a new deck is styled with; omitted means the default. */
+	theme?: string;
 	/** For an AI revision: the card revision being revised. */
 	baseRevision?: number;
 	/** For an AI revision: the cards to rewrite; omitted means every card. */
@@ -575,6 +580,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				operation,
 				prompt: options.prompt,
 				presentationId: targetPresentationId || undefined,
+				theme: options.theme,
 				researchStatus: options.researchEnabled && !options.researchPayload ? "searching" : "idle",
 			});
 			const stored: StoredGeneration = {
@@ -584,6 +590,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				prompt: options.prompt,
 				requestedSlides: options.slideCount,
 				lastEventId: 0,
+				...(options.theme ? { theme: options.theme } : {}),
 			};
 			storeGeneration(stored);
 
@@ -628,6 +635,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 						retry_presentation_id: options.retryPresentationId,
 						ai: options.ai,
 						plan: options.plan,
+						theme: options.theme,
 						base_revision: options.baseRevision,
 						card_ids: options.cardIds,
 					}),
@@ -865,6 +873,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 			operation: initialStored.operation,
 			prompt: initialStored.prompt,
 			requestedSlides: initialStored.requestedSlides,
+			theme: initialStored.theme,
 		});
 
 		void consumeJobEvents(

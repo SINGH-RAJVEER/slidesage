@@ -104,6 +104,21 @@ func TestSubmitInputRejectsLegacyFieldNames(t *testing.T) {
 	}
 }
 
+func TestSubmitInputReadsAThemeForANewPresentationOnly(t *testing.T) {
+	input, err := parseSubmitInput(decodeSubmitBody(t, `{"topic":"Grid storage","slide_count":5,"theme":"grove"}`))
+	if err != nil || input.Theme != "grove" {
+		t.Fatalf("theme = %q, %v", input.Theme, err)
+	}
+	for _, body := range []string{
+		`{"topic":"Grid storage","slide_count":5,"theme":7}`,
+		`{"topic":"Shorter","parent_presentation_id":"pres-1","base_revision":2,"theme":"grove"}`,
+	} {
+		if _, err := parseSubmitInput(decodeSubmitBody(t, body)); err == nil {
+			t.Fatalf("accepted %s", body)
+		}
+	}
+}
+
 func TestSubmitInputReadsARevisionTarget(t *testing.T) {
 	input, err := parseSubmitInput(decodeSubmitBody(t, `{
 		"topic":"Make these shorter",
@@ -365,7 +380,7 @@ func TestAnthropicGeneratePayloadEnablesExtendedThinking(t *testing.T) {
 }
 
 func TestOpenRouterPayloadReservesReasoningHeadroom(t *testing.T) {
-	payload := openRouterGeneratePayload("openrouter/free", "system", "user", 1500)
+	payload := openRouterGeneratePayload(defaultModel, "system", "user", 1500)
 	if payload["max_tokens"] != 1500+reasoningBudget {
 		t.Fatalf("completion bound was not padded: %v", payload["max_tokens"])
 	}
@@ -445,6 +460,7 @@ func TestGenerationFailureDocumentCarriesSubmittedSettingsIntoRetryState(t *test
 		slideCount:  12,
 		detailLevel: "detailed",
 		tonality:    "persuasive",
+		theme:       "grove",
 	}
 	failed := generationFailureDocument(job, "provider was unreachable")
 
@@ -452,7 +468,7 @@ func TestGenerationFailureDocumentCarriesSubmittedSettingsIntoRetryState(t *test
 	if retry["prompt"] != "Grid storage" || retry["slide_count"] != 12 {
 		t.Fatalf("retry prompt and slide count = %#v", retry)
 	}
-	if retry["detail_level"] != "detailed" || retry["tonality"] != "persuasive" {
-		t.Fatalf("retry detail level and tonality = %#v", retry)
+	if retry["detail_level"] != "detailed" || retry["tonality"] != "persuasive" || retry["theme"] != "grove" {
+		t.Fatalf("retry detail level, tonality, and theme = %#v", retry)
 	}
 }

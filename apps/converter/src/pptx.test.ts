@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { assembleDocument, type CardDraftInput, convertCards } from "@slidesage/cards";
+import {
+	assembleDocument,
+	CARD_TEMPLATES,
+	CARD_THEME_DEFINITIONS,
+	type CardDraftInput,
+	convertCards,
+	THEMES,
+} from "@slidesage/cards";
 import JSZip from "jszip";
 import { handle, SCHEMA_VERSION_HEADER } from "./handler";
 import { wrappedLines } from "./pptx";
@@ -142,6 +149,54 @@ async function slides(response: Response) {
 }
 
 describe("PPTX export", () => {
+	it("uses shared colors and native heading/body fonts for every theme", async () => {
+		const template = CARD_TEMPLATES.find((template) => template.id === "mono-briefing");
+		if (!template) throw new Error("Missing briefing template");
+		const sampleAssets = Object.fromEntries(
+			Object.entries(template.assets).map(([id, asset]) => [id, { ...asset, data: PIXEL }]),
+		);
+		for (const theme of THEMES) {
+			const definition = CARD_THEME_DEFINITIONS[theme];
+			const response = await exportDeck({
+				document: { ...template.document, theme },
+				assets: sampleAssets,
+				sources: [],
+			});
+			expect(response.status).toBe(200);
+			const { all, read } = await slides(response);
+			expect(all).toHaveLength(5);
+			for (const color of [
+				definition.palette.surface,
+				definition.palette.heading,
+				definition.palette.body,
+			]) {
+				expect(all[0]).toContain(color.slice(1).toUpperCase());
+			}
+			expect(all[0]).toContain(`typeface="${definition.fonts.heading.face}"`);
+			expect(all[0]).toContain(`typeface="${definition.fonts.body.face}"`);
+			expect(all[2]).toContain(definition.palette.rule.slice(1).toUpperCase());
+			expect(all[2]).toContain(definition.palette.accent.slice(1).toUpperCase());
+			expect(await read("ppt/theme/theme1.xml")).toContain(definition.fonts.heading.face);
+		}
+	});
+
+	it("exports every starter deck with its image nodes and photo credits", async () => {
+		for (const template of CARD_TEMPLATES) {
+			const sampleAssets = Object.fromEntries(
+				Object.entries(template.assets).map(([id, asset]) => [id, { ...asset, data: PIXEL }]),
+			);
+			const response = await exportDeck({
+				document: template.document,
+				assets: sampleAssets,
+				sources: [],
+			});
+			expect(response.status).toBe(200);
+			const { all } = await slides(response);
+			expect(all).toHaveLength(template.document.cardOrder.length);
+			expect(all.join("")).toContain("<p:pic>");
+			expect(all.join("")).toContain("Photo by ");
+		}
+	});
 	it("writes every card as a slide of native text, lists, and pictures", async () => {
 		const response = await exportDeck({ document: deck(), assets, sources });
 		expect(response.status).toBe(200);

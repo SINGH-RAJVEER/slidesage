@@ -20,6 +20,7 @@ export function getPresentationRetryDestination(
 				researchPayload: retry.research_payload,
 				retryPresentationId: presentationId,
 				...(retry.ai ? { ai: retry.ai } : {}),
+				...(retry.theme ? { theme: retry.theme } : {}),
 			},
 		};
 	}

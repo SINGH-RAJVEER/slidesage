@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import { assembleDocument, type Card, convertCards } from "@slidesage/cards";
+import {
+	assembleDocument,
+	CARD_TEMPLATES,
+	CARD_THEME_DEFINITIONS,
+	type Card,
+	convertCards,
+} from "@slidesage/cards";
 import { render, within } from "@testing-library/react";
 import { fitTextScale, MIN_TEXT_SCALE } from "../../components/Cards/CardView";
 import { CardList } from "../CardList";
@@ -56,6 +62,25 @@ function cards(): Card[] {
 }
 
 describe("CardView", () => {
+	it("renders catalog decks using their shared theme tokens and pre-placed photos", () => {
+		for (const template of CARD_TEMPLATES) {
+			const view = render(<CardList document={template.document} assets={template.assets} />);
+			const articles = view.getAllByRole("article");
+			const definition = CARD_THEME_DEFINITIONS[template.theme];
+			expect(articles).toHaveLength(5);
+			for (const article of articles) {
+				expect(article.style.getPropertyValue("--card-surface")).toBe(definition.palette.surface);
+				expect(article.style.getPropertyValue("--card-heading-font")).toBe(
+					definition.fonts.heading.cssFamily,
+				);
+			}
+			for (const img of view.getAllByRole("img")) {
+				expect(img.getAttribute("src")).toBe(Object.values(template.assets)[0]?.url ?? null);
+			}
+			expect(view.getAllByText(/Photo by/).length).toBeGreaterThan(0);
+			view.unmount();
+		}
+	});
 	it("renders every card in order with its layout content", () => {
 		const document = assembleDocument({ title: "Grid storage", theme: "paper", cards: cards() });
 		const view = render(

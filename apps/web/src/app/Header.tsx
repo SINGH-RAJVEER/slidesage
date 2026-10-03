@@ -9,6 +9,7 @@ const HEADER_ROUTES: HeaderRoutes = {
 	generate: ROUTES.generate,
 	research: ROUTES.research,
 	presentations: ROUTES.presentations,
+	marketplace: ROUTES.marketplace,
 	purchase: ROUTES.purchase,
 	profile: ROUTES.profile,
 	settings: ROUTES.settings,

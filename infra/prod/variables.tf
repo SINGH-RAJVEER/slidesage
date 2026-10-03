@@ -61,7 +61,7 @@ variable "converter_image" {
 variable "open_router_model" {
   description = "Server-owned OpenRouter generation model."
   type        = string
-  default     = "openrouter/free"
+  default     = "qwen/qwen3.8-27b:free"
 }
 
 variable "open_router_api_base" {

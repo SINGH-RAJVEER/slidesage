@@ -6,6 +6,7 @@ import {
 	cardToDraft,
 	convertCards,
 	draftingSchema,
+	getCardTemplate,
 	NARRATIVE_ROLES,
 	type NarrativeRole,
 	parseCardDocument,
@@ -110,6 +111,13 @@ async function convert(request: Request): Promise<Response> {
 		cards: draftInputs(body["cards"]),
 	});
 	return json(200, { schemaVersion: CARD_SCHEMA_VERSION, results });
+}
+
+async function templateDeck(request: Request): Promise<Response> {
+	const body = await readBody(request);
+	const template = getCardTemplate(requireString(body["templateId"], "templateId"));
+	if (!template) return json(404, { error: "template not found" });
+	return json(200, { document: template.document, assets: template.assets });
 }
 
 async function assemble(request: Request): Promise<Response> {
@@ -265,6 +273,7 @@ export async function handle(request: Request): Promise<Response> {
 		if (request.method !== "POST") return json(404, { error: "not found" });
 		const routes: Record<string, (request: Request) => Promise<Response>> = {
 			"/v1/cards": convert,
+			"/v1/templates": templateDeck,
 			"/v1/documents": assemble,
 			"/v1/documents/validate": validateDocument,
 			"/v1/documents/drafts": drafts,
