@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -80,6 +81,7 @@ type cardPlan struct {
 // draftingSchema is the part of the converter's schema the planner checks.
 type draftingSchema struct {
 	Roles   []string `json:"roles"`
+	Themes  []string `json:"themes"`
 	Layouts map[string]struct {
 		Image bool `json:"image"`
 	} `json:"layouts"`
@@ -192,6 +194,19 @@ func (drafter *cardDrafter) start(ctx context.Context, job streamJob) (*drafting
 	return d, nil
 }
 
+// knowsTheme reports whether the converter can style a deck with theme.
+func (drafter *cardDrafter) knowsTheme(ctx context.Context, theme string) (bool, error) {
+	schema, err := drafter.loadSchema(ctx)
+	if err != nil {
+		return false, err
+	}
+	var parsed draftingSchema
+	if err := json.Unmarshal(schema, &parsed); err != nil {
+		return false, fmt.Errorf("read drafting schema: %w", err)
+	}
+	return slices.Contains(parsed.Themes, theme), nil
+}
+
 // report sends a progress event when the job has somewhere to send it.
 func (d *drafting) report(eventType string, payload any) {
 	if d.job.report != nil {
@@ -228,7 +243,11 @@ func (drafter *cardDrafter) Draft(ctx context.Context, job streamJob) (draftResu
 	if err != nil {
 		return draftResult{}, err
 	}
-	document, issue, err := drafter.converter.Assemble(ctx, plan.Title, defaultCardTheme, cards, d.assetIDs())
+	theme := job.theme
+	if theme == "" {
+		theme = defaultCardTheme
+	}
+	document, issue, err := drafter.converter.Assemble(ctx, plan.Title, theme, cards, d.assetIDs())
 	if err != nil {
 		return draftResult{}, err
 	}

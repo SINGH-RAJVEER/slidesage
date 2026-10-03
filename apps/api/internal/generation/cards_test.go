@@ -183,7 +183,7 @@ func TestCardDrafterPlansDraftsRepairsWithoutImageStorage(t *testing.T) {
 	drafter := newCardDrafter(converter, nil, generate, nil)
 	job := streamJob{
 		kind: "generation", presentationID: "presentation-1", userID: "user-1", operationID: "operation-1",
-		prompt: "Grid storage", slideCount: 3, detailLevel: "balanced", tonality: "professional",
+		prompt: "Grid storage", slideCount: 3, detailLevel: "balanced", tonality: "professional", theme: "grove",
 		researchPayload: &presentation.ResearchPayload{Sources: []presentation.Source{{URL: "https://example.com", Title: "Report"}}},
 	}
 	draft, err := drafter.Draft(context.Background(), job)
@@ -205,14 +205,21 @@ func TestCardDrafterPlansDraftsRepairsWithoutImageStorage(t *testing.T) {
 	}
 	var document struct {
 		SchemaVersion int                        `json:"schemaVersion"`
+		Theme         string                     `json:"theme"`
 		CardOrder     []string                   `json:"cardOrder"`
 		Cards         map[string]json.RawMessage `json:"cards"`
 	}
 	if err := json.Unmarshal(assembled, &document); err != nil {
 		t.Fatal(err)
 	}
-	if document.SchemaVersion != 2 || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
+	if document.SchemaVersion != 2 || document.Theme != "grove" || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
 		t.Fatalf("assembled document = %s", assembled)
+	}
+	if known, err := drafter.knowsTheme(context.Background(), "grove"); err != nil || !known {
+		t.Fatalf("grove known = %v, %v", known, err)
+	}
+	if known, _ := drafter.knowsTheme(context.Background(), "neon"); known {
+		t.Fatal("an unknown theme was accepted")
 	}
 }
 
