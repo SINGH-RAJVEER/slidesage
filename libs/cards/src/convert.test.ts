@@ -1,8 +1,76 @@
 import { describe, expect, it } from "bun:test";
+import { createHash } from "node:crypto";
 import { assembleDocument, cleanText, convertCards, parseInlineMarkup } from "./convert";
 import { cardToDraft } from "./draft-format";
-import type { Card } from "./schema";
+import { type Card, THEMES } from "./schema";
+import {
+	CARD_TEMPLATES,
+	createTemplateDeck,
+	SAMPLE_ASSETS,
+	TEMPLATE_CATEGORIES,
+} from "./templates";
+import { CARD_THEME_DEFINITIONS, CURATED_THEMES } from "./themes";
 import { validateCardDocument } from "./validate";
+
+describe("curated starter decks", () => {
+	it("provides complete, valid decks with resolvable images and category metadata", () => {
+		expect(CARD_TEMPLATES).toHaveLength(6);
+		expect(new Set(CARD_TEMPLATES.map((template) => template.id)).size).toBe(6);
+		expect(CURATED_THEMES).toHaveLength(6);
+		for (const template of CARD_TEMPLATES) {
+			expect(TEMPLATE_CATEGORIES.some((category) => category.id === template.category)).toBe(true);
+			expect(template.document.cardOrder).toHaveLength(5);
+			expect(template.document.cards[template.previewCardId]).toBeDefined();
+			expect(
+				validateCardDocument(template.document, {
+					knownAssets: new Set(Object.keys(template.assets)),
+				}).ok,
+			).toBe(true);
+			const cards = template.document.cardOrder.map((id) => template.document.cards[id]);
+			expect(cards[0]?.role).toBe("opening");
+			expect(cards.at(-1)?.role).toBe("closing");
+			expect(new Set(cards.map((card) => card?.layout)).size).toBeGreaterThanOrEqual(4);
+			for (const card of cards) {
+				for (const node of card?.nodes ?? []) {
+					if (node.type === "image")
+						expect(template.assets[node.assetId]?.url).toStartWith("https://images.unsplash.com/");
+				}
+			}
+		}
+	});
+
+	it("keeps remote asset IDs consistent with the API's provider identity digest", () => {
+		for (const [id, asset] of Object.entries(SAMPLE_ASSETS)) {
+			expect(id).toBe(
+				createHash("sha256")
+					.update(`${asset.source.provider}:${asset.source.providerId}`)
+					.digest("hex"),
+			);
+			expect(asset.byteSize).toBe(0);
+		}
+	});
+
+	it("returns independent editable copies", () => {
+		const first = createTemplateDeck("ocean-proposal");
+		const second = createTemplateDeck("ocean-proposal");
+		first.document.title = "My proposal";
+		const asset = Object.values(first.assets)[0];
+		if (asset) asset.source.photographer = "Changed";
+		expect(second).toEqual(createTemplateDeck("ocean-proposal"));
+		expect(first).not.toEqual(second);
+		expect(() => createTemplateDeck("missing")).toThrow(RangeError);
+	});
+
+	it("accepts all registered theme IDs, including existing documents", () => {
+		const document = createTemplateDeck("mono-briefing").document;
+		for (const theme of THEMES) {
+			expect(validateCardDocument({ ...document, theme }).ok).toBe(true);
+			expect(CARD_THEME_DEFINITIONS[theme].id).toBe(theme);
+		}
+		expect(THEMES).toEqual(expect.arrayContaining(["slate", "paper", "ember"]));
+		expect(validateCardDocument({ ...document, theme: "unknown" }).ok).toBe(false);
+	});
+});
 
 const bulletsDraft = {
 	layout: "bullets",

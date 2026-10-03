@@ -13,7 +13,17 @@ export const CARD_SCHEMA_VERSION = 2;
 /** Schema versions this build can read. */
 export const READABLE_SCHEMA_VERSIONS = [1, 2] as const;
 
-export const THEMES = ["slate", "paper", "ember"] as const;
+export const THEMES = [
+	"slate",
+	"paper",
+	"ember",
+	"ocean",
+	"grove",
+	"orchid",
+	"sand",
+	"cobalt",
+	"mono",
+] as const;
 export type ThemeId = (typeof THEMES)[number];
 export const DEFAULT_THEME: ThemeId = "slate";
 
@@ -113,14 +123,14 @@ export interface ColumnsNode {
 }
 
 /**
- * An image the server stored for this presentation. The document holds only
+ * An image the server registered for this presentation. The document holds only
  * the asset's digest; dimensions, format, and attribution live on the server,
  * which also checks that every referenced asset belongs to the presentation.
  */
 export interface ImageNode {
 	id: string;
 	type: "image";
-	/** SHA-256 of the stored image. */
+	/** SHA-256 of stored bytes, or of `provider:providerId` for a hotlinked photo. */
 	assetId: string;
 	alt: string;
 	/** "cover" fills the frame and crops around the focus; "contain" letterboxes. */

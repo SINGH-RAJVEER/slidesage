@@ -4,4 +4,6 @@ export * from "./draft-format";
 export * from "./edit";
 export * from "./layouts";
 export * from "./schema";
+export * from "./templates";
+export * from "./themes";
 export * from "./validate";
