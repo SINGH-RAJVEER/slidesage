@@ -5,6 +5,7 @@
     packages = [
         pkgs.bun
         pkgs.go
+		pkgs.watchexec
         pkgs.goose
         pkgs.just
         pkgs.terraform
@@ -101,7 +102,11 @@
 		};
 		api = {
 			exec = ''
-				DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" go run ./cmd/api
+					mkdir -p "$DEVENV_STATE/go"
+					export DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage"
+					exec watchexec --restart --debounce 300ms --stop-signal SIGTERM --stop-timeout 20s \
+						--watch . --exts go,mod,sum --shell bash -- \
+						'go build -o "$DEVENV_STATE/go/api" ./cmd/api && exec "$DEVENV_STATE/go/api"'
 			'';
 			cwd = "apps/api";
 			after = [ "db:migrate" "devenv:processes:converter" ];
@@ -119,8 +124,11 @@
 		};
 		worker = {
 			exec = ''
-				DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" \
-					go run ./cmd/worker
+					mkdir -p "$DEVENV_STATE/go"
+					export DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage"
+					exec watchexec --restart --debounce 300ms --stop-signal SIGTERM --stop-timeout 20s \
+						--watch . --exts go,mod,sum --shell bash -- \
+						'go build -o "$DEVENV_STATE/go/worker" ./cmd/worker && exec "$DEVENV_STATE/go/worker"'
 			'';
 			cwd = "apps/api";
 			after = [ "db:migrate" "devenv:processes:converter" ];

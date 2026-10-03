@@ -2,7 +2,7 @@
 
 ## Requirements
 
-Install Nix with [devenv](https://devenv.sh/getting-started/). The environment provides Go, Bun, PostgreSQL, Goose, `just`, Terraform, and `fake-gcs-server`.
+Install Nix with [devenv](https://devenv.sh/getting-started/). The environment provides Go, Watchexec, Bun, PostgreSQL, Goose, `just`, Terraform, and `fake-gcs-server`.
 
 `apps/api` targets Go 1.27.1. The pinned devenv nixpkgs still ships Go 1.26, so the first `go` command in the shell downloads the 1.27.1 toolchain through the default `GOTOOLCHAIN=auto` and caches it under the module cache. That first build needs network access; later builds reuse the cached toolchain.
 
@@ -33,6 +33,10 @@ Vite exposes only `VITE_*` variables to browser bundles. If `VITE_API_URL` is ab
 The web entry stylesheet is `apps/web/styles.css`. It imports the shared UI stylesheet, whose global styles live in `libs/ui/styles/base.css`. The web workspace declares both `tailwindcss` and `@tailwindcss/vite`; both are required because the shared stylesheet imports Tailwind's CSS entrypoint and Vite's plugin resolves it at build time.
 
 Stop the foreground process with `Ctrl+C`. Devenv stops managed services with the development stack.
+
+During `just dev` or `devenv up`, Watchexec watches `apps/api` recursively for changes to `.go`, `go.mod`, and `go.sum` files. After a 300 ms debounce, both the API and worker stop with `SIGTERM`, rebuild, and restart. Each process has up to 20 seconds to shut down before it is forcibly stopped. Compiled binaries live under `.devenv/state/go`, outside the watched directory. Build errors appear in the process logs; saving a corrected file triggers another build.
+
+This rebuilds and restarts the Go processes, so active requests and generation jobs can be interrupted. Migration SQL changes still require `just migrate`. Changes to `.env` or `devenv.nix` require restarting the development stack. The standalone `just api` and `bun run dev:worker` commands run once without watching files.
 
 ## Commands
 
