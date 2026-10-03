@@ -1,12 +1,22 @@
 import type { CardTemplate } from "@slidesage/cards";
+import { Plus, Trash2 } from "lucide-react";
 import { TemplatePreview } from "./TemplatePreview";
 
 interface MarketplaceCardProps {
 	template: CardTemplate;
+	installed: boolean;
 	onOpen: (templateId: string) => void;
+	onInstall: (templateId: string) => void;
+	onRemove: (templateId: string) => void;
 }
 
-export default function MarketplaceCard({ template, onOpen }: MarketplaceCardProps) {
+export default function MarketplaceCard({
+	template,
+	installed,
+	onOpen,
+	onInstall,
+	onRemove,
+}: MarketplaceCardProps) {
 	return (
 		<article className="group min-w-0 break-inside-avoid">
 			<button
@@ -31,6 +41,15 @@ export default function MarketplaceCard({ template, onOpen }: MarketplaceCardPro
 				>
 					<h2 className="truncate text-base font-semibold text-white">{template.name}</h2>
 					<p className="mt-0.5 line-clamp-2 text-sm text-white/45">{template.description}</p>
+				</button>
+				<button
+					type="button"
+					aria-label={`${installed ? "Remove" : "Install"} ${template.name}`}
+					onClick={() => (installed ? onRemove(template.id) : onInstall(template.id))}
+					className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+				>
+					{installed ? <Trash2 className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+					{installed ? "Remove" : "Install"}
 				</button>
 			</div>
 		</article>

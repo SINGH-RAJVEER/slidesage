@@ -7,9 +7,11 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@slidesage/ui/components/dialog";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../app/router/paths";
 import { TemplatePreview } from "./TemplatePreview";
+import { useTemplateLibrary } from "./template-library";
 
 export function TemplatePicker({
 	open,
@@ -28,6 +30,11 @@ export function TemplatePicker({
 	onTheme: (template: CardTemplate) => void;
 	onReplace: (template: CardTemplate) => Promise<void>;
 }) {
+	const library = useTemplateLibrary();
+	const [installedOnly, setInstalledOnly] = useState(false);
+	const templates = CARD_TEMPLATES.filter(
+		(template) => !installedOnly || library.ids.includes(template.id),
+	);
 	return (
 		<Dialog
 			open={open}
@@ -46,11 +53,30 @@ export function TemplatePicker({
 						editable starter deck and its photos. You can undo either change.
 					</DialogDescription>
 				</DialogHeader>
-				<Button asChild variant="link" className="justify-self-start px-0">
-					<Link to={ROUTES.marketplace}>Open marketplace</Link>
-				</Button>
+				<div className="flex flex-wrap gap-2">
+					<Button
+						variant={installedOnly ? "ghost" : "secondary"}
+						onClick={() => setInstalledOnly(false)}
+					>
+						All templates
+					</Button>
+					<Button
+						variant={installedOnly ? "secondary" : "ghost"}
+						onClick={() => setInstalledOnly(true)}
+					>
+						Installed
+					</Button>
+					<Button asChild variant="link">
+						<Link to={ROUTES.marketplace}>Open marketplace</Link>
+					</Button>
+				</div>
+				{templates.length === 0 && (
+					<p className="py-8 text-muted-foreground">
+						Install templates in the marketplace to find them here.
+					</p>
+				)}
 				<div className="grid gap-8 sm:grid-cols-2">
-					{CARD_TEMPLATES.map((template) => (
+					{templates.map((template) => (
 						<section key={template.id} className="space-y-3">
 							<TemplatePreview template={template} />
 							<h3 className="font-medium">{template.name}</h3>
