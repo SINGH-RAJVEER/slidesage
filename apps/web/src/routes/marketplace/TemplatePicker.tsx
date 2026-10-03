@@ -7,11 +7,9 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@slidesage/ui/components/dialog";
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../app/router/paths";
 import { TemplatePreview } from "./TemplatePreview";
-import { useTemplateLibrary } from "./template-library";
 
 export function TemplatePicker({
 	open,
@@ -30,11 +28,6 @@ export function TemplatePicker({
 	onTheme: (template: CardTemplate) => void;
 	onReplace: (template: CardTemplate) => Promise<void>;
 }) {
-	const library = useTemplateLibrary();
-	const [savedOnly, setSavedOnly] = useState(false);
-	const templates = CARD_TEMPLATES.filter(
-		(template) => !savedOnly || library.ids.includes(template.id),
-	);
 	return (
 		<Dialog
 			open={open}
@@ -53,24 +46,11 @@ export function TemplatePicker({
 						editable starter deck and its photos. You can undo either change.
 					</DialogDescription>
 				</DialogHeader>
-				<div className="flex flex-wrap gap-2">
-					<Button variant={savedOnly ? "ghost" : "secondary"} onClick={() => setSavedOnly(false)}>
-						All templates
-					</Button>
-					<Button variant={savedOnly ? "secondary" : "ghost"} onClick={() => setSavedOnly(true)}>
-						Saved library
-					</Button>
-					<Button asChild variant="link">
-						<Link to={ROUTES.marketplace}>Open marketplace</Link>
-					</Button>
-				</div>
-				{templates.length === 0 && (
-					<p className="py-8 text-muted-foreground">
-						Save templates in the marketplace to find them here.
-					</p>
-				)}
+				<Button asChild variant="link" className="justify-self-start px-0">
+					<Link to={ROUTES.marketplace}>Open marketplace</Link>
+				</Button>
 				<div className="grid gap-8 sm:grid-cols-2">
-					{templates.map((template) => (
+					{CARD_TEMPLATES.map((template) => (
 						<section key={template.id} className="space-y-3">
 							<TemplatePreview template={template} />
 							<h3 className="font-medium">{template.name}</h3>
