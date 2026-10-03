@@ -12,8 +12,8 @@ export const ROUTES = {
 	outline: "/generate/outline",
 	presentations: "/presentations",
 	marketplace: "/marketplace",
-	templateLibrary: "/marketplace/library",
-	templateById: (id: string) => `/marketplace/templates/${encodeURIComponent(id)}`,
+	marketplacePreview: (marketplaceId: string) =>
+		`/marketplace/${encodeURIComponent(marketplaceId)}/preview`,
 	presentationById: (presentationId: string) =>
 		`/presentations/${encodeURIComponent(presentationId)}`,
 	presentationError: "/presentation-error",

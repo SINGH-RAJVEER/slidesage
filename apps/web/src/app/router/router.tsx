@@ -36,18 +36,6 @@ export const router = createBrowserRouter([
 			{ path: "sign-up/verify-email", element: <VerifyEmailPage /> },
 			{ path: "forgot-password", element: <ForgotPasswordPage /> },
 			{ path: "reset-password", element: <ResetPasswordPage /> },
-			{
-				path: "marketplace",
-				lazy: lazyRoute(() => import("../../routes/marketplace/MarketplacePage")),
-			},
-			{
-				path: "marketplace/library",
-				lazy: lazyRoute(() => import("../../routes/marketplace/MarketplacePage")),
-			},
-			{
-				path: "marketplace/templates/:templateId",
-				lazy: lazyRoute(() => import("../../routes/marketplace/TemplateDetailPage")),
-			},
 			/* share links open without an account */
 			{
 				path: "s/:token",
@@ -69,6 +57,14 @@ export const router = createBrowserRouter([
 					{
 						path: "generate/research",
 						lazy: lazyRoute(() => import("../../routes/presentations/GenerateResearchPage")),
+					},
+					{
+						path: "marketplace",
+						lazy: lazyRoute(() => import("../../routes/marketplace/MarketplacePage")),
+					},
+					{
+						path: "marketplace/:marketplaceId/preview",
+						lazy: lazyRoute(() => import("../../routes/marketplace/MarketplaceThemePreviewPage")),
 					},
 					{
 						path: "presentations",
