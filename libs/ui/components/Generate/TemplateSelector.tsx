@@ -1,5 +1,4 @@
 import { CARD_TEMPLATES, type CardTemplate, TEMPLATE_CATEGORIES } from "@slidesage/cards";
-import { Badge } from "@slidesage/ui/components/badge";
 import { Button } from "@slidesage/ui/components/button";
 import {
 	DropdownMenu,
@@ -191,14 +190,6 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 															>
 																{template.name}
 															</span>
-															{isSelected && (
-																<Badge
-																	variant="secondary"
-																	className="flex h-5 shrink-0 items-center border border-blue-500/20 bg-blue-500/20 px-1 text-[10px] text-blue-300"
-																>
-																	Active
-																</Badge>
-															)}
 														</div>
 													</div>
 												</DropdownMenuItem>
