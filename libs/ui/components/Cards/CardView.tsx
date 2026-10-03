@@ -3,6 +3,7 @@ import {
 	type BulletsNode,
 	type Card,
 	type CardDocument,
+	COVER_PALETTE,
 	type ColumnsNode,
 	type ContentNode,
 	type ImageNode,
@@ -24,6 +25,7 @@ import type { Source } from "@slidesage/types";
 import { cn } from "@slidesage/ui/lib/utils";
 import { Plus, X } from "lucide-react";
 import {
+	type CSSProperties,
 	createContext,
 	type ReactNode,
 	useContext,
@@ -297,7 +299,12 @@ function Columns({ node, theme }: { node: ColumnsNode; theme: CardTheme }) {
 						theme.rule,
 					)}
 				>
-					<h3 className={cn("text-[length:calc(2.1cqw*var(--fit,1))] font-semibold", theme.accent)}>
+					<h3
+						className={cn(
+							"text-[length:calc(2.1cqw*var(--fit,1))] font-semibold font-[family-name:var(--card-heading-font)]",
+							theme.accent,
+						)}
+					>
 						<PlainField
 							value={column.heading}
 							label="Column heading"
@@ -443,7 +450,7 @@ function Stats({ nodes, theme }: { nodes: StatNode[]; theme: CardTheme }) {
 				>
 					<span
 						className={cn(
-							"text-[length:calc(5cqw*var(--fit,1))] font-semibold leading-none tabular-nums",
+							"text-[length:calc(5cqw*var(--fit,1))] font-semibold leading-none tabular-nums font-[family-name:var(--card-heading-font)]",
 							theme.accent,
 						)}
 					>
@@ -649,9 +656,9 @@ export interface CardViewProps {
 /** The theme a cover card's text uses over its photo, whatever the deck theme. */
 const COVER_TEXT: CardTheme = {
 	surface: "",
-	heading: "text-white",
-	body: "text-white/85",
-	muted: "text-white/60",
+	heading: "text-white font-[family-name:var(--card-heading-font)]",
+	body: "text-[color:var(--card-cover-body)]",
+	muted: "text-[color:var(--card-cover-muted)]",
 	accent: "text-white",
 	rule: "border-white/20",
 };
@@ -779,12 +786,20 @@ export function CardView({
 		if (!article || !content) return undefined;
 		const fit = () => setTextScale(fitTextScale(article, content));
 		fit();
-		if (typeof ResizeObserver === "undefined") return undefined;
-		const observer = new ResizeObserver(fit);
-		observer.observe(article);
-		if (content.firstElementChild) observer.observe(content.firstElementChild);
-		return () => observer.disconnect();
-	}, [card]);
+		let active = true;
+		void document.fonts?.ready.then(() => {
+			if (active) fit();
+		});
+		document.fonts?.addEventListener("loadingdone", fit);
+		const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(fit);
+		observer?.observe(article);
+		if (content.firstElementChild) observer?.observe(content.firstElementChild);
+		return () => {
+			active = false;
+			observer?.disconnect();
+			document.fonts?.removeEventListener("loadingdone", fit);
+		};
+	}, [card, theme]);
 
 	const footer = (
 		<footer
@@ -813,6 +828,13 @@ export function CardView({
 		<div className="@container w-full">
 			<article
 				ref={articleRef}
+				style={
+					{
+						...theme.style,
+						"--card-cover-body": COVER_PALETTE.body,
+						"--card-cover-muted": COVER_PALETTE.muted,
+					} as CSSProperties
+				}
 				data-card-id={card.id}
 				data-layout={card.layout}
 				data-text-scale={textScale < 1 ? textScale.toFixed(2) : undefined}
