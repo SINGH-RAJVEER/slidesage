@@ -548,33 +548,98 @@ func (d *drafting) draft(ctx context.Context, plan cardPlan) ([]json.RawMessage,
 		if len(written) > 0 {
 			user += "\nCards already written, which these must not repeat: " + strings.Join(written, " | ")
 		}
-		response, err := d.call(ctx, "card-draft", draftSystemPrompt, user, len(batch)*draftTokensPerCard+200)
-		if err != nil {
+		if err := d.draftBatch(ctx, user, "Approved plan: "+string(encodedPlan), batch, converted); err != nil {
 			return nil, err
 		}
-		drafts := draftsByPosition(response)
-		inputs := make([]carddocument.DraftInput, len(batch))
-		for index, entry := range batch {
-			inputs[index] = carddocument.DraftInput{Position: entry.Position, Takeaway: entry.Takeaway, Role: entry.Role, Draft: d.withImage(entry.Position, drafts[entry.Position])}
+		for _, entry := range batch {
+			written = append(written, fmt.Sprintf("%d: %s", entry.Position, entry.Takeaway))
 		}
-		results, err := d.drafter.converter.ConvertCards(ctx, d.job.operationID, d.sourceIDs(), d.assetIDs(), inputs)
-		if err != nil {
-			return nil, err
-		}
-		for index, result := range results {
-			card := result.Card
-			if result.Issue != nil {
-				card, err = d.repair(ctx, "Approved plan: "+string(encodedPlan), inputs[index], *result.Issue)
-				if err != nil {
-					return nil, err
-				}
-			}
-			converted[inputs[index].Position-1] = card
-			written = append(written, fmt.Sprintf("%d: %s", inputs[index].Position, inputs[index].Takeaway))
-		}
-		d.reportCards(converted, batch, len(written), len(plan.Cards))
 	}
 	return converted, nil
+}
+
+// draftBatch writes one batch of cards into converted. Each card is validated
+// and reported as soon as the model finishes writing it, while the rest of the
+// batch is still streaming. A card that needs repair, or that the stream did
+// not yield, is handled from the finished answer.
+func (d *drafting) draftBatch(ctx context.Context, user, background string, batch []cardPlanEntry, converted []json.RawMessage) error {
+	planned := map[int]cardPlanEntry{}
+	for _, entry := range batch {
+		planned[entry.Position] = entry
+	}
+	// The stream's read loop must never wait, so it only queues cards; the
+	// buffer holds every card the batch can yield.
+	streamed := make(chan carddocument.DraftInput, len(batch))
+	seen := map[int]bool{}
+	stream := newCardStream(func(raw json.RawMessage) {
+		position, draft, ok := draftFromCard(unmarshalDocument(string(raw)))
+		entry, inBatch := planned[position]
+		if !ok || !inBatch || seen[position] {
+			return
+		}
+		seen[position] = true
+		streamed <- d.draftInput(entry, draft)
+	})
+	converting := make(chan struct{})
+	go func() {
+		defer close(converting)
+		for input := range streamed {
+			// A card that fails here is converted again from the finished
+			// answer, and repaired there if it needs to be.
+			results, err := d.drafter.converter.ConvertCards(ctx, d.job.operationID, d.sourceIDs(), d.assetIDs(), []carddocument.DraftInput{input})
+			if err != nil || results[0].Issue != nil {
+				continue
+			}
+			converted[input.Position-1] = results[0].Card
+			d.reportCards(converted, []cardPlanEntry{planned[input.Position]})
+		}
+	}()
+	response, err := d.call(withContentObserver(ctx, stream.write), "card-draft", draftSystemPrompt, user, len(batch)*draftTokensPerCard+200)
+	close(streamed)
+	<-converting
+	if err != nil {
+		return err
+	}
+	drafts := draftsByPosition(response)
+	var inputs []carddocument.DraftInput
+	for _, entry := range batch {
+		if converted[entry.Position-1] == nil {
+			inputs = append(inputs, d.draftInput(entry, drafts[entry.Position]))
+		}
+	}
+	if len(inputs) == 0 {
+		return nil
+	}
+	results, err := d.drafter.converter.ConvertCards(ctx, d.job.operationID, d.sourceIDs(), d.assetIDs(), inputs)
+	if err != nil {
+		return err
+	}
+	var valid []cardPlanEntry
+	for index, result := range results {
+		if result.Issue == nil {
+			converted[inputs[index].Position-1] = result.Card
+			valid = append(valid, planned[inputs[index].Position])
+		}
+	}
+	if len(valid) > 0 {
+		d.reportCards(converted, valid)
+	}
+	for index, result := range results {
+		if result.Issue == nil {
+			continue
+		}
+		card, err := d.repair(ctx, background, inputs[index], *result.Issue)
+		if err != nil {
+			return err
+		}
+		converted[inputs[index].Position-1] = card
+		d.reportCards(converted, []cardPlanEntry{planned[inputs[index].Position]})
+	}
+	return nil
+}
+
+func (d *drafting) draftInput(entry cardPlanEntry, draft json.RawMessage) carddocument.DraftInput {
+	return carddocument.DraftInput{Position: entry.Position, Takeaway: entry.Takeaway, Role: entry.Role, Draft: d.withImage(entry.Position, draft)}
 }
 
 type previewEntry struct {
@@ -592,12 +657,18 @@ func planPreview(plan cardPlan) map[string]any {
 	return map[string]any{"title": plan.Title, "cards": entries}
 }
 
-// reportCards streams a finished batch. The cards are converter-validated,
-// but they are a preview: the committed revision is the document.
-func (d *drafting) reportCards(converted []json.RawMessage, batch []cardPlanEntry, completed, total int) {
+// reportCards streams finished cards. They are converter-validated, but they
+// are a preview: the committed revision is the document.
+func (d *drafting) reportCards(converted []json.RawMessage, entries []cardPlanEntry) {
 	cards := map[string]json.RawMessage{}
 	assets := map[string]carddocument.Asset{}
-	for _, entry := range batch {
+	completed := 0
+	for _, card := range converted {
+		if card != nil {
+			completed++
+		}
+	}
+	for _, entry := range entries {
 		if card := converted[entry.Position-1]; card != nil {
 			cards[fmt.Sprint(entry.Position)] = card
 		}
@@ -605,7 +676,7 @@ func (d *drafting) reportCards(converted []json.RawMessage, batch []cardPlanEntr
 			assets[image.asset.SHA256] = image.asset
 		}
 	}
-	d.report("cards", map[string]any{"cards": cards, "assets": assets, "completed": completed, "total": total})
+	d.report("cards", map[string]any{"cards": cards, "assets": assets, "completed": completed, "total": len(converted)})
 }
 
 // draftsByPosition indexes a drafting response. A card the model left out has
@@ -614,19 +685,24 @@ func draftsByPosition(response map[string]any) map[int]json.RawMessage {
 	drafts := map[int]json.RawMessage{}
 	cards, _ := response["cards"].([]any)
 	for _, raw := range cards {
-		card, ok := raw.(map[string]any)
-		if !ok {
-			continue
+		card, _ := raw.(map[string]any)
+		if position, draft, ok := draftFromCard(card); ok {
+			drafts[position] = draft
 		}
-		position, ok := wholeNumber(card["position"])
-		if !ok {
-			continue
-		}
-		delete(card, "position")
-		encoded, _ := json.Marshal(card)
-		drafts[position] = encoded
 	}
 	return drafts
+}
+
+// draftFromCard splits one drafted card into its position and the draft the
+// converter reads, which carries no position of its own.
+func draftFromCard(card map[string]any) (int, json.RawMessage, bool) {
+	position, ok := wholeNumber(card["position"])
+	if !ok {
+		return 0, nil, false
+	}
+	delete(card, "position")
+	encoded, _ := json.Marshal(card)
+	return position, encoded, true
 }
 
 // wholeNumber reads a position from decoded provider JSON, which preserves
