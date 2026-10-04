@@ -1,15 +1,24 @@
+import { cleanAffix } from "./convert";
 import { layoutMismatch } from "./layouts";
 import {
+	type CalloutTone,
 	type Card,
 	type CardDocument,
+	type ChartKind,
+	type ChartNode,
 	type ContentNode,
 	LAYOUTS,
 	type LayoutId,
+	LIMITS,
 	type ListItem,
 	type RichText,
 	type TextRun,
 	type ThemeId,
+	type WidgetNode,
+	type WidgetSize,
+	type WidgetType,
 } from "./schema";
+import { compatibleChartKinds, FEATURE_TEXT, isWidget } from "./widgets";
 
 /**
  * Pure edit operations on a card document. Each returns a new document and
@@ -75,7 +84,7 @@ export function setTheme(document: CardDocument, theme: ThemeId): CardDocument {
 	return { ...document, theme };
 }
 
-/** Replaces the rich text of a heading, paragraph, or quote. */
+/** Replaces the rich text of a heading, paragraph, quote, or callout. */
 export function setNodeText(
 	document: CardDocument,
 	cardId: string,
@@ -83,7 +92,10 @@ export function setNodeText(
 	text: RichText,
 ): CardDocument {
 	return withNode(document, cardId, nodeId, (node) =>
-		node.type === "heading" || node.type === "paragraph" || node.type === "quote"
+		node.type === "heading" ||
+		node.type === "paragraph" ||
+		node.type === "quote" ||
+		node.type === "callout"
 			? { ...node, text: normalizeRuns(text) }
 			: node,
 	);
@@ -200,6 +212,20 @@ export function addListItem(
 		if (node.type === "steps") {
 			return { ...node, items: insert(node.items, { id: newId("i"), title: "New step" }) };
 		}
+		if (node.type === "progress") {
+			if (node.items.length >= LIMITS.meters.max) return node;
+			return {
+				...node,
+				items: insert(node.items, { id: newId("i"), label: "New measure", value: 50 }),
+			};
+		}
+		if (node.type === "table") {
+			if (node.rows.length >= LIMITS.tableRows.max) return node;
+			return {
+				...node,
+				rows: insert(node.rows, { id: newId("i"), cells: node.columns.map(() => "") }),
+			};
+		}
 		if (node.type === "columns") {
 			return {
 				...node,
@@ -227,6 +253,12 @@ export function removeListItem(
 	return withNode(document, cardId, nodeId, (node) => {
 		if (node.type === "bullets") return { ...node, items: drop(node.items) };
 		if (node.type === "steps") return { ...node, items: drop(node.items) };
+		if (node.type === "progress" && node.items.length > LIMITS.meters.min) {
+			return { ...node, items: drop(node.items) };
+		}
+		if (node.type === "table" && node.rows.length > LIMITS.tableRows.min) {
+			return { ...node, rows: drop(node.rows) };
+		}
 		if (node.type === "columns") {
 			return {
 				...node,
@@ -274,6 +306,16 @@ function reissueIds(card: Card): Card {
 				return { ...node, id, items: node.items.map((item) => ({ ...item, id: newId("i") })) };
 			case "steps":
 				return { ...node, id, items: node.items.map((step) => ({ ...step, id: newId("i") })) };
+			case "progress":
+				return { ...node, id, items: node.items.map((meter) => ({ ...meter, id: newId("i") })) };
+			case "chart":
+				return {
+					...node,
+					id,
+					series: node.series.map((series) => ({ ...series, id: newId("i") })),
+				};
+			case "table":
+				return { ...node, id, rows: node.rows.map((row) => ({ ...row, id: newId("i") })) };
 			case "columns":
 				return {
 					...node,
@@ -406,4 +448,311 @@ export function removeImage(document: CardDocument, cardId: string): CardDocumen
 	);
 	if (!layout) return document;
 	return withCard(document, cardId, (current) => ({ ...current, layout, nodes }));
+}
+
+function withWidget<T extends WidgetNode["type"]>(
+	document: CardDocument,
+	cardId: string,
+	nodeId: string,
+	type: T,
+	update: (node: Extract<WidgetNode, { type: T }>) => Extract<WidgetNode, { type: T }>,
+): CardDocument {
+	return withNode(document, cardId, nodeId, (node) =>
+		node.type === type ? update(node as Extract<WidgetNode, { type: T }>) : node,
+	);
+}
+
+/** Applies a change to a card only if the result still fits the card's layout. */
+function ifFits(document: CardDocument, cardId: string, next: CardDocument): CardDocument {
+	const card = next.cards[cardId];
+	return card && layoutMismatch(card.layout, card.nodes) === null ? next : document;
+}
+
+/** Sizes the widget can take without breaking its card's layout. */
+export function compatibleSizes(card: Card, nodeId: string): WidgetSize[] {
+	return (["small", "medium", "large", "full"] as const).filter((size) => {
+		const nodes = card.nodes.map((node) =>
+			node.id === nodeId && isWidget(node) ? { ...node, size } : node,
+		);
+		return layoutMismatch(card.layout, nodes) === null;
+	});
+}
+
+export function setWidgetSize(
+	document: CardDocument,
+	cardId: string,
+	nodeId: string,
+	size: WidgetSize,
+): CardDocument {
+	return ifFits(
+		document,
+		cardId,
+		withNode(document, cardId, nodeId, (node) => (isWidget(node) ? { ...node, size } : node)),
+	);
+}
+
+/** Changes how a chart draws its data, if the data suits that kind. */
+export function setChartKind(
+	document: CardDocument,
+	cardId: string,
+	nodeId: string,
+	kind: ChartKind,
+): CardDocument {
+	const node = document.cards[cardId]?.nodes.find((entry) => entry.id === nodeId);
+	if (node?.type !== "chart" || !compatibleChartKinds(node).includes(kind)) return document;
+	return withWidget(document, cardId, nodeId, "chart", (chart) => ({ ...chart, kind }));
+}
+
+export interface ChartData {
+	categories: string[];
+	/** Series without an ID are new and are given one. */
+	series: { id?: string; name: string; values: number[] }[];
+	prefix?: string;
+	suffix?: string;
+	caption?: string;
+}
+
+/**
+ * Replaces a chart's data. A chart whose kind no longer suits the data, such as
+ * a pie given a second series, switches to the first kind that does.
+ */
+export function setChartData(
+	document: CardDocument,
+	cardId: string,
+	nodeId: string,
+	data: ChartData,
+): CardDocument {
+	return withWidget(document, cardId, nodeId, "chart", (node) => {
+		const next: ChartNode = {
+			id: node.id,
+			type: "chart",
+			kind: node.kind,
+			size: node.size,
+			categories: data.categories,
+			series: data.series.map((series) => ({
+				id: series.id ?? newId("i"),
+				name: series.name,
+				values: series.values,
+			})),
+		};
+		for (const side of ["prefix", "suffix"] as const) {
+			const affix = cleanAffix(data[side] ?? "", side);
+			if (affix) next[side] = affix;
+		}
+		const caption = data.caption?.trim();
+		if (caption) next.caption = caption;
+		const kinds = compatibleChartKinds(next);
+		if (!kinds.includes(next.kind)) next.kind = kinds[0] ?? "column";
+		return next;
+	});
+}
+
+export function setCalloutTone(
+	document: CardDocument,
+	cardId: string,
+	nodeId: string,
+	tone: CalloutTone,
+): CardDocument {
+	return withWidget(document, cardId, nodeId, "callout", (node) => ({ ...node, tone }));
+}
+
+/** Edits a meter's label or value; values are clamped to 0-100. */
+export function setMeter(
+	document: CardDocument,
+	cardId: string,
+	nodeId: string,
+	meterId: string,
+	change: { label?: string; value?: number },
+): CardDocument {
+	return withWidget(document, cardId, nodeId, "progress", (node) => ({
+		...node,
+		items: node.items.map((meter) => {
+			if (meter.id !== meterId) return meter;
+			const next = { ...meter };
+			if (change.label !== undefined) next.label = change.label;
+			if (change.value !== undefined && Number.isFinite(change.value)) {
+				next.value = Math.min(100, Math.max(0, change.value));
+			}
+			return next;
+		}),
+	}));
+}
+
+/** Edits a table cell, or a column heading when `rowId` is null. */
+export function setTableCell(
+	document: CardDocument,
+	cardId: string,
+	nodeId: string,
+	rowId: string | null,
+	column: number,
+	value: string,
+): CardDocument {
+	return withWidget(document, cardId, nodeId, "table", (node) => {
+		if (rowId === null) {
+			return {
+				...node,
+				columns: node.columns.map((heading, index) => (index === column ? value : heading)),
+			};
+		}
+		return {
+			...node,
+			rows: node.rows.map((row) =>
+				row.id === rowId
+					? { ...row, cells: row.cells.map((cell, index) => (index === column ? value : cell)) }
+					: row,
+			),
+		};
+	});
+}
+
+export function addTableColumn(
+	document: CardDocument,
+	cardId: string,
+	nodeId: string,
+): CardDocument {
+	return withWidget(document, cardId, nodeId, "table", (node) => {
+		if (node.columns.length >= LIMITS.tableColumns.max) return node;
+		return {
+			...node,
+			columns: [...node.columns, "New column"],
+			rows: node.rows.map((row) => ({ ...row, cells: [...row.cells, ""] })),
+		};
+	});
+}
+
+export function removeTableColumn(
+	document: CardDocument,
+	cardId: string,
+	nodeId: string,
+	column: number,
+): CardDocument {
+	return withWidget(document, cardId, nodeId, "table", (node) => {
+		if (node.columns.length <= LIMITS.tableColumns.min) return node;
+		const keep = (_: unknown, index: number) => index !== column;
+		return {
+			...node,
+			columns: node.columns.filter(keep),
+			rows: node.rows.map((row) => ({ ...row, cells: row.cells.filter(keep) })),
+		};
+	});
+}
+
+/** A widget with placeholder content for the user to replace. */
+export function newWidget(type: WidgetType, size: WidgetSize = "medium"): WidgetNode {
+	switch (type) {
+		case "chart":
+			return {
+				id: newId("n"),
+				type: "chart",
+				kind: "column",
+				size,
+				categories: ["2023", "2024", "2025"],
+				series: [{ id: newId("i"), name: "Value", values: [12, 18, 26] }],
+			};
+		case "progress":
+			return {
+				id: newId("n"),
+				type: "progress",
+				size,
+				items: [
+					{ id: newId("i"), label: "Complete", value: 60 },
+					{ id: newId("i"), label: "In progress", value: 30 },
+				],
+			};
+		case "table":
+			return {
+				id: newId("n"),
+				type: "table",
+				size,
+				columns: ["Option", "Detail"],
+				rows: [
+					{ id: newId("i"), cells: ["First", "Add detail"] },
+					{ id: newId("i"), cells: ["Second", "Add detail"] },
+				],
+			};
+		case "callout":
+			return {
+				id: newId("n"),
+				type: "callout",
+				size,
+				tone: "note",
+				text: plainRuns("Add a highlight."),
+			};
+	}
+}
+
+/** The layouts a card moves to when a widget of each type is added, in preference order. */
+const WIDGET_LAYOUT_PREFERENCE: Record<WidgetType, LayoutId[]> = {
+	chart: ["chart", "dashboard"],
+	table: ["table", "dashboard"],
+	progress: ["dashboard"],
+	callout: ["chart", "table", "dashboard"],
+};
+
+const SIZE_PREFERENCE: WidgetSize[] = ["medium", "small", "large", "full"];
+
+/** The card that results from adding a widget of `type`, or null when its content cannot hold one. */
+function withAddedWidget(card: Card, type: WidgetType): Card | null {
+	const layouts = [card.layout, ...WIDGET_LAYOUT_PREFERENCE[type]];
+	for (const layout of new Set(layouts)) {
+		const feature = layout === type && (layout === "chart" || layout === "table");
+		const hasText = card.nodes.some((node) => FEATURE_TEXT.includes(node.type));
+		const sizes: WidgetSize[] = feature ? [hasText ? "large" : "full"] : SIZE_PREFERENCE;
+		for (const size of sizes) {
+			const nodes = [...card.nodes, newWidget(type, size)];
+			if (layoutMismatch(layout, nodes) === null) return { ...card, layout, nodes };
+		}
+	}
+	return null;
+}
+
+/** Whether a widget of `type` can be added to the card without changing its other content. */
+export function canAddWidget(card: Card, type: WidgetType): boolean {
+	return withAddedWidget(card, type) !== null;
+}
+
+/**
+ * Adds a placeholder widget to a card, keeping its layout when it has room and
+ * otherwise moving it to the first layout that holds the widget and the
+ * card's content. A card that cannot hold one is left unchanged.
+ */
+export function addWidget(document: CardDocument, cardId: string, type: WidgetType): CardDocument {
+	const card = document.cards[cardId];
+	const next = card ? withAddedWidget(card, type) : null;
+	return next ? withCard(document, cardId, () => next) : document;
+}
+
+/** Whether the card's layout still holds its content without this widget. */
+export function canRemoveWidget(card: Card, nodeId: string): boolean {
+	const nodes = card.nodes.filter((node) => node.id !== nodeId);
+	return nodes.length < card.nodes.length && layoutMismatch(card.layout, nodes) === null;
+}
+
+/** Removes a widget if the card's layout still holds what remains. */
+export function removeWidget(document: CardDocument, cardId: string, nodeId: string): CardDocument {
+	return ifFits(
+		document,
+		cardId,
+		withCard(document, cardId, (card) => ({
+			...card,
+			nodes: card.nodes.filter((node) => node.id !== nodeId),
+		})),
+	);
+}
+
+/** A new chart, table, or dashboard card with placeholder content. */
+export function newWidgetCard(layout: "chart" | "table" | "dashboard"): Card {
+	const heading = { id: newId("n"), type: "heading" as const, text: plainRuns("New card") };
+	const nodes: ContentNode[] =
+		layout === "dashboard"
+			? [heading, newWidget("chart", "large"), newWidget("progress", "small")]
+			: [heading, newWidget(layout, "full")];
+	return {
+		id: newId("c"),
+		takeaway: "New card",
+		role: "evidence",
+		layout,
+		nodes,
+		sourceIds: [],
+	};
 }

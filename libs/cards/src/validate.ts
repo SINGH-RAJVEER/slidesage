@@ -1,8 +1,11 @@
 import { layoutMismatch } from "./layouts";
 import {
+	CALLOUT_TONES,
 	CARD_SCHEMA_VERSION,
 	type Card,
 	type CardDocument,
+	CHART_KINDS,
+	type ChartNode,
 	type Column,
 	type ContentNode,
 	LAYOUTS,
@@ -14,7 +17,9 @@ import {
 	type Step,
 	type TextRun,
 	THEMES,
+	WIDGET_SIZES,
 } from "./schema";
+import { chartKindMismatch } from "./widgets";
 
 export interface SchemaIssue {
 	path: string;
@@ -126,6 +131,73 @@ function fraction(value: unknown, path: string): number {
 	return value;
 }
 
+function count(length: number, path: string, bounds: { min: number; max: number }, noun: string) {
+	if (length < bounds.min || length > bounds.max) {
+		fail(path, `must hold ${bounds.min}-${bounds.max} ${noun}, got ${length}`);
+	}
+}
+
+function finite(value: unknown, path: string, minimum: number, maximum: number): number {
+	if (typeof value !== "number" || !Number.isFinite(value)) fail(path, "must be a number");
+	if (value < minimum || value > maximum) fail(path, `must be from ${minimum} to ${maximum}`);
+	return value;
+}
+
+function chart(value: unknown, path: string, seen: Set<string>): ChartNode {
+	const raw = record(value, path, [
+		"id",
+		"type",
+		"kind",
+		"size",
+		"categories",
+		"series",
+		"prefix",
+		"suffix",
+		"caption",
+	]);
+	const nodeID = id(raw["id"], `${path}.id`, seen);
+	const categories = array(raw["categories"], `${path}.categories`).map((category, index) =>
+		text(category, `${path}.categories[${index}]`, LIMITS.categoryLabel),
+	);
+	count(categories.length, `${path}.categories`, LIMITS.chartCategories, "categories");
+	if (new Set(categories).size !== categories.length) fail(`${path}.categories`, "must not repeat");
+	const seriesList = array(raw["series"], `${path}.series`);
+	count(seriesList.length, `${path}.series`, LIMITS.chartSeries, "series");
+	const series = seriesList.map((rawSeries, index) => {
+		const seriesPath = `${path}.series[${index}]`;
+		const entry = record(rawSeries, seriesPath, ["id", "name", "values"]);
+		const values = array(entry["values"], `${seriesPath}.values`).map((number, valueIndex) =>
+			finite(number, `${seriesPath}.values[${valueIndex}]`, -LIMITS.chartValue, LIMITS.chartValue),
+		);
+		if (values.length !== categories.length) {
+			fail(`${seriesPath}.values`, `must hold one value per category, ${categories.length} in all`);
+		}
+		return {
+			id: id(entry["id"], `${seriesPath}.id`, seen),
+			name: text(entry["name"], `${seriesPath}.name`, LIMITS.seriesName),
+			values,
+		};
+	});
+	const result: ChartNode = {
+		id: nodeID,
+		type: "chart",
+		kind: oneOf(raw["kind"], `${path}.kind`, CHART_KINDS),
+		size: oneOf(raw["size"], `${path}.size`, WIDGET_SIZES),
+		categories,
+		series,
+	};
+	for (const field of ["prefix", "suffix"] as const) {
+		if (raw[field] !== undefined)
+			result[field] = text(raw[field], `${path}.${field}`, LIMITS.affix);
+	}
+	if (raw["caption"] !== undefined) {
+		result.caption = text(raw["caption"], `${path}.caption`, LIMITS.chartCaption);
+	}
+	const mismatch = chartKindMismatch(result.kind, result);
+	if (mismatch) fail(`${path}.kind`, mismatch);
+	return result;
+}
+
 function node(
 	value: unknown,
 	path: string,
@@ -229,6 +301,62 @@ function node(
 			}
 			return result;
 		}
+		case "chart":
+			return chart(value, path, seen);
+		case "progress": {
+			const raw = record(value, path, ["id", "type", "size", "items"]);
+			const nodeID = id(raw["id"], `${path}.id`, seen);
+			const items = array(raw["items"], `${path}.items`).map((rawMeter, index) => {
+				const meterPath = `${path}.items[${index}]`;
+				const meter = record(rawMeter, meterPath, ["id", "label", "value"]);
+				return {
+					id: id(meter["id"], `${meterPath}.id`, seen),
+					label: text(meter["label"], `${meterPath}.label`, LIMITS.meterLabel),
+					value: finite(meter["value"], `${meterPath}.value`, 0, 100),
+				};
+			});
+			count(items.length, `${path}.items`, LIMITS.meters, "meters");
+			return { id: nodeID, type, size: oneOf(raw["size"], `${path}.size`, WIDGET_SIZES), items };
+		}
+		case "table": {
+			const raw = record(value, path, ["id", "type", "size", "columns", "rows"]);
+			const nodeID = id(raw["id"], `${path}.id`, seen);
+			const columns = array(raw["columns"], `${path}.columns`).map((heading, index) =>
+				text(heading, `${path}.columns[${index}]`, LIMITS.tableHeading),
+			);
+			count(columns.length, `${path}.columns`, LIMITS.tableColumns, "columns");
+			const rows = array(raw["rows"], `${path}.rows`).map((rawRow, index) => {
+				const rowPath = `${path}.rows[${index}]`;
+				const row = record(rawRow, rowPath, ["id", "cells"]);
+				const cells = array(row["cells"], `${rowPath}.cells`).map((cell, cellIndex) => {
+					// An empty cell is allowed; a table may leave a value blank.
+					if (cell === "") return "";
+					return text(cell, `${rowPath}.cells[${cellIndex}]`, LIMITS.tableCell);
+				});
+				if (cells.length !== columns.length) {
+					fail(`${rowPath}.cells`, `must hold one cell per column, ${columns.length} in all`);
+				}
+				return { id: id(row["id"], `${rowPath}.id`, seen), cells };
+			});
+			count(rows.length, `${path}.rows`, LIMITS.tableRows, "rows");
+			return {
+				id: nodeID,
+				type,
+				size: oneOf(raw["size"], `${path}.size`, WIDGET_SIZES),
+				columns,
+				rows,
+			};
+		}
+		case "callout": {
+			const raw = record(value, path, ["id", "type", "size", "tone", "text"]);
+			return {
+				id: id(raw["id"], `${path}.id`, seen),
+				type,
+				size: oneOf(raw["size"], `${path}.size`, WIDGET_SIZES),
+				tone: oneOf(raw["tone"], `${path}.tone`, CALLOUT_TONES),
+				text: richText(raw["text"], `${path}.text`, LIMITS.callout),
+			};
+		}
 		default:
 			fail(`${path}.type`, `unsupported node type ${JSON.stringify(type)}`);
 	}
@@ -297,9 +425,9 @@ export interface DocumentOptions {
 
 /**
  * Checks an unknown value against the card document schema and returns it as
- * the current version. A version 1 document is upgraded on read: version 2
- * only added node types and layouts, so its content is already valid version 2.
- * Stored bytes are never rewritten; the next save writes version 2.
+ * the current version. Earlier documents are upgraded on read: versions 2 and
+ * 3 only added node types and layouts, so older content is already valid.
+ * Stored bytes are never rewritten; the next save writes the current version.
  */
 export function parseCardDocument(value: unknown, options: DocumentOptions = {}): CardDocument {
 	const raw = record(value, "document", ["schemaVersion", "title", "theme", "cardOrder", "cards"]);

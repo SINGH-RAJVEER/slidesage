@@ -212,7 +212,7 @@ func TestCardDrafterPlansDraftsRepairsWithoutImageStorage(t *testing.T) {
 	if err := json.Unmarshal(assembled, &document); err != nil {
 		t.Fatal(err)
 	}
-	if document.SchemaVersion != 2 || document.Theme != "grove" || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
+	if document.SchemaVersion != 3 || document.Theme != "grove" || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
 		t.Fatalf("assembled document = %s", assembled)
 	}
 	if known, err := drafter.knowsTheme(context.Background(), "grove"); err != nil || !known {

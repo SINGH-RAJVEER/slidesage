@@ -2,12 +2,16 @@ import {
 	CARD_SCHEMA_VERSION,
 	type Card,
 	type CardDocument,
+	type ContentNodeType,
 	type NarrativeRole,
 	type RichText,
 	type TextRun,
 	type ThemeId,
+	WIDGET_TYPES,
+	type WidgetSize,
 } from "./schema";
 import { parseCard, parseCardDocument, SchemaError, type SchemaIssue } from "./validate";
+import { FEATURE_TEXT } from "./widgets";
 
 /**
  * Model output for one card. It carries content only: no IDs, styling, or
@@ -62,6 +66,18 @@ const UNSAFE_CHARACTERS = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁩﻿]/
 // always escaped when rendered; the stripping keeps stray markup out of view.
 const MARKUP_TAG =
 	/<\/?(?:a|b|big|blockquote|br|code|del|div|em|embed|font|h[1-6]|hr|i|iframe|img|ins|li|mark|object|ol|p|pre|s|script|small|span|strike|strong|style|sub|sup|svg|table|tbody|td|th|thead|tr|u|ul)(?:\s+[\w:-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>=`]+))*\s*\/?>/gi;
+
+/**
+ * Cleans a value's prefix or suffix, keeping one space between it and the
+ * number when the original had one, so " GW" reads "12 GW".
+ */
+export function cleanAffix(value: string, side: "prefix" | "suffix"): string {
+	const text = cleanText(value);
+	if (text === "") return "";
+	if (side === "suffix" && /^\s/.test(value)) return ` ${text}`;
+	if (side === "prefix" && /\s$/.test(value)) return `${text} `;
+	return text;
+}
 
 /** Normalizes model text: no tags, no control characters, single spaces. */
 export function cleanText(value: string): string {
@@ -127,6 +143,22 @@ class DraftReader {
 	rich(value: unknown, path: string): RichText {
 		if (typeof value !== "string") throw new SchemaError({ path, message: "must be a string" });
 		return parseInlineMarkup(value);
+	}
+
+	/** A number, or a plain numeric string such as "1,200" or "-3.5". */
+	number(value: unknown, path: string): unknown {
+		if (typeof value !== "string") return value;
+		const plain = value.replace(/[,\s]/g, "");
+		if (!/^-?\d+(\.\d+)?$/.test(plain)) {
+			throw new SchemaError({ path, message: "must be a number without units" });
+		}
+		return Number(plain);
+	}
+
+	optional(raw: Record<string, unknown>, field: string, node: Record<string, unknown>) {
+		if (typeof raw[field] === "string" && cleanText(raw[field]) !== "") {
+			node[field] = cleanText(raw[field]);
+		}
 	}
 
 	items(value: unknown, path: string) {
@@ -205,12 +237,100 @@ class DraftReader {
 				if (raw["focus"] !== undefined) node["focus"] = raw["focus"];
 				return node;
 			}
+			case "chart": {
+				const node: Record<string, unknown> = {
+					id: this.nextID("n"),
+					type,
+					kind: raw["kind"],
+					size: raw["size"],
+					categories: this.list(raw["categories"], `${path}.categories`).map((category, index) =>
+						typeof category === "number"
+							? String(category)
+							: this.string(category, `${path}.categories[${index}]`),
+					),
+					series: this.list(raw["series"], `${path}.series`).map((rawSeries, index) => {
+						const seriesPath = `${path}.series[${index}]`;
+						const series = this.object(rawSeries, seriesPath);
+						return {
+							id: this.nextID("i"),
+							name: this.string(series["name"], `${seriesPath}.name`),
+							values: this.list(series["values"], `${seriesPath}.values`).map(
+								(number, valueIndex) => this.number(number, `${seriesPath}.values[${valueIndex}]`),
+							),
+						};
+					}),
+				};
+				for (const side of ["prefix", "suffix"] as const) {
+					const affix = typeof raw[side] === "string" ? cleanAffix(raw[side], side) : "";
+					if (affix) node[side] = affix;
+				}
+				this.optional(raw, "caption", node);
+				return node;
+			}
+			case "progress":
+				return {
+					id: this.nextID("n"),
+					type,
+					size: raw["size"],
+					items: this.list(raw["items"], `${path}.items`).map((rawMeter, index) => {
+						const meterPath = `${path}.items[${index}]`;
+						const meter = this.object(rawMeter, meterPath);
+						return {
+							id: this.nextID("i"),
+							label: this.string(meter["label"], `${meterPath}.label`),
+							value: this.number(meter["value"], `${meterPath}.value`),
+						};
+					}),
+				};
+			case "table":
+				return {
+					id: this.nextID("n"),
+					type,
+					size: raw["size"],
+					columns: this.list(raw["columns"], `${path}.columns`).map((heading, index) =>
+						this.string(heading, `${path}.columns[${index}]`),
+					),
+					rows: this.list(raw["rows"], `${path}.rows`).map((rawRow, index) => ({
+						id: this.nextID("i"),
+						cells: this.list(rawRow, `${path}.rows[${index}]`).map((cell, cellIndex) =>
+							typeof cell === "number"
+								? String(cell)
+								: this.string(cell, `${path}.rows[${index}][${cellIndex}]`),
+						),
+					})),
+				};
+			case "callout":
+				return {
+					id: this.nextID("n"),
+					type,
+					size: raw["size"],
+					tone: raw["tone"] ?? "note",
+					text: this.rich(raw["text"], `${path}.text`),
+				};
 			default:
 				throw new SchemaError({
 					path: `${path}.type`,
-					message: `unsupported node type ${JSON.stringify(type)}; use heading, paragraph, bullets, quote, stat, steps, or columns`,
+					message: `unsupported node type ${JSON.stringify(type)}; use heading, paragraph, bullets, quote, stat, steps, columns, chart, progress, table, or callout`,
 				});
 		}
+	}
+}
+
+/**
+ * The size a drafted widget takes when the model leaves it out: the chart of a
+ * chart card or the table of a table card takes two thirds of the width beside
+ * text and fills the card alone; any other widget takes half a row.
+ */
+function defaultSizes(layout: unknown, nodes: unknown[]) {
+	const types = nodes.map((node) => (node as { type?: unknown } | null)?.type);
+	const hasText = types.some((type) => FEATURE_TEXT.includes(type as ContentNodeType));
+	for (const node of nodes) {
+		const widget = node as Record<string, unknown>;
+		if (!(WIDGET_TYPES as readonly unknown[]).includes(widget["type"])) continue;
+		if (widget["size"] !== undefined) continue;
+		const feature = widget["type"] === layout && (layout === "chart" || layout === "table");
+		const size: WidgetSize = feature ? (hasText ? "large" : "full") : "medium";
+		widget["size"] = size;
 	}
 }
 
@@ -235,6 +355,7 @@ function convertOne(
 	if (typeof draft["notes"] === "string" && cleanText(draft["notes"]) !== "") {
 		candidate["notes"] = cleanText(draft["notes"]);
 	}
+	defaultSizes(candidate["layout"], candidate["nodes"] as unknown[]);
 	return parseCard(candidate, "card", { seen: new Set(), knownSources, knownAssets });
 }
 

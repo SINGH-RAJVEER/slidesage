@@ -33,6 +33,9 @@ export const LAYOUT_NAMES: Record<LayoutId, string> = {
 	"image-left": "Photo left",
 	"image-right": "Photo right",
 	cover: "Photo cover",
+	chart: "Chart",
+	table: "Table",
+	dashboard: "Dashboard",
 };
 
 function Action({

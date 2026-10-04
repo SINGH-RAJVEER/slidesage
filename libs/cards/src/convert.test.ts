@@ -263,15 +263,16 @@ describe("images", () => {
 });
 
 describe("schema versions", () => {
-	it("reads a stored version 1 document as version 2", () => {
+	it("reads stored version 1 and 2 documents as version 3", () => {
 		const document = assembleDocument({
 			title: "Grid storage",
 			theme: "slate",
 			cards: [card(bulletsDraft)],
 		});
-		const stored = { ...document, schemaVersion: 1 };
-		const result = validateCardDocument(stored);
-		expect(result.ok && result.value.schemaVersion).toBe(2);
+		for (const schemaVersion of [1, 2]) {
+			const result = validateCardDocument({ ...document, schemaVersion });
+			expect(result.ok && result.value.schemaVersion).toBe(3);
+		}
 	});
 
 	it("refuses versions this build cannot read", () => {
@@ -280,7 +281,7 @@ describe("schema versions", () => {
 			theme: "slate",
 			cards: [card(bulletsDraft)],
 		});
-		expect(validateCardDocument({ ...document, schemaVersion: 3 }).ok).toBe(false);
+		expect(validateCardDocument({ ...document, schemaVersion: 4 }).ok).toBe(false);
 	});
 });
 

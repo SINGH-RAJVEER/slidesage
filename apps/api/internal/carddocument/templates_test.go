@@ -31,7 +31,7 @@ func templateConverter(t *testing.T) (*Converter, string) {
 		map[string]any{"id": "n_heading", "type": "heading", "text": []any{map[string]string{"text": "Grid storage"}}},
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/v1/templates" || request.Header.Get(schemaVersionHeader) != "2" {
+		if request.URL.Path != "/v1/templates" || request.Header.Get(schemaVersionHeader) != "3" {
 			t.Errorf("unexpected converter request: %s", request.URL.Path)
 		}
 		var input struct {

@@ -1,4 +1,5 @@
-import type { ContentNode, ContentNodeType, LayoutId } from "./schema";
+import type { ContentNode, ContentNodeType, LayoutId, WidgetNode } from "./schema";
+import { DASHBOARD_ROWS, isWidget, widgetRows } from "./widgets";
 
 interface Bounds {
 	min: number;
@@ -14,6 +15,8 @@ export interface LayoutRule {
 	requireOneOf?: ContentNodeType[];
 	/** Whether the layout shows an image, so drafting resolves one for it. */
 	image?: boolean;
+	/** How many widgets the layout holds in total, packed into at most two rows. */
+	widgets?: Bounds;
 	description: string;
 }
 
@@ -100,6 +103,40 @@ export const LAYOUT_RULES: Record<LayoutId, LayoutRule> = {
 		description:
 			"Full-bleed photo behind a large heading and optional subtitle. For openings, section breaks, and closings.",
 	},
+	chart: {
+		nodes: {
+			heading: { min: 1, max: 1 },
+			chart: { min: 1, max: 1 },
+			paragraph: { min: 0, max: 1 },
+			bullets: { min: 0, max: 1 },
+			callout: { min: 0, max: 1 },
+		},
+		items: { min: 2, max: 4 },
+		description:
+			"Heading and one chart of real figures, with an optional short paragraph, two to four bullets, or a callout reading the chart. The chart's size sets its share of the width beside the text; a full chart sits above the text.",
+	},
+	table: {
+		nodes: {
+			heading: { min: 1, max: 1 },
+			table: { min: 1, max: 1 },
+			paragraph: { min: 0, max: 1 },
+			callout: { min: 0, max: 1 },
+		},
+		description:
+			"Heading and one table of two to five columns and up to eight rows, with an optional paragraph or callout. The table's size sets its share of the width beside the text; a full table sits above it.",
+	},
+	dashboard: {
+		nodes: {
+			heading: { min: 1, max: 1 },
+			chart: { min: 0, max: 4 },
+			progress: { min: 0, max: 4 },
+			table: { min: 0, max: 2 },
+			callout: { min: 0, max: 4 },
+		},
+		widgets: { min: 2, max: 4 },
+		description:
+			"Heading and two to four widgets (charts, progress meters, tables, callouts) in up to two rows. Widgets fill a row left to right by size: small is a third, medium a half, large two thirds, full the whole row.",
+	},
 };
 
 export const COMPARISON_COLUMNS = { min: 2, max: 3 } as const;
@@ -136,6 +173,16 @@ export function layoutMismatch(layout: LayoutId, nodes: ContentNode[]): string |
 					return `column "${column.heading}" needs ${rule.items.min}-${rule.items.max} items, got ${size}`;
 				}
 			}
+		}
+	}
+	if (rule.widgets) {
+		const widgets = nodes.filter(isWidget) as WidgetNode[];
+		if (widgets.length < rule.widgets.min || widgets.length > rule.widgets.max) {
+			return `layout "${layout}" needs ${rule.widgets.min}-${rule.widgets.max} widgets, got ${widgets.length}`;
+		}
+		const rows = widgetRows(widgets).length;
+		if (rows > DASHBOARD_ROWS) {
+			return `layout "${layout}" fits its widgets in ${DASHBOARD_ROWS} rows, these sizes need ${rows}; use smaller sizes`;
 		}
 	}
 	if (rule.requireOneOf && !rule.requireOneOf.some((type) => counts.has(type))) {

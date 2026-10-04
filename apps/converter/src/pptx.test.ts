@@ -114,7 +114,7 @@ function exportDeck(body: Record<string, unknown>) {
 	return handle(
 		new Request("http://converter/v1/documents/pptx", {
 			method: "POST",
-			headers: { "Content-Type": "application/json", [SCHEMA_VERSION_HEADER]: "2" },
+			headers: { "Content-Type": "application/json", [SCHEMA_VERSION_HEADER]: "3" },
 			body: JSON.stringify(body),
 		}),
 	);
