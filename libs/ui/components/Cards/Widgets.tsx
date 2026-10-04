@@ -20,6 +20,7 @@ import { CircleCheck, Info, TriangleAlert } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { AddItem, PlainField, RemoveItem, RichField, useEditing } from "./fields";
 import type { CardTheme } from "./themes";
+import { WidgetControls } from "./WidgetControls";
 
 /**
  * Data widgets drawn from the theme's tokens. Marks take the series colors;
@@ -740,8 +741,6 @@ export function Table({ node, theme }: { node: TableNode; theme: CardTheme }) {
 					<tr className={cn("border-b-2", theme.rule)}>
 						{node.columns.map((heading, column) => (
 							<th
-								// Column headings may repeat, and columns have no IDs.
-								// biome-ignore lint/suspicious/noArrayIndexKey: a column is its position
 								key={column}
 								scope="col"
 								className={cn(
@@ -770,7 +769,6 @@ export function Table({ node, theme }: { node: TableNode; theme: CardTheme }) {
 						>
 							{row.cells.map((cell, column) => (
 								<td
-									// biome-ignore lint/suspicious/noArrayIndexKey: a cell is its column
 									key={column}
 									className={cn(
 										"px-[calc(1cqw*var(--fit,1))] py-[calc(0.7cqw*var(--fit,1))] align-top",
@@ -852,7 +850,7 @@ export function Callout({ node, theme }: { node: CalloutNode; theme: CardTheme }
 	);
 }
 
-export function Widget({ node, theme }: { node: WidgetNode; theme: CardTheme }) {
+function WidgetContent({ node, theme }: { node: WidgetNode; theme: CardTheme }) {
 	switch (node.type) {
 		case "chart":
 			return <Chart node={node} theme={theme} />;
@@ -863,4 +861,19 @@ export function Widget({ node, theme }: { node: WidgetNode; theme: CardTheme }) 
 		case "callout":
 			return <Callout node={node} theme={theme} />;
 	}
+}
+
+/** A widget and, while editing, its controls. A chart grows to fill its cell; the rest keep their height. */
+export function Widget({ node, theme }: { node: WidgetNode; theme: CardTheme }) {
+	return (
+		<div
+			className={cn(
+				"group/widget relative flex min-w-0 flex-col",
+				node.type === "chart" && "min-h-0 flex-1",
+			)}
+		>
+			<WidgetContent node={node} theme={theme} />
+			<WidgetControls node={node} />
+		</div>
+	);
 }

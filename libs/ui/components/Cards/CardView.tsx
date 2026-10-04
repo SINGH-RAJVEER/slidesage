@@ -36,7 +36,7 @@ import {
 	useEditing,
 } from "./fields";
 import type { CardTheme } from "./themes";
-import { Callout, Widget } from "./Widgets";
+import { Widget } from "./Widgets";
 
 export { CardEditScope, type DocumentEdit, RichTextView } from "./fields";
 
@@ -406,7 +406,7 @@ function FeatureText({ node, theme }: { node: ContentNode; theme: CardTheme }) {
 		case "bullets":
 			return <Bullets node={node} theme={theme} />;
 		case "callout":
-			return <Callout node={node} theme={theme} />;
+			return <Widget node={node} theme={theme} />;
 		default:
 			return null;
 	}

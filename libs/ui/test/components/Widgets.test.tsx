@@ -121,7 +121,7 @@ describe("widgets", () => {
 	it("places a sized chart beside its text and dashboard widgets in rows", () => {
 		const view = render(<CardList document={widgetDeck()} />);
 		const column = view.getByRole("figure", { name: "Column chart of Capacity" });
-		expect(column.parentElement?.style.flexGrow).toStartWith("0.66");
+		expect(column.closest<HTMLElement>("[style]")?.style.flexGrow).toStartWith("0.66");
 		const donut = view.getByRole("figure", { name: "Donut chart of Share" });
 		const meter = view.getByLabelText("Hiring plan");
 		const table = view
