@@ -9,7 +9,7 @@ import {
 	SAMPLE_ASSETS,
 	TEMPLATE_CATEGORIES,
 } from "./templates";
-import { CARD_THEME_DEFINITIONS, CURATED_THEMES } from "./themes";
+import { CARD_THEME_DEFINITIONS, CURATED_THEMES, SERIES_SLOTS } from "./themes";
 import { validateCardDocument } from "./validate";
 
 describe("curated starter decks", () => {
@@ -69,6 +69,30 @@ describe("curated starter decks", () => {
 		}
 		expect(THEMES).toEqual(expect.arrayContaining(["slate", "paper", "ember"]));
 		expect(validateCardDocument({ ...document, theme: "unknown" }).ok).toBe(false);
+	});
+
+	it("gives every theme a full chart palette with legible tone colors", () => {
+		const luminance = (hex: string) => {
+			const [r = 0, g = 0, b = 0] = [1, 3, 5].map((offset) => {
+				const channel = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
+				return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+			});
+			return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+		};
+		const contrast = (first: string, second: string) => {
+			const [high, low] = [luminance(first), luminance(second)].sort((a, b) => b - a);
+			return ((high ?? 0) + 0.05) / ((low ?? 0) + 0.05);
+		};
+		for (const theme of Object.values(CARD_THEME_DEFINITIONS)) {
+			expect(theme.chart.series).toHaveLength(SERIES_SLOTS);
+			expect(new Set(theme.chart.series).size).toBe(SERIES_SLOTS);
+			expect(contrast(theme.chart.positive, theme.palette.surface)).toBeGreaterThanOrEqual(3);
+			if (theme.appearance === "light") continue;
+			// Dark surfaces keep every series near 3:1 or above; light ones rely on value labels.
+			for (const color of theme.chart.series) {
+				expect(contrast(color, theme.palette.surface)).toBeGreaterThanOrEqual(2.8);
+			}
+		}
 	});
 });
 
