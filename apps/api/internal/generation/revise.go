@@ -19,6 +19,7 @@ Each card follows the supplied card and node shapes, with "position" as given an
 Change what the instruction asks for and keep everything else as it is.
 Keep each card's layout unless the instruction calls for another. A layout marked image may only be used by a card that already shows a photo; the photo is kept for you, so draft only text nodes.
 Each card satisfies its layout's node counts, item counts, and the character limits in the schema.
+Keep the figures in charts, meters, and tables unless the instruction supplies new ones; never invent figures.
 Text may use **bold** and *italic*; no other markup, HTML, links, or emoji.
 Cite only supplied source IDs. No styling, colors, or coordinates.`
 

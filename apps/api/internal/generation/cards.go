@@ -19,7 +19,7 @@ import (
 
 // cardPromptVersion identifies the prompts below in revision provenance, so a
 // document can be traced to the instructions that produced it.
-const cardPromptVersion = "cards-v1"
+const cardPromptVersion = "cards-v2"
 
 const defaultCardTheme = "slate"
 
@@ -44,6 +44,7 @@ Return exactly the requested number of cards with positions 1 to N in order.
 takeaway is one sentence stating the card's point, at most 200 characters.
 role and layout must be values from the supplied schema. Choose the layout whose description fits the content the card needs, and vary layouts where the content allows.
 evidence names the specific facts, figures, or examples the card will use.
+Use the chart, table, and dashboard layouts only for figures or comparisons stated in the research sources or the topic, and list those exact figures in evidence; otherwise use text layouts.
 Cite only supplied source IDs and never invent sources.
 When the deck has at least three cards, open with an opening card and end with a closing card.
 No styling, colors, CSS, HTML, or coordinates.`
@@ -54,6 +55,7 @@ Return one JSON object: {"cards": [card, ...]} with exactly one card for each re
 Each card follows the supplied card and node shapes exactly, uses the layout from its plan entry, and satisfies that layout's node counts, its item counts, and the character limits in the schema.
 Text may use **bold** and *italic*; no other markup, HTML, links, or emoji.
 Write substantive, specific content that supports the card's takeaway, and do not repeat content from other cards.
+Charts, meters, and tables show only figures from the plan's evidence or the sources, copied exactly; follow the widget guide in the schema to choose each chart's kind and each widget's size.
 Cite only supplied source IDs. No styling, colors, or coordinates.`
 
 const repairSystemPrompt = `A presentation card failed validation.
