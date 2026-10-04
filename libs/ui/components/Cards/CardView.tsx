@@ -2,15 +2,14 @@ import {
 	addListItem,
 	type BulletsNode,
 	type Card,
-	type CardDocument,
 	COVER_PALETTE,
 	type ColumnsNode,
 	type ContentNode,
+	FEATURE_TEXT,
+	featureSplit,
 	type ImageNode,
-	LAYOUT_RULES,
-	normalizeRuns,
+	isWidget,
 	type QuoteNode,
-	type RichText,
 	removeListItem,
 	STOCK_LIBRARIES,
 	type StatNode,
@@ -20,157 +19,26 @@ import {
 	setNodeText,
 	setPartField,
 	syncTakeaway,
+	type WidgetNode,
+	widgetRows,
 } from "@slidesage/cards";
 import type { Source } from "@slidesage/types";
 import { cn } from "@slidesage/ui/lib/utils";
-import { Plus, X } from "lucide-react";
+import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 import {
-	type CSSProperties,
-	createContext,
-	type ReactNode,
-	useContext,
-	useLayoutEffect,
-	useRef,
-	useState,
-} from "react";
-import { RichTextEditable } from "./RichTextEditable";
+	AddItem,
+	CardEditScope,
+	type DocumentEdit,
+	itemBounds,
+	PlainField,
+	RemoveItem,
+	RichField,
+	useEditing,
+} from "./fields";
 import type { CardTheme } from "./themes";
+import { Callout, Widget } from "./Widgets";
 
-/** Applies an edit to the whole document. Present only while editing. */
-export type DocumentEdit = (update: (document: CardDocument) => CardDocument) => void;
-
-const EditContext = createContext<{ edit: DocumentEdit; card: Card } | null>(null);
-
-function useEditing() {
-	return useContext(EditContext);
-}
-
-export function RichTextView({ text }: { text: RichText }) {
-	return (
-		<>
-			{text.map((run, index) => {
-				const key = `${index}-${run.text}`;
-				if (run.bold && run.italic) {
-					return (
-						<strong key={key}>
-							<em>{run.text}</em>
-						</strong>
-					);
-				}
-				if (run.bold) return <strong key={key}>{run.text}</strong>;
-				if (run.italic) return <em key={key}>{run.text}</em>;
-				return <span key={key}>{run.text}</span>;
-			})}
-		</>
-	);
-}
-
-/** Rich text that becomes an inline editor while the deck is being edited. */
-function RichField({
-	value,
-	label,
-	update,
-}: {
-	value: RichText;
-	label: string;
-	update: (document: CardDocument, value: RichText, cardId: string) => CardDocument;
-}) {
-	const editing = useEditing();
-	if (!editing) return <RichTextView text={value} />;
-	const { edit, card } = editing;
-	return (
-		<RichTextEditable
-			value={value}
-			label={label}
-			onChange={(next) => {
-				// Leaving a field re-reads it; unchanged text is not an edit.
-				if (JSON.stringify(normalizeRuns(next)) === JSON.stringify(normalizeRuns(value))) return;
-				edit((document) => update(document, next, card.id));
-			}}
-		/>
-	);
-}
-
-/** Plain text that becomes an inline editor while the deck is being edited. */
-function PlainField({
-	value,
-	label,
-	update,
-}: {
-	value: string;
-	label: string;
-	update: (document: CardDocument, value: string, cardId: string) => CardDocument;
-}) {
-	const editing = useEditing();
-	if (!editing) return <>{value}</>;
-	const { edit, card } = editing;
-	return (
-		<RichTextEditable
-			plain
-			value={[{ text: value }]}
-			label={label}
-			onChange={(next) => {
-				const text = next.map((run) => run.text).join("");
-				if (text === value) return;
-				edit((document) => update(document, text, card.id));
-			}}
-		/>
-	);
-}
-
-/** The card's item bounds, so list controls never break the layout's rules. */
-function itemBounds(card: Card) {
-	return LAYOUT_RULES[card.layout].items ?? { min: 1, max: 8 };
-}
-
-function RemoveItem({
-	label,
-	onRemove,
-	visible,
-}: {
-	label: string;
-	onRemove: () => void;
-	visible: boolean;
-}) {
-	if (!visible) return null;
-	return (
-		<button
-			type="button"
-			aria-label={label}
-			onClick={onRemove}
-			className="ml-auto shrink-0 self-start rounded-full p-[calc(0.3cqw*var(--fit,1))] opacity-0 transition-opacity group-hover/item:opacity-60 hover:!opacity-100 focus-visible:opacity-100"
-		>
-			<X className="size-[calc(1.6cqw*var(--fit,1))]" />
-		</button>
-	);
-}
-
-function AddItem({
-	label,
-	onAdd,
-	visible,
-	theme,
-}: {
-	label: string;
-	onAdd: () => void;
-	visible: boolean;
-	theme: CardTheme;
-}) {
-	if (!visible) return null;
-	return (
-		<button
-			type="button"
-			onClick={onAdd}
-			className={cn(
-				"flex w-fit items-center gap-[calc(0.6cqw*var(--fit,1))] rounded-full px-[calc(1cqw*var(--fit,1))] py-[calc(0.4cqw*var(--fit,1))] text-[length:calc(1.3cqw*var(--fit,1))] opacity-60 transition-opacity hover:opacity-100",
-				theme.muted,
-			)}
-		>
-			<Plus className="size-[calc(1.4cqw*var(--fit,1))]" />
-			{label}
-		</button>
-	);
-}
+export { CardEditScope, type DocumentEdit, RichTextView } from "./fields";
 
 function nodesOf<T extends ContentNode["type"]>(card: Card, type: T) {
 	return card.nodes.filter((node): node is Extract<ContentNode, { type: T }> => node.type === type);
@@ -516,22 +384,112 @@ function Quote({ node, theme }: { node: QuoteNode; theme: CardTheme }) {
 	);
 }
 
-/** Provides the editing context to one card's content. */
-export function CardEditScope({
-	edit,
-	card,
-	children,
-}: {
-	edit?: DocumentEdit;
-	card: Card;
-	children: ReactNode;
-}) {
-	if (!edit) return <>{children}</>;
-	return <EditContext.Provider value={{ edit, card }}>{children}</EditContext.Provider>;
+/** A paragraph, bullet list, or callout shown beside a chart or table. */
+function FeatureText({ node, theme }: { node: ContentNode; theme: CardTheme }) {
+	switch (node.type) {
+		case "paragraph":
+			return (
+				<p
+					data-node-id={node.id}
+					className={cn(
+						"text-[length:calc(1.8cqw*var(--fit,1))] leading-snug text-pretty",
+						theme.body,
+					)}
+				>
+					<RichField
+						value={node.text}
+						label="Paragraph"
+						update={(document, value, cardId) => setNodeText(document, cardId, node.id, value)}
+					/>
+				</p>
+			);
+		case "bullets":
+			return <Bullets node={node} theme={theme} />;
+		case "callout":
+			return <Callout node={node} theme={theme} />;
+		default:
+			return null;
+	}
+}
+
+/**
+ * A chart or table card: the widget takes its size's share of the width with
+ * the text beside it, or sits above the text at full size. A chart fills the
+ * height left over; a table keeps its own.
+ */
+function Feature({ card, theme }: { card: Card; theme: CardTheme }) {
+	const widget = card.nodes.find((node): node is WidgetNode => node.type === card.layout);
+	const text = card.nodes.filter((node) => node !== widget && FEATURE_TEXT.includes(node.type));
+	if (!widget) return null;
+	const split = featureSplit(widget.size, text.length > 0);
+	const row = split.direction === "row";
+	return (
+		<div className="flex min-h-0 flex-1 flex-col gap-[calc(2.6cqw*var(--fit,1))]">
+			<Heading card={card} theme={theme} />
+			<div
+				className={cn(
+					"flex min-h-0 flex-1 gap-[calc(3cqw*var(--fit,1))]",
+					row ? "flex-row" : "flex-col",
+				)}
+			>
+				<div
+					className="flex min-h-0 min-w-0 flex-col"
+					style={{
+						flex: row ? `${split.share} 1 0` : widget.type === "chart" ? "1 1 0" : "none",
+					}}
+				>
+					<Widget node={widget} theme={theme} />
+				</div>
+				{text.length > 0 && (
+					<div
+						className="flex min-w-0 flex-col justify-center gap-[calc(1.8cqw*var(--fit,1))]"
+						style={{ flex: row ? `${1 - split.share} 1 0` : "none" }}
+					>
+						{text.map((node) => (
+							<FeatureText key={node.id} node={node} theme={theme} />
+						))}
+					</div>
+				)}
+			</div>
+		</div>
+	);
+}
+
+/** Widgets packed into rows by size, the rows sharing the height left under the heading. */
+function Dashboard({ card, theme }: { card: Card; theme: CardTheme }) {
+	const rows = widgetRows(card.nodes.filter(isWidget));
+	return (
+		<div className="flex min-h-0 flex-1 flex-col gap-[calc(2.6cqw*var(--fit,1))]">
+			<Heading card={card} theme={theme} />
+			<div className="flex min-h-0 flex-1 flex-col gap-[calc(2.4cqw*var(--fit,1))]">
+				{rows.map((cells) => (
+					<div
+						key={cells.map((cell) => cell.widget.id).join()}
+						className="flex min-h-0 flex-1 gap-[calc(3cqw*var(--fit,1))]"
+					>
+						{cells.map((cell) => (
+							<div
+								key={cell.widget.id}
+								className="flex min-h-0 min-w-0 flex-col justify-center"
+								style={{ flex: `${cell.width} 1 0` }}
+							>
+								<Widget node={cell.widget} theme={theme} />
+							</div>
+						))}
+					</div>
+				))}
+			</div>
+		</div>
+	);
 }
 
 function CardBody({ card, theme }: { card: Card; theme: CardTheme }) {
 	switch (card.layout) {
+		case "chart":
+		case "table":
+			return <Feature card={card} theme={theme} />;
+		case "dashboard":
+			return <Dashboard card={card} theme={theme} />;
 		case "title":
 			return (
 				<div className="flex flex-1 flex-col justify-center gap-[calc(2cqw*var(--fit,1))]">
