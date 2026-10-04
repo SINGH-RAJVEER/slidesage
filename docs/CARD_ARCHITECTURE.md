@@ -8,12 +8,11 @@ The PPTX-first pipeline this replaces has been removed: the template-slot compil
 
 ### Implemented so far
 
-The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 2 card schema in `libs/cards`, the Bun converter service, immutable card revisions in PostgreSQL JSONB and image assets in GCS, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, direct editing in the browser, AI revisions of chosen cards, present mode, read-only share links, and synchronous PPTX export of native text, lists, and photos.
+The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 3 card schema in `libs/cards`, the Bun converter service, immutable card revisions in PostgreSQL JSONB and image assets in GCS, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, direct editing in the browser, AI revisions of chosen cards, present mode, read-only share links, charts, progress meters, tables, and callouts in sized chart, table, and dashboard cards, and synchronous PPTX export of native text, lists, photos, charts, and tables.
 
 Still to build:
 
-- charts, tables, and AI-generated images;
-- theme choice at creation;
+- AI-generated images;
 - the rest of the export design below: asynchronous exports recorded with their revision, exporter version, and output digest; text measured with the actual fonts; and a browser-versus-PPTX comparison gate.
 
 Also open:
