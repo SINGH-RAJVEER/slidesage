@@ -1,7 +1,9 @@
 import { AlertTriangle, Check } from "lucide-react";
 import { useEffect } from "react";
+import { Button } from "./button";
 
-const NOTICE_TTL_MS = 4000;
+/** How long a notice stays up, which is also the window an Undo action is offered. */
+export const NOTICE_TTL_MS = 4000;
 
 const TONE_CLASSES = {
 	error: "border-red-400/30 text-red-200",
@@ -17,6 +19,8 @@ interface FloatingNoticeProps {
 	/** Success message to display; an error or a warning takes precedence. */
 	success?: string | null;
 	onDismiss: () => void;
+	/** A button shown beside the message, such as Undo for a deletion. */
+	action?: { label: string; onClick: () => void } | null;
 }
 
 /**
@@ -28,7 +32,13 @@ interface FloatingNoticeProps {
  * Blocking states that own the whole page or panel and offer their own
  * recovery action (a retry button, an error route) stay inline instead.
  */
-export function FloatingNotice({ error, warning, success, onDismiss }: FloatingNoticeProps) {
+export function FloatingNotice({
+	error,
+	warning,
+	success,
+	onDismiss,
+	action,
+}: FloatingNoticeProps) {
 	const message = error || warning || success;
 	const tone = error ? "error" : warning ? "warning" : "success";
 
@@ -52,6 +62,17 @@ export function FloatingNotice({ error, warning, success, onDismiss }: FloatingN
 				<AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
 			)}
 			<span className="truncate">{message}</span>
+			{action ? (
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					onClick={action.onClick}
+					className="-mr-3 shrink-0 rounded-full px-3 text-white hover:bg-white/10 hover:text-white"
+				>
+					{action.label}
+				</Button>
+			) : null}
 		</div>
 	);
 }
