@@ -33,6 +33,7 @@
 
 - Terraform `cache_enabled` defaults to false. GitHub `CACHE_ENABLED=true` enables it in plan/deploy; local plans can use `-var=cache_enabled=true`.
 - Deploy through the migration-first workflow so version tracking exists before enabling cache.
+- Deploy provisions the instance, its networking, and runtime IAM through a targeted apply before pausing runtimes. A slow or failed create stops the release while the previous version still serves.
 - `CACHE_ENABLED=false` removes cache resources on the next release and restores direct database reads.
 - Enabled defaults are Memorystore for Valkey 9.0 with cluster mode disabled, one `SHARED_CORE_NANO` node, no replicas, and a dedicated VPC.
 - Private Service Connect automation is the only connection method. A `gcp-memorystore` service connection policy reserves the primary and reader endpoints in a `/28` subnet; the API uses only the primary, because the reader rejects writes.

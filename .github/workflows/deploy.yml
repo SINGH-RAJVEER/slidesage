@@ -194,6 +194,19 @@ jobs:
             exit 1
           fi
 
+      # Creating Memorystore takes minutes. Provision it while the old release
+      # still serves, so a slow or failed create never extends the pause.
+      - name: Provision the read cache
+        if: vars.CACHE_ENABLED == 'true'
+        working-directory: infra/prod
+        run: |
+          terraform plan -input=false -lock-timeout=5m -no-color \
+            -target=google_memorystore_instance.cache \
+            -target=google_compute_subnetwork.cache \
+            -target=google_project_iam_member.runtime_cache_connect \
+            -out=cache.tfplan
+          terraform apply -input=false -lock-timeout=5m -no-color cache.tfplan
+
       - name: Update the migration job
         working-directory: infra/prod
         run: |

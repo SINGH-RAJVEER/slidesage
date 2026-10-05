@@ -9,7 +9,7 @@
 1. Run checks, compile three Go binaries, and bundle the Bun converter.
 2. Build four targets through `docker-bake.hcl` and push full-commit-SHA and `latest` tags.
 3. Start an on-demand database backup while planning the complete Terraform configuration.
-4. Verify backup completion, then update the migration job through a targeted apply.
+4. Verify backup completion. With `CACHE_ENABLED=true`, provision the read cache through a targeted apply while the old release still serves. Then update the migration job through a targeted apply.
 5. Pause API, worker, and maintenance scheduler; run migrations and the retired-object sweep.
 6. Create a fresh full plan and apply the release images, restoring automatic scaling.
 7. Verify ingress and worker invocation restrictions.
