@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/cache"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/stockimages"
 )
 
@@ -19,6 +20,7 @@ import (
 type Handler struct {
 	DB    *sql.DB
 	Store ObjectStore
+	Cache cache.Store
 	// Converter validates edited documents; without it the save route
 	// reports that editing is unavailable.
 	Converter *Converter
@@ -68,7 +70,7 @@ func (handler Handler) current(writer http.ResponseWriter, request *http.Request
 		return
 	}
 	ctx := request.Context()
-	revision, err := CurrentRevision(ctx, handler.DB, request.PathValue("id"), userID)
+	revision, err := CachedCurrentRevision(ctx, handler.DB, request.PathValue("id"), userID, handler.Cache)
 	switch {
 	case errors.Is(err, ErrPresentationMissing):
 		writeError(writer, http.StatusNotFound, "Presentation not found")

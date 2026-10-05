@@ -33,7 +33,7 @@ func (handler Handler) exportPptx(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 	ctx := request.Context()
-	revision, err := CurrentRevision(ctx, handler.DB, presentationID, userID)
+	revision, err := CachedCurrentRevision(ctx, handler.DB, presentationID, userID, handler.Cache)
 	switch {
 	case errors.Is(err, ErrPresentationMissing):
 		writeError(writer, http.StatusNotFound, "Presentation not found")

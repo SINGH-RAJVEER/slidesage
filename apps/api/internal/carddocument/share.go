@@ -193,7 +193,7 @@ func (handler Handler) shared(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 	ctx := request.Context()
-	revision, err := CurrentRevision(ctx, handler.DB, presentationID, ownerID)
+	revision, err := CachedCurrentRevision(ctx, handler.DB, presentationID, ownerID, handler.Cache)
 	if errors.Is(err, ErrPresentationMissing) || errors.Is(err, ErrNoRevision) {
 		writeError(writer, http.StatusNotFound, "This link is not valid")
 		return
@@ -239,7 +239,7 @@ func (handler Handler) sharedAsset(writer http.ResponseWriter, request *http.Req
 	}
 	ctx := request.Context()
 	digest := request.PathValue("sha256")
-	revision, err := CurrentRevision(ctx, handler.DB, presentationID, ownerID)
+	revision, err := CachedCurrentRevision(ctx, handler.DB, presentationID, ownerID, handler.Cache)
 	if errors.Is(err, ErrPresentationMissing) || errors.Is(err, ErrNoRevision) {
 		writeError(writer, http.StatusNotFound, "Image not found")
 		return
