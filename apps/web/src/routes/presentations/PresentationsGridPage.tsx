@@ -1,9 +1,4 @@
-import type {
-	ApiErrorResponse,
-	PresentationResponse,
-	PresentationSummary,
-	PresentationsResponse,
-} from "@slidesage/types";
+import type { ApiErrorResponse, PresentationSummary } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
 import {
 	Dialog,
@@ -18,7 +13,10 @@ import { GridSizeControl, PresentationCard } from "@slidesage/ui/components/Pres
 import { SearchBar } from "@slidesage/ui/components/SearchBar";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
-import { PRESENTATIONS_UPDATED_EVENT } from "@slidesage/ui/lib/presentation-events";
+import {
+	PRESENTATIONS_UPDATED_EVENT,
+	type PresentationUpdatedDetail,
+} from "@slidesage/ui/lib/presentation-events";
 import { getPresentationRetryDestination } from "@slidesage/ui/lib/presentation-retry";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -26,6 +24,14 @@ import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
 import type { LibraryNotice } from "./PresentationPage";
+import {
+	evictPresentation,
+	fetchPresentationsPage,
+	PRESENTATIONS_PAGE_SIZE,
+	prefetchPresentation,
+	prefetchPresentationDetail,
+	takeLibrary,
+} from "./presentation-data";
 
 interface PaginationState {
 	total: number;
@@ -39,8 +45,6 @@ interface FetchPresentationsOptions {
 	append?: boolean;
 	offset?: number;
 }
-
-const PRESENTATIONS_PAGE_SIZE = 20;
 
 function parseDateRange(value: string) {
 	const trimmed = value.trim();
@@ -145,25 +149,22 @@ export default function PresentationsGridPage() {
 				if (append) setLoadingMore(true);
 				else if (!background) setLoading(true);
 				setError("");
-				const response = await fetch(
-					`${API_URL}/presentations?limit=${PRESENTATIONS_PAGE_SIZE}&offset=${offset}`,
-					{
-						credentials: "include",
-					},
-				);
-				const result = await readJsonResponse<PresentationsResponse | ApiErrorResponse>(response);
+				// Opening the library may use the first page that hovering its link
+				// prefetched; refreshes and further pages always ask the server.
+				const page =
+					background || append ? await fetchPresentationsPage(offset) : await takeLibrary();
 
-				if (response.status === 401) {
+				if (!page.ok && page.status === 401) {
 					setError("Authentication failed. Please log in again.");
 					return;
 				}
 
-				if (!response.ok || !result || "error" in result) {
-					const message = result && "error" in result ? result.error.message : undefined;
-					setError(message || `Failed to load presentations (${response.status}).`);
+				if (!page.ok) {
+					setError(page.message || `Failed to load presentations (${page.status}).`);
 					return;
 				}
 
+				const result = page.data;
 				const presentationsList = result.presentations;
 				setPresentations((current) => {
 					if (!append) return presentationsList;
@@ -195,7 +196,10 @@ export default function PresentationsGridPage() {
 	}, [fetchPresentations]);
 
 	useEffect(() => {
-		const handlePresentationsUpdated = () => {
+		const handlePresentationsUpdated = (event: Event) => {
+			// A card hovered while its deck was generating holds a stale status.
+			const { presentationId } = (event as CustomEvent<PresentationUpdatedDetail>).detail;
+			evictPresentation(presentationId);
 			void fetchPresentations({ background: true });
 		};
 
@@ -212,32 +216,36 @@ export default function PresentationsGridPage() {
 	const handlePresentationClick = async (presentationId: string) => {
 		try {
 			setOpeningId(presentationId);
-			const response = await fetch(`${API_URL}/presentations/${presentationId}`, {
-				credentials: "include",
-			});
+			// Usually loaded already by hovering the card, and kept for the
+			// presentation page so it does not ask again.
+			const detail = await prefetchPresentationDetail(presentationId);
 
-			if (response.status === 401) {
-				setError("Session expired. Please log in again.");
+			if (!detail.ok) {
+				// A refusal is not kept, so clicking again asks the server again.
+				evictPresentation(presentationId);
+				setError(
+					detail.status === 401
+						? "Session expired. Please log in again."
+						: detail.message || `Failed to open presentation (${detail.status}).`,
+				);
 				return;
 			}
 
-			const result = (await response.json()) as PresentationResponse | ApiErrorResponse;
+			const { presentation } = detail.data;
+			const retryDestination = getPresentationRetryDestination(
+				presentation.slides_data,
+				presentation.id,
+			);
 
-			if ("error" in result) {
-				setError(result.error.message);
-			} else {
-				const retryDestination = getPresentationRetryDestination(
-					result.presentation.slides_data,
-					result.presentation.id,
-				);
-
-				if (retryDestination) {
-					navigate(retryDestination.to, { state: retryDestination.state });
-					return;
-				}
-
-				navigate(ROUTES.presentationById(result.presentation.id));
+			if (retryDestination) {
+				// Only the presentation page reads the kept detail, and a retry
+				// is about to change it.
+				evictPresentation(presentationId);
+				navigate(retryDestination.to, { state: retryDestination.state });
+				return;
 			}
+
+			navigate(ROUTES.presentationById(presentation.id));
 		} catch (err) {
 			setError(`Error: ${err instanceof Error ? err.message : err}`);
 		} finally {
@@ -274,6 +282,7 @@ export default function PresentationsGridPage() {
 				return;
 			}
 
+			evictPresentation(presentationId);
 			setPresentations((current) =>
 				current.filter((presentation) => presentation.id !== presentationId),
 			);
@@ -362,6 +371,7 @@ export default function PresentationsGridPage() {
 											isDeleting={deletingId === presentation.id}
 											isOpening={openingId === presentation.id}
 											onCardClick={handlePresentationClick}
+											onPrefetch={prefetchPresentation}
 											onDelete={handleDeletePresentation}
 											formatDate={formatDate}
 										/>

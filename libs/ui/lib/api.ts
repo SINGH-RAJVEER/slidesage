@@ -101,3 +101,18 @@ export const API_URL = resolveApiUrl(
 	isProd(),
 	typeof window === "undefined" ? undefined : window.location.origin,
 );
+
+/** A GET's outcome: the body when it succeeded, otherwise the status and the API's reason. */
+export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; message?: string };
+
+/** Reads a signed-in JSON resource without throwing for an HTTP error. */
+export async function getJson<T>(path: string): Promise<ApiResult<T>> {
+	const response = await fetch(`${API_URL}${path}`, { credentials: "include" });
+	const body = await readJsonResponse<T | { error?: { message?: string } }>(response);
+	if (response.ok && body !== null && !(typeof body === "object" && "error" in body)) {
+		return { ok: true, data: body as T };
+	}
+	const message =
+		body !== null && typeof body === "object" && "error" in body ? body.error?.message : undefined;
+	return { ok: false, status: response.status, message };
+}
