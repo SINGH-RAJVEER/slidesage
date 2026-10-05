@@ -17,9 +17,31 @@ import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useSt
 import { useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+import { isRecord, usePageDraft } from "../../hooks/usePageDraft";
 
 const AVATAR_URL_DEBOUNCE_MS = 800;
 const MAX_AVATAR_UPLOAD_BYTES = 800 * 1024;
+
+interface ProfileDraft {
+	editingName: boolean;
+	newName: string | null;
+	editingEmail: boolean;
+	newEmail: string | null;
+	editingPassword: boolean;
+	imageUrl: string | null;
+}
+
+function isProfileDraft(value: unknown): value is ProfileDraft {
+	return (
+		isRecord(value) &&
+		typeof value["editingName"] === "boolean" &&
+		typeof value["editingEmail"] === "boolean" &&
+		typeof value["editingPassword"] === "boolean" &&
+		[value["newName"], value["newEmail"], value["imageUrl"]].every(
+			(field) => field === null || typeof field === "string",
+		)
+	);
+}
 
 function isValidAvatarUrl(value: string): boolean {
 	try {
@@ -37,20 +59,36 @@ export default function ProfilePage() {
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
 
-	// Form states
-	const [editingName, setEditingName] = useState(false);
-	const [newName, setNewName] = useState("");
-
-	const [editingEmail, setEditingEmail] = useState(false);
-	const [newEmail, setNewEmail] = useState("");
+	const [draft, setDraft] = usePageDraft<ProfileDraft>(
+		"profile",
+		{
+			editingName: false,
+			newName: null,
+			editingEmail: false,
+			newEmail: null,
+			editingPassword: false,
+			imageUrl: null,
+		},
+		isProfileDraft,
+	);
+	const { editingName, editingEmail, editingPassword } = draft;
+	const newName = draft.newName ?? profile?.name ?? "";
+	const newEmail = draft.newEmail ?? profile?.email ?? "";
+	const imageUrl = draft.imageUrl ?? profile?.image ?? "";
+	const change = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) =>
+		setDraft((current) => ({ ...current, [key]: value }));
+	const setEditingName = (value: boolean) => change("editingName", value);
+	const setNewName = (value: string) => change("newName", value);
+	const setEditingEmail = (value: boolean) => change("editingEmail", value);
+	const setNewEmail = (value: string) => change("newEmail", value);
+	const setEditingPassword = (value: boolean) => change("editingPassword", value);
+	const setImageUrl = (value: string | null) => change("imageUrl", value);
+	// Credentials stay in the mounted form and are never written to draft storage.
 	const [emailCurrentPassword, setEmailCurrentPassword] = useState("");
-
-	const [editingPassword, setEditingPassword] = useState(false);
 	const [currentPassword, setCurrentPassword] = useState("");
 	const [newPassword, setNewPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
 
-	const [imageUrl, setImageUrl] = useState("");
 	const [uploadingImage, setUploadingImage] = useState(false);
 	const avatarUrlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const avatarRequest = useRef<AbortController | null>(null);
@@ -74,9 +112,6 @@ export default function ProfilePage() {
 
 			const data = (await res.json()) as ProfileResponse;
 			setProfile(data.user);
-			setNewName(data.user.name || "");
-			setNewEmail(data.user.email);
-			setImageUrl(data.user.image || "");
 			savedImage.current = data.user.image || "";
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load profile");
@@ -133,6 +168,7 @@ export default function ProfilePage() {
 			setProfile(data.user);
 			await refreshSession({ force: true });
 			setEditingName(false);
+			change("newName", null);
 			setSuccess("Name updated successfully");
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to update name");
@@ -169,6 +205,7 @@ export default function ProfilePage() {
 			};
 			setProfile(data.user);
 			setEditingEmail(false);
+			change("newEmail", null);
 			setEmailCurrentPassword("");
 			if (data.verification_required && data.pending_email) {
 				navigate(
@@ -267,7 +304,7 @@ export default function ProfilePage() {
 			if (!data?.user || revision !== avatarRevision.current) return;
 
 			savedImage.current = data.user.image || "";
-			setImageUrl(data.user.image || "");
+			setImageUrl(null);
 			setProfile((currentProfile) =>
 				currentProfile ? { ...currentProfile, ...data.user } : currentProfile,
 			);
@@ -466,7 +503,7 @@ export default function ProfilePage() {
 										type="button"
 										onClick={() => {
 											setEditingName(false);
-											setNewName(profile.name || "");
+											change("newName", null);
 										}}
 										className="flex-1 bg-white/10 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 hover:bg-white/20"
 									>
@@ -528,7 +565,7 @@ export default function ProfilePage() {
 										type="button"
 										onClick={() => {
 											setEditingEmail(false);
-											setNewEmail(profile.email);
+											change("newEmail", null);
 											setEmailCurrentPassword("");
 										}}
 										className="flex-1 bg-white/10 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 hover:bg-white/20"

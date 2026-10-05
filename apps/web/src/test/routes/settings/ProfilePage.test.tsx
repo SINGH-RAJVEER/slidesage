@@ -22,6 +22,57 @@ function VerificationProbe() {
 	);
 }
 
+it("restores unfinished profile fields without storing passwords", async () => {
+	const originalFetch = globalThis.fetch;
+	globalThis.fetch = mock(async () =>
+		Response.json({
+			user: {
+				id: "user_1",
+				name: "Test User",
+				email: "old@example.com",
+				image: null,
+				emailVerified: true,
+				slideTokens: 50,
+				createdAt: "2026-07-14T10:00:00.000Z",
+			},
+		}),
+	) as unknown as typeof fetch;
+	try {
+		const { default: ProfilePage } = await import("../../../routes/settings/ProfilePage");
+		const first = render(
+			<MemoryRouter>
+				<ProfilePage />
+			</MemoryRouter>,
+		);
+		await first.findByText("old@example.com");
+		fireEvent.click(first.getAllByRole("button", { name: "Edit" })[0] as HTMLElement);
+		fireEvent.change(first.getByPlaceholderText("Your name"), { target: { value: "Draft name" } });
+		fireEvent.click(first.getAllByRole("button", { name: "Edit" })[0] as HTMLElement);
+		fireEvent.change(first.getByDisplayValue("old@example.com"), {
+			target: { value: "draft@example.com" },
+		});
+		fireEvent.change(first.getByPlaceholderText("Current password"), {
+			target: { value: "secret-current-password" },
+		});
+		fireEvent.change(first.getByLabelText("Image URL"), {
+			target: { value: "https://unfinished" },
+		});
+		first.unmount();
+		const restored = render(
+			<MemoryRouter>
+				<ProfilePage />
+			</MemoryRouter>,
+		);
+		expect(await restored.findByPlaceholderText("Your name")).toHaveValue("Draft name");
+		expect(restored.getByDisplayValue("draft@example.com")).toBeInTheDocument();
+		expect(restored.getByPlaceholderText("Current password")).toHaveValue("");
+		expect(restored.getByLabelText("Image URL")).toHaveValue("https://unfinished");
+		expect(JSON.stringify({ ...localStorage })).not.toContain("secret-current-password");
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});
+
 it("sends a pending email change to its verification route", async () => {
 	refreshSession.mockClear();
 	const originalFetch = globalThis.fetch;

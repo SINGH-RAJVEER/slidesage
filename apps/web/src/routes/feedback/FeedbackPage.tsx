@@ -5,9 +5,14 @@ import { Textarea } from "@slidesage/ui/components/textarea";
 import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
 import { type FormEvent, useCallback, useState } from "react";
 import Header from "../../app/Header";
+import { usePageDraft } from "../../hooks/usePageDraft";
 
 export default function FeedbackPage() {
-	const [message, setMessage] = useState("");
+	const [message, setMessage] = usePageDraft(
+		"feedback",
+		"",
+		(value): value is string => typeof value === "string" && value.length <= FEEDBACK_MAX_LENGTH,
+	);
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);

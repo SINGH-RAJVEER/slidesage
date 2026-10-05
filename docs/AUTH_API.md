@@ -51,6 +51,7 @@ RESEND_FROM_EMAIL=auth@example.com
 
 ## Password and email changes
 
+- Profile keeps unfinished name, email, and avatar URL edits in browser storage per account, including which forms were open. Returning or refreshing restores them after loading the saved profile. Save and Cancel clear the corresponding name or email draft. Password fields are never stored and must be entered again after leaving the page.
 - `PUT /profile` requires a JWT and current-password verification for security changes.
 - Password changes require `currentPassword` and `newPassword`, write a salted scrypt hash, and cannot include name or email changes.
 - Email changes require `currentPassword`. The API sends a user-bound six-digit OTP to the normalized new address and returns `pending_email` and `verification_required`; the existing email stays unchanged.

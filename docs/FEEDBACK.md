@@ -8,6 +8,7 @@
 
 - Messages are trimmed and may be 1 to 4,000 characters (`FEEDBACK_MAX_LENGTH` in `@slidesage/types`). Send stays disabled while the field is blank.
 - A successful send clears the field and shows a success notice. A failed send keeps the draft and shows the API error. Both use [`FloatingNotice`](USER_NOTICES.md).
+- Unsent feedback is saved in browser storage per account and restored after navigation or refresh. Sending successfully clears the saved draft. Drafts do not sync between browsers.
 
 ## API
 

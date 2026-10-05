@@ -13,6 +13,24 @@ mock.module("@slidesage/ui/context/AuthContext", () => ({
 
 const { default: FeedbackPage } = await import("../../../routes/feedback/FeedbackPage");
 
+it("restores feedback drafts when the page is reopened", () => {
+	const first = render(
+		<MemoryRouter>
+			<FeedbackPage />
+		</MemoryRouter>,
+	);
+	fireEvent.change(first.getByLabelText("Your feedback"), {
+		target: { value: "My unfinished feedback" },
+	});
+	first.unmount();
+	const restored = render(
+		<MemoryRouter>
+			<FeedbackPage />
+		</MemoryRouter>,
+	);
+	expect(restored.getByLabelText("Your feedback")).toHaveValue("My unfinished feedback");
+});
+
 it("sends trimmed feedback and clears the form", async () => {
 	const originalFetch = globalThis.fetch;
 	const bodies: string[] = [];
