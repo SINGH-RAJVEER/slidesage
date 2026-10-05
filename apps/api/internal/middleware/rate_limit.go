@@ -162,6 +162,8 @@ func policyFor(method, path string) (ratePolicy, bool) {
 		return ratePolicy{"presentation-export", 30, hour, true}, true
 	case method == http.MethodGet && path == "/images/search":
 		return ratePolicy{"photo-search", 60, hour, true}, true
+	case method == http.MethodPost && path == "/feedback":
+		return ratePolicy{"feedback-submit", 10, hour, true}, true
 	case method == http.MethodPost && path == "/billing/webhook":
 		return ratePolicy{"billing-webhook", 120, minute, false}, true
 	default:
