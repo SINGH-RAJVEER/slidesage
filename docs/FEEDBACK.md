@@ -2,7 +2,7 @@
 
 - The account menu in the app header lists Profile, Settings, Feedback, Report a bug, and Sign Out.
 - Feedback opens `/feedback`, a signed-in page with one free-text field.
-- Report a bug opens the [GitHub issues page](https://github.com/SINGH-RAJVEER/slidesage/issues) in a new tab. The URL is `BUG_REPORT_URL` in `libs/ui/components/Header.tsx`, and the feedback page links to it too.
+- Report a bug opens the [GitHub issues page](https://github.com/SINGH-RAJVEER/slidesage/issues) in a new tab. The URL is `BUG_REPORT_URL` in `libs/ui/components/Header.tsx`.
 
 ## Feedback page
 
