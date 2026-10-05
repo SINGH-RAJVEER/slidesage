@@ -5,9 +5,11 @@ go 1.27.1
 require (
 	cloud.google.com/go/storage v1.68.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.23.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pressly/goose/v3 v3.27.3
+	github.com/redis/go-redis/v9 v9.17.3
 	github.com/riverqueue/river v0.43.0
 	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.43.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.20.0
@@ -44,6 +46,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.37.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
@@ -51,7 +54,6 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.17 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

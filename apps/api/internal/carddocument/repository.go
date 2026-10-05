@@ -6,6 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"time"
+
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/cache"
 )
 
 type querier interface {
@@ -82,7 +86,45 @@ func CommitTx(ctx context.Context, tx *sql.Tx, expected int, revision Revision) 
 
 // CurrentRevision returns the current revision of a presentation the user owns.
 func CurrentRevision(ctx context.Context, database querier, presentationID, userID string) (Revision, error) {
-	row := database.QueryRowContext(ctx, `SELECT `+prefixed("r.")+`
+	return currentRevision(ctx, database, presentationID, userID, true)
+}
+
+// CachedCurrentRevision always reads ownership and the current revision from
+// PostgreSQL. Only the immutable body is cached; assets and shares stay fresh.
+func CachedCurrentRevision(ctx context.Context, database querier, presentationID, userID string, store cache.Store) (Revision, error) {
+	if store == nil {
+		return CurrentRevision(ctx, database, presentationID, userID)
+	}
+	revision, err := currentRevision(ctx, database, presentationID, userID, false)
+	if err != nil {
+		return Revision{}, err
+	}
+	key := cache.Key("card-body", userID, presentationID, strconv.Itoa(revision.Number), revision.SHA256)
+	if body, hit := store.Get(ctx, key); hit && json.Valid(body) {
+		revision.Document = append(json.RawMessage(nil), body...)
+		return revision, nil
+	}
+	// Repeat authorization on a miss as ownership/deletion may have changed.
+	var body []byte
+	err = database.QueryRowContext(ctx, `SELECT r.document FROM card_revisions r
+		JOIN presentations p ON p.id = r.presentation_id
+		WHERE p.id = $1 AND p.user_id = $2 AND r.revision = $3`, presentationID, userID, revision.Number).Scan(&body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Revision{}, ErrPresentationMissing
+	}
+	if err != nil {
+		return Revision{}, err
+	}
+	revision.Document = append(json.RawMessage(nil), body...)
+	if _, err := Load(revision); err != nil {
+		return Revision{}, err
+	}
+	store.Set(ctx, key, body, time.Hour)
+	return revision, nil
+}
+
+func currentRevision(ctx context.Context, database querier, presentationID, userID string, includeBody bool) (Revision, error) {
+	row := database.QueryRowContext(ctx, `SELECT `+prefixed("r.", includeBody)+`
 		FROM presentations p
 		JOIN card_revisions r ON r.presentation_id = p.id AND r.revision = p.current_card_revision
 		WHERE p.id = $1 AND p.user_id = $2`, presentationID, userID)
@@ -101,7 +143,7 @@ func CurrentRevision(ctx context.Context, database querier, presentationID, user
 }
 
 func findByOperation(ctx context.Context, database querier, presentationID, operationID string) (Revision, bool, error) {
-	row := database.QueryRowContext(ctx, `SELECT `+prefixed("")+` FROM card_revisions WHERE presentation_id = $1 AND operation_id = $2`, presentationID, operationID)
+	row := database.QueryRowContext(ctx, `SELECT `+prefixed("", true)+` FROM card_revisions WHERE presentation_id = $1 AND operation_id = $2`, presentationID, operationID)
 	revision, err := scanRevision(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Revision{}, false, nil
@@ -112,7 +154,7 @@ func findByOperation(ctx context.Context, database querier, presentationID, oper
 	return revision, true, nil
 }
 
-func prefixed(prefix string) string {
+func prefixed(prefix string, includeBody bool) string {
 	columns := []string{"presentation_id", "revision", "sha256", "byte_size", "card_count", "schema_version",
 		"author_id", "operation_kind", "operation_id", "base_revision", "provenance", "created_at", "document"}
 	result := ""
@@ -120,7 +162,11 @@ func prefixed(prefix string) string {
 		if index > 0 {
 			result += ", "
 		}
-		result += prefix + column
+		if column == "document" && !includeBody {
+			result += "NULL::jsonb"
+		} else {
+			result += prefix + column
+		}
 	}
 	return result
 }

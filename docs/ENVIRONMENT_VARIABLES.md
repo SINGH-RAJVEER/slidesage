@@ -1,169 +1,167 @@
 # Environment variables
 
-Copy `.env.example` to `.env`. Devenv loads it for the Go API, generation worker, and Bun workspace processes.
+- Copy `.env.example` to `.env`; devenv loads it for API, worker, and Bun processes.
+- Keep `.env` out of version control. Store production secrets in Secret Manager.
 
 ## Core
 
-| Variable                      | Required   | Default                                                                                                    | Purpose                                                                             |
-| ----------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `AUTH_SECRET`                 | Production | Local-only development secret                                                                              | Signs JWTs; HTTPS deployments require at least 32 characters                        |
-| `BASE_URL`                    | No         | `http://localhost:8000`                                                                                    | Public API and auth callback origin                                                 |
-| `PORT`                        | No         | `8000`                                                                                                     | API listen port                                                                     |
-| `HOST`                        | No         | `0.0.0.0`                                                                                                  | API listen host                                                                     |
-| `DATABASE_URL`                | No locally | Local devenv database                                                                                      | PostgreSQL connection string                                                        |
-| `DATABASE_CONNECT_TIMEOUT`    | No         | `10`                                                                                                       | PostgreSQL connection timeout in seconds                                            |
-| `DATABASE_IDLE_TIMEOUT`       | No         | `20`                                                                                                       | PostgreSQL idle connection timeout in seconds                                       |
-| `DATABASE_POOL_MAX`           | No         | `5`                                                                                                        | Maximum open and idle connections in the Go API pool                                |
-| `RATE_LIMIT_HASH_SECRET`      | Production | `AUTH_SECRET`                                                                                              | Independent secret mixed into hashed rate-limit identities                          |
-| `TRUST_PROXY_HEADERS`         | No         | `false`                                                                                                    | Allows Go to use proxy-supplied client-IP headers; enable only behind a proxy that replaces them |
-| `CORS_ORIGINS`                | No         | Local Bun origins, `https://slidesage.pages.dev`, `https://slidesage.app`, and `https://www.slidesage.app` | Comma-separated allowed web origins; trailing slashes are normalized                |
-| `CORS_ORIGIN`                 | No         | Default CORS origins                                                                                       | Single-origin fallback; trailing slashes are normalized                             |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | No         | Local frontend, `https://slidesage.pages.dev`, `https://slidesage.app`, and `https://www.slidesage.app`    | Comma-separated auth callback origins; trailing slashes are normalized              |
-| `VITE_API_URL`                | No         | `http://localhost:8000`                                                                                    | Browser API origin without a path suffix; set production to `https://api.slidesage.app` |
-| `NODE_ENV`                    | No         | `development` in devenv                                                                                    | Controls production auth and email-delivery safeguards; OTP values are never logged |
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `AUTH_SECRET` | Production | Local-only development secret | Signs JWTs; HTTPS deployments require at least 32 characters |
+| `BASE_URL` | No | `http://localhost:8000` | Public API and auth callback origin |
+| `PORT` | No | `8000` | API listen port |
+| `HOST` | No | `0.0.0.0` | API listen host |
+| `DATABASE_URL` | No locally | Local devenv database | PostgreSQL connection string |
+| `DATABASE_CONNECT_TIMEOUT` | No | `10` | PostgreSQL connection timeout in seconds |
+| `DATABASE_IDLE_TIMEOUT` | No | `20` | PostgreSQL idle connection timeout in seconds |
+| `DATABASE_POOL_MAX` | No | `5` | Maximum open and idle connections in the Go API pool |
+| `RATE_LIMIT_HASH_SECRET` | Production | `AUTH_SECRET` | Independent secret mixed into hashed rate-limit identities |
+| `TRUST_PROXY_HEADERS` | No | `false` | Allows Go to use proxy-supplied client-IP headers; enable only behind a proxy that replaces them |
+| `CORS_ORIGINS` | No | Local frontend origins, `https://slidesage.pages.dev`, `https://slidesage.app`, and `https://www.slidesage.app` | Comma-separated allowed web origins; trailing slashes are normalized |
+| `CORS_ORIGIN` | No | Default CORS origins | Single-origin fallback; trailing slashes are normalized |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | No | Local frontend, `https://slidesage.pages.dev`, `https://slidesage.app`, and `https://www.slidesage.app` | Comma-separated auth callback origins; trailing slashes are normalized |
+| `VITE_API_URL` | No | `http://localhost:8000` | Browser API origin without a path suffix; set production to `https://api.slidesage.app` |
+| `NODE_ENV` | No | `development` in devenv | Controls production auth and email-delivery safeguards; OTP values are never logged |
 
-Devenv also supplies `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, and `POSTGRES_PORT` for its local PostgreSQL process. Their defaults are all `slidesage`, except `POSTGRES_PORT=5432`. The running PostgreSQL process exposes its active port as `PGPORT`.
+- Devenv supplies local PostgreSQL credentials, defaulting to `slidesage`, and port `5432`. Use active `PGPORT` when devenv selects another port.
+- Managed API and migration commands build `DATABASE_URL` from active `PGPORT` rather than reloading a stale `.env` value.
+- The API uses one bounded `database/sql` pool.
+- Production web builds ignore loopback `VITE_API_URL` values and fall back to same-origin routes.
 
-Devenv may select another PostgreSQL port when the default is occupied. Its migration task constructs `DATABASE_URL` from the active `PGPORT`, so values loaded from `.env` cannot redirect migrations to a stale local port. The managed API process uses the same active-port connection string and does not reload `.env`, preventing its development command from reverting to the default port.
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `GENERATION_STREAM_LIMIT` | No | `40` | Maximum concurrent generation SSE streams in one API process |
+| `GENERATION_STREAM_LIMIT_PER_USER` | No | `3` | Maximum concurrent generation SSE streams for one user in one API process |
 
-The Go API uses one bounded `database/sql` pool configured by `DATABASE_POOL_MAX`, `DATABASE_CONNECT_TIMEOUT`, and `DATABASE_IDLE_TIMEOUT`.
+- Use an independent production `RATE_LIMIT_HASH_SECRET` so auth-secret rotation does not reset identity hashes. See [Rate limiting](RATE_LIMITING.md).
 
-| Variable                  | Required | Default | Purpose                                                      |
-| ------------------------- | -------- | ------- | ------------------------------------------------------------ |
-| `GENERATION_STREAM_LIMIT` | No       | `40`    | Maximum concurrent generation SSE streams in one API process |
-| `GENERATION_STREAM_LIMIT_PER_USER` | No       | `3`     | Maximum concurrent generation SSE streams for one user in one API process |
+## Database read cache
 
-Set `RATE_LIMIT_HASH_SECRET` to a separate random deployment secret. Falling back to `AUTH_SECRET` is supported, but an independent value avoids coupling rate-limit identity hashes to auth-secret rotation. See [RATE_LIMITING.md](RATE_LIMITING.md).
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `CACHE_REDIS_ADDR` | No | Empty | Redis host:port; empty disables caching |
+| `CACHE_REDIS_PASSWORD` | Production cache | Empty | Redis AUTH credential |
+| `CACHE_REDIS_CA_PEM` | Production cache | Empty | Trusted TLS CA certificates |
+| `CACHE_TIMEOUT_MS` | No | `100` | Operation timeout, 1 to 1,000 milliseconds |
+
+- GitHub `CACHE_ENABLED` controls Terraform provisioning and defaults to `false`.
+- See [Database cache](DATABASE_CACHE.md) for read paths, invalidation, fallback, and production setup.
 
 ## Generation worker
 
-| Variable               | Required | Default | Purpose                                                          |
-| ---------------------- | -------- | ------- | ---------------------------------------------------------------- |
-| `WORKER_CONCURRENCY`   | No       | `2`     | Maximum concurrent River generation jobs in one worker process   |
-| `WORKER_DATABASE_POOL_MAX` | No       | `WORKER_CONCURRENCY + 3` | Maximum open and idle connections in the worker database pool    |
-| `WORKER_DRAIN_TIMEOUT` | No       | `8`     | Graceful shutdown timeout in seconds after `SIGINT` or `SIGTERM` |
-| `WORKER_HEALTH_PORT`   | No       | `8080`  | Worker `/live`, `/ready`, and `/drain` health server port        |
-| `WORKER_DRAIN_POLL_SECONDS` | No  | `2`     | Interval at which `POST /drain` recounts outstanding queue rows  |
-| `WORKER_DRAIN_IDLE_SECONDS` | No  | `30`    | How long the queue must stay empty before `POST /drain` returns  |
-| `WORKER_DRAIN_ACCEPT_SECONDS` | No | `1200` | How long a request-owned River client may claim new jobs         |
-| `WORKER_DRAIN_HANDOFF_SECONDS` | No | `480` | Time reserved for active work to finish before lease renewal     |
-| `WORKER_REQUEST_LEASED`     | No       | `false` | Start River only inside `/drain`; production sets this to `true` |
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `WORKER_CONCURRENCY` | No | `2` | Maximum concurrent River generation jobs in one worker process |
+| `WORKER_DATABASE_POOL_MAX` | No | `WORKER_CONCURRENCY + 3` | Maximum open and idle connections in the worker database pool |
+| `WORKER_DRAIN_TIMEOUT` | No | `8` | Graceful shutdown timeout in seconds after `SIGINT` or `SIGTERM` |
+| `WORKER_HEALTH_PORT` | No | `8080` | Worker `/live`, `/ready`, and `/drain` health server port |
+| `WORKER_DRAIN_POLL_SECONDS` | No | `2` | Interval at which `POST /drain` recounts outstanding queue rows |
+| `WORKER_DRAIN_IDLE_SECONDS` | No | `30` | How long the queue must stay empty before `POST /drain` returns |
+| `WORKER_DRAIN_ACCEPT_SECONDS` | No | `1200` | How long a request-owned River client may claim new jobs |
+| `WORKER_DRAIN_HANDOFF_SECONDS` | No | `480` | Time reserved for active work to finish before lease renewal |
+| `WORKER_REQUEST_LEASED` | No | `false` | Start River only inside `/drain`; production sets this to `true` |
 
-The worker also requires `DATABASE_URL` and uses `DATABASE_CONNECT_TIMEOUT` and `DATABASE_IDLE_TIMEOUT`. It must receive the same generation provider and BYOK encryption configuration as the API because provider execution occurs in `cmd/worker`, not in the submission request.
-
-`GET /live` returns `204` while the worker health server is running. `GET /ready` returns `204` only when the worker accepts work and PostgreSQL is reachable. It returns `503` during shutdown. With request leasing enabled, `POST /drain` creates the only River client in that instance. It stops claiming work after `WORKER_DRAIN_ACCEPT_SECONDS`, waits up to `WORKER_DRAIN_HANDOFF_SECONDS` for its local attempt, and returns `500` when pending work remains so Cloud Tasks renews the same task. It returns `204` only after the pending queue has stayed empty for `WORKER_DRAIN_IDLE_SECONDS` and its local client has stopped.
+- Worker needs the same database, provider, and BYOK encryption settings as API.
+- Health probes, lease behavior, and shutdown are in [Worker operation](GENERATION_WORKER.md#process-configuration).
 
 ## Worker wake signal
 
-The API sets these so a scaled-to-zero worker learns that committed work exists. Leave `WORKER_WAKE_URL` unset in development, where the worker runs continuously and nothing needs waking.
+- Set wake variables for production scale-to-zero operation. Leave `WORKER_WAKE_URL` unset locally.
 
-| Variable                       | Required | Default | Purpose                                                              |
-| ------------------------------ | -------- | ------- | -------------------------------------------------------------------- |
-| `WORKER_WAKE_URL`              | No       | unset   | Worker `/drain` URL. Unset disables waking entirely                  |
-| `WORKER_WAKE_QUEUE`            | With URL | none    | Cloud Tasks queue path that carries the signal                        |
-| `WORKER_WAKE_SERVICE_ACCOUNT`  | No       | unset   | Service account minted into the task's OIDC token                    |
-| `WORKER_WAKE_DEADLINE_SECONDS` | No       | `1800`  | How long Cloud Tasks holds the drain request open                    |
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `WORKER_WAKE_URL` | No | unset | Worker `/drain` URL. Unset disables waking entirely |
+| `WORKER_WAKE_QUEUE` | With URL | none | Cloud Tasks queue path that carries the signal |
+| `WORKER_WAKE_SERVICE_ACCOUNT` | No | unset | Service account minted into the task's OIDC token |
+| `WORKER_WAKE_DEADLINE_SECONDS` | No | `1800` | How long Cloud Tasks holds the drain request open |
 
-`cmd/worker --maintenance` reads the same variables: the scheduled sweep re-wakes the worker when it finds queue rows nothing is polling for.
-
-Account for both the instance ceiling and `WORKER_CONCURRENCY` when sizing PostgreSQL connection limits and provider capacity. See [GENERATION_WORKER.md](GENERATION_WORKER.md). The worker must keep instance-based billing with CPU throttling disabled so River keeps running between HTTP requests.
-
-## Office editor
-
-The browser editor is not part of this build. No API process reads any `ONLYOFFICE_*` or `EDITOR_*`
-variable, because the document server is not provisioned and the integration has been moved to the
-`onlyoffice-editor` bookmark. The variables and their documentation live there, and come back with
-it.
+- Scheduled maintenance uses the same wake settings to re-wake due work.
+- Size worker slots, instance limits, database pools, and provider capacity together. Production requires instance-based billing with CPU throttling disabled.
+- See [Generation worker](GENERATION_WORKER.md) for lease and scaling behavior.
 
 ## AI and research
 
-| Variable                        | Required                                  | Default                              | Purpose                                                                                                                                    |
-| ------------------------------- | ----------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `OPEN_ROUTER_API_KEY`           | Yes for default generation                | None                                 | Server OpenRouter authentication; BYOK replaces only generation calls                                                                      |
-| `OPEN_ROUTER_MODEL`             | No                                        | `qwen/qwen3.8-27b:free`              | Server-owned OpenRouter generation model                                                                                                   |
-| `OPEN_ROUTER_API_BASE`          | No                                        | OpenRouter chat completions endpoint | Chat endpoint override                                                                                                                     |
-| `OPEN_ROUTER_MAX_OUTPUT_TOKENS` | No                                        | Not used                             | Generation enforces a server-owned 2,000-16,000 output-token ceiling based on requested slide count so point authorizations remain bounded |
-| `PROVIDER_VALIDATION_TIMEOUT_MS` | No                                        | `15000`                              | Total timeout for listing models from a user-connected BYOK provider                                                                       |
-| `EXA_API_KEY`                   | For web research                          | None                                 | Exa search authentication                                                                                                                  |
-| `EXA_REQUEST_TIMEOUT_MS`        | No                                        | `10000`                              | Maximum Exa request duration; caller cancellation can stop it earlier                                                                      |
-Presentation requests without a valid user provider connection use OpenRouter JSON output and consume SlideSage points. The server defaults to the specific free model `qwen/qwen3.8-27b:free`, rather than the rotating `openrouter/free` route. OpenRouter lists structured-output support and zero token pricing for this model; an October 3, 2026 streaming JSON probe using the production credential returned a valid outline at zero cost without changing the account's zero-data-retention policy. Set `OPEN_ROUTER_MODEL` to override it. Free endpoints remain subject to provider availability and rate limits. See the [OpenRouter model page](https://openrouter.ai/qwen/qwen3.8-27b:free). Valid BYOK connections replace this generation path.
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `OPEN_ROUTER_API_KEY` | Yes for default generation | None | Server OpenRouter authentication; BYOK replaces only generation calls |
+| `OPEN_ROUTER_MODEL` | No | `qwen/qwen3.8-27b:free` | Server-owned OpenRouter generation model |
+| `OPEN_ROUTER_API_BASE` | No | OpenRouter chat completions endpoint | Chat endpoint override |
+| `PROVIDER_VALIDATION_TIMEOUT_MS` | No | `15000` | Total timeout for listing models from a user-connected BYOK provider |
+| `EXA_API_KEY` | For web research | None | Exa search authentication |
+| `EXA_REQUEST_TIMEOUT_MS` | No | `10000` | Maximum Exa request duration; caller cancellation can stop it earlier |
+
+- OpenRouter funds default generation; valid BYOK selection replaces those calls. Research always uses Exa.
+- `OPEN_ROUTER_MODEL` overrides the server default. Free models still have availability and rate limits.
 
 ## Authentication and email
 
-| Variable                    | Required         | Default | Purpose                                        |
-| --------------------------- | ---------------- | ------- | ---------------------------------------------- |
-| `RESEND_API_KEY`            | Production email | None    | Sends verification and password-reset OTPs     |
-| `RESEND_FROM_EMAIL`         | No               | `onboarding@resend.dev` | Sender address on a Resend-verified domain; prefer plain `email@example.com` syntax because some dotenv loaders preserve quotes |
-| `EMAIL_DELIVERY_TIMEOUT_MS` | No               | `10000` | Maximum wait for Resend to accept an OTP email |
-| `GOOGLE_CLIENT_ID`          | For Google OAuth | None    | Google OAuth client ID                         |
-| `GOOGLE_CLIENT_SECRET`      | For Google OAuth | None    | Google OAuth client secret                     |
-| `GITHUB_CLIENT_ID`          | For GitHub OAuth | None    | GitHub OAuth client ID                         |
-| `GITHUB_CLIENT_SECRET`      | For GitHub OAuth | None    | GitHub OAuth client secret                     |
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `RESEND_API_KEY` | Production email | None | Sends verification and password-reset OTPs |
+| `RESEND_FROM_EMAIL` | No | `onboarding@resend.dev` | Sender address on a Resend-verified domain; prefer plain `email@example.com` syntax because some dotenv loaders preserve quotes |
+| `EMAIL_DELIVERY_TIMEOUT_MS` | No | `10000` | Maximum wait for Resend to accept an OTP email |
+| `GOOGLE_CLIENT_ID` | For Google OAuth | None | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | For Google OAuth | None | Google OAuth client secret |
+| `GITHUB_CLIENT_ID` | For GitHub OAuth | None | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | For GitHub OAuth | None | GitHub OAuth client secret |
 
-Without `RESEND_API_KEY`, development mode skips delivery and logs a warning but never logs the OTP. Production send requests fail with `503` when the key is missing or Resend rejects the request. OAuth callback URLs are `${BASE_URL}/auth/callback/google` and `${BASE_URL}/auth/callback/github`.
-
-When `BASE_URL` is unset in a deployment, auth can derive it from the platform-provided `CF_PAGES_URL` or `VERCEL_URL`.
+- Development without a Resend key skips delivery and never logs OTPs. Production delivery failures return `503`.
+- OAuth callbacks use `${BASE_URL}/auth/callback/google` and `${BASE_URL}/auth/callback/github`.
+- Without explicit `BASE_URL`, auth can use `CF_PAGES_URL` or `VERCEL_URL`.
+- See [Authentication](AUTH_API.md) for cookie and email behavior.
 
 ## Billing
 
-| Variable                  | Required      | Default | Purpose                                                         |
-| ------------------------- | ------------- | ------- | --------------------------------------------------------------- |
-| `RAZORPAY_KEY_ID`         | Yes           | None    | Public checkout key                                             |
-| `RAZORPAY_KEY_SECRET`     | Yes           | None    | Creates orders and verifies payments                            |
-| `RAZORPAY_WEBHOOK_SECRET` | Yes           | None    | Verifies signatures against the exact raw Razorpay webhook body |
-| `RAZORPAY_REQUEST_TIMEOUT_MS` | No            | `15000` | Maximum Razorpay API request duration                           |
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `RAZORPAY_KEY_ID` | Yes | None | Public checkout key |
+| `RAZORPAY_KEY_SECRET` | Yes | None | Creates orders and verifies payments |
+| `RAZORPAY_WEBHOOK_SECRET` | Yes | None | Verifies signatures against the exact raw Razorpay webhook body |
+| `RAZORPAY_REQUEST_TIMEOUT_MS` | No | `15000` | Maximum Razorpay API request duration |
 
-The API reads all three credentials at startup and exits when any of them is empty, so it cannot run without payments configured. `.env.example` ships placeholder values that satisfy the check for local development.
-
-Do not commit `.env`. Keep secrets in the deployment platform's secret store in production.
-
-Set `VITE_API_URL=https://api.slidesage.app` for the `slidesage.app` production build. The client sends requests directly to each endpoint. As a deployment safeguard, production builds ignore loopback values such as `localhost` and `127.0.0.1` and fall back to same-origin routes instead.
+- API startup requires all three Razorpay credentials. Local `.env.example` includes placeholders.
 
 ## Card documents and image storage
 
-| Variable                  | Required | Secret | Purpose |
-| ------------------------- | -------- | ------ | ------- |
-| `PRESENTATION_GCS_BUCKET` | Stored images | No | Private bucket for card image assets. `cmd/migrate` deletes objects left in it by retired document formats and skips that sweep when the variable is unset. Document bodies live in PostgreSQL JSONB; text-only generation and document reads need no bucket |
+| Variable | Required | Secret | Purpose |
+| --- | --- | --- | --- |
+| `PRESENTATION_GCS_BUCKET` | Stored images | No | Private image bucket and migration sweep target; text-only documents need no bucket |
 | `STORAGE_EMULATOR_HOST` | Local image storage | No | GCS emulator URL. Devenv and `.env.example` use `http://127.0.0.1:4443`. Leave unset in production so clients use real GCS |
 | `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
 | `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
 | `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |
-| `UNSPLASH_ACCESS_KEY` | Stock photos when enabled | Yes | Unsplash application access key for the only stock-photo provider. Production Terraform looks up and injects this Secret Manager secret into the API and worker only when `unsplash_enabled=true`. Without the key, stock routes return `503` and generation drafts text-only decks; uploads remain available |
+| `UNSPLASH_ACCESS_KEY` | Stock photos | Yes | Unsplash key; without it stock routes return `503` and generation uses text layouts. Uploads remain available |
 | `UNSPLASH_API_BASE` | No | No | Unsplash API base URL; defaults to `https://api.unsplash.com`. Only for tests and local stubs |
 
-`UNSPLASH_ENABLED` is a GitHub repository variable, not an application environment variable. Both plan and deploy workflows pass it as `TF_VAR_unsplash_enabled`, defaulting to `false` when unset. Terraform's `unsplash_enabled` boolean also defaults to `false`; no Unsplash key is looked up or injected while false. Leave the key out for now. To enable stock photos later, first provision `UNSPLASH_ACCESS_KEY` with an enabled Secret Manager version available as `latest`, then set `UNSPLASH_ENABLED=true` and deploy.
-
-The removed template fetcher and thumbnail routes were the only users of the Cloud CDN signing variables (`CDN_URL`, `CDN_SIGNING_KEY_NAME`, `CDN_SIGNING_KEY_SECRET`, `CDN_SIGNED_URL_TTL_SECONDS`). Production Terraform no longer passes them to Cloud Run or manages the template CDN route.
-
-The API refuses to initialize authentication on an HTTPS base URL without a sufficiently strong `AUTH_SECRET`.
+- `UNSPLASH_ENABLED` is a GitHub repository variable, passed to Terraform as `TF_VAR_unsplash_enabled`, default `false`.
+- Enable photos by provisioning an enabled `UNSPLASH_ACCESS_KEY:latest`, setting `UNSPLASH_ENABLED=true`, and deploying. Disabled deployments skip the secret lookup and injection.
 
 ## Observability
 
-| Variable                       | Required | Default                                            | Purpose                                                                                     |
-| ------------------------------ | -------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`  | No       | Empty                                              | Common OTLP endpoint; telemetry export stays disabled while empty                           |
-| `OTEL_EXPORTER_OTLP_PROTOCOL`  | No       | `grpc`                                             | `grpc` for a collector or `http/protobuf` for an HTTP intake such as Datadog direct intake   |
-| `OTEL_EXPORTER_OTLP_HEADERS`   | No       | Empty                                              | Comma-separated OTLP request headers; treat the value as a secret when it contains an API key |
-| `OTEL_EXPORTER_OTLP_INSECURE`  | No       | `false`                                            | Plaintext gRPC for collectors without TLS, such as local development                        |
-| `OTEL_SERVICE_NAME`            | No       | `slidesage-api`, `-worker`, or `-preview`          | Resource service name on all signals                                                        |
-| `OTEL_SERVICE_VERSION`         | No       | Empty                                              | Resource service version                                                                    |
-| `OTEL_RESOURCE_ENVIRONMENT`    | No       | `ENVIRONMENT`, then `NODE_ENV`, then `development` | Deployment environment label                                                                |
-| `OTEL_RESOURCE_ATTRIBUTES`     | No       | Empty                                              | Extra comma-separated OpenTelemetry resource attributes                                     |
-| `OTEL_TRACES_EXPORTER`         | No       | `otlp`                                             | Set to `none` to disable trace export                                                        |
-| `OTEL_METRICS_EXPORTER`        | No       | `otlp`                                             | Set to `none` to disable metric export                                                       |
-| `OTEL_LOGS_EXPORTER`           | No       | `otlp`                                             | Set to `none` to disable OTLP logs, for example when another integration collects stdout     |
-| `OTEL_TRACES_SAMPLING_RATIO`   | No       | `1`                                                | Head-sampling ratio for root spans between 0 and 1                                          |
-| `OTEL_METRIC_EXPORT_INTERVAL`  | No       | `60000`                                            | Metric export interval in milliseconds                                                      |
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | Empty | Common OTLP endpoint; telemetry export stays disabled while empty |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `http/protobuf` | Only supported export protocol; other values are rejected when export is enabled |
+| `OTEL_EXPORTER_OTLP_HEADERS` | No | Empty | Comma-separated OTLP request headers; treat the value as a secret when it contains an API key |
+| `OTEL_SERVICE_NAME` | No | `slidesage-api` or `slidesage-worker` | Resource service name on all signals |
+| `OTEL_SERVICE_VERSION` | No | Empty | Resource service version |
+| `OTEL_RESOURCE_ENVIRONMENT` | No | `ENVIRONMENT`, then `NODE_ENV`, then `development` | Deployment environment label |
+| `OTEL_RESOURCE_ATTRIBUTES` | No | Empty | Extra comma-separated OpenTelemetry resource attributes |
+| `OTEL_TRACES_EXPORTER` | No | `otlp` | Set to `none` to disable trace export |
+| `OTEL_METRICS_EXPORTER` | No | `otlp` | Set to `none` to disable metric export |
+| `OTEL_LOGS_EXPORTER` | No | `otlp` | Set to `none` to disable OTLP logs, for example when another integration collects stdout |
+| `OTEL_TRACES_SAMPLING_RATIO` | No | `1` | Head-sampling ratio for root spans between 0 and 1 |
+| `OTEL_METRIC_EXPORT_INTERVAL` | No | `60000` | Metric export interval in milliseconds |
+| `GEN_AI_CAPTURE_CONTENT` | No | `false` | Capture provider prompts/responses on traces; omit values above 256 KiB |
 
-Setting `OTEL_SDK_DISABLED=true` also disables export regardless of endpoint. See [OBSERVABILITY.md](OBSERVABILITY.md) for the emitted traces, metrics, and logs.
+- `OTEL_SDK_DISABLED=true` disables export regardless of endpoint. See [Observability](OBSERVABILITY.md) for signals and Datadog setup.
 
 ## BYOK credential encryption
 
-| Variable                              | Required | Description                                           |
-| ------------------------------------- | -------- | ----------------------------------------------------- |
+| Variable | Required | Description |
+| --- | --- | --- |
 | `BYOK_ENCRYPTION_KEY_CURRENT_VERSION` | For BYOK | Active encryption key version, normally `1` initially |
-| `BYOK_ENCRYPTION_KEY`                 | For BYOK | Base64-encoded 32-byte AES-GCM key (active version `1`) |
+| `BYOK_ENCRYPTION_KEY` | For BYOK | Base64-encoded 32-byte AES-GCM key (active version `1`) |
 
-Provider API keys are supplied by users and encrypted with these deployment secrets. They are used only for presentation generation.
-
-`BYOK_ENCRYPTION_KEY_CURRENT_VERSION` is a non-secret version selector. The active version `1` key is read from `BYOK_ENCRYPTION_KEY`; rotated-out versions `n > 1` stay in `BYOK_ENCRYPTION_KEY_V<n>`. Every referenced key is secret and must remain available while stored credentials still use that version.
+- API and worker use these keys to encrypt user credentials. They never reach browser bundles.
+- Version 1 uses `BYOK_ENCRYPTION_KEY`; higher versions use `BYOK_ENCRYPTION_KEY_V<n>`. The selector is non-secret; every key value is secret. Retain keys while stored credentials reference them.

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/auth"
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/cache"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/generation"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/billing"
@@ -57,6 +58,15 @@ func main() {
 		fatal(logger, err)
 	}
 
+	readCache, err := cache.FromEnv()
+	if err != nil {
+		fatal(logger, err)
+	}
+	defer readCache.Close()
+	var readStore cache.Store
+	if readCache != nil {
+		readStore = readCache
+	}
 	baseURL := env("BASE_URL", "http://localhost:8000")
 	secureCookies := strings.HasPrefix(baseURL, "https://")
 	cookieName := "slidesage_token"
@@ -85,7 +95,7 @@ func main() {
 	auth.RegisterProfileRoutes(mux, service)
 	identity := service.AuthenticatedUserID
 	researchService := presentation.NewExaResearchService(os.Getenv("EXA_API_KEY"), nil)
-	presentation.RegisterRoutes(mux, presentation.NewService(presentation.NewRepository(database)), func(_ context.Context, request *http.Request) (string, error) {
+	presentation.RegisterRoutes(mux, presentation.NewService(presentation.NewRepository(database)).WithCache(readStore), func(_ context.Context, request *http.Request) (string, error) {
 		return identity(request)
 	}, researchService, database)
 	ai.RegisterRoutes(mux, ai.ConnectionService{DB: database}, identity)
@@ -99,7 +109,7 @@ func main() {
 	generation.RegisterRoutes(mux, database, func(_ context.Context, request *http.Request) (string, error) {
 		return identity(request)
 	}, ai.ConnectionService{DB: database}, generation.RouteConfig{StreamContext: streamContext, Research: researchService})
-	if err := registerDocumentRoutes(mux, database, identity); err != nil {
+	if err := registerDocumentRoutes(mux, database, identity, readStore); err != nil {
 		fatal(logger, err)
 	}
 	mux.HandleFunc("GET /health", healthHandler)

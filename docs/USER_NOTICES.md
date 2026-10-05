@@ -1,23 +1,26 @@
 # User notices
 
-Every transient error or confirmation the web app shows is rendered through a single component, `FloatingNotice` (`libs/ui/components/FloatingNotice.tsx`), exported from `@slidesage/ui`. It is a pill pinned below the header's top-right corner that mirrors the active generation indicator, and it dismisses itself after four seconds.
+- Use `FloatingNotice` from `@slidesage/ui` for transient action feedback.
+- It appears below the header's top-right corner and dismisses after four seconds.
+- Use errors for failed actions and warnings for conditions the user can correct before proceeding. Rejected generation submissions are errors and keep the user on the page.
 
 ## Props
 
-| Prop | Type | Meaning |
+| Prop | Type | Purpose |
 | --- | --- | --- |
-| `error` | `string \| null \| undefined` | Error message. Takes precedence over the other two. |
-| `warning` | `string \| null \| undefined` | Warning message. Outranked by `error`, outranks `success`. |
-| `success` | `string \| null \| undefined` | Confirmation message. |
-| `onDismiss` | `() => void` | Called when the notice times out. Must clear the state that produced the message. |
+| `error` | `string \| null \| undefined` | Highest-priority message |
+| `warning` | `string \| null \| undefined` | Shown when no error exists |
+| `success` | `string \| null \| undefined` | Shown when no error or warning exists |
+| `onDismiss` | `() => void` | Clear the state that produced the message |
 
-An error renders with `role="alert"`, a warning icon, and red text on a red border; a warning renders with `role="status"`, the same icon, and amber text on an amber border; a success renders with `role="status"`, a check icon, and emerald text on an emerald border. All are `aria-live="polite"`. Rendering nothing when every message is empty is the component's own responsibility, so callers pass state through unconditionally.
-
-A warning is for a state the reader can correct before the action succeeds, rather than one that already failed. A generation submission the API refuses is an error: `/generate` and `/generate/research` report it on the notice and stay on the page.
+- Errors use `role="alert"`, a warning icon, and red styling.
+- Warnings use `role="status"`, a warning icon, and amber styling.
+- Success uses `role="status"`, a check icon, and emerald styling.
+- All notices use `aria-live="polite"`. Empty messages render nothing.
 
 ## Usage
 
-Mount it once per page, directly after `<Header />`, and feed it the page's message state:
+Mount once per page after `<Header />`:
 
 ```tsx
 <Header />
@@ -31,15 +34,16 @@ Mount it once per page, directly after `<Header />`, and feed it the page's mess
 />
 ```
 
-Because it is `position: fixed`, it does not need to sit near the control that failed. Do not add page-local error boxes, inline red text under a form, or `Alert` blocks for action feedback.
-
-Where the message is owned upstream and the component cannot clear it, such as an error in the streaming state, copy it into local state when it changes and clear that copy on dismiss, rather than adding a clear callback to the parent.
+- Pass message state unconditionally. Fixed positioning keeps the notice independent of the affected control.
+- Use this component instead of page-local error boxes, inline action errors, or `Alert` blocks.
+- If upstream state cannot be cleared, copy the message into local state and clear that copy on dismissal.
+- Implementation: `libs/ui/components/FloatingNotice.tsx`.
 
 ## What stays inline
 
-The notice replaces feedback that follows a user action. Blocking states that own a whole page or panel and carry their own recovery action keep their inline treatment, since a self-dismissing pill would take the retry affordance with it:
+Keep states that replace a page or panel and provide recovery controls inline:
 
-- `PresentationErrorPage`, the dedicated route for a failed generation (its retry failure message uses the notice)
-- The research failure block on `GenerateResearchPage`, which offers **Retry research**
-- The "AI settings could not be loaded" state in `AISettings`, which replaces the whole panel. It is tracked separately from the panel's confirmations, which do go to the notice
-- The "Email verified" block on `VerifyEmailPage`, which replaces the form for the terminal state of the flow
+- `PresentationErrorPage`; retry failures use a notice.
+- The research failure block on `GenerateResearchPage`, with Retry research.
+- The load failure in `AISettings`; action confirmations use a notice.
+- The terminal Email verified state on `VerifyEmailPage`.

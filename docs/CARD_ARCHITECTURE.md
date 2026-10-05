@@ -2,86 +2,91 @@
 
 ## Status and decision
 
-This is the architecture of SlideSage presentations. It describes the target design; the part already built is listed under "Implemented so far". The defining decision is that an editable card document becomes the authoritative presentation. Browser presentation and PPTX export derive from a saved card revision.
-
-The PPTX-first pipeline this replaces has been removed: the template-slot compiler, the legacy PPTX template catalog, publisher, and marketplace, canonical PPTX revision storage and its document routes, and the browser PPTX viewer. Production Terraform now drops the template CDN route and deploys the converter with the API and worker. Migration 34 drops the legacy `presentation_revisions` table and the `current_pptx_revision` column, and `cmd/migrate` deletes the PPTX objects those rows pointed at.
+- The editable card document is the authoritative presentation. The browser and PPTX exporter read a saved revision.
+- The implementation is documented in [Card documents](CARD_DOCUMENTS.md). This guide records design constraints and remaining work.
+- The former PPTX-first pipeline and its revision routes have been removed. Migrations 34 and 35 retire its tables and documents.
 
 ### Implemented so far
 
-The first vertical slice is built; [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md) describes it. It covers the version 3 card schema in `libs/cards`, the Bun converter service, immutable card revisions in PostgreSQL JSONB and image assets in GCS, planned and batch-drafted generation with targeted card repair, an outline the user approves before drafting, a live preview of cards as they are drafted, stock and uploaded photos, direct editing in the browser, AI revisions of chosen cards, present mode, read-only share links, charts, progress meters, tables, and callouts in sized chart, table, and dashboard cards, and synchronous PPTX export of native text, lists, photos, charts, and tables.
+- Version 3 schema, private Bun converter, immutable JSONB revisions, and GCS image storage.
+- Approved outlines, bounded drafting batches, targeted repairs, and live previews.
+- Direct editing, selected-card AI revisions, stock and uploaded photos, presenting, and read-only sharing.
+- Charts, meters, tables, and callouts with shared browser/export geometry.
+- Synchronous PPTX export with native text, lists, pictures, charts, and tables.
+- Shared template catalog and browser-local installation library.
 
-Still to build:
+Remaining work:
 
-- AI-generated images;
-- the rest of the export design below: asynchronous exports recorded with their revision, exporter version, and output digest; text measured with the actual fonts; and a browser-versus-PPTX comparison gate.
-
-Also open:
-
-- The converter is configured as a localhost sidecar in both Cloud Run services, but the card pipeline has not been deployed or verified against the live environment.
-- Provenance is recorded only on successful revisions. A failed run keeps its error and retry settings but not the model, prompt version, or source IDs it used.
-- At their schema limits most layouts need more room than one 16:9 slide. Cards never change shape: the browser and export both shrink their text to fit, down to half size. Tighter per-layout limits would keep more cards at their designed size.
-
-The design takes inspiration from Gamma's disclosed card system and its HTML-to-editor conversion. The [card system description](https://gamma.app/explore/content/guides/how-gamma-maps-content-directly-to-slides-using-its-card-system) describes flexible cards and layout selection. The [engineering case study](https://vercel.com/customers/gamma-builds-design-first-agents-with-vercel) says generated HTML is parsed into structured Tiptap content and assets are resolved. Neither source specifies Gamma's complete prompts, internal document schema, or export writer. The choices below are SlideSage proposals.
+- AI-generated images with a defined per-image price.
+- Asynchronous exports recorded by revision, exporter version, and output digest.
+- Text measurement with actual fonts and a browser/PPTX visual comparison gate.
+- Failed-run provenance, including model, prompt version, and source IDs.
+- Tighter layout limits to reduce text shrinking and overflow at schema bounds.
 
 ## User-visible result
 
-A user enters a topic, notes, or supplied research, chooses a theme and target card count, and receives an editable browser presentation. Each card has one main point. The user can edit text and assets, reorder cards, change an offered layout, and ask AI to revise selected content. The browser displays the saved card document directly. A PPTX download exports a particular saved revision into fixed-size slides.
-
-The initial product must say which rich browser features have editable PPTX equivalents. An export cannot silently turn a chart or diagram into a picture while claiming it remains editable.
+- Users choose a topic, reviewed sources, theme, and card count, then approve an outline before drafting.
+- Each card carries one main point. Users can edit content and photos, reorder cards, change compatible layouts, and revise selected cards with AI.
+- PPTX exports one saved card per fixed-size slide. Supported editable objects and export limits must remain explicit.
 
 ## Document model and module interface
 
-Define a versioned `CardDocument` with document ID, schema version, theme reference, ordered card IDs, and asset references. Each card contains a takeaway, narrative role, chosen layout, content nodes, source references, and optional speaker notes. Content nodes have stable IDs so edits can address them without relying on array positions. Rich text uses a constrained editor schema. Layout and theme choices are separate from the content nodes; model output cannot inject arbitrary CSS or script.
-
-One presentation-document module owns `create`, `get`, `revise`, `saveEdit`, and `exportPPTX`. Its interface guarantees card-count checks, schema validation, operation idempotency, optimistic revision checks, immutable storage, and asset ownership. Callers do not manipulate editor JSON, ZIP entries, or GCS object keys directly. Internally, a card-layout module and a PPTX-export module can change independently behind that interface.
-
-Store immutable card bodies as JSONB alongside revision metadata in PostgreSQL, and advance the current-revision pointer in the same transaction. Use compare-and-swap on manual and AI saves. Keep image bytes in GCS under immutable identifiers with MIME, size, digest, license or source metadata, and ownership checks. Migration 35 deletes every deck without a card body and `cmd/migrate` deletes the retired GCS document objects; see [Card documents](CARD_DOCUMENTS.md#storage). An export records the card revision, exporter version, dimensions, and output digest that produced it. Repeat downloads of the same export return the same bytes.
+- Versioned documents contain a theme, ordered card IDs, content nodes, and source references. Cards and nodes have stable IDs.
+- Layouts and themes are separate from content. Model output cannot inject styling or scripts.
+- `internal/carddocument` owns validation, immutable revisions, idempotent operations, expected-revision checks, and asset ownership.
+- Callers use the document interface rather than manipulating JSONB bodies, ZIP entries, or GCS keys.
+- The browser and exporter share layout definitions; their rendering implementations can change independently.
+- Commit document bodies, revision metadata, and the current-revision pointer in one transaction. Keep image bytes under immutable GCS identifiers.
+- Planned export records must identify the card revision, exporter version, dimensions, and digest, with repeat downloads returning identical bytes.
 
 ## Generation and editing flow
 
-1. Keep the current Go API, River jobs, persisted progress events, provider selection, cancellation, and point accounting. A generation job first produces a whole-deck plan with a takeaway, evidence, narrative role, and proposed visual for every card. Validate the requested count and source coverage before drafting.
-2. Draft cards in bounded batches with the same plan and a summary of completed cards. The model emits a restricted markup format or structured nodes supported by the editor schema. Save model, provider, prompt version, plan version, and source IDs with the generation record so failed runs can be inspected.
-3. A Bun/TypeScript conversion process validates and sanitizes model output, parses supported markup into editor content, resolves referenced assets, and rejects unsupported nodes. It must have the same schema version as the browser editor. The Go worker calls this process through a narrow, versioned request and response interface. No generated HTML is rendered directly in the browser.
-4. Resolve uploaded, selected, or generated images before saving a card. Check dimensions and usage rights; preserve source identifiers. Charts carry actual data and a declared chart type. Missing required assets fail or trigger a bounded repair instead of leaving a decorative placeholder.
-5. Render and edit the saved card document in React. Designed layout patterns handle comparison, process, quote, image with text, and data cards. Layout selection is constrained to patterns that support the card's content. Manual edits save new revisions. AI revisions target stable card and node IDs against an expected base revision; stale revisions return a conflict.
-6. Serialize the current editor content into a compact AI-readable form when revising it. The requested operation and its affected card IDs are explicit. Validate the resulting patch against the pinned base and save a new immutable revision only after content and asset checks pass.
+1. Validate the requested count and source coverage in a whole-deck plan, or use the approved outline.
+2. Draft bounded batches with the full plan and a summary of completed cards.
+3. Convert through the shared schema. Sanitize content, resolve assets, and repair unsupported output within bounded attempts.
+4. Save only a complete validated document through the durable River and point-accounting transaction.
+5. Manual edits and AI revisions save new immutable revisions against an expected base. Stale saves return a conflict.
+
+- Images need ownership and source metadata; charts need actual data and a declared kind.
+- AI revisions identify affected cards and preserve unaffected content.
+- Successful revisions record provider, model, prompt and plan versions, and sources. Recording this information for failed runs remains open.
 
 ## Runtime placement
 
-The API and worker images contain only Go binaries. Production runs the Bun converter as a sidecar beside each Go container, reached at `127.0.0.1:8090` in the shared Cloud Run network namespace. The API uses it to validate saves and prepare outlines; the worker uses it to draft and assemble cards. All four runtime images are built from one commit and pinned to that commit by Terraform. This adds converter CPU and memory to each service instance, but avoids a separately exposed service and cross-service authentication. The Go processes call the versioned conversion interface with timeouts and idempotent operation IDs. Keep card generation durable in River; a converter restart must not lose the job or commit a partial document. The browser and converter must ship compatible schema versions, and old card revisions must remain readable after an editor upgrade.
+- Go API and worker images contain their binaries. Each Cloud Run service runs a private Bun converter sidecar at `127.0.0.1:8090`.
+- API uses conversion for outlines, save validation, and export. Worker uses it for drafting and assembly.
+- All four runtime images use the same commit. Browser and converter must agree on schema version; older saved revisions must remain readable.
+- Converter calls use timeouts and operation IDs. A converter restart must not lose the River job or commit a partial document.
+- Sidecar CPU and memory count toward each service instance.
 
 ## PPTX export
 
-Export is an asynchronous conversion from one card revision to a fixed slide geometry. The exporter lays out each card at the selected slide size, measures text with the actual fonts, writes native text and images, and handles supported charts and tables as native PowerPoint objects. It must report a specific unsupported-content error or require the user to select a documented fallback. It must never quietly crop a card to fit.
-
-The removed template-slot compiler cloned authored PPTX slides and filled named slots, so it is no basis for this exporter. Build a separate exporter with a shared, testable layout description so the browser and PPTX paths agree on content order, emphasis, and image crops. Browser CSS and PowerPoint will still render differently; comparison against exported slides is a required gate. Fix card size for PPTX-oriented presentations or define a deterministic split rule for content that exceeds one slide. Preserve exact requested slide counts only when every card maps to one slide and all cards fit.
-
-PPTX and PDF files are derived artifacts, not writable sources for the card document. An edit made in PowerPoint cannot be merged back without a separate import and reconciliation design. Presentations generated by the removed PPTX pipeline are not migrated, and the application no longer reads their revisions. There is no automatic conversion of arbitrary OOXML into editable cards in this proposal.
-
-## Implementation sequence
-
-1. Specify the card schema, revision rules, supported content nodes, and export contract. Build a small set of representative cards and expected browser/PPTX outputs before changing generation.
-2. Implement card storage and revision commits behind the presentation-document interface, and implement `documentDrafter` against it. (Done.)
-3. Build the constrained editor schema, conversion process, browser renderer, and direct editing for the representative cards. (Done.)
-4. Add planning, bounded card drafting, asset resolution, and AI edits using the current durable job and accounting flow. (Done.)
-5. Build PPTX export for the supported card types. Expand the type set only after native export and browser comparison pass for each one.
-6. Configure the drafter so submission accepts jobs again, and restore opening presentations from the library once the card renderer can display them. (Done.)
+- Current export is synchronous and writes one 16:9 slide per card. [PPTX export](CARD_DOCUMENTS.md#pptx-export) lists its editable objects and limits.
+- The planned exporter adds asynchronous records, font-based text measurement, and deterministic downloads.
+- Unsupported content must return a specific error or use an explicit documented fallback.
+- Browser and PowerPoint rendering differ. Representative exports need package validation and visual comparison.
+- Keep requested slide counts only while each card fits one slide; any future splitting rule must be deterministic.
+- PPTX and PDF are derived files. Importing PowerPoint edits would require a separate reconciliation design.
 
 ## Acceptance gates and risks
 
-- A generated deck has the requested card count and every card's takeaway is represented in the saved document.
-- Manual and AI edits preserve unaffected card IDs and content; concurrent saves cannot overwrite a newer revision.
-- The browser opens the exact saved card revision, and an export can be traced to that revision and exporter version.
-- Representative exports pass package validation and visual comparison. Native text, images, and supported data objects remain editable in desktop PowerPoint.
-- Provider output cannot execute browser code, fetch unapproved URLs, or reference another user's assets.
-- The benchmark records content support, repetition, render defects, export defects, first-attempt success, latency, and provider cost. No quality or speed improvement is assumed before measurement.
-
-The largest risk is export fidelity. A flexible browser document and a fixed-size PowerPoint slide obey different layout rules. If editable PPTX is the primary product promise, this architecture must prove that conversion before cards ship, because there is no PPTX-first path left to fall back on.
+- Saved decks have the requested count and retain each planned takeaway.
+- Manual and AI edits preserve unaffected IDs and content. Concurrent saves cannot overwrite newer revisions.
+- Browser views match saved revisions; planned export records trace output to revision and exporter version.
+- Supported native PowerPoint objects remain editable and pass visual comparison.
+- Provider output cannot execute code, fetch unapproved URLs, or reference another user's assets.
+- Measure content support, repetition, render/export defects, first-attempt success, latency, and provider cost.
+- Export fidelity remains the main risk. Browser text can still overflow at the minimum fit scale, and PPTX fit uses estimates rather than actual font measurement.
 
 ## Theme templates and marketplace
 
-The card marketplace at `/marketplace` uses the shared catalog in `libs/cards/src/templates.ts`. Six five-slide starter decks include pre-placed photo nodes, image metadata and attribution, category tags, distinct color palettes, and heading/body font pairs. Their previews use `CardView`, so the marketplace, editor, landing ring, and native PPTX exporter use the same content and theme definitions. The landing ring draws from all six decks, shows 24 slides on desktop, and keeps its smaller mobile counts and reduced-motion behavior.
-
-The marketplace is a search bar over a grid of the templates, sorted by name. Search matches a template's name, description, tags, and theme name. Opening a template shows its full deck at `/marketplace/{templateId}/preview` in the same viewer as a presentation, with its carousel, thumbnails, and full-screen presenting. Install adds a template to a library kept in this browser's local storage, not the account; Remove takes it out. A browser that has never stored a library starts with the first template of each category installed; one whose reader removed every template stays empty. The editor's Templates dialog can show only installed templates. The generate page has a Template dropdown listing installed templates by category, with nothing preselected; Generate asks for a template until one is chosen, and the trash control on a row uninstalls it. The selected template is marked with a checkmark and row highlight. The chosen template's theme is sent as `theme` and styles the drafted deck and its live preview. A retry restores the template whose theme the failed deck was submitted with. Both pages require sign-in. `POST /templates/{templateId}/presentations`, which creates a separate presentation from a template, is no longer called from the web app.
-
-In an existing presentation, Edit > Templates offers two actions. Apply theme changes only colors and fonts. Replace all slides replaces the deck with the starter slides after `POST /presentations/{id}/templates/{templateId}` registers the curated photos for the owner. Both edits use normal autosave and undo; replacement failures leave the current document intact. The API obtains the template from the private converter's `/v1/templates` endpoint and never accepts client-supplied asset URLs. Photos remain attributed Unsplash hotlinks in the browser and become embedded pictures in PPTX downloads. Browser display depends on photo availability and Google Fonts; fonts are referenced by name in PowerPoint, not embedded, so a machine without those fonts may substitute them.
+- `/marketplace` and `/marketplace/{templateId}/preview` require sign-in and use `libs/cards/src/templates.ts`.
+- Six five-slide starters include photo nodes, attribution, category tags, palettes, and heading/body fonts. Previews use `CardView`.
+- Search matches name, description, tags, and theme; results sort by name. Preview uses the presentation carousel, thumbnails, and Present mode.
+- Install and Remove update this browser's local storage. A new library starts with the first template in each category; an explicitly emptied library stays empty.
+- Generate lists installed templates by category, requires a selection, and sends its theme. Selection uses a checkmark and row highlight; retries restore the submitted theme.
+- The editor's Templates dialog lists installed templates. Apply theme changes colors and fonts; Replace all slides registers curated photos through `POST /presentations/{id}/templates/{templateId}` before replacement.
+- Theme changes and replacements use autosave and undo. Failed replacement leaves the current document intact.
+- The API reads curated templates from the private converter's `/v1/templates`, never client-supplied asset URLs.
+- Browser photos are attributed Unsplash hotlinks; PPTX embeds them. Browser availability depends on photos and Google Fonts; PowerPoint may substitute unavailable fonts.
+- The landing ring draws from the same catalog. See [Landing page](LANDING_PAGE.md).

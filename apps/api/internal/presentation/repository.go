@@ -20,6 +20,12 @@ func NewRepository(db DBTX) *Repository {
 	return &Repository{db: db}
 }
 
+func (r *Repository) CacheVersion(ctx context.Context, userID string) (int64, error) {
+	var version int64
+	err := r.db.QueryRowContext(ctx, `SELECT COALESCE((SELECT version FROM presentation_cache_versions WHERE user_id = $1), 0)`, userID).Scan(&version)
+	return version, err
+}
+
 func (r *Repository) FindByID(ctx context.Context, presentationID string) (Presentation, error) {
 	const query = `SELECT id, user_id, title, prompt, slides_data, ai_provider, ai_model, parent_presentation_id, revision, created_at, updated_at
         FROM presentations WHERE id = $1`

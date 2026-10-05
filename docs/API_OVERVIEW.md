@@ -1,151 +1,150 @@
 # API reference
 
-The local API origin is `http://localhost:8000`. JSON errors use:
-
-```json
-{ "error": { "message": "Description" } }
-```
-
-Authenticated browser requests use the HTTP-only JWT cookie and must include credentials. The API also accepts the same JWT in an `Authorization: Bearer` header.
-
-Rate-limited requests return `429`, include `Retry-After`, and use the `RATE_LIMITED` error code. See [RATE_LIMITING.md](RATE_LIMITING.md).
+- Local origin: `http://localhost:8000`.
+- Browser requests include credentials for the HTTP-only JWT cookie. API clients may use `Authorization: Bearer <jwt>`.
+- JSON errors use `{ "error": { "message": "Description" } }`; coded auth errors use top-level `code` and `message`.
+- [Rate limits](RATE_LIMITING.md) return `429`, `Retry-After`, and `RATE_LIMITED`.
 
 ## Health
 
-| Method | Path      | Auth | Description                           |
-| ------ | --------- | ---- | ------------------------------------- |
-| `GET`  | `/health` | No   | Returns `{ status: "ok", timestamp }` |
+| Method | Path | Auth | Result |
+| --- | --- | --- | --- |
+| `GET` | `/health` | No | `{ status: "ok", timestamp }` |
 
 ## Authentication
 
-The Go API owns the auth routes used by the web application. They cover email/password registration, email OTP, password reset, JWT tokens, sign-out, social sign-in, and OAuth callbacks. The API can read older credential hash formats used by existing accounts. See [AUTH_API.md](AUTH_API.md).
+- Auth routes cover registration, OTP verification/reset, JWTs, sign-out, and Google/GitHub OAuth.
+- See [Authentication](AUTH_API.md) for endpoints and security behavior.
 
 ## Profile
 
-| Method | Path                         | Body                    | Description                      |
-| ------ | ---------------------------- | ----------------------- | -------------------------------- |
-| `GET`  | `/profile`                   | None                    | Get the signed-in user's profile |
-| `PUT`  | `/profile`                   | `name`, `email`, `currentPassword`, `newPassword`, `landingPage` | Update profile fields or change the password |
-| `POST` | `/profile/avatar`            | `{ "imageUrl": "..." }` | Update the avatar URL            |
-| `POST` | `/profile/avatar/upload`     | Multipart `file` field  | Upload and use a local image     |
-| `GET`  | `/profile/avatar/image/{id}` | None                    | Serve an uploaded avatar image   |
+| Method | Path | Body | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/profile` | None | Current profile |
+| `PUT` | `/profile` | `name`, `email`, `currentPassword`, `newPassword`, `landingPage` | Update profile or preferences |
+| `POST` | `/profile/email/verify` | `email`, `otp` | Complete email change |
+| `POST` | `/profile/avatar` | `imageUrl` | Set avatar URL |
+| `POST` | `/profile/avatar/upload` | Multipart `file` | Upload avatar |
+| `GET` | `/profile/avatar/image/{id}` | None | Public uploaded avatar |
 
-Profile management routes require authentication. Uploaded avatar images are public because browsers load their URLs without API credentials. Password changes require both the current and new password. Existing JWTs remain valid until they expire. The change cannot be combined with name or email updates. An email change requires current-password verification, then sends a six-digit OTP to the normalized new address. The existing email remains unchanged until `POST /profile/email/verify` atomically consumes that OTP and sets the new email as verified; it also invalidates relevant OTPs for the old and new addresses. A user who has forgotten the current password must complete the verified password-reset OTP flow first.
-
-Avatar URLs must be valid HTTPS URLs no longer than 2,048 characters. URLs with embedded credentials or control characters are rejected. Local uploads accept PNG, JPEG, WebP, and GIF files up to 800 KB. Uploads replace the previous stored avatar and return the same profile-avatar response as URL updates.
-
-The profile carries a `landingPage` preference (`generate` or `presentations`, defaulting to `generate`) that controls where a signed-in user lands on the app home route. It is updated on its own through `PUT /profile`, cannot be combined with name, email, or password changes, and is included in session and profile responses so the client can route without an extra request.
+- Management requires authentication; uploaded avatar URLs are public.
+- Password and email changes require current-password proof. Email changes finish through OTP verification. See [Security changes](AUTH_API.md#password-and-email-changes).
+- Avatar URLs must be HTTPS, at most 2,048 characters, and contain no embedded credentials or control characters.
+- Avatar uploads accept PNG, JPEG, WebP, and GIF up to 800 KB and replace the previous image.
+- `landingPage` accepts `generate`, `presentations`, or `landing`, defaults to `generate`, updates independently, and appears in profile/session responses.
 
 ## Presentations
 
-| Method  | Path                           | Description                                                                                             |
-| ------- | ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `POST`  | `/presentation-jobs`           | Submit generation, iteration, retry, or research preview as a durable job; returns job identity as JSON |
-| `GET`   | `/generation-jobs/{id}`        | Get an owned durable generation job                                                                     |
-| `GET`   | `/generation-jobs/{id}/events` | Stream persisted events for an owned generation job                                                     |
-| `POST`  | `/generation-jobs/{id}/cancel` | Request cancellation of an active generation job                                                        |
-| `GET`   | `/presentations`               | List the user's decks                                                                                   |
-| `GET`   | `/presentations/:id`           | Get one owned deck                                                                                      |
-| `POST`  | `/presentation-outlines`       | Plan a deck for review before drafting                                                                  |
-| `GET`   | `/presentations/:id/document`  | Get the current card document revision of an owned deck                                                 |
-| `PUT`   | `/presentations/:id/document`  | Save an edited card document as a new revision                                                          |
-| `GET`   | `/presentations/:id/assets/:sha256` | Get a stored photo of an owned deck                                                                |
-| `POST`  | `/presentations/:id/assets/stock` | Store a stock photo for an owned deck                                                                |
-| `POST`  | `/presentations/:id/assets/upload` | Store an uploaded photo for an owned deck                                                           |
-| `GET`   | `/images/search`               | Search stock photos                                                                                     |
-| `GET`   | `/presentations/:id/export/pptx` | Download an owned deck's current revision as an editable PowerPoint file                             |
-| `GET`   | `/presentations/:id/share`     | Report whether an owned deck has a live read-only link                                                  |
-| `POST`  | `/presentations/:id/share`     | Create a read-only link, replacing any earlier one                                                      |
-| `DELETE` | `/presentations/:id/share`    | Revoke an owned deck's read-only link                                                                   |
-| `GET`   | `/shared/:token`               | Get the deck behind a read-only link, without signing in                                                |
-| `GET`   | `/shared/:token/assets/:sha256` | Get a photo the deck behind a read-only link shows; removed photos are not served                    |
-| `PATCH` | `/presentations/:id`           | Apply persistent presentation mutations                                                                 |
-| `DELETE` | `/presentations/:id`           | Delete one owned deck and its associated memory                                                         |
+Owner authentication is required except for `/shared` routes:
 
-Generation requires `topic` and `slide_count`; the web client supports custom slide counts from 5 through 40. Generation also accepts `detail_level`, `tonality`, `research`, an optional `research_payload`, and an optional `theme`. A new presentation is styled with `theme`, which must be a card theme the converter knows; without one it starts with `slate`. `theme` is refused on a revision of an existing deck. Users can change the saved theme in the viewer. Research options can include `freshness`, `maxResults`, included or excluded domains, publication date bounds, and `maxAgeHours`. The research endpoint and payload contain source records only. The web client presents those records in a compact source table with a dedicated outbound link for each result. The research review fills the available workspace and supports Enter as a shortcut to begin generation.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/presentation-jobs` | Submit generation, revision, retry, or research preview |
+| `GET` | `/generation-jobs/{id}` | Job status |
+| `GET` | `/generation-jobs/{id}/events` | Persisted SSE events |
+| `POST` | `/generation-jobs/{id}/cancel` | Cancel active job |
+| `POST` | `/presentation-outlines` | Plan before drafting |
+| `GET` | `/presentations` | List decks |
+| `GET` | `/presentations/{id}` | Deck metadata |
+| `DELETE` | `/presentations/{id}` | Delete deck, `204` with no body |
+| `GET` | `/presentations/{id}/document` | Current card document |
+| `PUT` | `/presentations/{id}/document` | Save edited document revision |
+| `GET` | `/presentations/{id}/assets/{sha256}` | Stored image or remote redirect |
+| `POST` | `/presentations/{id}/assets/stock` | Register Unsplash photo |
+| `POST` | `/presentations/{id}/assets/upload` | Upload image |
+| `GET` | `/images/search` | Search Unsplash |
+| `GET` | `/presentations/{id}/export/pptx` | Export current revision |
+| `GET` | `/presentations/{id}/share` | Share status |
+| `POST` | `/presentations/{id}/share` | Create or replace share link |
+| `DELETE` | `/presentations/{id}/share` | Revoke share link |
+| `GET` | `/shared/{token}` | Public shared document |
+| `GET` | `/shared/{token}/assets/{sha256}` | Currently referenced shared photo |
+| `POST` | `/templates/{templateId}/presentations` | Create deck from curated template |
+| `POST` | `/presentations/{id}/templates/{templateId}` | Register template assets for replacement |
 
-Generation accepts an approved outline as `plan`; see [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md#outline). Iteration uses `parent_presentation_id` and `topic`. Retry uses `retry_presentation_id`. Request fields use snake case only.
-
-Submission returns `503` unless `CARD_CONVERTER_URL` is configured; research previews are unaffected. Document bodies live in PostgreSQL JSONB. Text-only generation and document reads do not require `PRESENTATION_GCS_BUCKET`, which supplies stored image assets. An iteration is an AI revision of a card document: it also requires `base_revision` and may name `card_ids`, and a stale `base_revision` returns `409`; see [CARD_DOCUMENTS.md](CARD_DOCUMENTS.md#ai-revisions). Generation creates a `generating` presentation placeholder before work is available to the worker. Point reservation, placeholder creation, application job creation, initial event persistence, and River insertion commit in one database transaction. Iteration requires a `ready` presentation and records its row revision in the same durable handoff. Provider, content-validation, cancellation, and final-save failures mark the job terminal and release the active reservation. Retrying reuses the failed presentation ID and moves the record back to `generating`; malformed requests and failures before the submission transaction do not create a job or presentation record.
-
-Provider output must use the current content block contract with explicit `text` fields for paragraphs, quotes, and callouts and `items` for bullets. The API does not translate older document shapes or block aliases. It rejects generated slides without substantive text instead of persisting synthetic placeholder content as a successful presentation.
+- New generation requires `topic` and `slide_count`; optional fields include `detail_level`, `tonality`, `research`, `research_payload`, `theme`, and approved `plan`.
+- `theme` must be known to the converter and defaults to `slate`. AI revisions reject a theme request and retain the saved theme.
+- AI revisions require `parent_presentation_id`, instruction in `topic`, and `base_revision`; optional `card_ids` target selected cards. Stale bases return `409` before reservation.
+- Retry uses `retry_presentation_id` for an owned failed deck and reuses that row.
+- Request fields use snake case, except nested research options documented below.
+- Missing `CARD_CONVERTER_URL` returns `503` before reserving points; research previews remain available.
+- Documents use versioned cards in PostgreSQL JSONB. Stored images require `PRESENTATION_GCS_BUCKET`; text-only documents do not.
+- Editing, outlines, photos, shares, and export contracts are in [Card documents](CARD_DOCUMENTS.md).
+- List pagination uses `limit` from 1 to 100, default 20, and non-negative `offset`, default 0, bounded by JavaScript's maximum safe integer. Responses include `presentations`, `total`, `limit`, `offset`, and `has_more`.
+- Summaries expose `generating`, `ready`, or `failed` status and `has_research`. Failed decks retain `failure.retry` settings for recovery.
 
 ### Input limits
 
-Presentation routes read and measure the body before parsing JSON. Generation bodies are limited to 256 KiB, research and iteration bodies to 32 KiB each, and mutation bodies to 1 MiB. An oversized body returns `413`; malformed JSON, non-object bodies, invalid types, and out-of-range values return `400`.
-
-Topics and iteration feedback contain 1 through 400 trimmed characters. Slide counts are integers from 5 through 40. Detail level is `brief`, `concise`, `balanced`, `detailed`, or `comprehensive`; tonality is `casual`, `professional`, `enthusiastic`, or `persuasive`. A direct-provider model identifier is limited to 200 characters.
-
-When supplied, `research` must be an object with a boolean `enabled` field. `maxResults` is 1 through 8, each domain list contains at most 10 non-empty entries of at most 253 characters, dates are real `YYYY-MM-DD` values with the start no later than the end, and `maxAgeHours` is an integer from 0 through 8,760. The standalone research endpoint requires `research.enabled=true`.
-
-A generation `research_payload` is limited to 128 KiB after serialization and at most eight source objects. Source URLs must be HTTP or HTTPS and no longer than 2,048 characters. Titles are limited to 500 characters, snippets to 2,000, authors to 200, summaries to 4,000, and each source may have at most eight highlights of 1,200 characters each. Retrieval and publication date strings are limited to 64 characters. Point charges are server-owned. Server-generated and rendered presentation image URLs remain HTTPS-only even though cited research links may use HTTP.
-
-Generated presentation documents do not carry a schema-version field, and the API does not load or translate earlier stored document shapes. AI output carries content only: no styling, coordinates, layouts, regions, or CSS.
-
-Content slides support bounded, data-only semantic widgets for timelines, flows, architecture diagrams, and comparisons. Widget nodes use allowlisted roles and tones, edges can reference only nodes in the same widget, and direction is horizontal or vertical. Generated widgets cannot carry code, HTML, raw SVG, styles, class names, attributes, or URLs. The Web renderer compiles widgets into deterministic full-width or column-width SVG scenes and exports their nodes, text, and connectors as editable PowerPoint objects. Unsupported widget data is shown explicitly rather than silently omitted. The API returns stored documents without translating older slide formats. Presentation writes validate and normalize the current document contract. `PATCH /presentations/:id` accepts a non-empty `mutations` array containing at most 50 operations. Supported operations are `update-presentation`, `update-slide`, `delete-slide`, and `reorder-slides`. Slide IDs cannot be changed, reorder requests must contain every slide exactly once, and the final slide cannot be deleted. All mutations in one request are validated and applied to one document update. Writes use the owned row's monotonic integer `revision` as a compare-and-swap version. Every successful write increments it; a concurrent write returns `409` instead of overwriting another editor mutation.
-
-`GET /presentations` accepts integer `limit` and `offset` query parameters. `limit` defaults to 20 and is bounded from 1 through 100; `offset` defaults to 0. Its maximum is JavaScript's maximum safe integer. The response returns `presentations`, `total`, `limit`, `offset`, and `has_more`. `DELETE /presentations/:id` returns `204 No Content` with an empty body after deleting the owned deck. Database foreign-key rules remove or detach its related memory records as defined by each table.
-
-Without a valid user provider connection, generation and iteration use the configured SlideSage OpenRouter model. Point balances use integer milli-points: one point is 1,000 milli-points and one provider token is one milli-point. Before the job is enqueued, the API reserves a bounded authorization covering the serialized prompt plus the explicit output-token ceiling. The reservation, ledger entry, placeholder when applicable, application job, initial events, and River `InsertTx` are one transaction. The client supplies the job ID in the `job_id` field; it doubles as the idempotency key and must contain 16-128 URL-safe characters when provided (the server generates one otherwise). Resubmitting the same job ID with the same request attaches to the existing job and prevents another reservation; reusing it with a different request returns `409`.
-
-Successful generation settles against the provider's authoritative aggregate token usage and releases the unused authorization. Missing provider usage is a failure: the presentation is not marked ready and its reservation is released. A client or API stream disconnect does not cancel the River job. The worker continues and persists events for later replay. Failures, revision conflicts, cancellation, and failed persistence finalize and release the active authorization even if the presentation was changed or deleted.
-
-External provider execution is at-least-once. A worker interruption after sending a provider request but before recording its result can cause a later River attempt to call the provider again. The provider may therefore observe or bill duplicate execution. SlideSage accounting remains idempotent: operation status, balance updates, ledger entries, final presentation persistence, settlement, and refunds use transactions so an authorization is settled or refunded only once.
-
-Every balance change is recorded in the immutable `point_ledger`, including signup credits, payment credits, reservations, and releases. Balances are never allowed to be negative. The final `saved` event includes `slide_tokens_charged` and `slide_tokens_remaining` as point values for browser display.
-
-Once a user connects a provider key, model generation is billed by that provider and reserves zero SlideSage model points. SlideSage web research is separate from model billing: each successful Exa search costs one point, including for BYOK users. Research has its own idempotent point operation; provider and parsing failures refund the fee. The research response includes `slide_tokens_remaining` and the final generation event includes the model charge and remaining balance.
-
-Presentation summaries include `status` (`generating`, `ready`, or `failed`) and `has_research`. A new placeholder remains `generating` while its durable job is queued, running, or retrying. A terminally failed generation remains in the presentation library with an empty slide list and a `failure.retry` object in `slides_data`. That object stores the original prompt, slide count, detail level, tonality, research setting, theme when one was chosen, error message, and any sources collected before the failure. When a provider stops mid-JSON because it hit its output token limit or dropped the stream, the stored message says so explicitly and includes how many bytes arrived; near-complete responses are repaired by closing unterminated strings and containers so partial truncation does not fail an otherwise finished deck. A provider's own error wording is stored with every link stripped out, because providers name the key and link to its billing page in the message and a failed presentation is shown to its owner. A response that means the account behind the key cannot pay for the request, a 402 or a quota message such as OpenRouter's "requires more credits", replaces that wording entirely: the shared key reports that SlideSage is out of credit and the points were refunded, while a connected key tells its owner to top the account up or generate fewer slides. Neither is retried, since further attempts cannot pay the bill. Failed and cancelled jobs release their active authorization. Clients fetch the full presentation on click, then open the saved sources on `/generate/research` when sources exist or prefill `/generate` when they do not. The same retry action is available directly from `/presentation-error`, so users do not need to return to the presentation library first. That error page keeps recovery focused on retrying or deleting the unfinished presentation and does not show a separate presentations-list action. Retry requests send the failed presentation ID as `retry_presentation_id`. The API verifies that the row belongs to the current user and is still marked `failed`, then updates that row through subsequent failures until a successful generation replaces it. A retry therefore never adds another failed card.
+- Generation, research-preview, revision, and outline submissions allow bodies up to 256 KiB.
+- Oversized bodies return `413`; malformed JSON, non-object bodies, invalid types, and out-of-range values return `400`.
+- `topic` and revision instructions contain 1 to 400 trimmed characters; slide counts are integers from 5 to 40.
+- Detail levels: `brief`, `concise`, `balanced`, `detailed`, `comprehensive`.
+- Tonalities: `casual`, `professional`, `enthusiastic`, `persuasive`.
+- Direct-provider model IDs are at most 200 characters.
+- `research` requires boolean `enabled`. Preview requires it to be true.
+- `maxResults` is 1 to 8. Each domain list has at most ten entries of at most 253 characters.
+- Publication dates use valid `YYYY-MM-DD` values with start no later than end. `maxAgeHours` is an integer from 0 to 8,760.
+- Supplied research has at most eight sources. Titles cap at 500 characters, snippets at 2,000, URLs at 2,048, authors at 200, summaries at 4,000, and date strings at 64. Each source has at most eight highlights of 1,200 characters.
+- Research links may use HTTP/HTTPS; presentation image URLs remain HTTPS-only.
 
 ### Streaming
 
-Streaming submission endpoints respond with server-sent events over a POST response. Before streaming, the API transactionally creates the application job, persists its initial events, and inserts the River job. It then tails persisted `generation_job_events`; provider execution occurs in `cmd/worker`, not in the request handler.
-
-The stream begins with `created`, forwards generation events such as `theme`, `stage`, `retry`, `plan`, and slide updates, and ends with `saved`. The theme event reports the assigned default for generation or the saved theme for iteration. Worker stages are `planning`, `drafting`, and `finalizing`, reported in that order; each stage includes a display message and bounded progress counts. Generated slides are normalized into safe content slides with allowlisted layouts, blocks, themes, dimensions, and stable IDs before they are streamed or saved. Clients treat slide events as index-based upserts. Iteration uses the current deck as authoritative context and returns the same current format. The API sends SSE keepalive comments while no new persisted event is available. A `complete` event contains the normalized document after durable persistence and point settlement; `saved` immediately follows as the durable success acknowledgement. Failures use an `error` event and persist retry metadata without partial slides. Clients must use `saved` as the durable success signal. Closing the POST response does not cancel generation; clients can inspect and resume the same job after a disconnect. Clients should parse the response stream rather than use the browser `EventSource` API, which only supports GET. Web clients also treat non-JSON deployment and proxy error pages as service failures rather than exposing a JSON parser exception. Provider errors that happen before slide streaming, including account rate limits, are preserved in the failed presentation so the retry screen can show an actionable cause instead of a generic generation message.
+- Submission returns JSON. Open `/generation-jobs/{id}/events` separately for SSE.
+- Events report creation, theme, planning/drafting/finalizing stages, repairs, and card previews.
+- `complete` contains the final document; `saved` acknowledges durable persistence and settlement. Treat `saved` as success; `error` terminates failures.
+- Streams send keepalive comments. Disconnecting does not cancel the job.
+- Provider failures persist actionable retry metadata. Credit/quota failures refund points and require account funding or smaller requests rather than automatic retries.
+- Browser clients handle non-JSON proxy errors as service failures.
 
 ### Durable job status and replay
 
-`GET /generation-jobs/{id}` returns the authenticated owner's durable job state. The response includes `id`, `presentation_id`, `kind`, `status`, `progress`, `created_at`, and `updated_at`, with `stage` and `error` when available. Status is `queued`, `running`, `retrying`, `succeeded`, `failed`, or `cancelled`.
+- New submissions return `202` with `job_id`, `presentation_id`, and `status: "queued"`; matching committed resubmissions return `200` and `status: "existing"`.
+- Client `job_id` values contain 16 to 128 URL-safe characters; the server generates one when omitted. Changed input with the same ID returns `409`.
+- After a lost submission response, poll that ID before resubmitting.
+- Statuses are `queued`, `running`, `retrying`, `succeeded`, `failed`, and `cancelled`.
+- Resume SSE with `Last-Event-ID` or `?after=<id>`; the header wins. Only later events replay.
+- Cancellation returns `202` with `status: "cancellation_requested"`, or `409` for non-cancellable jobs.
+- `preview: true` returns research `sources`, `estimated_tokens`, and `slide_tokens_remaining` synchronously without a job.
+- Queue retries, reservations, refunds, and external-call guarantees are in [Generation worker](GENERATION_WORKER.md).
 
-`GET /generation-jobs/{id}/events` replays ordered persisted SSE events and then tails new events until `saved` or `error`. Every event has a numeric SSE `id` from `generation_job_events`. Send the last received ID in `Last-Event-ID` or as `?after=<id>`; the header takes precedence when both are present. The API returns only events after that cursor. Browser clients that cannot set the resume header can use the query parameter.
+### Point accounting
 
-`POST /presentation-jobs` returns `202 Accepted` with `{"job_id","presentation_id","status":"queued"}` as JSON; resubmitting an already-committed job ID returns `200` with `"status":"existing"`. The client chooses the job ID before sending, so if the connection fails before the response arrives it can poll `GET /generation-jobs/{id}` to learn whether the submission committed, then open `/generation-jobs/{id}/events`. A `preview: true` body runs research only and responds synchronously with `sources`, `estimated_tokens`, and `slide_tokens_remaining` instead of creating a job.
-
-`POST /generation-jobs/{id}/cancel` transactionally finalizes cancellation for a `queued`, `running`, or `retrying` job and returns `202` with `{"status":"cancellation_requested"}`. It returns `409` when no active owned job can be updated. River cooperatively cancels an in-flight job context. The provider may still finish its external work, but the locked terminal application state prevents a late success from settling after cancellation.
-
-See [GENERATION_WORKER.md](GENERATION_WORKER.md) for queue, delivery, accounting, worker operation, and deployment details.
-
-Generation assigns `corporate-blue` without accepting a theme request field. Iteration preserves the saved presentation theme. Layout and visual composition are selected automatically from each slide's narrative role, visual intent, semantic blocks, and available assets. Generated image placeholders contain descriptive text but no URL; grounded image blocks require HTTPS URLs.
+- One point is 1,000 milli-points; one provider token is one milli-point.
+- Server-funded generation reserves a bounded authorization and settles authoritative provider usage. Missing usage fails generation and releases the reservation.
+- Every balance change enters immutable `point_ledger`; balances cannot become negative.
+- `saved` includes `slide_tokens_charged` and `slide_tokens_remaining` in display points.
+- BYOK reserves zero model points. Each successful Exa search costs one point with separate idempotent accounting and refunds on failure.
 
 ## Billing
 
-| Method | Path               | Auth | Description                                                      |
-| ------ | ------------------ | ---- | ---------------------------------------------------------------- |
-| `GET`  | `/billing/balance` | Yes  | Return `slide_tokens`                                            |
-| `POST` | `/billing/checkout` | Yes  | Create a Razorpay order                                          |
-| `POST` | `/billing/verify`  | Yes  | Verify a captured provider payment and grant points idempotently |
-| `POST` | `/billing/webhook` | Signature | Process `payment.captured`                                       |
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `GET` | `/billing/balance` | User | Return `slide_tokens` |
+| `POST` | `/billing/checkout` | User | Create Razorpay order |
+| `POST` | `/billing/verify` | User | Verify captured payment and credit points |
+| `POST` | `/billing/webhook` | Signature | Process `payment.captured` |
 
-Checkout accepts `starter`, `pro`, `premium`, or `custom`. Starter grants 25 points for ₹50, Pro grants 250 points for ₹450, and Premium grants 625 points for ₹1000. Custom quantities must be between 25 and 10,000 points and use the same ₹2-per-point base rate with 10% and 20% volume discounts at 250 and 625 points.
+| Plan | Points | INR price |
+| --- | --- | --- |
+| `starter` | 25 | ₹50 |
+| `pro` | 250 | ₹450 |
+| `premium` | 625 | ₹1000 |
+| `custom` | 25 to 10,000 | ₹2/point, 10% discount at 250 and 20% at 625 |
 
-Checkout rejects Razorpay orders whose entity, amount, amount due, amount paid, currency, receipt, status, or partial-payment flag differs from the request. Browser verification first checks the strict hexadecimal HMAC signature, then fetches the payment from Razorpay and requires a captured INR payment whose payment ID, order ID, and amount match the local order. Webhooks verify the HMAC against the exact raw request body and accept only complete `payment.captured` entities.
-
-Claiming a created payment and adding its points happen in one database transaction. Repeating the same payment is idempotent and returns the current balance; attempts to link an order to different payment details return `409`. An authenticated verification for another user's order returns `403`. A webhook for an order not yet visible locally returns `503` so Razorpay can retry.
+- Checkout validates provider order amounts, currency, receipt, status, and partial-payment fields.
+- Verification checks strict hexadecimal HMAC, fetches the payment, and requires matching captured INR payment/order IDs and amount.
+- Webhooks verify the exact raw body and require complete `payment.captured` entities.
+- Claiming payment and crediting points are one transaction. Repeated payment is idempotent; conflicting details return `409`.
+- Another user's order returns `403`. A webhook arriving before the local order returns `503` for retry.
 
 ## CORS
 
-The API permits credentialed requests from `CORS_ORIGINS` or `CORS_ORIGIN`. Local defaults are `http://localhost:5173` and `http://127.0.0.1:5173`. Allowed methods are `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, and `OPTIONS`, so browser presentation mutations can complete a credentialed `PATCH` preflight. Allowed request headers are `Content-Type`, `Authorization`, and `Last-Event-ID`. Browser event replay can also use `?after=` without adding a custom header.
+- `CORS_ORIGINS` or `CORS_ORIGIN` allow credentialed requests. Local origins are `http://localhost:5173` and `http://127.0.0.1:5173`.
+- Allowed methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`.
+- Allowed headers: `Content-Type`, `Authorization`, `Last-Event-ID`.
 
 ## AI provider connections
 
-Authenticated users with more than 50 points can manage encrypted BYOK connections under `/ai`:
-
-- `GET /ai/config`
-- `POST /ai/connections`
-- `PUT /ai/connections/:provider`
-- `PUT /ai/connections/:provider/enabled`
-- `DELETE /ai/connections/:provider`
-- `PUT /ai/selection`
-
-Supported providers are `openai`, `google`, and `anthropic`. Generation requests may include `ai: { provider, model }`; iteration resolves the user's current selection server-side. The enabled endpoint accepts `{ "enabled": boolean }` and pauses that provider without deleting its saved key. Keys are never returned by these endpoints. Successful connection deletion returns `204 No Content`.
+- `/ai` manages encrypted keys and model selection for `openai`, `google`, and `anthropic`.
+- Generation may supply `ai: { provider, model }`; revisions resolve the current selection server-side.
+- Keys are never returned. Eligibility, routes, switches, and errors are in [BYOK connections](BYOK_CONNECTIONS.md).

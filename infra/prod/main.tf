@@ -59,7 +59,7 @@ locals {
   required_services = setunion(local.preexisting_services, toset([
     "cloudscheduler.googleapis.com",
     "cloudtasks.googleapis.com",
-  ]))
+  ]), var.cache_enabled ? toset(["redis.googleapis.com"]) : toset([]))
 }
 
 data "google_project" "current" {
@@ -130,6 +130,18 @@ resource "google_cloud_run_v2_service" "api" {
     service_account                  = google_service_account.runtime.email
     timeout                          = "300s"
     max_instance_request_concurrency = 80
+
+    dynamic "vpc_access" {
+      for_each = var.cache_enabled ? [true] : []
+      content {
+        egress = "PRIVATE_RANGES_ONLY"
+        network_interfaces {
+          network    = google_compute_network.cache[0].name
+          subnetwork = google_compute_subnetwork.cache[0].name
+          tags       = ["slidesage-api-cache"]
+        }
+      }
+    }
 
     scaling {
       min_instance_count = 0
@@ -219,10 +231,23 @@ resource "google_cloud_run_v2_service" "api" {
       }
 
       dynamic "env" {
-        for_each = local.observability_environment
+        for_each = merge(local.observability_environment, local.cache_environment)
         content {
           name  = env.key
           value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.cache_enabled ? [true] : []
+        content {
+          name = "CACHE_REDIS_PASSWORD"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.cache_password[0].secret_id
+              version = google_secret_manager_secret_version.cache_password[0].version
+            }
+          }
         }
       }
 
@@ -310,7 +335,7 @@ resource "google_cloud_run_v2_service" "api" {
     ignore_changes = [client, client_version]
   }
 
-  depends_on = [google_secret_manager_secret_iam_member.runtime_accessor]
+  depends_on = [google_secret_manager_secret_iam_member.runtime_accessor, google_secret_manager_secret_iam_member.cache_password]
 }
 
 resource "google_cloud_run_v2_service" "worker" {

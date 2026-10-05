@@ -4,10 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strconv"
+	"time"
+
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/cache"
 )
 
 type Service struct {
 	repository *Repository
+	cache      cache.Store
+}
+
+func (s *Service) WithCache(store cache.Store) *Service {
+	s.cache = store
+	return s
+}
+
+type cachedList struct {
+	Summaries []PresentationSummary
+	Total     int
+	HasMore   bool
 }
 
 func NewService(repository *Repository) *Service {
@@ -15,6 +31,24 @@ func NewService(repository *Repository) *Service {
 }
 
 func (s *Service) List(ctx context.Context, userID string, limit, offset int) ([]PresentationSummary, int, bool, error) {
+	if limit < 1 || limit > 100 || offset < 0 {
+		return nil, 0, false, errors.New("invalid presentation pagination")
+	}
+	var key string
+	if s.cache != nil {
+		// Read the generation from PostgreSQL on every request. Trigger updates are
+		// transactional, including worker writes. A late fill keeps its old key.
+		version, err := s.repository.CacheVersion(ctx, userID)
+		if err == nil {
+			key = cache.Key("presentation-list", userID, strconv.FormatInt(version, 10), strconv.Itoa(limit), strconv.Itoa(offset))
+			if value, hit := s.cache.Get(ctx, key); hit {
+				var list cachedList
+				if json.Unmarshal(value, &list) == nil && list.Summaries != nil {
+					return list.Summaries, list.Total, list.HasMore, nil
+				}
+			}
+		}
+	}
 	page, err := s.repository.ListByUserID(ctx, userID, limit, offset)
 	if err != nil {
 		return nil, 0, false, err
@@ -22,6 +56,11 @@ func (s *Service) List(ctx context.Context, userID string, limit, offset int) ([
 	summaries := make([]PresentationSummary, 0, len(page.Presentations))
 	for _, presentation := range page.Presentations {
 		summaries = append(summaries, presentationSummary(presentation))
+	}
+	if key != "" {
+		if value, err := json.Marshal(cachedList{summaries, page.Total, page.HasMore}); err == nil {
+			s.cache.Set(ctx, key, value, 30*time.Second)
+		}
 	}
 	return summaries, page.Total, page.HasMore, nil
 }
