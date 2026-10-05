@@ -114,7 +114,7 @@ function exportDeck(body: Record<string, unknown>) {
 	return handle(
 		new Request("http://converter/v1/documents/pptx", {
 			method: "POST",
-			headers: { "Content-Type": "application/json", [SCHEMA_VERSION_HEADER]: "2" },
+			headers: { "Content-Type": "application/json", [SCHEMA_VERSION_HEADER]: "3" },
 			body: JSON.stringify(body),
 		}),
 	);
@@ -263,6 +263,96 @@ describe("PPTX export", () => {
 		const { all, read } = await slides(unsafe);
 		expect(all[2]).toContain("[1]");
 		expect(await read("ppt/slides/_rels/slide3.xml.rels")).not.toContain("javascript");
+	});
+
+	it("writes charts and tables as native, editable objects in the theme's colors", async () => {
+		const drafts = [
+			card(1, "chart", [
+				{ type: "heading", text: "Capacity tripled" },
+				{
+					type: "chart",
+					kind: "column",
+					size: "large",
+					categories: ["2023", "2024", "2025"],
+					series: [{ name: "Capacity", values: [12, 18.5, 36] }],
+					suffix: " GW",
+					caption: "Operator filings",
+				},
+				{ type: "callout", tone: "caution", text: "Supply is **tight**." },
+			]),
+			card(2, "dashboard", [
+				{ type: "heading", text: "Quarter at a glance" },
+				{
+					type: "chart",
+					kind: "donut",
+					size: "medium",
+					categories: ["Solar", "Wind", "Hydro"],
+					series: [{ name: "Share", values: [50, 30, 20] }],
+				},
+				{ type: "progress", size: "medium", items: [{ label: "Hiring plan", value: 72 }] },
+				{
+					type: "table",
+					size: "full",
+					columns: ["Region", "Sites"],
+					rows: [
+						["North", "4"],
+						["South", "11"],
+					],
+				},
+			]),
+			card(3, "chart", [
+				{ type: "heading", text: "Two sources" },
+				{
+					type: "chart",
+					kind: "line",
+					categories: ["Q1", "Q2", "Q3", "Q4"],
+					series: [
+						{ name: "Solar", values: [1, 2, 3, 5] },
+						{ name: "Wind", values: [2, 2, 3, 4] },
+					],
+				},
+			]),
+		];
+		const results = convertCards({ operationId: "widgets", sourceIds: [], cards: drafts });
+		const cards = results.map((result) => {
+			if ("issue" in result) throw new Error(JSON.stringify(result.issue));
+			return result.card;
+		});
+		const document = assembleDocument({ title: "Widgets", theme: "cobalt", cards });
+		const response = await exportDeck({ document, assets: {}, sources: [] });
+		expect(response.status).toBe(200);
+		const { all, read } = await slides(response);
+		const series = CARD_THEME_DEFINITIONS.cobalt.chart.series.map((color) =>
+			color.slice(1).toUpperCase(),
+		);
+		const column = await read("ppt/charts/chart1.xml");
+		expect(column).toContain('<c:barDir val="col"/>');
+		expect(column).toContain("<c:v>18.5</c:v>");
+		expect(column).toContain(series[0] ?? "");
+		expect(column).toContain('formatCode="#,##0.0#&quot; GW&quot;"');
+		expect(column).toContain('<c:showVal val="1"/>');
+		const donut = await read("ppt/charts/chart2.xml");
+		expect(donut).toContain("<c:doughnutChart>");
+		expect(donut).toContain('<c:holeSize val="62"/>');
+		for (const color of series.slice(0, 3)) expect(donut).toContain(color);
+		const line = await read("ppt/charts/chart3.xml");
+		expect(line).toContain("<c:lineChart>");
+		expect(line).toContain('<c:legendPos val="t"/>');
+		expect(all[0]).toContain("Operator filings");
+		expect(all[0]).toContain(CARD_THEME_DEFINITIONS.cobalt.chart.caution.slice(1).toUpperCase());
+		// The table is a native table, its figures aligned right.
+		expect(all[1]).toContain("<a:tbl>");
+		expect(all[1]).toContain("South");
+		expect(all[1]).toMatch(/algn="r"[\s\S]*?<a:t>11<\/a:t>/);
+		expect(all[1]).toContain("72%");
+		for (const slide of all) {
+			for (const [, x, y, width, height] of slide.matchAll(
+				/<a:off x="(\d+)" y="(\d+)"\/>\s*<a:ext cx="(\d+)" cy="(\d+)"\/>/g,
+			)) {
+				expect(Number(x) + Number(width)).toBeLessThanOrEqual(13.333 * EMU_PER_INCH + 1);
+				expect(Number(y) + Number(height)).toBeLessThanOrEqual(7.5 * EMU_PER_INCH + 1);
+			}
+		}
 	});
 
 	it("estimates wrapping from word widths", () => {

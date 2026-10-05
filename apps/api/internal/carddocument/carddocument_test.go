@@ -55,7 +55,7 @@ func (store *memoryStore) OpenObject(_ context.Context, key string) (io.ReadClos
 	return io.NopCloser(bytes.NewReader(contents)), nil
 }
 
-const sampleDocument = `{"schemaVersion": 2, "title": "Grid storage", "theme": "slate",
+const sampleDocument = `{"schemaVersion": 3, "title": "Grid storage", "theme": "slate",
 	"cardOrder": ["c_aaaaaaaa"], "cards": {"c_aaaaaaaa": {}}}`
 
 func prepareInput() PrepareInput {
@@ -75,7 +75,7 @@ func TestPrepareCopiesCompactDocumentWithoutObjectStorage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if revision.CardCount != 1 || revision.SchemaVersion != 2 {
+	if revision.CardCount != 1 || revision.SchemaVersion != 3 {
 		t.Fatalf("revision = %+v", revision)
 	}
 	stored := revision.Document
@@ -99,7 +99,7 @@ func TestPrepareCopiesCompactDocumentWithoutObjectStorage(t *testing.T) {
 func TestPrepareRefusesOtherSchemaVersionsAndEmptyDocuments(t *testing.T) {
 	for _, document := range []string{
 		`{"schemaVersion": 3, "cardOrder": ["c_aaaaaaaa"]}`,
-		`{"schemaVersion": 2, "cardOrder": []}`,
+		`{"schemaVersion": 3, "cardOrder": []}`,
 		`not json`,
 	} {
 		input := prepareInput()
@@ -149,7 +149,7 @@ func TestConverterClassifiesFailures(t *testing.T) {
 	ctx := context.Background()
 
 	results, err := converter.ConvertCards(ctx, "op", nil, nil, []DraftInput{{Position: 1, Takeaway: "t", Role: "evidence", Draft: json.RawMessage(`{}`)}})
-	if err != nil || results[0].Issue == nil || results[0].Issue.Path != "card.layout" || header != "2" {
+	if err != nil || results[0].Issue == nil || results[0].Issue.Path != "card.layout" || header != "3" {
 		t.Fatalf("results = %+v, err = %v, header = %q", results, err, header)
 	}
 

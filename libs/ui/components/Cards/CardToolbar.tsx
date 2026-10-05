@@ -1,15 +1,27 @@
 import {
 	addCard,
+	addWidget,
 	type CardDocument,
 	canAddImage,
+	canAddWidget,
 	compatibleLayouts,
 	duplicateCard,
 	type LayoutId,
 	moveCard,
+	newWidgetCard,
 	removeImage,
 	setLayout,
+	WIDGET_TYPES,
 } from "@slidesage/cards";
 import { Button } from "@slidesage/ui/components/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@slidesage/ui/components/dropdown-menu";
 import {
 	Select,
 	SelectContent,
@@ -18,9 +30,19 @@ import {
 	SelectValue,
 } from "@slidesage/ui/components/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@slidesage/ui/components/tooltip";
-import { ArrowLeft, ArrowRight, Copy, ImageMinus, ImagePlus, Plus, Sparkles } from "lucide-react";
+import {
+	ArrowLeft,
+	ArrowRight,
+	ChartColumn,
+	Copy,
+	ImageMinus,
+	ImagePlus,
+	Plus,
+	Sparkles,
+} from "lucide-react";
 import type { ReactNode } from "react";
-import type { DocumentEdit } from "./CardView";
+import type { DocumentEdit } from "./fields";
+import { WIDGET_NAMES } from "./WidgetControls";
 
 export const LAYOUT_NAMES: Record<LayoutId, string> = {
 	title: "Title",
@@ -33,7 +55,71 @@ export const LAYOUT_NAMES: Record<LayoutId, string> = {
 	"image-left": "Photo left",
 	"image-right": "Photo right",
 	cover: "Photo cover",
+	chart: "Chart",
+	table: "Table",
+	dashboard: "Dashboard",
 };
+
+const WIDGET_CARDS = [
+	{ layout: "chart", label: "Chart card" },
+	{ layout: "table", label: "Table card" },
+	{ layout: "dashboard", label: "Dashboard card" },
+] as const;
+
+/**
+ * Adds a widget to this card, moving it to a layout that holds the widget
+ * beside its content, or adds a new card built around widgets.
+ */
+function InsertMenu({
+	document,
+	cardId,
+	edit,
+}: Pick<CardToolbarProps, "document" | "cardId" | "edit">) {
+	const card = document.cards[cardId];
+	if (!card) return null;
+	return (
+		<DropdownMenu>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<DropdownMenuTrigger asChild>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							aria-label="Insert a widget"
+							className="size-8 text-white/60 hover:bg-white/10 hover:text-white"
+						>
+							<ChartColumn className="size-4" />
+						</Button>
+					</DropdownMenuTrigger>
+				</TooltipTrigger>
+				<TooltipContent>Insert a widget</TooltipContent>
+			</Tooltip>
+			<DropdownMenuContent align="end">
+				<DropdownMenuLabel>Add to this card</DropdownMenuLabel>
+				{WIDGET_TYPES.map((type) => (
+					<DropdownMenuItem
+						key={type}
+						disabled={!canAddWidget(card, type)}
+						onSelect={() => edit((current) => addWidget(current, cardId, type))}
+					>
+						{WIDGET_NAMES[type]}
+					</DropdownMenuItem>
+				))}
+				<DropdownMenuSeparator />
+				<DropdownMenuLabel>New card after this one</DropdownMenuLabel>
+				{WIDGET_CARDS.map(({ layout, label }) => (
+					<DropdownMenuItem
+						key={layout}
+						onSelect={() => edit((current) => addCard(current, cardId, newWidgetCard(layout)))}
+					>
+						{label}
+					</DropdownMenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
 
 function Action({
 	label,
@@ -115,6 +201,7 @@ export function CardToolbar({ document, cardId, edit, onPhoto, onRevise }: CardT
 				</SelectContent>
 			</Select>
 			<div className="ml-auto flex items-center gap-1">
+				<InsertMenu document={document} cardId={cardId} edit={edit} />
 				{onRevise && (
 					<Action label="Revise this card with AI" onClick={() => onRevise(cardId)}>
 						<Sparkles className="size-4" />

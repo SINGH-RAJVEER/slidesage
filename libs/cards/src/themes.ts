@@ -20,6 +20,54 @@ export interface ThemeFont {
 	weights: readonly number[];
 }
 
+/**
+ * Colors for data widgets. Series colors mark data only; labels and values
+ * always use the text colors, so a light series hue never has to be legible.
+ */
+export interface ChartPalette {
+	/** Categorical series colors, assigned in this order and never cycled. */
+	series: readonly string[];
+	/** Callout tone colors, always shown beside an icon and a label. */
+	positive: string;
+	caution: string;
+}
+
+/** The most series or pie slices a chart can show, one color each. */
+export const SERIES_SLOTS = 6;
+
+/**
+ * Validated with the data-viz palette checks against every light theme
+ * surface: lightness band, chroma floor, adjacent colour-blind separation of
+ * at least 9.1, and a normal-vision floor of 19.6. Four hues fall below 3:1
+ * on the paler surfaces, so charts always label their values and carry a
+ * data table.
+ */
+const LIGHT_CHART: ChartPalette = {
+	series: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"],
+	positive: "#0a7f0a",
+	caution: "#b26b00",
+};
+
+/** The same hues stepped for dark surfaces, passing every check at 3:1 or more. */
+const DARK_CHART: ChartPalette = {
+	series: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300"],
+	positive: "#0ca30c",
+	caution: "#fab219",
+};
+
+/**
+ * Cobalt's surface is a saturated mid blue, so no step of the shared hues
+ * reaches 3:1 on it. These lighter hues all clear 3:1 and the normal-vision
+ * floor; their colour-blind separation of 7.7 needs the gaps, legend, and
+ * labels every chart draws anyway. They sit above the dark lightness band
+ * by design, since the surface is far lighter than the band assumes.
+ */
+const COBALT_CHART: ChartPalette = {
+	series: ["#fd95dc", "#db9152", "#17eace", "#5fbf49", "#ddcc6b", "#30aff8"],
+	positive: "#7ee08a",
+	caution: "#ffd166",
+};
+
 export interface CardThemeDefinition {
 	id: ThemeId;
 	name: string;
@@ -27,6 +75,7 @@ export interface CardThemeDefinition {
 	appearance: "light" | "dark";
 	curated: boolean;
 	palette: ThemePalette;
+	chart: ChartPalette;
 	fonts: { heading: ThemeFont; body: ThemeFont };
 }
 
@@ -99,6 +148,7 @@ export const CARD_THEME_DEFINITIONS: Record<ThemeId, CardThemeDefinition> = {
 		name: "Slate",
 		description: "The original dark blue theme.",
 		appearance: "dark",
+		chart: DARK_CHART,
 		curated: false,
 		palette: palette(
 			"#1b2130",
@@ -115,6 +165,7 @@ export const CARD_THEME_DEFINITIONS: Record<ThemeId, CardThemeDefinition> = {
 		name: "Paper",
 		description: "The original warm paper theme.",
 		appearance: "light",
+		chart: LIGHT_CHART,
 		curated: false,
 		palette: palette(
 			"#f7f5f0",
@@ -131,6 +182,7 @@ export const CARD_THEME_DEFINITIONS: Record<ThemeId, CardThemeDefinition> = {
 		name: "Ember",
 		description: "The original copper on charcoal theme.",
 		appearance: "dark",
+		chart: DARK_CHART,
 		curated: false,
 		palette: palette(
 			"#231a17",
@@ -147,6 +199,7 @@ export const CARD_THEME_DEFINITIONS: Record<ThemeId, CardThemeDefinition> = {
 		name: "Ocean",
 		description: "Ink blue and sea glass for business proposals.",
 		appearance: "dark",
+		chart: DARK_CHART,
 		curated: true,
 		palette: palette("#102f3b", "#effafb", "#c5dce1", "#91b3bd", "#70dfc3", "#365864"),
 		fonts: { heading: THEME_FONTS.spaceGrotesk, body: THEME_FONTS.dmSans },
@@ -156,6 +209,7 @@ export const CARD_THEME_DEFINITIONS: Record<ThemeId, CardThemeDefinition> = {
 		name: "Grove",
 		description: "Pale sage with botanical serif headings.",
 		appearance: "light",
+		chart: LIGHT_CHART,
 		curated: true,
 		palette: palette("#edf3e8", "#23392d", "#3b5143", "#627565", "#466e38", "#c6d4be"),
 		fonts: { heading: THEME_FONTS.fraunces, body: THEME_FONTS.dmSans },
@@ -165,6 +219,7 @@ export const CARD_THEME_DEFINITIONS: Record<ThemeId, CardThemeDefinition> = {
 		name: "Orchid",
 		description: "Lavender and plum for creative portfolios.",
 		appearance: "light",
+		chart: LIGHT_CHART,
 		curated: true,
 		palette: palette("#f0eafa", "#38234f", "#554167", "#77628a", "#843caf", "#d6c7e7"),
 		fonts: { heading: THEME_FONTS.spaceGrotesk, body: THEME_FONTS.dmSans },
@@ -174,6 +229,7 @@ export const CARD_THEME_DEFINITIONS: Record<ThemeId, CardThemeDefinition> = {
 		name: "Sand",
 		description: "Stone, ochre and classic editorial type.",
 		appearance: "light",
+		chart: LIGHT_CHART,
 		curated: true,
 		palette: palette("#f4ead8", "#42382b", "#5c5141", "#7b6e5b", "#926016", "#d8c8ad"),
 		fonts: { heading: georgia, body: THEME_FONTS.dmSans },
@@ -183,6 +239,7 @@ export const CARD_THEME_DEFINITIONS: Record<ThemeId, CardThemeDefinition> = {
 		name: "Cobalt",
 		description: "Electric blue and lemon for product launches.",
 		appearance: "dark",
+		chart: COBALT_CHART,
 		curated: true,
 		palette: palette("#1739b5", "#ffffff", "#e1e8ff", "#b5c5ff", "#f4f38a", "#5874d0"),
 		fonts: { heading: THEME_FONTS.spaceGrotesk, body: THEME_FONTS.dmSans },
@@ -192,6 +249,7 @@ export const CARD_THEME_DEFINITIONS: Record<ThemeId, CardThemeDefinition> = {
 		name: "Mono",
 		description: "Graphite and cool gray with technical monospace headings.",
 		appearance: "light",
+		chart: LIGHT_CHART,
 		curated: true,
 		palette: palette("#eef0f2", "#202a35", "#3e4b59", "#677482", "#245e8a", "#c8cfd7"),
 		fonts: { heading: THEME_FONTS.plexMono, body: arial },

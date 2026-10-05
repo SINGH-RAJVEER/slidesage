@@ -26,6 +26,11 @@ export const CARD_THEMES = Object.fromEntries(
 				...Object.fromEntries(
 					Object.entries(theme.palette).map(([key, color]) => [`--card-${key}`, color]),
 				),
+				...Object.fromEntries(
+					theme.chart.series.map((color, index) => [`--card-series-${index + 1}`, color]),
+				),
+				"--card-positive": theme.chart.positive,
+				"--card-caution": theme.chart.caution,
 				"--card-heading-font": theme.fonts.heading.cssFamily,
 				fontFamily: theme.fonts.body.cssFamily,
 			} as CSSProperties,

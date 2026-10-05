@@ -9,7 +9,7 @@ import (
 )
 
 func jsonbDocument(fragment string) []byte {
-	return []byte(`{"schemaVersion":2,"cardOrder":["c_a"],"cards":{"c_a":{"content":` + fragment + `}}}`)
+	return []byte(`{"schemaVersion":3,"cardOrder":["c_a"],"cards":{"c_a":{"content":` + fragment + `}}}`)
 }
 
 func TestPrepareJSONBCompatibility(t *testing.T) {

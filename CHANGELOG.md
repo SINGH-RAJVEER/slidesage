@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Add chart, progress, table, and callout widgets to cards, with native PowerPoint export, and show each drafted card as soon as the model finishes writing it.
+
 ## 0.3.0
 
 - Polish the card viewer, retire unused template paths, and update the shipped architecture documentation.

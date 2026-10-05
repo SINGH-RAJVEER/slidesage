@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { CARD_TEMPLATES, THEMES } from "@slidesage/cards";
 import { handle, SCHEMA_VERSION_HEADER } from "./handler";
 
-function post(path: string, body: unknown, version = "2") {
+function post(path: string, body: unknown, version = "3") {
 	return handle(
 		new Request(`http://converter${path}`, {
 			method: "POST",
@@ -55,13 +55,13 @@ describe("converter", () => {
 	});
 	it("reports health with its schema version", async () => {
 		const response = await handle(new Request("http://converter/health"));
-		expect(await response.json()).toEqual({ status: "ok", schemaVersion: 2 });
+		expect(await response.json()).toEqual({ status: "ok", schemaVersion: 3 });
 	});
 
 	it("serves the drafting schema its caller builds prompts from", async () => {
 		const response = await handle(new Request("http://converter/v1/schema"));
 		const body = (await response.json()) as { schemaVersion: number; layouts: object };
-		expect(body.schemaVersion).toBe(2);
+		expect(body.schemaVersion).toBe(3);
 		expect(Object.keys(body.layouts)).toContain("comparison");
 	});
 
@@ -171,7 +171,7 @@ describe("template catalog endpoint", () => {
 		const response = await handle(
 			new Request("http://converter/v1/templates", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", [SCHEMA_VERSION_HEADER]: "2" },
+				headers: { "Content-Type": "application/json", [SCHEMA_VERSION_HEADER]: "3" },
 				body: JSON.stringify({
 					templateId: "grove-lesson",
 					url: "https://example.com/untrusted.jpg",
@@ -187,7 +187,7 @@ describe("template catalog endpoint", () => {
 		const missing = await handle(
 			new Request("http://converter/v1/templates", {
 				method: "POST",
-				headers: { [SCHEMA_VERSION_HEADER]: "2" },
+				headers: { [SCHEMA_VERSION_HEADER]: "3" },
 				body: JSON.stringify({ templateId: "missing" }),
 			}),
 		);

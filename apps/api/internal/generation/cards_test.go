@@ -212,7 +212,7 @@ func TestCardDrafterPlansDraftsRepairsWithoutImageStorage(t *testing.T) {
 	if err := json.Unmarshal(assembled, &document); err != nil {
 		t.Fatal(err)
 	}
-	if document.SchemaVersion != 2 || document.Theme != "grove" || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
+	if document.SchemaVersion != 3 || document.Theme != "grove" || len(document.CardOrder) != 3 || len(document.Cards) != 3 {
 		t.Fatalf("assembled document = %s", assembled)
 	}
 	if known, err := drafter.knowsTheme(context.Background(), "grove"); err != nil || !known {
@@ -254,5 +254,71 @@ func TestCardAuthorizationGrowsWithCardsAndSources(t *testing.T) {
 	sourced := cardAuthorizationMillis(5, "Topic", nil, &presentation.ResearchPayload{Sources: []presentation.Source{{URL: "https://example.com", Snippet: strings.Repeat("x", 2000)}}})
 	if small <= 0 || large <= small || sourced <= small {
 		t.Fatalf("small=%d large=%d sourced=%d", small, large, sourced)
+	}
+}
+
+func TestCardDrafterShowsEachCardWhileItsBatchStreams(t *testing.T) {
+	converter := startConverter(t)
+	plan := &cardPlan{Title: "Approved", Cards: []cardPlanEntry{
+		{Position: 1, Takeaway: "First", Role: "evidence", Layout: "bullets"},
+		{Position: 2, Takeaway: "Second", Role: "evidence", Layout: "bullets"},
+		{Position: 3, Takeaway: "Third", Role: "closing", Layout: "bullets"},
+	}}
+	card := func(position int) string {
+		return strings.Replace(bulletsCard(position), `"sourceIds": ["s1"]`, `"sourceIds": []`, 1)
+	}
+	var mu sync.Mutex
+	var shown []map[string]any
+	firstShown := make(chan struct{})
+	report := func(kind string, payload any) {
+		if kind != "cards" {
+			return
+		}
+		encoded, _ := json.Marshal(payload)
+		mu.Lock()
+		defer mu.Unlock()
+		shown = append(shown, decoded(t, string(encoded)))
+		if len(shown) == 1 {
+			close(firstShown)
+		}
+	}
+	generate := func(ctx context.Context, _ streamJob, _, _, _ string, _ int) (map[string]any, int, error) {
+		observe := contentObserver(ctx)
+		if observe == nil {
+			t.Error("drafting did not observe the stream")
+			return decoded(t, `{"cards": []}`), 1, nil
+		}
+		// The third card is only in the finished answer, as if the stream
+		// had missed it.
+		streamed := `{"cards": [` + card(1) + `, ` + card(2)
+		for start := 0; start < len(streamed); start += 7 {
+			observe(streamed[start:min(start+7, len(streamed))])
+		}
+		select {
+		case <-firstShown:
+		case <-time.After(5 * time.Second):
+			t.Error("no card was shown while the answer was streaming")
+		}
+		return decoded(t, `{"cards": [`+card(1)+`, `+card(2)+`, `+card(3)+`]}`), 12, nil
+	}
+	drafter := newCardDrafter(converter, &memoryObjects{}, generate, nil)
+	_, err := drafter.Draft(context.Background(), streamJob{
+		kind: "generation", presentationID: "p", userID: "u", operationID: "o", slideCount: 3, plan: plan, report: report,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(shown) != 3 {
+		t.Fatalf("cards events = %+v", shown)
+	}
+	for index, event := range shown {
+		cards, _ := event["cards"].(map[string]any)
+		completed, _ := wholeNumber(event["completed"])
+		if len(cards) != 1 || completed != index+1 {
+			t.Fatalf("cards event %d = %+v", index, event)
+		}
+	}
+	if _, ok := shown[2]["cards"].(map[string]any)["3"]; !ok {
+		t.Fatalf("the card missing from the stream was not shown: %+v", shown[2])
 	}
 }

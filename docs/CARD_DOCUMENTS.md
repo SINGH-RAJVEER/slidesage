@@ -4,26 +4,26 @@ A generated presentation is a versioned card document: an ordered set of cards, 
 
 ## Schema
 
-`libs/cards` (`@slidesage/cards`) defines schema version 2 and is the single authority for it. The Bun converter uses it to validate model output, and the browser uses it to check every document it loads. Version 1 documents are still readable: they are upgraded on read, and saves write version 2.
+`libs/cards` (`@slidesage/cards`) defines schema version 3 and is the single authority for it. The Bun converter uses it to validate model output, and the browser uses it to check every document it loads. Version 1 and 2 documents are still readable: they are upgraded on read, and saves write version 3. Version 2 added image nodes and photo layouts; version 3 added the widget nodes and layouts described under [Widgets](#widgets).
 
 - A document has `schemaVersion`, `title`, `theme`, `cardOrder`, and `cards` keyed by card ID.
 - A card has a `takeaway`, a narrative `role`, a `layout`, content `nodes`, cited `sourceIds`, and optional `notes`.
-- Node types are `heading`, `paragraph`, `bullets`, `quote`, `stat`, `steps`, `columns`, and `image`. An image node names a stored asset by its sha256 and carries alt text; it never carries a URL. Rich text is a list of runs with optional `bold` and `italic`; there are no links.
-- Every card, node, and list item has a stable ID, so edits can address content directly.
-- Layouts are `title`, `statement`, `bullets`, `comparison`, `process`, `quote`, `stats`, `image-left`, `image-right`, and `cover`. `LAYOUT_RULES` states which node types and how many items each layout accepts, which node types a layout requires one of, and whether it shows a photo. A card whose nodes do not fit its layout is invalid.
-- Themes are `slate`, `paper`, and `ember`. A document names a theme; it can never carry styling.
-- `LIMITS` bounds the card count (1 to 40) and every text field.
+- Node types are `heading`, `paragraph`, `bullets`, `quote`, `stat`, `steps`, `columns`, `image`, and the widgets `chart`, `progress`, `table`, and `callout`. An image node names a stored asset by its sha256 and carries alt text; it never carries a URL. Rich text is a list of runs with optional `bold` and `italic`; there are no links.
+- Every card, node, list item, chart series, meter, and table row has a stable ID, so edits can address content directly.
+- Layouts are `title`, `statement`, `bullets`, `comparison`, `process`, `quote`, `stats`, `image-left`, `image-right`, `cover`, `chart`, `table`, and `dashboard`. `LAYOUT_RULES` states which node types and how many items each layout accepts, which node types a layout requires one of, whether it shows a photo, and how many widgets it holds. A card whose nodes do not fit its layout is invalid.
+- Themes are `slate`, `paper`, `ember`, `ocean`, `grove`, `orchid`, `sand`, `cobalt`, and `mono`. A document names a theme; it can never carry styling. Each theme in `themes.ts` defines its surface, text, accent, and rule colors, a heading and body font, and a chart palette (see [Widgets](#widgets)).
+- `LIMITS` bounds the card count (1 to 40), every text field, and every widget's categories, series, values, meters, rows, and columns.
 
 A document may only reference assets the caller says the presentation owns (`knownAssets`). Validation is strict: unknown fields, unknown node types, duplicate IDs, and text over its limit are rejected with a path and a message, for example `card.nodes[0].text: is 91 characters, the limit is 90`.
 
 ## Converter
 
-`apps/converter` is a private Bun HTTP service. Every conversion request sends `X-Card-Schema-Version: 2`; a different version is refused with `409`.
+`apps/converter` is a private Bun HTTP service. Every conversion request sends `X-Card-Schema-Version: 3`; a different version is refused with `409`.
 
 | Method | Path | Purpose |
 | ------ | ---- | ------- |
 | `GET`  | `/health` | Liveness and served schema version |
-| `GET`  | `/v1/schema` | Layout rules, limits, roles, themes, and draft shapes that drafting prompts are built from |
+| `GET`  | `/v1/schema` | Layout rules, limits, roles, themes, draft shapes, and the widget guide that drafting prompts are built from |
 | `POST` | `/v1/cards` | Converts drafted cards independently; each result is a card or an issue |
 | `POST` | `/v1/documents` | Assembles converted cards into a validated document, or returns `422` with an issue |
 | `POST` | `/v1/documents/validate` | Validates an edited document before it is saved |
@@ -31,6 +31,8 @@ A document may only reference assets the caller says the presentation owns (`kno
 | `POST` | `/v1/documents/pptx` | Writes a document, with the images it shows, as an editable PowerPoint file |
 
 Conversion, assembly, and validation take `assetIds`, the assets the presentation owns; an image node naming any other asset is an issue.
+
+Conversion also reads chart values and meter percentages written as numeric strings, such as `"1,200"`, refuses values with units such as `"4%"`, and gives a widget the model left unsized a default size (see [Widgets](#widgets)).
 
 Conversion strips HTML formatting tags such as `<b>` and `<span class="x">` (but not text like `a<b and c>d`), control characters, zero-width characters, and bidirectional overrides, and parses `**bold**` and `*italic*` into runs. IDs are derived from the operation ID and card position, so repeating a conversion produces identical IDs.
 
@@ -40,17 +42,39 @@ Run it with `just converter`, or bundle it with `just converter-bundle` for the 
 
 The worker drafts through `cardDrafter` (`apps/api/internal/generation/cards.go`):
 
-1. The planner returns a title and one plan entry per requested card: takeaway, role, layout, evidence, source IDs, and a photo search for photo layouts. The plan must have exactly the requested count, positions without gaps, known roles and layouts, and only supplied sources; otherwise the planner is asked again, up to twice. When the user approved an outline first (see [Outline](#outline)), the worker uses that plan and skips this step.
+1. The planner returns a title and one plan entry per requested card: takeaway, role, layout, evidence, source IDs, and a photo search for photo layouts. It may choose the chart, table, and dashboard layouts only for figures or comparisons the sources or topic state, and must list those figures in the card's evidence. The plan must have exactly the requested count, positions without gaps, known roles and layouts, and only supplied sources; otherwise the planner is asked again, up to twice. When the user approved an outline first (see [Outline](#outline)), the worker uses that plan and skips this step.
 2. Photos are resolved for cards with photo layouts, up to `min(6, max(2, (count+1)/2))` per deck. Further photo cards, and cards whose search finds nothing, fall back to a text layout rather than failing the deck. A `plan` event reports the plan to the browser.
 3. Cards are drafted in batches of four with the whole plan and the takeaways already written.
-4. The converter validates each batch. An invalid or missing card is redrafted on its own against the reported issue, up to twice, and the rest of the batch is kept. Each finished batch is reported as a `cards` event with the photos it shows, so the browser can preview the deck before it is saved.
+4. The converter validates each card as soon as the model finishes writing it, while the rest of its batch is still streaming. Each valid card is reported straight away as its own `cards` event with the photo it shows, so the browser previews the deck one card at a time before it is saved. Once the batch's answer is complete, any card the stream did not yield is validated from the full answer. An invalid or missing card is redrafted on its own against the reported issue, up to twice, and reported when it passes. Only OpenRouter calls stream; a direct BYOK provider returns the batch at once, so its valid cards arrive together.
 5. The converter assembles the document, and the drafter checks it holds the requested number of cards.
 6. The worker prepares the document body and revision metadata for a PostgreSQL JSONB commit. It does not upload document JSON to GCS.
 7. The completion transaction records the photo assets, commits the revision and its body, advances `presentations.current_card_revision`, and settles points together.
 
-Revision provenance records the provider, model, prompt version, plan version, and source IDs. Converter `5xx` responses and network failures are retried as temporary; `4xx` responses fail the job.
+Revision provenance records the provider, model, prompt version (`cards-v2` since widgets were added), plan version, and source IDs. Converter `5xx` responses and network failures are retried as temporary; `4xx` responses fail the job.
 
 The API accepts submissions only when `CARD_CONVERTER_URL` is set; otherwise it returns `503` before reserving points. `PRESENTATION_GCS_BUCKET` supplies image storage. Text-only document generation and reads do not require a bucket.
+
+## Widgets
+
+Widgets are the four data nodes. Each has a `size`: `small`, `medium`, `large`, or `full`.
+
+- `chart` has a `kind`, `categories` (2 to 12, unique), and `series` (1 to 4), each with a name and one finite value per category. An optional `prefix` and `suffix` are written around every value, such as `$` and ` GW`, and an optional `caption` names where the figures come from. Kinds are `column`, `bar`, `stacked-column`, `line`, `area`, `pie`, and `donut`. `chartKindMismatch` decides which kinds suit the data: a pie or donut shows exactly one series of two to six non-negative values, and a stacked column needs two series or more.
+- `progress` holds one to six meters, each a label and a percentage from 0 to 100.
+- `table` has two to five column headings and one to eight rows, each with one cell per column. A cell may be empty.
+- `callout` holds rich text with a `tone`: `note`, `positive`, or `caution`. The tone is shown with an icon, never by color alone.
+
+The three widget layouts place them:
+
+- A `chart` card holds a heading, one chart, and optionally a paragraph, two to four bullets, or a callout. A `table` card holds a heading, one table, and optionally a paragraph or callout. With text, the widget's size is its share of the card's width beside the text: a third, a half, or two thirds. A `full` widget sits above the text instead. Without text, the widget fills the card.
+- A `dashboard` card holds a heading and two to four widgets of any type. `widgetRows` packs them in order on a twelve-column grid (small 4, medium 6, large 8, full 12): a widget starts a new row when it would overflow the current one, and the widgets of a row share its width by span. The sizes must pack into at most two rows, so three `large` widgets are refused.
+
+The card view and PPTX export share this geometry from `libs/cards/src/widgets.ts`, so both place every widget at the same width. A chart grows to fill the height its card leaves; meters, tables, and callouts keep their own height and are centered in their row.
+
+Every theme carries a chart palette: six categorical series colors, used in order and never cycled, and the positive and caution tone colors. Light themes share one hue order and dark themes the same hues stepped for dark surfaces, both checked against every theme surface for lightness, chroma, colour-blind separation of neighbouring series, and normal-vision separation. Cobalt's saturated blue surface needs its own lighter hues to reach 3:1. Some light-theme hues sit below 3:1 on their surface, so charts label their values and carry their data in a table for assistive technology. The card view exposes the palette as `--card-series-1` to `--card-series-6`, `--card-positive`, and `--card-caution`.
+
+In the browser, charts are SVG drawn to their box from those variables. Bars are rounded at their data end with a surface gap between neighbours, lines carry ringed markers, and values, labels, and legends use the text colors. A chart with two or more series has a legend; a pie or donut lists each slice with its value and share. Bars are labelled when one series has eight categories or fewer, and every mark has a hover title. Each chart names its kind and series, and keeps its numbers in a visually hidden table.
+
+When drafting, the schema's widget guide tells the model which kind suits which data and what each size means, and drafting copies figures exactly from the plan's evidence or the sources. An AI revision keeps a widget's figures unless the instruction supplies new ones. A widget the model leaves unsized is sized by the converter: the chart or table of a chart or table card takes `large` beside text and `full` alone, and any other widget takes `medium`.
 
 ## AI revisions
 
@@ -107,9 +131,11 @@ After its migrations, `cmd/migrate` deletes the objects the retired formats left
 
 New edits must pass document validation and JSONB compatibility checks. An incompatible string or number returns `422` before the revision is committed; it is not silently normalized into storable content.
 
-Edits are pure functions in `libs/cards/src/edit.ts`: text, fields, list items, layout, order, duplication, insertion, deletion, and photos. The layout menu offers only layouts the card's content fits. Text is edited in place and supports bold and italic only. Undo history coalesces keystrokes within 800 ms, and the document autosaves 1.2 seconds after the last change. A save whose response is lost is sent again with the same operation ID before any newer edit, so it lands once and the next save builds on it; until it is confirmed the deck counts as unsaved, even if its edits were undone. After a conflict the editor stops saving and offers to reload. Leaving the deck for another page, including another deck, saves pending edits first; edits that cannot be saved are dropped only after the user confirms, and closing the tab with unsaved edits asks the browser to confirm.
+Edits are pure functions in `libs/cards/src/edit.ts`: text, fields, list items, layout, order, duplication, insertion, deletion, photos, and widgets. A widget edit that would break the card's layout, such as a fifth dashboard widget or a size that needs a third row, leaves the document unchanged. The layout menu offers only layouts the card's content fits. Text is edited in place and supports bold and italic only. Undo history coalesces keystrokes within 800 ms, and the document autosaves 1.2 seconds after the last change. A save whose response is lost is sent again with the same operation ID before any newer edit, so it lands once and the next save builds on it; until it is confirmed the deck counts as unsaved, even if its edits were undone. After a conflict the editor stops saving and offers to reload. Leaving the deck for another page, including another deck, saves pending edits first; edits that cannot be saved are dropped only after the user confirms, and closing the tab with unsaved edits asks the browser to confirm.
 
-In the viewer, Edit makes the slide in the middle of the carousel editable and puts the title, theme, undo, and redo in the header. The toolbar for that slide sits under the carousel: layout, AI revision, photo, move left or right, duplicate, and add a card after it. Delete in the navigation bar asks first and removes the slide on screen, whether or not the deck is being edited.
+In the viewer, Edit makes the slide in the middle of the carousel editable and puts the title, theme, undo, and redo in the header. The toolbar for that slide sits under the carousel: layout, insert widget, AI revision, photo, move left or right, duplicate, and add a card after it. Insert adds a chart, meters, a table, or a callout to the card, moving it to the first layout that holds the widget beside its content, or adds a new chart, table, or dashboard card after it; options the card cannot hold are disabled.
+
+While editing, hovering or focusing a widget shows its controls: a chart's kind, offering only kinds that suit its data, and a grid editor for its categories, series, values, prefix, suffix, and source note; a callout's tone; a table's columns; the widget's size where it changes the layout; and removal where the layout still holds the rest. Meter labels and percentages, table headings and cells, and callout text are edited in place. The chart data editor checks the result against the card schema before it saves. Delete in the navigation bar asks first and removes the slide on screen, whether or not the deck is being edited.
 
 
 ## Sharing
@@ -132,7 +158,7 @@ In the browser, Share on a saved deck opens a dialog that creates, replaces, or 
 
 `GET /presentations/{id}/export/pptx` sends the owner the current revision as a PowerPoint file. The API reads the revision, the images it shows (at most 64 MiB of them), and the presentation's research sources, and posts them to the converter's `/v1/documents/pptx`. The converter accepts bodies up to 96 MiB on that route, since images travel base64-encoded, and stores nothing. A hotlinked Unsplash photo is downloaded from `images.unsplash.com` for the export and normalized like a stored image; the copy exists only inside the exported file, which is the user downloading the photo they chose. If Unsplash cannot serve it, because it is unreachable or the photo was removed, the export fails with `502` and asks the user to try again.
 
-`apps/converter/src/pptx.ts` writes the file with pptxgenjs on a 13.333 by 7.5 inch slide, one slide per card. Everything is native and editable: headings and paragraphs are text boxes, bullets are PowerPoint list paragraphs, comparison columns and process steps are text boxes with hairlines, and photos are pictures cropped around the image node's focus the way the browser crops them. Layout, padding, type sizes, and theme colors follow the web card view; translucent theme colors are flattened onto the card surface. A cover card's gradient is a stretched PNG over the photo, because pptxgenjs shapes have no gradient fill. Citations become hyperlinks to their sources (only `http` and `https` links; other sources keep their number without a link), stock photos keep their credit with the photographer and library linked, and card notes become speaker notes.
+`apps/converter/src/pptx.ts` writes the file with pptxgenjs on a 13.333 by 7.5 inch slide, one slide per card. Everything is native and editable: headings and paragraphs are text boxes, bullets are PowerPoint list paragraphs, comparison columns and process steps are text boxes with hairlines, and photos are pictures cropped around the image node's focus the way the browser crops them. Charts are native PowerPoint charts whose data opens in PowerPoint's data sheet, in the theme's series colors, with number formats that carry the chart's prefix and suffix and value labels where the browser labels bars. Tables are native tables with right-aligned figure columns. Meters are rounded track and fill shapes, and callouts keep their tone's rule and a sign for the tone. A donut's total, shown in its middle in the browser, is not drawn in PowerPoint. Layout, padding, type sizes, and theme colors follow the web card view; translucent theme colors are flattened onto the card surface. A cover card's gradient is a stretched PNG over the photo, because pptxgenjs shapes have no gradient fill. Citations become hyperlinks to their sources (only `http` and `https` links; other sources keep their number without a link), stock photos keep their credit with the photographer and library linked, and card notes become speaker notes.
 
 A card whose content needs more room than one slide is not split or cropped: its text shrinks until it fits, down to half its designed size, the same rule the browser applies. The fit is estimated from average glyph widths, not measured with the font, so every text box also has PowerPoint's shrink-on-overflow turned on for anything the estimate misses; PowerPoint applies that only once the text is edited.
 

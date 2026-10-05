@@ -29,6 +29,21 @@ const defaultModel = "qwen/qwen3.8-27b:free"
 // shorten it; nothing at runtime reassigns it.
 var streamIdleTimeout = 45 * time.Second
 
+type contentObserverKey struct{}
+
+// withContentObserver asks a streamed provider call to hand each piece of the
+// answer to observe as it arrives. observe runs on the stream's read loop, so
+// it must return quickly: a blocked loop reads as a stalled upstream. A
+// provider that does not stream never calls it.
+func withContentObserver(ctx context.Context, observe func(string)) context.Context {
+	return context.WithValue(ctx, contentObserverKey{}, observe)
+}
+
+func contentObserver(ctx context.Context) func(string) {
+	observe, _ := ctx.Value(contentObserverKey{}).(func(string))
+	return observe
+}
+
 // doProviderRequest sends a provider request and retries transient failures (429 and 5xx) with exponential backoff, honoring Retry-After when present.
 func (h *handler) doProviderRequest(ctx context.Context, send func() (*http.Response, error)) (*http.Response, error) {
 	for attempt := 0; ; attempt++ {
@@ -143,6 +158,7 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, promptName, s
 		}
 	}
 	var content strings.Builder
+	observe := contentObserver(ctx)
 	inputTokens := 0
 	outputTokens := 0
 	finishReason := ""
@@ -214,6 +230,9 @@ func (h *handler) generateJSON(ctx context.Context, job streamJob, promptName, s
 				return nil, 0, errors.New("OpenRouter response is too large")
 			}
 			content.WriteString(chunk.Choices[0].Delta.Content)
+			if observe != nil && chunk.Choices[0].Delta.Content != "" {
+				observe(chunk.Choices[0].Delta.Content)
+			}
 		}
 		if chunk.Usage.TotalTokens > 0 {
 			tokens = chunk.Usage.TotalTokens

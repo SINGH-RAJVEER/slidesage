@@ -7,3 +7,4 @@ export * from "./schema";
 export * from "./templates";
 export * from "./themes";
 export * from "./validate";
+export * from "./widgets";

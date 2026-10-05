@@ -27,7 +27,7 @@ func TestExportSendsTheCurrentDocumentWithItsImagesAndSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	document := json.RawMessage(`{"schemaVersion": 2, "title": "Grid: storage / 2026", "theme": "slate", "cardOrder": ["c_aaaaaaaa", "c_bbbbbbbb"],
+	document := json.RawMessage(`{"schemaVersion": 3, "title": "Grid: storage / 2026", "theme": "slate", "cardOrder": ["c_aaaaaaaa", "c_bbbbbbbb"],
 		"cards": {"c_aaaaaaaa": {"nodes": [{"type": "image", "assetId": "` + asset.SHA256 + `"}]},
 			"c_bbbbbbbb": {"nodes": [{"type": "image", "assetId": "` + hotlinked.SHA256 + `"}]}}}`)
 	revision, err := Prepare(PrepareInput{PresentationID: presentationID, AuthorID: userID, OperationID: "op-" + presentationID, OperationKind: OperationGeneration, Document: document})

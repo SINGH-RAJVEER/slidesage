@@ -32,7 +32,7 @@ func fakeValidator(t *testing.T) *Converter {
 }
 
 func editedDocument(title string) json.RawMessage {
-	return json.RawMessage(`{"schemaVersion":2,"title":"` + title + `","theme":"paper","cardOrder":["c_aaaaaaaa"],"cards":{"c_aaaaaaaa":{"nodes":[]}}}`)
+	return json.RawMessage(`{"schemaVersion":3,"title":"` + title + `","theme":"paper","cardOrder":["c_aaaaaaaa"],"cards":{"c_aaaaaaaa":{"nodes":[]}}}`)
 }
 
 func TestSaveCommitsEditsAndRefusesStaleOnes(t *testing.T) {
