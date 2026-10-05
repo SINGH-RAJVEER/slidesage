@@ -176,4 +176,39 @@ describe("Header", () => {
 			expect(item.querySelector("svg")).not.toBeNull();
 		}
 	});
+
+	it("loads the library while the user is about to open it", async () => {
+		mockAuthState.user = {
+			id: "user_1",
+			name: "Rajveer Singh",
+			email: "rajveer@example.com",
+			image: null,
+			emailVerified: true,
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+			slideTokens: 10,
+		};
+		const originalFetch = globalThis.fetch;
+		const fetchMock = mock(async (_input: string | URL | Request) =>
+			Response.json({ presentations: [] }),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		try {
+			const { default: Header } = await import("../../app/Header");
+			const { getByRole } = render(
+				<MemoryRouter initialEntries={["/generate"]}>
+					<Header />
+				</MemoryRouter>,
+			);
+
+			fireEvent.focus(getByRole("link", { name: "Presentations" }));
+			fireEvent.focus(getByRole("link", { name: "Generate" }));
+
+			expect(fetchMock).toHaveBeenCalledTimes(1);
+			expect(String(fetchMock.mock.calls[0]?.[0])).toEndWith("/presentations?limit=20&offset=0");
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
 });

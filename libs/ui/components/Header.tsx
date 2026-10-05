@@ -1,5 +1,6 @@
 import { LogOut, Settings, UserRound } from "lucide-react";
 import { type ComponentType, type ReactNode, useState } from "react";
+import { usePrefetchIntent } from "../hooks/usePrefetchIntent";
 import { cn } from "../lib/utils";
 import {
 	DropdownMenu,
@@ -43,6 +44,8 @@ interface HeaderProps {
 	user?: HeaderUser | null;
 	sticky?: boolean;
 	onNavigate: (path: string) => void;
+	/** Called once the user looks about to open a page the header reaches without a link. */
+	onPrefetch?: (path: string) => void;
 	onSignOut: () => Promise<void>;
 }
 
@@ -53,9 +56,13 @@ export function Header({
 	user,
 	sticky = false,
 	onNavigate,
+	onPrefetch,
 	onSignOut,
 }: HeaderProps) {
 	const [signingOut, setSigningOut] = useState(false);
+	const purchaseIntent = usePrefetchIntent(
+		onPrefetch ? () => onPrefetch(routes.purchase) : undefined,
+	);
 
 	const handleSignOut = async () => {
 		if (signingOut) return;
@@ -139,6 +146,7 @@ export function Header({
 						<>
 							<button
 								type="button"
+								{...purchaseIntent}
 								onClick={() => onNavigate(routes.purchase)}
 								className="hidden rounded-full border border-white/10 px-5 py-2 text-base font-medium text-white/90 transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20 lg:block"
 								title="Click to purchase more points"

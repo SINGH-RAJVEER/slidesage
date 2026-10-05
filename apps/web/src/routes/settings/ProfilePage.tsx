@@ -17,6 +17,7 @@ import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useSt
 import { useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+import { takeProfile } from "./settings-data";
 
 const AVATAR_URL_DEBOUNCE_MS = 800;
 const MAX_AVATAR_UPLOAD_BYTES = 800 * 1024;
@@ -64,15 +65,7 @@ export default function ProfilePage() {
 	const fetchProfile = useCallback(async () => {
 		try {
 			setLoading(true);
-			const res = await fetch(`${API_URL}/profile`, {
-				credentials: "include",
-			});
-
-			if (!res.ok) {
-				throw new Error("Failed to load profile");
-			}
-
-			const data = (await res.json()) as ProfileResponse;
+			const data = await takeProfile();
 			setProfile(data.user);
 			setNewName(data.user.name || "");
 			setNewEmail(data.user.email);

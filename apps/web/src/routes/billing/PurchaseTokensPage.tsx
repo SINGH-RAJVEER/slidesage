@@ -22,6 +22,7 @@ import { publishPointsBalance } from "@slidesage/ui/lib/points";
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "../../app/Header";
+import { takeBalance } from "./billing-data";
 
 declare global {
 	interface Window {
@@ -75,13 +76,8 @@ export default function PurchaseTokensPage() {
 
 	const fetchBalance = useCallback(async () => {
 		try {
-			const res = await fetch(`${API_URL}/billing/balance`, {
-				method: "GET",
-				credentials: "include",
-			});
-			if (!res.ok) return;
-			const data = (await res.json()) as BillingBalanceResponse;
-			setBalance(data);
+			const data = await takeBalance();
+			if (data) setBalance(data);
 		} catch {
 			// ignore
 		}
