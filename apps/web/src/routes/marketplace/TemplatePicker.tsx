@@ -13,6 +13,11 @@ import { ROUTES } from "../../app/router/paths";
 import { TemplatePreview } from "./TemplatePreview";
 import { useTemplateLibrary } from "./template-library";
 
+// The picker sits on the dark marketplace surface, so its controls use the
+// white-on-navy styling the rest of the app draws by hand.
+const SELECTED = "bg-white/10 text-white hover:bg-white/15";
+const UNSELECTED = "text-white/70 hover:bg-white/10 hover:text-white";
+
 export function TemplatePicker({
 	open,
 	onOpenChange,
@@ -43,35 +48,37 @@ export function TemplatePicker({
 			}}
 		>
 			<DialogContent
-				className="dark max-h-[85vh] overflow-y-auto bg-[#181e2a] text-foreground sm:max-w-5xl"
+				className="max-h-[85vh] overflow-y-auto bg-[#181e2a] text-white sm:max-w-5xl [&>button]:data-[state=open]:bg-transparent [&>button]:data-[state=open]:text-white/70"
 				aria-busy={busy}
 			>
 				<DialogHeader>
 					<DialogTitle>Choose a template</DialogTitle>
-					<DialogDescription>
+					<DialogDescription className="text-white/60">
 						Apply colors and fonts to keep your content, or replace all {slideCount} slides with an
 						editable starter deck and its photos. You can undo either change.
 					</DialogDescription>
 				</DialogHeader>
 				<div className="flex flex-wrap gap-2">
 					<Button
-						variant={installedOnly ? "ghost" : "secondary"}
+						variant="ghost"
+						className={installedOnly ? UNSELECTED : SELECTED}
 						onClick={() => setInstalledOnly(false)}
 					>
 						All templates
 					</Button>
 					<Button
-						variant={installedOnly ? "secondary" : "ghost"}
+						variant="ghost"
+						className={installedOnly ? SELECTED : UNSELECTED}
 						onClick={() => setInstalledOnly(true)}
 					>
 						Installed
 					</Button>
-					<Button asChild variant="link">
+					<Button asChild variant="link" className="text-white">
 						<Link to={ROUTES.marketplace}>Open marketplace</Link>
 					</Button>
 				</div>
 				{templates.length === 0 && (
-					<p className="py-8 text-muted-foreground">
+					<p className="py-8 text-white/60">
 						Install templates in the marketplace to find them here.
 					</p>
 				)}
@@ -80,13 +87,14 @@ export function TemplatePicker({
 						<section key={template.id} className="space-y-3">
 							<TemplatePreview template={template} />
 							<h3 className="font-medium">{template.name}</h3>
-							<p className="text-sm text-muted-foreground">
+							<p className="text-sm text-white/60">
 								{CARD_THEME_DEFINITIONS[template.theme].name} / {template.document.cardOrder.length}{" "}
 								slides
 							</p>
 							<div className="flex flex-wrap gap-2">
 								<Button
-									variant="secondary"
+									variant="ghost"
+									className={SELECTED}
 									disabled={busy || disabled}
 									onClick={() => onTheme(template)}
 								>
@@ -94,6 +102,7 @@ export function TemplatePicker({
 								</Button>
 								<Button
 									variant="outline"
+									className="border-white/15 bg-transparent text-white hover:bg-white/10 hover:text-white"
 									disabled={busy || disabled}
 									onClick={() => void onReplace(template)}
 								>
