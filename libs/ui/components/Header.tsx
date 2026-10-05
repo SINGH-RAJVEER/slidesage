@@ -30,7 +30,7 @@ export interface HeaderRoutes {
 	auth: string[];
 }
 
-export const BUG_REPORT_URL = "https://github.com/SINGH-RAJVEER/slidesage/issues";
+const BUG_REPORT_URL = "https://github.com/SINGH-RAJVEER/slidesage/issues";
 
 export interface HeaderLinkProps {
 	to: string;

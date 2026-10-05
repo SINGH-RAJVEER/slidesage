@@ -1,7 +1,6 @@
 import { type ApiErrorResponse, FEEDBACK_MAX_LENGTH, type FeedbackRequest } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
 import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
-import { BUG_REPORT_URL } from "@slidesage/ui/components/Header";
 import { Textarea } from "@slidesage/ui/components/textarea";
 import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
 import { type FormEvent, useCallback, useState } from "react";
@@ -51,24 +50,9 @@ export default function FeedbackPage() {
 			<FloatingNotice error={error} success={success} onDismiss={dismissNotice} />
 			<main className="flex-1 px-4 py-8 md:px-8 md:py-12">
 				<form className="mx-auto w-full max-w-2xl" onSubmit={handleSubmit}>
-					<div className="text-xs font-semibold uppercase tracking-[0.18em] text-white/45">
-						Feedback
+					<div className="text-center">
+						<h1 className="text-3xl font-semibold text-white md:text-4xl">Feedback</h1>
 					</div>
-					<h1 className="mt-2 text-lg font-semibold text-white">
-						What should SlideSage do better?
-					</h1>
-					<p className="mt-1 text-sm text-white/60">
-						Ideas, rough edges, things you like. Found something broken?{" "}
-						<a
-							href={BUG_REPORT_URL}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-white/80 underline underline-offset-4 hover:text-white"
-						>
-							Report a bug on GitHub
-						</a>
-						.
-					</p>
 					<label htmlFor="feedback-message" className="sr-only">
 						Your feedback
 					</label>
@@ -78,7 +62,7 @@ export default function FeedbackPage() {
 						onChange={(event) => setMessage(event.target.value)}
 						maxLength={FEEDBACK_MAX_LENGTH}
 						placeholder="Tell us what you think..."
-						className="mt-6 min-h-48 rounded-lg border-white/15 bg-white/10 px-4 py-3 text-base text-white placeholder:text-white/40 focus-visible:border-white/30 focus-visible:ring-white/20 md:text-base"
+						className="mt-8 min-h-48 rounded-lg border-white/15 bg-white/10 px-4 py-3 text-base text-white placeholder:text-white/40 focus-visible:border-white/30 focus-visible:ring-white/20 md:text-base"
 					/>
 					<div className="mt-3 flex items-center justify-between gap-4">
 						<span className="text-xs text-white/50">
