@@ -18,3 +18,8 @@ otel_logs_exporter = "otlp"
 
 # Create UNSPLASH_ACCESS_KEY in Secret Manager before enabling stock photos.
 unsplash_enabled = false
+
+# Enable after reviewing the recurring Memorystore cost and deployment plan.
+cache_enabled   = false
+cache_tier      = "BASIC"
+cache_memory_gb = 1
