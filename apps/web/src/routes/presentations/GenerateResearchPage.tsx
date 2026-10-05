@@ -15,6 +15,8 @@ interface ResearchRouteState {
 	slideCount: number;
 	detailLevel: string;
 	tonality: string;
+	/** How many sources the search retrieves; the API defaults to five. */
+	maxResults?: number;
 	researchPayload?: ResearchPayload;
 	retryPresentationId?: string;
 	ai?: AIModelSelection;
@@ -40,6 +42,7 @@ export default function GenerateResearchPage() {
 	const slideCount = routeState?.slideCount ?? 0;
 	const detailLevel = routeState?.detailLevel ?? "balanced";
 	const tonality = routeState?.tonality ?? "professional";
+	const maxResults = routeState?.maxResults;
 	const savedResearch = routeState?.researchPayload;
 	const retryPresentationId = routeState?.retryPresentationId;
 	const ai = routeState?.ai;
@@ -58,8 +61,9 @@ export default function GenerateResearchPage() {
 			slideCount,
 			detailLevel,
 			tonality,
+			maxResults,
 		}),
-		[detailLevel, prompt, slideCount, tonality],
+		[detailLevel, maxResults, prompt, slideCount, tonality],
 	);
 	const fetchedSources = researchPreviewState.sources;
 	const removedSourceUrls = researchPreviewState.removedSourceUrls;

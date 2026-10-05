@@ -72,6 +72,45 @@ describe("GenerateResearchPage", () => {
 		}
 	});
 
+	it("asks the search for the chosen number of results", async () => {
+		const originalFetch = globalThis.fetch;
+		const fetchMock = mock(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+			Response.json({ sources: [] }),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		try {
+			const view = render(
+				<MemoryRouter
+					initialEntries={[
+						{
+							pathname: "/generate/research",
+							state: {
+								prompt: "Tidal energy",
+								slideCount: 6,
+								detailLevel: "balanced",
+								tonality: "professional",
+								maxResults: 3,
+							},
+						},
+					]}
+				>
+					<StreamingProvider>
+						<Routes>
+							<Route path="/generate/research" element={<GenerateResearchPage />} />
+						</Routes>
+					</StreamingProvider>
+				</MemoryRouter>,
+			);
+
+			await waitFor(() => expect(view.getByText(/No sources found/)).toBeInTheDocument());
+			const init = fetchMock.mock.calls[0]?.[1];
+			expect(JSON.parse(String(init?.body)).research).toEqual({ enabled: true, maxResults: 3 });
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
 	it("leaves removed sources out of the reviewed payload until they are restored", async () => {
 		const view = render(
 			<MemoryRouter
