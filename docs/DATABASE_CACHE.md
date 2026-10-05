@@ -1,6 +1,6 @@
 # Database read cache
 
-- Optional shared Redis caches presentation summaries and immutable card bodies. Empty `CACHE_REDIS_ADDR` disables it.
+- Optional shared Valkey caches presentation summaries and immutable card bodies. Empty `CACHE_VALKEY_ADDR` disables it.
 - PostgreSQL owns authorization, current revisions, balances, billing, jobs, and writes. Losing cache contents loses no application data.
 
 ## Read paths and invalidation
@@ -12,7 +12,7 @@
 
 - List hits skip count, body loading, and summary parsing, retaining one indexed generation lookup.
 - Migration 37 installs a row trigger that advances `presentation_cache_versions` on inserts, updates, and deletes. Ownership changes advance both owners.
-- Invalidation commits or rolls back with the write. It covers API, editor, template, worker, and maintenance changes without Redis calls from writers.
+- Invalidation commits or rolls back with the write. It covers API, editor, template, worker, and maintenance changes without Valkey calls from writers.
 - Late cache fills use their earlier generation, so later requests cannot find stale entries. Superseded keys expire; in-flight reads may return their pre-commit snapshot.
 - Generation tombstones have no user foreign key, preserving invalidation during cascading account deletion. Do not truncate presentations while serving requests; the trigger covers row writes.
 - Document misses repeat authorization before loading the requested body. Editor, export, and shared reads use this path; share validity and assets are checked separately.
@@ -23,7 +23,7 @@
 ## Availability and telemetry
 
 - Connections open lazily, with at most eight active connections per API instance.
-- Operations default to 100 ms with no retries. Errors bypass Redis for five seconds before trying again.
+- Operations default to 100 ms with no retries. Errors bypass Valkey for five seconds before trying again.
 - Cache outages do not fail readiness or block writes. PostgreSQL must handle a complete cache outage.
 - `slidesage.cache.requests` and `slidesage.cache.duration` record `operation` and `outcome`; duration is milliseconds.
 - Get outcomes are `hit`, `miss`, `error`, and `bypass`; set outcomes are `ok`, `error`, and `bypass`.
@@ -33,22 +33,26 @@
 
 - Terraform `cache_enabled` defaults to false. GitHub `CACHE_ENABLED=true` enables it in plan/deploy; local plans can use `-var=cache_enabled=true`.
 - Deploy through the migration-first workflow so version tracking exists before enabling cache.
+- Deploy provisions the instance, its networking, and runtime IAM through a targeted apply before pausing runtimes. A slow or failed create stops the release while the previous version still serves.
 - `CACHE_ENABLED=false` removes cache resources on the next release and restores direct database reads.
-- Enabled defaults are Redis 7.2, 1 GiB Basic Tier, dedicated VPC, `/26` Cloud Run subnet, and separate `/29` Redis peering range.
-- API uses Direct VPC egress with `PRIVATE_RANGES_ONLY`. Worker needs no Redis credentials or VPC attachment; database triggers invalidate its writes.
-- TLS and Redis AUTH are enabled. Terraform stores the password in Secret Manager, injects a specific version, and supplies instance CAs through `CACHE_REDIS_CA_PEM`.
-- Production rejects configured Redis without both password and CA. The generated password is also in sensitive Terraform state; retain backend access controls.
-- `cache_memory_gb` defaults to 1. `cache_tier` accepts `BASIC` or `STANDARD_HA`; changing tier replaces the disposable cache.
-- Basic permits cold restarts and flushes; Standard adds replication/failover. Both require PostgreSQL fallback and incur idle capacity charges. See [Redis pricing](https://cloud.google.com/memorystore/docs/redis/pricing).
+- Enabled defaults are Memorystore for Valkey 9.0 with cluster mode disabled, one `SHARED_CORE_NANO` node, no replicas, and a dedicated VPC.
+- Private Service Connect automation is the only connection method. A `gcp-memorystore` service connection policy reserves the primary and reader endpoints in a `/28` subnet; the API uses only the primary, because the reader rejects writes.
+- API uses Direct VPC egress from a separate `/26` subnet with `PRIVATE_RANGES_ONLY`. Worker needs no cache access or VPC attachment; database triggers invalidate its writes.
+- TLS and IAM authentication are enabled. Memorystore for Valkey has no generated AUTH password, so nothing is stored in Secret Manager or Terraform state. Terraform supplies the instance CA chain through `CACHE_VALKEY_CA_PEM`, sets `CACHE_VALKEY_AUTH=iam`, and grants the runtime account `roles/memorystore.dbConnectionUser`.
+- With IAM auth, each new connection sends a runtime service account access token through Valkey AUTH. Authenticated connections outlive token expiry. A token refresh slower than the operation budget fails that operation and starts the five-second bypass.
+- Production rejects a configured cache without both the CA and IAM auth.
+- `cache_node_type` accepts `SHARED_CORE_NANO`, `STANDARD_SMALL`, `HIGHMEM_MEDIUM`, or `HIGHMEM_XLARGE`. `cache_replica_count` accepts 0 to 5; one or more adds automatic failover.
+- Zero replicas permit cold restarts and flushes. Every node is billed while idle, and PostgreSQL fallback is required either way. See [Memorystore for Valkey pricing](https://cloud.google.com/memorystore/valkey/pricing).
 
 ## Local development and checks
 
-- Start Redis separately, set `CACHE_REDIS_ADDR=127.0.0.1:6379`, and apply migrations before enabling it.
-- Non-production Redis may omit password and CA. Variables are listed in [Environment variables](ENVIRONMENT_VARIABLES.md#database-read-cache).
+- devenv starts Valkey on `127.0.0.1:6379` as the `cache` process, without persistence, and points the API at it. Apply migrations before relying on it; devenv orders them first.
+- Non-production Valkey may omit IAM auth and CA. Variables are listed in [Environment variables](ENVIRONMENT_VARIABLES.md#database-read-cache).
+- Outside devenv, run a disposable server:
 
 ```bash
-podman run --rm --name slidesage-redis -p 127.0.0.1:6379:6379 docker.io/library/redis:7.2-alpine redis-server --save '' --appendonly no
+podman run --rm --name slidesage-valkey -p 127.0.0.1:6379:6379 docker.io/valkey/valkey:9.0-alpine valkey-server --save '' --appendonly no
 ```
 
-- Integration tests use a migrated disposable `DATABASE_URL` and disposable `TEST_REDIS_ADDR`. Redis tests create expiring keys without flushing the database.
+- Integration tests use a migrated disposable `DATABASE_URL` and disposable `TEST_VALKEY_ADDR`. Valkey tests create expiring keys without flushing the database.
 - Coverage includes invalidation/rollback, concurrent fill, user isolation, ownership transfer, account deletion, revision selection, corruption, expiry, and outages.

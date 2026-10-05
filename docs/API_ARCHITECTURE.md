@@ -51,7 +51,7 @@
 - `generation_jobs` and `generation_job_events` own public status and replay; River's queue tables handle scheduling.
 - SSE handlers close database queries before writing to clients. Stream limits bound polling and handler load.
 - Scheduled maintenance handles recovery, expired counters, and unverified accounts.
-- Optional Redis caches list summaries and immutable bodies while PostgreSQL retains authorization and invalidation. See [Database cache](DATABASE_CACHE.md).
+- Optional Valkey caches list summaries and immutable bodies while PostgreSQL retains authorization and invalidation. See [Database cache](DATABASE_CACHE.md).
 
 ## Deployment
 

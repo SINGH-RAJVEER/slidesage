@@ -1,4 +1,4 @@
-// Package cache provides optional, disposable Redis storage. A cache failure
+// Package cache provides optional, disposable Valkey storage. A cache failure
 // is a miss; callers retain authoritative reads and authorization in PostgreSQL.
 package cache
 
@@ -20,6 +20,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 const MaxValueBytes = 4 << 20
@@ -29,8 +31,9 @@ type Store interface {
 	Set(context.Context, string, []byte, time.Duration)
 }
 
+// Client uses go-redis, which speaks the Redis 7.2 protocol that Valkey preserves.
 type Client struct {
-	redis    *redis.Client
+	valkey   *redis.Client
 	timeout  time.Duration
 	retryAt  atomic.Int64
 	requests metric.Int64Counter
@@ -39,12 +42,16 @@ type Client struct {
 
 // FromEnv does not connect during startup. An absent address disables caching.
 func FromEnv() (*Client, error) {
-	address := strings.TrimSpace(os.Getenv("CACHE_REDIS_ADDR"))
+	address := strings.TrimSpace(os.Getenv("CACHE_VALKEY_ADDR"))
 	if address == "" {
 		return nil, nil
 	}
-	if os.Getenv("NODE_ENV") == "production" && (os.Getenv("CACHE_REDIS_CA_PEM") == "" || os.Getenv("CACHE_REDIS_PASSWORD") == "") {
-		return nil, errors.New("production cache requires TLS CA and authentication")
+	authMode := os.Getenv("CACHE_VALKEY_AUTH")
+	if authMode != "" && authMode != "iam" {
+		return nil, errors.New("CACHE_VALKEY_AUTH must be empty or iam")
+	}
+	if os.Getenv("NODE_ENV") == "production" && (os.Getenv("CACHE_VALKEY_CA_PEM") == "" || authMode != "iam") {
+		return nil, errors.New("production cache requires TLS CA and IAM authentication")
 	}
 	timeout := 100 * time.Millisecond
 	if raw := os.Getenv("CACHE_TIMEOUT_MS"); raw != "" {
@@ -55,16 +62,23 @@ func FromEnv() (*Client, error) {
 		timeout = time.Duration(millis) * time.Millisecond
 	}
 	options := &redis.Options{
-		Addr: address, Password: os.Getenv("CACHE_REDIS_PASSWORD"), Protocol: 2,
+		Addr: address, Protocol: 2,
 		PoolSize: 8, MaxActiveConns: 8, MinIdleConns: 0,
 		DialTimeout: timeout, ReadTimeout: timeout, WriteTimeout: timeout,
 		PoolTimeout: timeout, ContextTimeoutEnabled: true, MaxRetries: -1,
 		ConnMaxIdleTime: time.Minute,
 	}
-	if pem := os.Getenv("CACHE_REDIS_CA_PEM"); pem != "" {
+	if authMode == "iam" {
+		source, err := google.DefaultTokenSource(context.Background(), "https://www.googleapis.com/auth/cloud-platform")
+		if err != nil {
+			return nil, fmt.Errorf("cache IAM credentials: %w", err)
+		}
+		options.CredentialsProviderContext = iamCredentials(source)
+	}
+	if pem := os.Getenv("CACHE_VALKEY_CA_PEM"); pem != "" {
 		roots := x509.NewCertPool()
 		if !roots.AppendCertsFromPEM([]byte(pem)) {
-			return nil, errors.New("CACHE_REDIS_CA_PEM contains no valid certificates")
+			return nil, errors.New("CACHE_VALKEY_CA_PEM contains no valid certificates")
 		}
 		options.TLSConfig = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}
 	}
@@ -77,10 +91,37 @@ func FromEnv() (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{redis: redis.NewClient(options), timeout: timeout, requests: requests, latency: latency}, nil
+	return &Client{valkey: redis.NewClient(options), timeout: timeout, requests: requests, latency: latency}, nil
 }
 
-// Key hashes length-delimited identities so user content never enters Redis keys.
+// iamCredentials authenticates each new connection with a fresh access token.
+// Memorystore keeps authenticated connections open after the token expires.
+// The token source caches tokens but ignores contexts, so a slow metadata
+// server is bounded by the operation budget instead.
+func iamCredentials(source oauth2.TokenSource) func(context.Context) (string, string, error) {
+	return func(ctx context.Context) (string, string, error) {
+		type result struct {
+			token *oauth2.Token
+			err   error
+		}
+		done := make(chan result, 1)
+		go func() {
+			token, err := source.Token()
+			done <- result{token, err}
+		}()
+		select {
+		case fetched := <-done:
+			if fetched.err != nil {
+				return "", "", fetched.err
+			}
+			return "", fetched.token.AccessToken, nil
+		case <-ctx.Done():
+			return "", "", ctx.Err()
+		}
+	}
+}
+
+// Key hashes length-delimited identities so user content never enters cache keys.
 func Key(parts ...string) string {
 	hash := sha256.New()
 	for _, part := range parts {
@@ -100,7 +141,7 @@ func (client *Client) Get(ctx context.Context, key string) ([]byte, bool) {
 	}
 	opCtx, cancel := context.WithTimeout(ctx, client.timeout)
 	defer cancel()
-	value, err := client.redis.Get(opCtx, key).Bytes()
+	value, err := client.valkey.Get(opCtx, key).Bytes()
 	if errors.Is(err, redis.Nil) {
 		client.observe(ctx, "get", "miss", started)
 		return nil, false
@@ -128,7 +169,7 @@ func (client *Client) Set(ctx context.Context, key string, value []byte, ttl tim
 	}
 	opCtx, cancel := context.WithTimeout(ctx, client.timeout)
 	defer cancel()
-	if err := client.redis.Set(opCtx, key, value, ttl).Err(); err != nil {
+	if err := client.valkey.Set(opCtx, key, value, ttl).Err(); err != nil {
 		client.failed(ctx, "set", started)
 		return
 	}
@@ -136,7 +177,7 @@ func (client *Client) Set(ctx context.Context, key string, value []byte, ttl tim
 }
 
 func (client *Client) failed(ctx context.Context, operation string, started time.Time) {
-	// Cancellation by the caller does not mean Redis is unhealthy.
+	// Cancellation by the caller does not mean Valkey is unhealthy.
 	if ctx.Err() == nil {
 		previous := client.retryAt.Load()
 		if previous <= started.UnixNano() && client.retryAt.CompareAndSwap(previous, time.Now().Add(5*time.Second).UnixNano()) {
@@ -156,5 +197,5 @@ func (client *Client) Close() error {
 	if client == nil {
 		return nil
 	}
-	return client.redis.Close()
+	return client.valkey.Close()
 }

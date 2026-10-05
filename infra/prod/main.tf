@@ -56,10 +56,17 @@ locals {
     "storage.googleapis.com",
   ])
 
+  # Memorystore for Valkey connects through Private Service Connect automation.
+  cache_services = var.cache_enabled ? toset([
+    "memorystore.googleapis.com",
+    "networkconnectivity.googleapis.com",
+    "serviceconsumermanagement.googleapis.com",
+  ]) : toset([])
+
   required_services = setunion(local.preexisting_services, toset([
     "cloudscheduler.googleapis.com",
     "cloudtasks.googleapis.com",
-  ]), var.cache_enabled ? toset(["redis.googleapis.com"]) : toset([]))
+  ]), local.cache_services)
 }
 
 data "google_project" "current" {
@@ -239,19 +246,6 @@ resource "google_cloud_run_v2_service" "api" {
       }
 
       dynamic "env" {
-        for_each = var.cache_enabled ? [true] : []
-        content {
-          name = "CACHE_REDIS_PASSWORD"
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.cache_password[0].secret_id
-              version = google_secret_manager_secret_version.cache_password[0].version
-            }
-          }
-        }
-      }
-
-      dynamic "env" {
         for_each = local.observability_secret_names
         content {
           name = "OTEL_EXPORTER_OTLP_HEADERS"
@@ -335,7 +329,7 @@ resource "google_cloud_run_v2_service" "api" {
     ignore_changes = [client, client_version]
   }
 
-  depends_on = [google_secret_manager_secret_iam_member.runtime_accessor, google_secret_manager_secret_iam_member.cache_password]
+  depends_on = [google_secret_manager_secret_iam_member.runtime_accessor, google_project_iam_member.runtime_cache_connect]
 }
 
 resource "google_cloud_run_v2_service" "worker" {
