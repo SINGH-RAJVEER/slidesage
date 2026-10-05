@@ -1,7 +1,6 @@
 import type { AIModelSelection, ResearchPayload } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
-import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { ArrowLeft, ExternalLink, RefreshCw, Sparkles, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -50,7 +49,6 @@ export default function GenerateResearchPage() {
 
 	const [isProceeding, setIsProceeding] = useState(false);
 	const [researchAttempt, setResearchAttempt] = useState(0);
-	const [notice, setNotice] = useState<string | null>(null);
 	const isProceedingRef = useRef(false);
 	const removeButtonsRef = useRef(new Map<string, HTMLButtonElement>());
 	const restoreButtonRef = useRef<HTMLButtonElement>(null);
@@ -73,7 +71,7 @@ export default function GenerateResearchPage() {
 	);
 	const removedCount = fetchedSources.length - sources.length;
 	const estimatedTokens = researchPreviewState.estimatedTokens;
-	const error = researchPreviewState.error ?? "";
+	const error = researchPreviewState.error || "Research failed";
 	const researchStatus: ResearchStatus =
 		researchPreviewState.status === "ready"
 			? "ready"
@@ -83,12 +81,6 @@ export default function GenerateResearchPage() {
 
 	const hasSources = sources.length > 0;
 	const isLoading = researchStatus === "loading";
-
-	// A retry that fails the same way still passes through loading, so the notice
-	// shows again for every failed attempt.
-	useEffect(() => {
-		if (researchStatus === "error") setNotice(error || "Research failed");
-	}, [error, researchStatus]);
 
 	const getSourceLabel = (url: string) => {
 		try {
@@ -109,10 +101,7 @@ export default function GenerateResearchPage() {
 		void previewResearch(researchRequest, savedResearch, researchAttempt > 0);
 	}, [prompt, slideCount, researchAttempt, researchRequest, savedResearch, previewResearch]);
 
-	const handleRetry = () => {
-		setNotice(null);
-		setResearchAttempt((attempt) => attempt + 1);
-	};
+	const handleRetry = () => setResearchAttempt((attempt) => attempt + 1);
 
 	// The removed row takes its focused button with it, so focus moves to the
 	// neighbouring row, or to the restore button once no rows are left.
@@ -217,7 +206,6 @@ export default function GenerateResearchPage() {
 	return (
 		<div className="flex h-dvh flex-col overflow-hidden bg-transparent">
 			<Header />
-			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
 			<div className="relative min-h-0 flex-1 overflow-y-auto pb-[env(safe-area-inset-bottom)]">
 				<button
 					type="button"
@@ -423,8 +411,13 @@ export default function GenerateResearchPage() {
 							</div>
 						)}
 
+						{/* The failure replaces the results, so its reason stays on the page
+							beside the retry rather than leaving with a transient notice. */}
 						{researchStatus === "error" && (
-							<div className="flex flex-col items-center gap-4 pb-6 pt-2">
+							<div className="flex flex-col items-center gap-4 py-16 text-center">
+								<p role="alert" className="max-w-xl text-sm leading-6 text-red-200">
+									{error}
+								</p>
 								<Button
 									type="button"
 									onClick={handleRetry}

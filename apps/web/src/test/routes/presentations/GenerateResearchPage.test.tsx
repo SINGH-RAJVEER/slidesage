@@ -262,13 +262,7 @@ describe("GenerateResearchPage", () => {
 		}
 	});
 
-	// The Enter shortcut was registered with the handler bound into it, so every
-	// render swapped the listener. Between research turning ready on screen and
-	// the effect running with the new handler, an Enter press was answered by the
-	// closure that still saw a loading page and dropped it. On a loaded machine
-	// that window is wide enough to lose the keystroke, which is how it surfaced
-	// as an intermittent CI failure.
-	it("reports a failed search in a notice and offers a retry in place of Proceed", async () => {
+	it("keeps a failed search's reason on the page with a retry in place of Proceed", async () => {
 		const originalFetch = globalThis.fetch;
 		const fetchMock = mock(
 			async () =>
@@ -302,7 +296,9 @@ describe("GenerateResearchPage", () => {
 				</MemoryRouter>,
 			);
 
-			expect(await view.findByRole("alert")).toHaveTextContent("Unable to run research");
+			const reason = await view.findByRole("alert");
+			expect(reason).toHaveTextContent("Unable to run research");
+			expect(reason.closest(".fixed")).toBeNull();
 			expect(view.queryByText("Proceed to Generate")).not.toBeInTheDocument();
 			expect(view.queryByRole("table", { name: "Research sources" })).not.toBeInTheDocument();
 
@@ -313,6 +309,12 @@ describe("GenerateResearchPage", () => {
 		}
 	});
 
+	// The Enter shortcut was registered with the handler bound into it, so every
+	// render swapped the listener. Between research turning ready on screen and
+	// the effect running with the new handler, an Enter press was answered by the
+	// closure that still saw a loading page and dropped it. On a loaded machine
+	// that window is wide enough to lose the keystroke, which is how it surfaced
+	// as an intermittent CI failure.
 	it("binds the Enter shortcut once so a press cannot reach a stale handler", async () => {
 		const originalFetch = globalThis.fetch;
 		const originalAdd = window.addEventListener.bind(window);
