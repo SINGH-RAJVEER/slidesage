@@ -8,7 +8,7 @@ import {
 	DialogTitle,
 } from "@slidesage/ui/components/dialog";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { PrefetchLink } from "../../app/PrefetchLink";
 import { ROUTES } from "../../app/router/paths";
 import { TemplatePreview } from "./TemplatePreview";
 import { useTemplateLibrary } from "./template-library";
@@ -67,7 +67,7 @@ export function TemplatePicker({
 						Installed
 					</Button>
 					<Button asChild variant="link">
-						<Link to={ROUTES.marketplace}>Open marketplace</Link>
+						<PrefetchLink to={ROUTES.marketplace}>Open marketplace</PrefetchLink>
 					</Button>
 				</div>
 				{templates.length === 0 && (
