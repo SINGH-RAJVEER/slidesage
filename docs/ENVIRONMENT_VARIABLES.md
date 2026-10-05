@@ -39,9 +39,9 @@
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
-| `CACHE_REDIS_ADDR` | No | Empty | Redis host:port; empty disables caching |
-| `CACHE_REDIS_PASSWORD` | Production cache | Empty | Redis AUTH credential |
-| `CACHE_REDIS_CA_PEM` | Production cache | Empty | Trusted TLS CA certificates |
+| `CACHE_VALKEY_ADDR` | No | Empty | Valkey host:port; empty disables caching |
+| `CACHE_VALKEY_AUTH` | Production cache | Empty | `iam` sends IAM access tokens through Valkey AUTH; empty skips AUTH |
+| `CACHE_VALKEY_CA_PEM` | Production cache | Empty | Trusted TLS CA certificates |
 | `CACHE_TIMEOUT_MS` | No | `100` | Operation timeout, 1 to 1,000 milliseconds |
 
 - GitHub `CACHE_ENABLED` controls Terraform provisioning and defaults to `false`.
