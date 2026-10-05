@@ -122,10 +122,19 @@ export function DeckViewer({
 		},
 	});
 
+	// A drafting deck follows its newest card until the viewer picks a slide.
+	const followsDraft = useRef(true);
+	const stayPut = () => {
+		followsDraft.current = false;
+	};
+
 	useViewerKeyboardNavigation({
 		currentSlide: navigation.currentSlide,
 		slideCount,
-		onNavigate: (index) => navigation.scrollToSlide(index, "auto"),
+		onNavigate: (index) => {
+			stayPut();
+			navigation.scrollToSlide(index, "auto");
+		},
 		onStopPlayback: playback.stop,
 	});
 
@@ -138,11 +147,47 @@ export function DeckViewer({
 		}
 		if (hadSlides.current) return undefined;
 		hadSlides.current = true;
+		// A deck that is still drafting follows its newest card instead.
+		if (isWaiting) return undefined;
 		const id = setTimeout(() => {
 			navigation.scrollToSlide(0, "smooth");
 		}, 100);
 		return () => clearTimeout(id);
-	}, [navigation.scrollToSlide, slideCount]);
+	}, [isWaiting, navigation.scrollToSlide, slideCount]);
+
+	// While a deck drafts, move to each card as it is written. Cards in one
+	// batch land together, so the furthest of them is shown.
+	const writtenKeys = useRef(new Set<string>());
+	useEffect(() => {
+		// A retried draft reuses the slide keys, so its cards count as new.
+		if (!isWaiting || slideCount === 0) {
+			writtenKeys.current.clear();
+			followsDraft.current = true;
+			return;
+		}
+		let newest = -1;
+		slides.forEach((slide, index) => {
+			if (!("card" in slide) || writtenKeys.current.has(slide.key)) return;
+			writtenKeys.current.add(slide.key);
+			newest = index;
+		});
+		if (newest >= 0 && followsDraft.current) navigation.scrollToSlide(newest, "smooth");
+	}, [isWaiting, slideCount, slides, navigation.scrollToSlide]);
+
+	// Scrolling the carousel by hand also picks a slide.
+	useEffect(() => {
+		const container = slideContainerRef.current;
+		if (!isWaiting || !container) return undefined;
+		const stop = () => {
+			followsDraft.current = false;
+		};
+		container.addEventListener("wheel", stop, { passive: true });
+		container.addEventListener("touchstart", stop, { passive: true });
+		return () => {
+			container.removeEventListener("wheel", stop);
+			container.removeEventListener("touchstart", stop);
+		};
+	}, [isWaiting]);
 
 	// Each request is acted on once. `scrollToSlide` changes whenever the slide
 	// count does, and replaying the last request then would jump to a stale slide.
@@ -185,6 +230,7 @@ export function DeckViewer({
 	}, [isFullscreenMode]);
 
 	const stopAnd = (move: () => void) => () => {
+		stayPut();
 		playback.stop();
 		move();
 	};
@@ -227,6 +273,7 @@ export function DeckViewer({
 						editableSlide={navigation.currentSlide}
 						onSelectSlide={(idx) => {
 							if (idx !== navigation.currentSlide) {
+								stayPut();
 								playback.stop();
 								navigation.scrollToSlide(idx, "smooth");
 							}
@@ -261,6 +308,7 @@ export function DeckViewer({
 						currentSlide={navigation.currentSlide}
 						isStreaming={isWaiting}
 						onSelect={(index) => {
+							stayPut();
 							playback.stop();
 							navigation.scrollToSlide(index, "smooth", { block: "center" });
 						}}
