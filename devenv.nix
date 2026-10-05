@@ -10,6 +10,7 @@
         pkgs.just
         pkgs.terraform
         pkgs.fake-gcs-server
+        pkgs.valkey
 		pkgs.uv
     ];
 
@@ -84,6 +85,22 @@
 				failure_threshold = 30;
 			};
 		};
+		cache = {
+			exec = ''
+				mkdir -p "$DEVENV_STATE/valkey"
+				exec valkey-server --bind 127.0.0.1 --port 6379 --dir "$DEVENV_STATE/valkey" \
+					--save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+			'';
+			cwd = ".";
+			ready = {
+				exec = "valkey-cli -h 127.0.0.1 -p 6379 ping";
+				initial_delay = 1;
+				period = 1;
+				probe_timeout = 3;
+				success_threshold = 1;
+				failure_threshold = 30;
+			};
+		};
 		converter = {
 			exec = "bun src/main.ts";
 			cwd = "apps/converter";
@@ -104,12 +121,13 @@
 			exec = ''
 					mkdir -p "$DEVENV_STATE/go"
 					export DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage"
+					export CACHE_VALKEY_ADDR="127.0.0.1:6379"
 					exec watchexec --restart --debounce 300ms --stop-signal SIGTERM --stop-timeout 20s \
 						--watch . --exts go,mod,sum --shell bash -- \
 						'go build -o "$DEVENV_STATE/go/api" ./cmd/api && exec "$DEVENV_STATE/go/api"'
 			'';
 			cwd = "apps/api";
-			after = [ "db:migrate" "devenv:processes:converter" ];
+			after = [ "db:migrate" "devenv:processes:converter" "devenv:processes:cache" ];
 			ready = {
 				http.get = {
 					port = 8000;
