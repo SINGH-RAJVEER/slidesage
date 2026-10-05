@@ -1,44 +1,70 @@
-# BYOK Provider Connections
+# BYOK provider connections
 
-SlideSage supports direct presentation generation through user-owned OpenAI, Google Gemini, and Anthropic API keys.
+Use OpenAI, Google Gemini, or Anthropic keys for direct generation and AI revisions.
 
 ## Eligibility
 
-Users must have strictly more than 50 SlideSage points to connect or replace a key or change the selected model. Existing connections remain visible, usable, and removable below this threshold.
+- Connecting or replacing a key and changing the selected model require more than 50 points.
+- Existing connections remain visible, usable, and removable below that threshold.
+- Direct generation is billed by the provider and consumes no SlideSage model points.
+- Exa research still costs one point per successful request and uses the server key.
 
-Direct model usage is billed by the selected provider and does not consume SlideSage generation points. Each successful SlideSage web research request still costs one point and never receives the user's provider key.
+## Credential handling
 
-## Credential Handling
+- The authenticated API validates keys against the provider's model-list endpoint and encrypts them with AES-256-GCM, a random IV, and user/provider metadata.
+- Keys must contain 8 to 512 characters after trimming and cannot contain newlines or null bytes.
+- The API never returns plaintext keys or logs credentials and raw provider responses.
+- `PROVIDER_VALIDATION_TIMEOUT_MS` bounds the complete catalog request, including pagination; the default is 15 seconds. Caller cancellation stops it early.
 
-Provider keys are submitted to the authenticated API, validated against the provider's official model-list endpoint, and encrypted using AES-256-GCM before being stored. The encryption uses a random IV and authenticated user/provider metadata. Plaintext keys are never returned to the browser.
+| Provider | Catalog | Model filter |
+| --- | --- | --- |
+| OpenAI | `GET /v1/models` | Structured-output-capable GPT and o-series families, including matching fine-tunes; excludes incompatible task-specific variants |
+| Google | Paginated `GET /v1beta/models` | Models advertising `generateContent` |
+| Anthropic | Paginated `GET /v1/models` | Models advertising structured-output support |
 
-Model choices are not maintained as a static SlideSage catalog. The API lists models with the connected key when settings or selection validates availability. Generation uses the previously validated encrypted selection without a second catalog round trip. OpenAI uses `GET /v1/models`; Google uses the paginated Gemini `GET /v1beta/models` API and keeps models that advertise `generateContent`; Anthropic uses the paginated `GET /v1/models` API and keeps models that advertise structured-output support. OpenAI's list response has no capability metadata, so SlideSage keeps returned structured-output-capable GPT and o-series families, including matching fine-tuned models, while excluding old GPT families and returned audio, realtime, transcription, embedding, moderation, image, search, and computer-use variants. Provider display names and descriptions are used when available.
+- Catalogs come from the connected key. Listing bounds pages and bytes, deduplicates IDs, and rejects invalid IDs.
+- Selection saves validate against a fresh catalog. Generation uses the validated encrypted selection without another catalog request.
+- A missing or delisted selection defaults to the first compatible model in provider order.
+- Independent catalogs load concurrently, with at most three requests per response and one active catalog request per provider per API process.
+- Definitive key rejection or loss of compatible models invalidates the connection. Transient failures preserve it and show a provider-local warning.
 
-The API follows provider pagination, deduplicates model IDs, rejects control characters and IDs too large for persisted preferences, limits catalog pages and response sizes, and applies one timeout across the complete listing operation. The first compatible model in the provider's ordering becomes the default when a saved selection is missing or no longer listed. A selection is checked against a fresh provider response before it is saved or used for generation.
+| Provider result | API response |
+| --- | --- |
+| `401` or `403` | `403 PROVIDER_KEY_REJECTED` |
+| No compatible models | `422 PROVIDER_NO_COMPATIBLE_MODELS` |
+| Unavailable catalog | `502 PROVIDER_VALIDATION_UNAVAILABLE` |
 
-Catalog refresh failures are isolated per provider so the settings page remains responsive. Enabling a connected provider selects the first model in its catalog as the generation default until the user chooses a different model. Its model selector becomes available as soon as that provider is enabled, even when another provider is the current selection. Generation requests fund model reasoning separately from the answer on every provider: reasoning and thinking tokens count against each provider's output bound, so a fixed allowance (`reasoningBudget`) is reserved on top of the requested output limit whenever the selected model supports it. Google Gemini 2.5+ receives `thinkingBudget`, Anthropic Claude 3.7/4 receives an extended `thinking` block, OpenAI o-series and GPT-5 switch from `max_tokens` to `max_completion_tokens` (which those models require), and the built-in OpenRouter route always sends the normalized `reasoning.max_tokens` parameter, which OpenRouter drops for models that cannot reason. Inline `<think>` blocks emitted inside answer text are stripped before the presentation JSON is parsed, and an empty provider response is reported as its own error instead of a generic JSON parse failure. usable for replacing or deleting a key. A definitive key rejection or loss of all compatible models marks that connection invalid and restores point-funded OpenRouter when no other valid connection remains. A transient provider failure keeps the connection and saved selection intact and displays a provider-local warning for retry.
+Configure encryption:
 
-Keys are trimmed, must contain 8 through 512 characters, and cannot contain a newline or null byte. Validation receives the caller's cancellation signal and has a 15-second default timeout, configurable with `PROVIDER_VALIDATION_TIMEOUT_MS`. Provider `401` or `403` responses become a sanitized `403 PROVIDER_KEY_REJECTED`; an account with no supported generation model receives `422 PROVIDER_NO_COMPATIBLE_MODELS`; provider unavailability receives `502 PROVIDER_VALIDATION_UNAVAILABLE`. Raw provider responses and submitted credentials are not logged or returned.
-
-Configure a base64-encoded 32-byte key:
-
-```text
+```dotenv
 BYOK_ENCRYPTION_KEY_CURRENT_VERSION=1
-BYOK_ENCRYPTION_KEY=<base64 key>
+BYOK_ENCRYPTION_KEY=<base64-encoded-32-byte-key>
 ```
 
-Keep old versioned keys available while rotating stored credentials. `BYOK_ENCRYPTION_KEY_CURRENT_VERSION` is a non-secret selector. The `BYOK_ENCRYPTION_KEY` value (and any rotated `BYOK_ENCRYPTION_KEY_V<n>` values) are secrets; `secretspec.toml` includes the initial `BYOK_ENCRYPTION_KEY` entry without treating the version selector as a secret.
+- The version selector is non-secret; every key value is secret.
+- Keep versioned keys available while stored credentials reference them. See [Encryption variables](ENVIRONMENT_VARIABLES.md#byok-credential-encryption).
 
 ## Routing
 
-API keys and the default model are managed on the protected `/settings` page, available from the account dropdown. Generation and iteration use point-funded SlideSage OpenRouter while no valid provider connection exists. Connecting the first key selects the first compatible model returned by that provider and switches subsequent requests to BYOK. Removing the final valid connection restores OpenRouter automatically. When one or more connections exist, SlideSage uses the saved provider and never silently falls back to another direct provider.
+- Manage connections on `/settings` through `GET /ai/config`.
+- The first valid connection selects its first compatible model. Removing the final valid connection restores point-funded OpenRouter.
+- Generation uses the saved provider and never silently switches to another direct provider.
+- Each provider has an enable switch. Disabling the selected provider restores point-funded OpenRouter while retaining its key and model.
+- Enabling a provider selects its first compatible model until the user chooses another.
+- Each connected row has a delete control and its own model dropdown. Configuration loading uses row skeletons.
 
-Each connected provider has its own generation switch at the end of its row in settings. `PUT /ai/connections/:provider/enabled` pauses or resumes that key without deleting it. If the selected provider is disabled, generation uses SlideSage points and the server-owned OpenRouter route; the saved key and model selection remain available for later. Connected rows show a delete icon beside the provider name and do not show inline replacement controls. Each connected provider's model dropdown appears below that provider so the key and its available models stay together. While configuration loads, the API keys section uses provider-row skeletons rather than a full-page loading indicator.
+| Method | Path | Result |
+| --- | --- | --- |
+| `POST` | `/ai/connections` | Create, `201` |
+| `PUT` | `/ai/connections/:provider` | Replace, `200` |
+| `PUT` | `/ai/connections/:provider/enabled` | Pause or resume with `{ "enabled": boolean }` |
+| `PUT` | `/ai/selection` | Save provider and model |
+| `DELETE` | `/ai/connections/:provider` | Delete, `204` with no body |
 
-The settings page loads its configuration from `GET /ai/config`. Production releases that add or change these endpoints must deploy the Go API as well as the web application; an unauthenticated request to this route should return `401`, not a service-wide `404` response.
+## Deployment
 
-Creating a connection returns `201`. Replacing one returns `200`, and deleting one returns `204 No Content` with an empty body. Connection creation/replacement and selection/deletion use separate per-user rate-limit scopes. See [RATE_LIMITING.md](RATE_LIMITING.md) for exact windows and the PostgreSQL deployment requirement.
-
-Apply committed database migrations before deploying the Go API. BYOK requires `00010_add_ai_provider_connections.sql`, per-provider switches require `00019_add_ai_provider_connections_enabled.sql`, and production needs the `BYOK_ENCRYPTION_KEY_CURRENT_VERSION` and versioned encryption-key secrets.
-
-Research uses Exa with the server-owned key, never a user BYOK key.
+- Apply migrations before starting the API. Connections require migration 10; switches require migration 19.
+- Configure the encryption keys for API and worker.
+- Deploy both API and web when changing the connection contract. Unauthenticated `GET /ai/config` should return `401`.
+- Creation/replacement and selection/deletion have separate per-user [rate limits](RATE_LIMITING.md).
+- Provider reasoning budgets and retries are documented in [Generation worker](GENERATION_WORKER.md#worker-lifecycle).
