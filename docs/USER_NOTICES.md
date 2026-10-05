@@ -43,8 +43,8 @@ Mount once per page after `<Header />`:
 
 Keep states that replace a page or panel and provide recovery controls inline:
 
-- `PresentationErrorPage`; retry failures use a notice.
+- `PresentationErrorPage`, including the saved reason the generation failed; retry failures use a notice.
 - A failed research search on `GenerateResearchPage`: the reason stays in place of the sources, and Retry research replaces Proceed to Generate.
-- A failed outline request on `OutlinePage`: the reason stays in place of the outline beside Back to generate; a refused draft submission keeps the outline and uses a notice.
+- A failed outline request on `OutlinePage`: the reason stays in place of the outline. Its back button keeps the chosen settings, returning reviewed sources to the research page without another search. A refused draft submission keeps the outline and uses a notice.
 - The load failure in `AISettings`; action confirmations use a notice.
 - The terminal Email verified state on `VerifyEmailPage`.
