@@ -467,7 +467,7 @@ describe("DeckWorkspace", () => {
 		}
 	});
 
-	it("asks before deleting the slide on screen, then saves the deck without it", async () => {
+	it("deletes the slide on screen in one click, then puts it back on Undo", async () => {
 		const bodies: Array<{ document: { cardOrder: string[] } }> = [];
 		globalThis.fetch = mock(async (_input: string | URL | Request, init?: RequestInit) => {
 			bodies.push(JSON.parse(String(init?.body)));
@@ -477,13 +477,16 @@ describe("DeckWorkspace", () => {
 
 		const view = open(() => {}, document);
 		fireEvent.click(view.getByRole("button", { name: "Delete slide" }));
-		expect(bodies).toHaveLength(0);
-		const dialog = await view.findByRole("dialog", { name: "Delete this slide?" });
-		fireEvent.click(within(dialog).getByRole("button", { name: "Delete slide" }));
+		expect(view.queryByRole("dialog")).toBeNull();
 
 		await waitFor(() => expect(bodies).toHaveLength(1), { timeout: 8000 });
 		expect(bodies[0]?.document.cardOrder).toEqual(document.cardOrder.slice(1));
-	}, 15000);
+
+		const notice = view.getByText("Slide deleted").closest("[role=status]") as HTMLElement;
+		fireEvent.click(within(notice).getByRole("button", { name: "Undo" }));
+		await waitFor(() => expect(bodies).toHaveLength(2), { timeout: 8000 });
+		expect(bodies[1]?.document.cardOrder).toEqual(document.cardOrder);
+	}, 20000);
 });
 
 describe("workspace templates", () => {

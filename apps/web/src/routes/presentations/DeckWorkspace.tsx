@@ -1,8 +1,11 @@
 import {
+	addCard,
 	CARD_THEME_DEFINITIONS,
+	type Card,
 	type CardDocument,
 	type CardTemplate,
 	deleteCard,
+	placeCard,
 	setImage,
 	setTheme,
 	setTitle,
@@ -147,7 +150,8 @@ export function DeckWorkspace({
 	// The scope the iterate panel opened with; null while it is closed.
 	const [iterateScope, setIterateScope] = useState<IterateScope | null>(null);
 	const [currentSlide, setCurrentSlide] = useState(0);
-	const [slideToDelete, setSlideToDelete] = useState<number>();
+	// The slide the last delete removed, kept while its Undo is on offer.
+	const [deletedSlide, setDeletedSlide] = useState<{ card: Card; index: number } | null>(null);
 	const [notice, setNotice] = useState<string | null>(null);
 	const { streamingState, generate } = useStreaming();
 	const revising =
@@ -333,13 +337,30 @@ export function DeckWorkspace({
 		}
 	}, [streamingState.operation, streamingState.error]);
 
-	// The deck without the slide autosaves as the next revision; while
-	// editing, Undo brings the slide back.
-	const confirmDelete = () => {
-		const cardId =
-			slideToDelete === undefined ? undefined : editor.document.cardOrder[slideToDelete];
-		setSlideToDelete(undefined);
-		if (cardId) editor.edit((current) => deleteCard(current, cardId));
+	// One click removes the slide and the deck without it autosaves as the next
+	// revision. Undo on the notice puts the card back where it was, even after
+	// later edits.
+	const deleteSlide = (index: number) => {
+		const cardId = editor.document.cardOrder[index];
+		const card = cardId ? editor.document.cards[cardId] : undefined;
+		if (!card || editor.document.cardOrder.length <= 1) return;
+		editor.edit((current) => deleteCard(current, card.id));
+		setNotice(null);
+		setDeletedSlide({ card, index });
+	};
+	const restoreSlide = () => {
+		setDeletedSlide(null);
+		if (!deletedSlide || !canEdit) return;
+		const { card, index } = deletedSlide;
+		editor.edit((current) =>
+			current.cards[card.id]
+				? current
+				: placeCard(
+						addCard(current, null, card),
+						card.id,
+						Math.min(index, current.cardOrder.length),
+					),
+		);
 	};
 
 	// The export is built from the saved revision, so it is offered only when
@@ -531,7 +552,7 @@ export function DeckWorkspace({
 			}}
 			onExport={downloadPptx}
 			downloadDisabled={editing || revising || status.state !== "saved"}
-			onDeleteSlide={canEdit ? setSlideToDelete : undefined}
+			onDeleteSlide={canEdit ? deleteSlide : undefined}
 			deleteDisabled={editor.document.cardOrder.length <= 1}
 			aside={
 				<IterateModal
@@ -564,30 +585,16 @@ export function DeckWorkspace({
 				}}
 				onReplace={replaceTemplate}
 			/>
-			<FloatingNotice error={notice} onDismiss={() => setNotice(null)} />
-			<Dialog
-				open={slideToDelete !== undefined}
-				onOpenChange={(open) => {
-					if (!open) setSlideToDelete(undefined);
+			<FloatingNotice
+				key={deletedSlide?.card.id}
+				error={notice}
+				success={deletedSlide ? "Slide deleted" : null}
+				action={!notice && deletedSlide ? { label: "Undo", onClick: restoreSlide } : null}
+				onDismiss={() => {
+					setNotice(null);
+					setDeletedSlide(null);
 				}}
-			>
-				<DialogContent className="sm:max-w-md">
-					<DialogHeader>
-						<DialogTitle>Delete this slide?</DialogTitle>
-						<DialogDescription>
-							Slide {(slideToDelete ?? 0) + 1} is removed from the deck and a new revision is saved.
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button variant="outline" onClick={() => setSlideToDelete(undefined)}>
-							Keep slide
-						</Button>
-						<Button variant="destructive" onClick={confirmDelete}>
-							Delete slide
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			/>
 			<Dialog
 				open={leaveUnsaved}
 				onOpenChange={(open) => {
