@@ -5,6 +5,7 @@ import {
 	POINTS_UPDATED_EVENT,
 	readPointBalanceStorage,
 } from "../lib/points";
+import { clearPrefetched } from "../lib/prefetch";
 import { fetchSessionWithRetry, isSessionCheckStale, type SessionUser } from "../lib/session";
 import { rememberSignedIn } from "../lib/session-history";
 
@@ -139,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 		lastSessionCheckAt.current = null;
 		setUser(null);
 		clearPointBalanceStorage();
+		clearPrefetched();
 
 		const serverSignOut = import("../lib/auth-client")
 			.then(({ auth }) => auth.signOut())
