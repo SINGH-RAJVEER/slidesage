@@ -5,6 +5,7 @@ import type {
 	Outline,
 	OutlineEntry,
 	OutlineResponse,
+	PresentationRetryOptions,
 	ResearchPayload,
 } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
@@ -184,6 +185,29 @@ export default function OutlinePage() {
 
 	const problem = outline ? outlineProblem(outline) : null;
 
+	// Leaving a failed outline keeps what the user chose. Reviewed sources go
+	// back to the research page, which shows them without another paid search;
+	// otherwise the generate form is refilled the way a saved retry refills it.
+	const back = () => {
+		if (!request) return;
+		if (request.researchPayload) {
+			navigate(ROUTES.research, { state: request });
+			return;
+		}
+		const retry: PresentationRetryOptions = {
+			prompt: request.prompt,
+			slide_count: request.slideCount,
+			detail_level: request.detailLevel,
+			tonality: request.tonality,
+			research_enabled: false,
+			...(request.ai ? { ai: request.ai } : {}),
+			...(request.theme ? { theme: request.theme } : {}),
+		};
+		navigate(ROUTES.generate, {
+			state: { retry, retryPresentationId: request.retryPresentationId },
+		});
+	};
+
 	const draft = async () => {
 		if (!outline || !request || problem || submitting) return;
 		setSubmitting(true);
@@ -237,8 +261,8 @@ export default function OutlinePage() {
 						<p role="alert" className="max-w-xl text-sm leading-6 text-red-200">
 							{loadError}
 						</p>
-						<Button variant="ghost" onClick={() => navigate(ROUTES.generate)}>
-							Back to generate
+						<Button variant="ghost" onClick={back}>
+							{request?.researchPayload ? "Back to research" : "Back to generate"}
 						</Button>
 					</section>
 				)}

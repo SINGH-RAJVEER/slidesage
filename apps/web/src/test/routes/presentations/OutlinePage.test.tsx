@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { StreamingProvider } from "@slidesage/ui";
 import { fireEvent, render, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useParams } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useParams } from "react-router-dom";
 import OutlinePage from "../../../routes/presentations/OutlinePage";
 
 const originalFetch = globalThis.fetch;
@@ -31,7 +31,12 @@ function PresentationProbe() {
 	return <p>Presentation {presentationId}</p>;
 }
 
-function renderOutline() {
+function RouteStateProbe() {
+	const location = useLocation();
+	return <pre>{`${location.pathname} ${JSON.stringify(location.state)}`}</pre>;
+}
+
+function renderOutline(extraState: Record<string, unknown> = {}) {
 	return render(
 		<MemoryRouter
 			initialEntries={[
@@ -42,6 +47,7 @@ function renderOutline() {
 						slideCount: 3,
 						detailLevel: "balanced",
 						tonality: "professional",
+						...extraState,
 					},
 				},
 			]}
@@ -49,6 +55,8 @@ function renderOutline() {
 			<StreamingProvider>
 				<Routes>
 					<Route path="/generate/outline" element={<OutlinePage />} />
+					<Route path="/generate" element={<RouteStateProbe />} />
+					<Route path="/generate/research" element={<RouteStateProbe />} />
 					<Route path="/presentations/:presentationId" element={<PresentationProbe />} />
 				</Routes>
 			</StreamingProvider>
@@ -145,12 +153,34 @@ describe("OutlinePage", () => {
 		globalThis.fetch = mock(async () =>
 			Response.json({ error: { message: "Insufficient points for an outline" } }, { status: 402 }),
 		) as unknown as typeof fetch;
-		const view = renderOutline();
+		const view = renderOutline({ theme: "aurora" });
 
 		const reason = await view.findByRole("alert");
 		expect(reason).toHaveTextContent("Insufficient points for an outline");
 		expect(reason.closest(".fixed")).toBeNull();
-		expect(view.getByRole("button", { name: "Back to generate" })).toBeInTheDocument();
+
+		fireEvent.click(view.getByRole("button", { name: "Back to generate" }));
+
+		const probe = await view.findByText(/^\/generate /);
+		expect(probe).toHaveTextContent('"prompt":"Battery storage market"');
+		expect(probe).toHaveTextContent('"slide_count":3');
+		expect(probe).toHaveTextContent('"theme":"aurora"');
+	});
+
+	it("returns a failed outline with reviewed sources to the research page", async () => {
+		globalThis.fetch = mock(async () =>
+			Response.json({ error: { message: "The outline could not be prepared." } }, { status: 503 }),
+		) as unknown as typeof fetch;
+		const researchPayload = {
+			sources: [{ url: "https://example.com/storage", title: "Storage outlook" }],
+		};
+		const view = renderOutline({ researchPayload });
+
+		fireEvent.click(await view.findByRole("button", { name: "Back to research" }));
+
+		const probe = await view.findByText(/^\/generate\/research /);
+		expect(probe).toHaveTextContent('"prompt":"Battery storage market"');
+		expect(probe).toHaveTextContent('"url":"https://example.com/storage"');
 	});
 
 	it("opens the presentation once the job is accepted", async () => {
