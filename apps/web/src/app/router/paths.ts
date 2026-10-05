@@ -7,6 +7,7 @@ export const ROUTES = {
 	resetPassword: "/reset-password",
 	profile: "/profile",
 	settings: "/settings",
+	feedback: "/feedback",
 	generate: "/generate",
 	research: "/generate/research",
 	outline: "/generate/outline",

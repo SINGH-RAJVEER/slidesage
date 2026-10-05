@@ -144,7 +144,7 @@ describe("Header", () => {
 		).toBeInTheDocument();
 	});
 
-	it("links to settings from the account menu", async () => {
+	it("links to settings, feedback, and bug reports from the account menu", async () => {
 		mockAuthState.user = {
 			id: "user_1",
 			name: "Rajveer Singh",
@@ -170,9 +170,21 @@ describe("Header", () => {
 
 		const profile = await view.findByRole("menuitem", { name: "Profile" });
 		const settings = await view.findByRole("menuitem", { name: "Settings" });
+		const feedback = await view.findByRole("menuitem", { name: "Feedback" });
+		const reportBug = await view.findByRole("menuitem", { name: "Report a bug" });
 		const signOut = await view.findByRole("menuitem", { name: "Sign Out" });
 		expect(settings).toHaveAttribute("href", "/settings");
-		for (const item of [profile, settings, signOut]) {
+		expect(feedback).toHaveAttribute("href", "/feedback");
+		expect(reportBug).toHaveAttribute("href", "https://github.com/SINGH-RAJVEER/slidesage/issues");
+		expect(reportBug).toHaveAttribute("target", "_blank");
+		expect(view.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+			"Profile",
+			"Settings",
+			"Feedback",
+			"Report a bug",
+			"Sign Out",
+		]);
+		for (const item of [profile, settings, feedback, reportBug, signOut]) {
 			expect(item.querySelector("svg")).not.toBeNull();
 		}
 	});

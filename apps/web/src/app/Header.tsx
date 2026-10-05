@@ -13,6 +13,7 @@ const HEADER_ROUTES: HeaderRoutes = {
 	purchase: ROUTES.purchase,
 	profile: ROUTES.profile,
 	settings: ROUTES.settings,
+	feedback: ROUTES.feedback,
 	auth: [ROUTES.signIn, ROUTES.signUp, ROUTES.forgotPassword, ROUTES.resetPassword],
 };
 
