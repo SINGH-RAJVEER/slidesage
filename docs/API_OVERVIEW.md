@@ -137,6 +137,14 @@ Owner authentication is required except for `/shared` routes:
 - Claiming payment and crediting points are one transaction. Repeated payment is idempotent; conflicting details return `409`.
 - Another user's order returns `403`. A webhook arriving before the local order returns `503` for retry.
 
+## Feedback
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `/feedback` | User | Store a 1 to 4,000 character `message` |
+
+- Validation, limits, and storage are in [Feedback and bug reports](FEEDBACK.md).
+
 ## CORS
 
 - `CORS_ORIGINS` or `CORS_ORIGIN` allow credentialed requests. Local origins are `http://localhost:5173` and `http://127.0.0.1:5173`.

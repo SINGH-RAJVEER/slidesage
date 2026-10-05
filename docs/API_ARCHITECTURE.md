@@ -44,6 +44,11 @@
 - The browser renders the saved card revision; the converter derives an editable PPTX from it.
 - See [Card documents](CARD_DOCUMENTS.md) for the schema, editing, sharing, and export limits.
 
+## Feedback
+
+- `internal/feedback` validates and stores signed-in users' feedback messages in the `feedback` table.
+- See [Feedback and bug reports](FEEDBACK.md) for the route, limits, and storage.
+
 ## Persistence
 
 - Domain repositories own SQL. Handlers validate HTTP input and translate service results.
