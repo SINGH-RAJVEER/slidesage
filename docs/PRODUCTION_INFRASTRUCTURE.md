@@ -31,7 +31,7 @@
 - `PRESENTATION_GCS_BUCKET` overrides the default `<project-id>-presentation-revisions` in both workflows.
 - Runtime bucket permissions allow creation/reading of assets and deletion only under legacy `objects/`, `revisions/`, and `cards/` prefixes.
 - Conditional deletion uses IAM `startsWith()` and `extract()`, not unsupported `matches()`. Validate changes with `gcloud alpha iam policies lint-condition`; Terraform validation does not compile these expressions.
-- Optional Redis and its VPC resources are disabled by default; GitHub `CACHE_ENABLED` controls provisioning. See [Database cache](DATABASE_CACHE.md#production).
+- Optional Memorystore for Valkey and its VPC resources are disabled by default; GitHub `CACHE_ENABLED` controls provisioning. See [Database cache](DATABASE_CACHE.md#production).
 - API memory limit is 512 MiB with `GOMEMLIMIT=400MiB`; image decoding uses a separate bounded budget.
 - Converters have no secrets, public URLs, or invoker bindings and use localhost `8090`.
 - Preserve `api-matcher`, managed API certificate, DNS-only record, and load-balancer routing.
