@@ -141,6 +141,18 @@ describe("OutlinePage", () => {
 		expect(view.getByRole("button", { name: "Write 3 cards" })).not.toBeDisabled();
 	});
 
+	it("keeps the reason an outline failed on the page", async () => {
+		globalThis.fetch = mock(async () =>
+			Response.json({ error: { message: "Insufficient points for an outline" } }, { status: 402 }),
+		) as unknown as typeof fetch;
+		const view = renderOutline();
+
+		const reason = await view.findByRole("alert");
+		expect(reason).toHaveTextContent("Insufficient points for an outline");
+		expect(reason.closest(".fixed")).toBeNull();
+		expect(view.getByRole("button", { name: "Back to generate" })).toBeInTheDocument();
+	});
+
 	it("opens the presentation once the job is accepted", async () => {
 		serve((url) =>
 			url.endsWith("/presentation-jobs")

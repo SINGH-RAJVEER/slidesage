@@ -70,7 +70,9 @@ export default function OutlinePage() {
 	const [outline, setOutline] = useState<Outline | null>(null);
 	const [photos, setPhotos] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [loadFailed, setLoadFailed] = useState(false);
+	// Why the outline could not be prepared. It replaces the outline, so it
+	// stays on the page rather than in the transient notice.
+	const [loadError, setLoadError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 	const requested = useRef(false);
 	const submitted = useRef(false);
@@ -105,16 +107,14 @@ export default function OutlinePage() {
 					| (Partial<OutlineResponse> & Partial<ApiErrorResponse>)
 					| null;
 				if (!response.ok || !body?.plan) {
-					setError(body?.error?.message ?? "The outline could not be prepared.");
-					setLoadFailed(true);
+					setLoadError(body?.error?.message ?? "The outline could not be prepared.");
 					return;
 				}
 				publishPointsBalance(body.slide_tokens_remaining);
 				setPhotos(Boolean(body.photos));
 				setOutline(body.plan);
 			} catch {
-				setError("The outline could not be prepared. Check your connection.");
-				setLoadFailed(true);
+				setLoadError("The outline could not be prepared. Check your connection.");
 			}
 		})();
 	}, [request]);
@@ -223,7 +223,7 @@ export default function OutlinePage() {
 			<Header />
 			<FloatingNotice error={error} onDismiss={() => setError(null)} />
 			<main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10 md:px-8">
-				{!outline && !loadFailed && (
+				{!outline && !loadError && (
 					<section
 						className="flex flex-1 flex-col items-center justify-center gap-4"
 						aria-live="polite"
@@ -232,9 +232,11 @@ export default function OutlinePage() {
 						<p className="text-sm text-white/70">Planning your presentation</p>
 					</section>
 				)}
-				{loadFailed && !outline && (
-					<section className="flex flex-1 flex-col items-center justify-center gap-4" role="alert">
-						<p className="text-sm text-white/70">The outline could not be prepared.</p>
+				{loadError && !outline && (
+					<section className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+						<p role="alert" className="max-w-xl text-sm leading-6 text-red-200">
+							{loadError}
+						</p>
 						<Button variant="ghost" onClick={() => navigate(ROUTES.generate)}>
 							Back to generate
 						</Button>
