@@ -96,6 +96,7 @@ gcloud iam service-accounts add-iam-policy-binding \
 
 - CI uses short-lived GitHub OIDC credentials, without service-account keys.
 - Authorize the deploy identity for Terraform-managed Cloud Run, Cloud Tasks, Cloud Scheduler, Cloud SQL, Artifact Registry, Compute, service accounts, project services/IAM, Secret Manager IAM, and storage resources.
+- With `CACHE_ENABLED=true`, also grant `roles/compute.networkAdmin` for the cache VPC, subnets, and service connection policy, and `roles/memorystore.admin` for the Valkey instance. Load balancer roles do not include network creation.
 - Include runtime-account `actAs` and state-bucket object access. Image building requires `roles/artifactregistry.writer`.
 - These commands create the identity; they do not grant the complete deployment permissions.
 - Keep runtime and deployment accounts separate. Use [Bootstrap](PRODUCTION_INFRASTRUCTURE.md#bootstrap) for backend and resource adoption.
