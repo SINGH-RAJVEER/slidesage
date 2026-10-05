@@ -72,6 +72,59 @@ describe("GenerateResearchPage", () => {
 		}
 	});
 
+	it("leaves removed sources out of the reviewed payload until they are restored", async () => {
+		const view = render(
+			<MemoryRouter
+				initialEntries={[
+					{
+						pathname: "/generate/research",
+						state: {
+							prompt: "Coastal erosion",
+							slideCount: 5,
+							detailLevel: "balanced",
+							tonality: "professional",
+							researchPayload: {
+								sources: [
+									{ url: "https://example.com/first", title: "First source" },
+									{ url: "https://example.com/second", title: "Second source" },
+									{ url: "https://example.com/third", title: "Third source" },
+								],
+							},
+						},
+					},
+				]}
+			>
+				<StreamingProvider>
+					<Routes>
+						<Route path="/generate/research" element={<GenerateResearchPage />} />
+						<Route path="/generate/outline" element={<OutlineStateProbe />} />
+					</Routes>
+				</StreamingProvider>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => expect(view.getByText("Second source")).toBeInTheDocument());
+
+		fireEvent.click(view.getByRole("button", { name: "Remove source: Second source" }));
+		expect(view.queryByText("Second source")).not.toBeInTheDocument();
+		expect(view.getByRole("button", { name: "Remove source: Third source" })).toHaveFocus();
+
+		fireEvent.click(view.getByRole("button", { name: "Remove source: First source" }));
+		fireEvent.click(view.getByRole("button", { name: "Restore 2 removed" }));
+		expect(view.getByText("First source")).toBeInTheDocument();
+		expect(view.getByText("Second source")).toBeInTheDocument();
+		expect(view.getByRole("button", { name: "Remove source: First source" })).toHaveFocus();
+
+		fireEvent.click(view.getByRole("button", { name: "Remove source: First source" }));
+		fireEvent.click(view.getByText("Proceed to Generate"));
+
+		const state = JSON.parse((await view.findByTestId("outline-state")).textContent ?? "{}");
+		expect(state.researchPayload.sources.map((source: { url: string }) => source.url)).toEqual([
+			"https://example.com/second",
+			"https://example.com/third",
+		]);
+	});
+
 	it("keeps generation disabled while the research request is loading", async () => {
 		const originalFetch = globalThis.fetch;
 		let requestCount = 0;

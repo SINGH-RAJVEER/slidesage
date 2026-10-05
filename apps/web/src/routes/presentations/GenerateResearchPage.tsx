@@ -2,8 +2,9 @@ import type { AIModelSelection, ResearchPayload } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
-import { ArrowLeft, ExternalLink, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Sparkles, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
@@ -25,7 +26,13 @@ type ResearchStatus = "loading" | "ready" | "error";
 export default function GenerateResearchPage() {
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { streamingState, researchPreviewState, previewResearch } = useStreaming();
+	const {
+		streamingState,
+		researchPreviewState,
+		previewResearch,
+		removeResearchSource,
+		restoreResearchSources,
+	} = useStreaming();
 
 	const routeState = location.state as ResearchRouteState | null;
 	const prompt = routeState?.prompt?.trim() ?? "";
@@ -40,6 +47,8 @@ export default function GenerateResearchPage() {
 	const [isProceeding, setIsProceeding] = useState(false);
 	const [researchAttempt, setResearchAttempt] = useState(0);
 	const isProceedingRef = useRef(false);
+	const removeButtonsRef = useRef(new Map<string, HTMLButtonElement>());
+	const restoreButtonRef = useRef<HTMLButtonElement>(null);
 
 	const researchRequest = useMemo(
 		() => ({
@@ -50,7 +59,13 @@ export default function GenerateResearchPage() {
 		}),
 		[detailLevel, prompt, slideCount, tonality],
 	);
-	const sources = researchPreviewState.sources;
+	const fetchedSources = researchPreviewState.sources;
+	const removedSourceUrls = researchPreviewState.removedSourceUrls;
+	const sources = useMemo(
+		() => fetchedSources.filter((source) => !removedSourceUrls.includes(source.url)),
+		[fetchedSources, removedSourceUrls],
+	);
+	const removedCount = fetchedSources.length - sources.length;
 	const estimatedTokens = researchPreviewState.estimatedTokens;
 	const error = researchPreviewState.error ?? "";
 	const researchStatus: ResearchStatus =
@@ -81,6 +96,23 @@ export default function GenerateResearchPage() {
 		if (!prompt || !slideCount) return;
 		void previewResearch(researchRequest, savedResearch, researchAttempt > 0);
 	}, [prompt, slideCount, researchAttempt, researchRequest, savedResearch, previewResearch]);
+
+	// The removed row takes its focused button with it, so focus moves to the
+	// neighbouring row, or to the restore button once no rows are left.
+	const handleRemoveSource = (url: string) => {
+		const index = sources.findIndex((source) => source.url === url);
+		const nextUrl = (sources[index + 1] ?? sources[index - 1])?.url;
+		flushSync(() => removeResearchSource(url));
+		((nextUrl && removeButtonsRef.current.get(nextUrl)) || restoreButtonRef.current)?.focus();
+	};
+
+	// The restore button unmounts once nothing is removed, so focus moves to the
+	// first row rather than falling to the page, where Enter would proceed.
+	const handleRestoreSources = () => {
+		flushSync(restoreResearchSources);
+		const firstUrl = fetchedSources[0]?.url;
+		if (firstUrl) removeButtonsRef.current.get(firstUrl)?.focus();
+	};
 
 	const handleProceed = useCallback(async () => {
 		if (
@@ -204,11 +236,26 @@ export default function GenerateResearchPage() {
 									Sources
 									{isLoading && <ThinkingOrb size={20} className="opacity-50" />}
 								</h3>
-								{hasSources && (
-									<span className="text-sm text-white/45">
-										{sources.length} {sources.length === 1 ? "source" : "sources"}
-									</span>
-								)}
+								<div className="flex items-center gap-3">
+									{removedCount > 0 && (
+										<Button
+											ref={restoreButtonRef}
+											type="button"
+											variant="ghost"
+											size="sm"
+											onClick={handleRestoreSources}
+											className="text-white/60 hover:bg-white/10 hover:text-white"
+										>
+											<Undo2 className="h-4 w-4" />
+											Restore {removedCount} removed
+										</Button>
+									)}
+									{hasSources && (
+										<span className="text-sm text-white/45">
+											{sources.length} {sources.length === 1 ? "source" : "sources"}
+										</span>
+									)}
+								</div>
 							</div>
 
 							<div className="max-h-[62dvh] overflow-auto rounded-md border border-white/10 bg-black/15">
@@ -218,9 +265,9 @@ export default function GenerateResearchPage() {
 								>
 									<colgroup>
 										<col className="w-auto md:w-[28%]" />
-										<col className="hidden md:table-column md:w-[48%]" />
+										<col className="hidden md:table-column md:w-[44%]" />
 										<col className="hidden md:table-column md:w-[17%]" />
-										<col className="w-14 md:w-[7%]" />
+										<col className="w-24 md:w-[11%]" />
 									</colgroup>
 									<thead className="sticky top-0 z-20 bg-[hsl(222,27%,12%)]">
 										<tr className="border-b border-white/10 bg-white/[0.025]">
@@ -246,7 +293,7 @@ export default function GenerateResearchPage() {
 												scope="col"
 												className="sticky right-0 top-0 bg-[hsl(222,27%,12%)] px-3 py-3"
 											>
-												<span className="sr-only">Open source</span>
+												<span className="sr-only">Source actions</span>
 											</th>
 										</tr>
 									</thead>
@@ -293,16 +340,36 @@ export default function GenerateResearchPage() {
 															)}
 														</td>
 														<td className="sticky right-0 bg-background/95 px-3 py-5 text-center align-top transition-colors group-hover/row:bg-[#121214]">
-															<a
-																href={source.url}
-																target="_blank"
-																rel="noopener noreferrer"
-																aria-label={`Open source: ${sourceTitle}`}
-																title="Open source"
-																className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 text-white/45 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-															>
-																<ExternalLink className="h-4 w-4" />
-															</a>
+															<div className="inline-flex gap-2">
+																<a
+																	href={source.url}
+																	target="_blank"
+																	rel="noopener noreferrer"
+																	aria-label={`Open source: ${sourceTitle}`}
+																	title="Open source"
+																	className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 text-white/45 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+																>
+																	<ExternalLink className="h-4 w-4" />
+																</a>
+																<Button
+																	ref={(button) => {
+																		if (button) {
+																			removeButtonsRef.current.set(source.url, button);
+																		} else {
+																			removeButtonsRef.current.delete(source.url);
+																		}
+																	}}
+																	type="button"
+																	variant="ghost"
+																	size="icon"
+																	onClick={() => handleRemoveSource(source.url)}
+																	aria-label={`Remove source: ${sourceTitle}`}
+																	title="Remove source"
+																	className="size-8 border border-white/10 text-white/45 hover:border-red-300/30 hover:bg-red-400/10 hover:text-red-200"
+																>
+																	<X className="h-4 w-4" />
+																</Button>
+															</div>
 														</td>
 													</tr>
 												);
@@ -311,7 +378,9 @@ export default function GenerateResearchPage() {
 										{researchStatus === "ready" && !hasSources && (
 											<tr>
 												<td colSpan={4} className="px-6 py-10 text-center text-sm text-white/45">
-													No sources found. Try a different phrasing or a broader topic.
+													{removedCount > 0
+														? "All sources removed. Restore them, or proceed without research sources."
+														: "No sources found. Try a different phrasing or a broader topic."}
 												</td>
 											</tr>
 										)}
