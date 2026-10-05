@@ -344,7 +344,7 @@ export default function GenerateResearchPage() {
 																	<span className="text-white/30">Not listed</span>
 																)}
 															</td>
-															<td className="sticky right-0 bg-background/95 px-3 py-5 text-center align-top transition-colors group-hover/row:bg-[#121214]">
+															<td className="sticky right-0 bg-[hsl(222,27%,12%)] px-3 py-5 text-center align-top transition-colors group-hover/row:bg-[hsl(222,27%,14%)] lg:bg-transparent lg:group-hover/row:bg-transparent">
 																<div className="inline-flex gap-2">
 																	<a
 																		href={source.url}
