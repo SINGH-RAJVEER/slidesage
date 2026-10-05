@@ -130,13 +130,13 @@ jobs:
           docker run -d --name slidesage-test-postgres \
             -e POSTGRES_USER=slidesage -e POSTGRES_PASSWORD=slidesage -e POSTGRES_DB=slidesage \
             -p 127.0.0.1:55439:5432 docker.io/pgvector/pgvector:pg17
-          docker run -d --name slidesage-test-redis \
-            -p 127.0.0.1:56389:6379 docker.io/library/redis:7.2-alpine \
-            redis-server --save '' --appendonly no
+          docker run -d --name slidesage-test-valkey \
+            -p 127.0.0.1:56389:6379 docker.io/valkey/valkey:9.0-alpine \
+            valkey-server --save '' --appendonly no
           ready=false
           for attempt in {1..30}; do
             if docker exec slidesage-test-postgres pg_isready -h 127.0.0.1 -U slidesage -d slidesage \
-              && docker exec slidesage-test-redis redis-cli ping; then
+              && docker exec slidesage-test-valkey valkey-cli ping; then
               ready=true
               break
             fi
@@ -154,7 +154,7 @@ jobs:
       - if: steps.scope.outputs.api == 'true'
         env:
           DATABASE_URL: postgresql://slidesage:slidesage@127.0.0.1:55439/slidesage
-          TEST_REDIS_ADDR: 127.0.0.1:56389
+          TEST_VALKEY_ADDR: 127.0.0.1:56389
         run: go test ./...
         working-directory: apps/api
 
