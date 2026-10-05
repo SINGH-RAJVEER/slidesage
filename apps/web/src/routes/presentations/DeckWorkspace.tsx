@@ -43,6 +43,7 @@ import { Check, Link2, Pencil, Redo2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBlocker, useNavigate } from "react-router-dom";
 import { ROUTES } from "../../app/router/paths";
+import { isRecord, usePageDraft } from "../../hooks/usePageDraft";
 import { TemplatePicker } from "../marketplace/TemplatePicker";
 import { DeckViewer } from "./DeckViewer";
 import { ShareDialog } from "./ShareDialog";
@@ -124,7 +125,23 @@ export function DeckWorkspace({
 	const [sharing, setSharing] = useState(false);
 	const [templatesOpen, setTemplatesOpen] = useState(false);
 	const [applyingTemplate, setApplyingTemplate] = useState(false);
-	const [assets, setAssets] = useState(initialAssets);
+	const [draftAssets, setAssets] = usePageDraft<Record<string, CardAsset>>(
+		`document-assets:${presentationId}`,
+		{},
+		(value): value is Record<string, CardAsset> =>
+			isRecord(value) &&
+			Object.values(value).every(
+				(asset) =>
+					isRecord(asset) &&
+					typeof asset["mimeType"] === "string" &&
+					typeof asset["width"] === "number" &&
+					typeof asset["height"] === "number",
+			),
+	);
+	const assets = useMemo(
+		() => ({ ...draftAssets, ...initialAssets }),
+		[draftAssets, initialAssets],
+	);
 	const [photoCard, setPhotoCard] = useState<string | null>(null);
 	// The scope the iterate panel opened with; null while it is closed.
 	const [iterateScope, setIterateScope] = useState<IterateScope | null>(null);
@@ -165,8 +182,8 @@ export function DeckWorkspace({
 		if (index !== undefined) setFocusRequest({ index });
 	}, [editor.document.cardOrder]);
 
-	// Leaving for another page saves pending edits first. Edits that cannot be
-	// saved are dropped only once the user confirms.
+	// Leaving saves pending edits first. A failed save keeps the browser draft
+	// for recovery when the user returns.
 	const blocker = useBlocker(
 		({ currentLocation, nextLocation }) =>
 			currentLocation.pathname !== nextLocation.pathname && !editor.isSaved(),
@@ -466,7 +483,7 @@ export function DeckWorkspace({
 						</div>
 					);
 				}
-				if (!editing) return null;
+				if (!editing && !blocked) return null;
 				return (
 					<div className="flex min-h-10 flex-wrap items-center gap-3 px-4 pt-3">
 						<div
@@ -487,7 +504,10 @@ export function DeckWorkspace({
 								<Button
 									variant="link"
 									className="h-auto p-0 text-xs text-sky-300"
-									onClick={onReload}
+									onClick={() => {
+										editor.discardDraft();
+										onReload();
+									}}
 								>
 									Reload the latest version
 								</Button>
@@ -577,6 +597,7 @@ export function DeckWorkspace({
 						<DialogTitle>Leave without saving?</DialogTitle>
 						<DialogDescription>
 							Your latest changes are not saved: {statusText(status)}
+							{editor.hasLocalDraft() && " A draft is kept in this browser for your return."}
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>

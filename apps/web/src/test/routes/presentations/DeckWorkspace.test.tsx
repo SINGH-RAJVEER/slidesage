@@ -11,6 +11,7 @@ import {
 	within,
 } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { pageDraftKey } from "../../../hooks/usePageDraft";
 import { DeckWorkspace } from "../../../routes/presentations/DeckWorkspace";
 
 const originalFetch = globalThis.fetch;
@@ -36,7 +37,7 @@ function deck(headings = ["Grid storage"]) {
 	return assembleDocument({ title: "Grid storage", theme: "slate", cards });
 }
 
-function open(onReload = () => {}, document = deck()) {
+function open(onReload = () => {}, document = deck(), revision = 3) {
 	const router = createMemoryRouter(
 		[
 			{
@@ -45,7 +46,7 @@ function open(onReload = () => {}, document = deck()) {
 					<DeckWorkspace
 						presentationId="pres_1"
 						document={document}
-						revision={3}
+						revision={revision}
 						sources={[]}
 						assets={{}}
 						onReload={onReload}
@@ -70,6 +71,74 @@ function typeHeading(view: ReturnType<typeof open>, text: string) {
 }
 
 describe("DeckWorkspace", () => {
+	it("keeps restored edits in conflict when the server has a newer revision", async () => {
+		globalThis.fetch = mock(async () => {
+			throw new TypeError("network");
+		}) as unknown as typeof fetch;
+		const first = open();
+		fireEvent.click(first.getByRole("button", { name: "Edit" }));
+		typeHeading(first, "My local change");
+		first.unmount();
+		const fetchMock = mock(async () => Response.json({ revision: { revision: 5 } }));
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+		const reload = mock(() => {});
+		const restored = open(reload, deck(["Changed on another device"]), 4);
+		expect(restored.getAllByText("My local change").length).toBeGreaterThan(0);
+		fireEvent.click(restored.getByRole("button", { name: "Reload the latest version" }));
+		expect(reload).toHaveBeenCalled();
+		expect(localStorage.getItem(pageDraftKey(undefined, "document:pres_1"))).toBeNull();
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("restores edits after a failed save when the deck is reopened", async () => {
+		const requests: Array<Record<string, unknown>> = [];
+		globalThis.fetch = mock(async (_input: string | URL | Request, init?: RequestInit) => {
+			requests.push(JSON.parse(String(init?.body)));
+			throw new TypeError("network");
+		}) as unknown as typeof fetch;
+		const first = open();
+		fireEvent.click(first.getByRole("button", { name: "Edit" }));
+		typeHeading(first, "Recover my edit");
+		fireEvent.click(first.getByRole("button", { name: "Back to presentations" }));
+		fireEvent.click(
+			within(await first.findByRole("dialog")).getByRole("button", { name: "Leave anyway" }),
+		);
+		await first.findByText("Library");
+		first.unmount();
+		const restored = open();
+		expect(restored.getAllByText("Recover my edit").length).toBeGreaterThan(0);
+		fireEvent.click(restored.getByRole("button", { name: "Edit" }));
+		expect(restored.getByRole("textbox", { name: "Card heading" })).toHaveTextContent(
+			"Recover my edit",
+		);
+		const retried: Array<Record<string, unknown>> = [];
+		globalThis.fetch = mock(async (_input: string | URL | Request, init?: RequestInit) => {
+			retried.push(JSON.parse(String(init?.body)));
+			return Response.json({ revision: { revision: 4 } });
+		}) as unknown as typeof fetch;
+		fireEvent.click(restored.getByRole("button", { name: "Back to presentations" }));
+		await restored.findByText("Library");
+		expect(retried[0]?.["operationId"]).toBe(requests[0]?.["operationId"]);
+		expect(retried[0]?.["baseRevision"]).toBe(3);
+		expect(localStorage.getItem(pageDraftKey(undefined, "document:pres_1"))).toBeNull();
+	});
+
+	it("restores incomplete text edits and clears their draft after a successful save", async () => {
+		globalThis.fetch = mock(async () =>
+			Response.json({ revision: { revision: 4 } }),
+		) as unknown as typeof fetch;
+		const first = open();
+		fireEvent.click(first.getByRole("button", { name: "Edit" }));
+		typeHeading(first, "");
+		first.unmount();
+		const restored = open();
+		fireEvent.click(restored.getByRole("button", { name: "Edit" }));
+		expect(restored.getByRole("textbox", { name: "Card heading" })).toHaveTextContent("");
+		typeHeading(restored, "Finished heading");
+		await restored.findByText("All changes saved", {}, { timeout: 5000 });
+		expect(localStorage.getItem(pageDraftKey(undefined, "document:pres_1"))).toBeNull();
+	});
+
 	it("saves settled edits on top of the revision it loaded", async () => {
 		const bodies: Array<Record<string, unknown>> = [];
 		globalThis.fetch = mock(async (_input: string | URL | Request, init?: RequestInit) => {
