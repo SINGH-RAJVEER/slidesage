@@ -8,7 +8,7 @@
 ## Research flow
 
 1. The API validates the research request and calls Exa.
-2. The web application displays returned sources for review.
+2. The web application displays returned sources for review. The sources table and Proceed to Generate appear only after a successful search; a failed search shows an error notice and a Retry research button.
 3. The user may remove sources they do not want cited, and can restore them until research runs again. Removing sources does not refund the search.
 4. The user proceeds with the remaining sources as the reviewed payload. Removing every source proceeds without research sources and does not trigger another search.
 5. The Go generation route includes those sources in the provider prompt.

@@ -3,6 +3,7 @@
 - Use `FloatingNotice` from `@slidesage/ui` for transient action feedback.
 - It appears below the header's top-right corner and dismisses after four seconds.
 - Use errors for failed actions and warnings for conditions the user can correct before proceeding. Rejected generation submissions are errors and keep the user on the page.
+- A failed research search on `GenerateResearchPage` is an error notice; the page swaps Proceed to Generate for a Retry research button.
 
 ## Props
 
@@ -44,6 +45,5 @@ Mount once per page after `<Header />`:
 Keep states that replace a page or panel and provide recovery controls inline:
 
 - `PresentationErrorPage`; retry failures use a notice.
-- The research failure block on `GenerateResearchPage`, with Retry research.
 - The load failure in `AISettings`; action confirmations use a notice.
 - The terminal Email verified state on `VerifyEmailPage`.
