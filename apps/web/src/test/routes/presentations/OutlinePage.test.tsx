@@ -73,6 +73,24 @@ function serve(jobs: Handler) {
 }
 
 describe("OutlinePage", () => {
+	it("restores unfinished outline edits without paying for another outline", async () => {
+		const calls = serve(() => new Promise<Response>(() => {}));
+		const first = renderOutline();
+		fireEvent.change(await first.findByLabelText("Card 2 point"), {
+			target: { value: "An unfinished edit" },
+		});
+		fireEvent.change(first.getByLabelText("Presentation title"), {
+			target: { value: "My outline" },
+		});
+		fireEvent.click(first.getByRole("button", { name: "Remove card 3" }));
+		first.unmount();
+		const restored = renderOutline();
+		expect(await restored.findByDisplayValue("An unfinished edit")).toBeInTheDocument();
+		expect(restored.getByLabelText("Presentation title")).toHaveValue("My outline");
+		expect(restored.getByRole("button", { name: "Write 2 cards" })).toBeInTheDocument();
+		expect(calls.filter((call) => call.url.includes("/presentation-outlines"))).toHaveLength(1);
+	});
+
 	it("asks for the outline once with the route's settings", async () => {
 		const calls = serve(() => new Promise<Response>(() => {}));
 		const view = renderOutline();

@@ -13,7 +13,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
+import { usePageDraft } from "../../hooks/usePageDraft";
 import { useTemplateLibrary } from "../marketplace/template-library";
+import { type GenerateDraft, isGenerateDraft } from "./generate-draft";
 
 interface GenerateRouteState {
 	retry?: PresentationRetryOptions;
@@ -23,23 +25,42 @@ interface GenerateRouteState {
 export default function GeneratePPTPage() {
 	useHorizonPageReady();
 	const location = useLocation();
-	const retry = (location.state as GenerateRouteState | null)?.retry;
-	const retryPresentationId = (location.state as GenerateRouteState | null)?.retryPresentationId;
-	const retryPrompt = retry?.prompt.trim() ?? "";
-	const retrySlideCount = Math.min(40, Math.max(5, retry?.slide_count ?? 5)).toString();
-	const [prompt, setPrompt] = useState(retryPrompt);
-	const [loading, setLoading] = useState(false);
-	const [slideCount, setSlideCount] = useState(retrySlideCount);
-	const [detailLevel, setDetailLevel] = useState(retry?.detail_level ?? "balanced");
-	const [tonality, setTonality] = useState(retry?.tonality ?? "professional");
-	const [useWebResearch, setUseWebResearch] = useState(retry?.research_enabled ?? false);
-	const [researchResultCount, setResearchResultCount] = useState(DEFAULT_RESEARCH_RESULTS);
-	// A retried presentation names the theme it was generated in. Standing a
-	// default in for one this build does not carry would generate the retry in a
-	// template the reader never chose, so an unknown theme leaves nothing selected.
-	const [selectedTemplateId, setSelectedTemplateId] = useState(
-		() => CARD_TEMPLATES.find((template) => template.theme === retry?.theme)?.id,
+	const routeState = location.state as GenerateRouteState | null;
+	// Unknown retry themes leave the selection empty instead of substituting another template.
+	const [draft, setDraft] = usePageDraft<GenerateDraft>(
+		"generate",
+		{
+			prompt: routeState?.retry?.prompt.trim() ?? "",
+			slideCount: Math.min(40, Math.max(5, routeState?.retry?.slide_count ?? 5)).toString(),
+			detailLevel: routeState?.retry?.detail_level ?? "balanced",
+			tonality: routeState?.retry?.tonality ?? "professional",
+			useWebResearch: routeState?.retry?.research_enabled ?? false,
+			researchResultCount: DEFAULT_RESEARCH_RESULTS,
+			selectedTemplateId: CARD_TEMPLATES.find(
+				(template) => template.theme === routeState?.retry?.theme,
+			)?.id,
+			retry: routeState?.retry,
+			retryPresentationId: routeState?.retryPresentationId,
+		},
+		isGenerateDraft,
+		routeState?.retry ? location.key : undefined,
 	);
+	const {
+		prompt,
+		slideCount,
+		detailLevel,
+		tonality,
+		useWebResearch,
+		researchResultCount,
+		selectedTemplateId,
+		retry,
+		retryPresentationId,
+	} = draft;
+	const change = <K extends keyof GenerateDraft>(key: K, value: GenerateDraft[K]) =>
+		setDraft((current) => ({ ...current, [key]: value }));
+	const setPrompt = (value: string) => change("prompt", value);
+	const setSelectedTemplateId = (value: string | undefined) => change("selectedTemplateId", value);
+	const [loading, setLoading] = useState(false);
 	// Raised by pressing Generate with nothing selected. Nothing is preselected
 	// and nothing stands in for a choice, so the reader is told at the moment
 	// they ask for a deck rather than prompted before they have asked.
@@ -195,11 +216,11 @@ export default function GeneratePPTPage() {
 					slideCount={slideCount}
 					selectedTemplateId={selectedTemplateId}
 					installedTemplateIds={library.ids}
-					onDetailLevelChange={setDetailLevel}
-					onTonalityChange={setTonality}
-					onUseWebResearchChange={setUseWebResearch}
-					onResearchResultCountChange={setResearchResultCount}
-					onSlideCountChange={setSlideCount}
+					onDetailLevelChange={(value) => change("detailLevel", value)}
+					onTonalityChange={(value) => change("tonality", value)}
+					onUseWebResearchChange={(value) => change("useWebResearch", value)}
+					onResearchResultCountChange={(value) => change("researchResultCount", value)}
+					onSlideCountChange={(value) => change("slideCount", value)}
 					onTemplateChange={handleTemplateChange}
 					onTemplateRemove={handleTemplateRemove}
 				/>

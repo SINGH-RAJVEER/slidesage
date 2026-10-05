@@ -93,6 +93,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - `/presentation-outlines` accepts generation fields plus a client `outline_id`, returning `plan`, photo availability, charged points, and remaining points.
 - Planning has its own `outline` reservation/settlement; repeated IDs return `409`.
 - Users can edit, reorder, add, or remove entries and change layouts or photo searches.
+- The browser keeps the latest unfinished outline and its request settings per account. Returning or refreshing restores edits and photo availability without another planning charge. Starting a new outline replaces this draft; an accepted generation clears it.
 - Submit the approved `plan` to `/presentation-jobs` with `slide_count` matching its length. Submission and worker validate it; drafting follows its order.
 
 ## Photos
@@ -183,3 +184,5 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Content exceeding the minimum fit clips at the bottom. `CardSlide` letterboxes other viewport ratios.
 - Present supports full screen and timed playback. Left/right or J/L move cards, up/down jump first/last, and N shows notes. Exiting full screen stops presenting.
 - Generate and research pass through `/generate/outline`; accepted jobs open their deck. The library and generation indicator open the same viewer.
+- Generate keeps the prompt, template selection, slide count, detail level, tone, research toggle, and result count in browser storage per account. Leaving for another section or refreshing restores the setup. A new retry starts with that presentation's settings; its edited setup retains the retry ID and AI selection until generation is accepted.
+- Drafts use versioned local storage keys and stay on the same browser. Invalid stored data falls back to the page defaults. If browser storage is unavailable or full, the form remains usable but recovery is unavailable.

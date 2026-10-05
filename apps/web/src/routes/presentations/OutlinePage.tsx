@@ -7,7 +7,7 @@ import type {
 	OutlineResponse,
 	ResearchPayload,
 } from "@slidesage/types";
-import { useStreaming } from "@slidesage/ui";
+import { useAuth, useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
 import { LAYOUT_NAMES } from "@slidesage/ui/components/Cards";
 import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
@@ -27,6 +27,14 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+import {
+	isRecord,
+	pageDraftKey,
+	readPageDraft,
+	usePageDraft,
+	writePageDraft,
+} from "../../hooks/usePageDraft";
+import { type GenerateDraft, isGenerateDraft } from "./generate-draft";
 
 interface OutlineRouteState {
 	prompt: string;
@@ -41,6 +49,39 @@ interface OutlineRouteState {
 }
 
 const MAX_CARDS = 40;
+
+interface OutlineDraft {
+	request: OutlineRouteState | null;
+	outline: Outline | null;
+	photos: boolean;
+}
+
+function isOutlineDraft(value: unknown): value is OutlineDraft {
+	return (
+		isRecord(value) &&
+		typeof value["photos"] === "boolean" &&
+		(value["request"] === null ||
+			(isRecord(value["request"]) &&
+				typeof value["request"]["prompt"] === "string" &&
+				typeof value["request"]["slideCount"] === "number" &&
+				typeof value["request"]["detailLevel"] === "string" &&
+				typeof value["request"]["tonality"] === "string")) &&
+		(value["outline"] === null ||
+			(isRecord(value["outline"]) &&
+				typeof value["outline"]["title"] === "string" &&
+				Array.isArray(value["outline"]["cards"]) &&
+				value["outline"]["cards"].length > 0 &&
+				value["outline"]["cards"].length <= MAX_CARDS &&
+				value["outline"]["cards"].every(
+					(card) =>
+						isRecord(card) &&
+						typeof card["position"] === "number" &&
+						typeof card["takeaway"] === "string" &&
+						typeof card["role"] === "string" &&
+						typeof card["layout"] === "string",
+				)))
+	);
+}
 
 function isImageLayout(layout: string): boolean {
 	return (IMAGE_LAYOUTS as readonly string[]).includes(layout);
@@ -64,25 +105,46 @@ function outlineProblem(outline: Outline): string | null {
  */
 export default function OutlinePage() {
 	const location = useLocation();
+	return <OutlineVisit key={location.key} />;
+}
+
+function OutlineVisit() {
+	const location = useLocation();
 	const navigate = useNavigate();
-	const request = location.state as OutlineRouteState | null;
+	const { user } = useAuth();
+	const routeRequest = location.state as OutlineRouteState | null;
+	const [draftState, setDraftState] = usePageDraft<OutlineDraft>(
+		"outline",
+		{
+			request: routeRequest,
+			outline: null,
+			photos: false,
+		},
+		isOutlineDraft,
+		routeRequest ? location.key : undefined,
+	);
+	const { request, outline, photos } = draftState;
+	const setOutline = (action: Outline | null | ((outline: Outline | null) => Outline | null)) =>
+		setDraftState((current) => ({
+			...current,
+			outline: typeof action === "function" ? action(current.outline) : action,
+		}));
 	const { streamingState, generate } = useStreaming();
-	const [outline, setOutline] = useState<Outline | null>(null);
-	const [photos, setPhotos] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [loadFailed, setLoadFailed] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const requested = useRef(false);
 	const submitted = useRef(false);
+	const completed = useRef(false);
 
 	useEffect(() => {
-		if (!request?.prompt) navigate(ROUTES.generate, { replace: true });
+		if (!request?.prompt && !completed.current) navigate(ROUTES.generate, { replace: true });
 	}, [navigate, request]);
 
-	// One outline per visit: the request is paid for, so a re-render or a
-	// strict-mode double effect must not ask twice.
+	// Reuse a saved outline on return. Planning is paid for, so restoring edits
+	// must not make another request or charge the user again.
 	useEffect(() => {
-		if (!request?.prompt || requested.current) return;
+		if (!request?.prompt || outline || requested.current) return;
 		requested.current = true;
 		void (async () => {
 			try {
@@ -110,22 +172,50 @@ export default function OutlinePage() {
 					return;
 				}
 				publishPointsBalance(body.slide_tokens_remaining);
-				setPhotos(Boolean(body.photos));
-				setOutline(body.plan);
+				setDraftState((current) => ({
+					...current,
+					photos: Boolean(body.photos),
+					outline: body.plan as Outline,
+				}));
 			} catch {
 				setError("The outline could not be prepared. Check your connection.");
 				setLoadFailed(true);
 			}
 		})();
-	}, [request]);
+	}, [outline, request, setDraftState]);
 
 	// Once the job is accepted, the presentation page shows the cards arriving.
 	useEffect(() => {
 		if (submitted.current && streamingState.accepted && streamingState.presentationId) {
 			submitted.current = false;
+			completed.current = true;
+			setDraftState({ request: null, outline: null, photos: false });
+			const key = pageDraftKey(user?.id, "generate");
+			const setup = readPageDraft(
+				key,
+				(value): value is { value: GenerateDraft; seedKey?: string; owner?: string } =>
+					isRecord(value) && isGenerateDraft(value["value"]),
+			);
+			if (
+				setup &&
+				setup.value.retryPresentationId === request?.retryPresentationId &&
+				setup.value.prompt.trim() === request?.prompt.trim()
+			) {
+				writePageDraft(key, {
+					...setup,
+					value: { ...setup.value, retry: undefined, retryPresentationId: undefined },
+				});
+			}
 			navigate(ROUTES.presentationById(streamingState.presentationId));
 		}
-	}, [navigate, streamingState.accepted, streamingState.presentationId]);
+	}, [
+		navigate,
+		request,
+		setDraftState,
+		streamingState.accepted,
+		streamingState.presentationId,
+		user?.id,
+	]);
 
 	useEffect(() => {
 		if (streamingState.error) {
