@@ -125,7 +125,7 @@ describe("GenerateResearchPage", () => {
 		]);
 	});
 
-	it("keeps generation disabled while the research request is loading", async () => {
+	it("shows the sources table and Proceed only once research succeeds", async () => {
 		const originalFetch = globalThis.fetch;
 		let requestCount = 0;
 		let resolveResearch: ((response: Response) => void) | undefined;
@@ -163,8 +163,10 @@ describe("GenerateResearchPage", () => {
 			);
 
 			await waitFor(() => expect(requestCount).toBe(1));
-			expect(view.getByText("Proceed to Generate").closest("button")).toBeDisabled();
-			expect(view.getByText("Sources")).toBeInTheDocument();
+			expect(view.getByText("Searching the web for sources...")).toBeInTheDocument();
+			expect(view.queryByText("Proceed to Generate")).not.toBeInTheDocument();
+			expect(view.queryByText("Sources")).not.toBeInTheDocument();
+			expect(view.queryByRole("columnheader", { name: "Research note" })).not.toBeInTheDocument();
 
 			resolveResearch?.(
 				new Response(
@@ -189,6 +191,7 @@ describe("GenerateResearchPage", () => {
 				expect(view.getByText("Battery storage outlook")).toBeInTheDocument();
 			});
 			expect(view.getByRole("table", { name: "Research sources" })).toBeInTheDocument();
+			expect(view.getByRole("columnheader", { name: "Research note" })).toBeInTheDocument();
 			expect(view.getAllByText("A complete source preview.")).not.toHaveLength(0);
 			const sourceLink = view.getByRole("link", {
 				name: "Open source: Battery storage outlook",
@@ -226,6 +229,51 @@ describe("GenerateResearchPage", () => {
 	// closure that still saw a loading page and dropped it. On a loaded machine
 	// that window is wide enough to lose the keystroke, which is how it surfaced
 	// as an intermittent CI failure.
+	it("reports a failed search in a notice and offers a retry in place of Proceed", async () => {
+		const originalFetch = globalThis.fetch;
+		const fetchMock = mock(
+			async () =>
+				new Response(JSON.stringify({ error: "Unable to run research" }), {
+					status: 500,
+					headers: { "Content-Type": "application/json" },
+				}),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		try {
+			const view = render(
+				<MemoryRouter
+					initialEntries={[
+						{
+							pathname: "/generate/research",
+							state: {
+								prompt: "Desalination costs",
+								slideCount: 5,
+								detailLevel: "balanced",
+								tonality: "professional",
+							},
+						},
+					]}
+				>
+					<StreamingProvider>
+						<Routes>
+							<Route path="/generate/research" element={<GenerateResearchPage />} />
+						</Routes>
+					</StreamingProvider>
+				</MemoryRouter>,
+			);
+
+			expect(await view.findByRole("alert")).toHaveTextContent("Unable to run research");
+			expect(view.queryByText("Proceed to Generate")).not.toBeInTheDocument();
+			expect(view.queryByRole("table", { name: "Research sources" })).not.toBeInTheDocument();
+
+			fireEvent.click(view.getByRole("button", { name: "Retry research" }));
+			await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
 	it("binds the Enter shortcut once so a press cannot reach a stale handler", async () => {
 		const originalFetch = globalThis.fetch;
 		const originalAdd = window.addEventListener.bind(window);
