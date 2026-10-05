@@ -142,6 +142,8 @@ interface ResearchPreviewRequest {
 	slideCount: number;
 	detailLevel: string;
 	tonality: string;
+	/** Left out, the API retrieves its default of five sources. */
+	maxResults?: number;
 }
 
 interface ResearchPreviewState extends ResearchPreviewRequest {
@@ -196,9 +198,13 @@ const initialResearchPreviewState: ResearchPreviewState = {
 export const StreamingContext = createContext<StreamingContextValue | null>(null);
 
 function getResearchPreviewKey(request: ResearchPreviewRequest) {
-	return [request.prompt.trim(), request.slideCount, request.detailLevel, request.tonality].join(
-		"\u001f",
-	);
+	return [
+		request.prompt.trim(),
+		request.slideCount,
+		request.detailLevel,
+		request.tonality,
+		request.maxResults ?? "",
+	].join("\u001f");
 }
 
 async function fetchPersistedPresentation(
@@ -795,7 +801,10 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 						slide_count: request.slideCount,
 						detail_level: request.detailLevel,
 						tonality: request.tonality,
-						research: { enabled: true },
+						research: {
+							enabled: true,
+							...(request.maxResults ? { maxResults: request.maxResults } : {}),
+						},
 					}),
 					signal: controller.signal,
 				});
