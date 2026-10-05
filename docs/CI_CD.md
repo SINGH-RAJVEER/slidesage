@@ -1,331 +1,210 @@
-# CI/CD: Artifact Registry and Cloud Run
+# CI/CD
 
-The repository deploys its Go API and generation worker to Google Cloud Run, each with a Bun card converter sidecar. Every push to `main` builds versioned container images, pushes them to Artifact Registry, runs database migrations, and rolls both services onto Cloud Run as new revisions.
+- `.github/workflows/deploy.yml` builds and deploys API, worker, migration, and converter images.
+- Releases run on pushes or manual dispatches to `main`. Other refs are rejected; production runs share one concurrency group.
+- Cloudflare Pages builds the frontend independently from GitHub.
 
 ## Flow
 
-1. GitHub Actions compiles three Go release binaries and bundles the Bun converter on the runner, then builds four image targets with one `docker buildx bake` over `docker-bake.hcl`. The Go images are `FROM scratch` and copy one binary each out of `dist/`:
-   - `api` (web server, port 8000) -> Cloud Run **service** `api`
-   - `worker` (River queue consumer with a health server, port 8080) -> Cloud Run **service** `worker`
-   - `migrate` (Goose and River migrations, then a sweep of retired bucket objects) -> Cloud Run **job** `slidesage-migrate`
-   - `converter` (card schema conversion and validation, port 8090) -> localhost **sidecar** in both `api` and `worker`
-2. Each image is tagged with the full git commit SHA (e.g. `api:a1b2c3d...`) plus `latest` and pushed to Artifact Registry.
-3. `terraform apply -target=google_cloud_run_v2_job.migrate` updates the migration job and its dependencies, including the bucket viewer and conditional delete IAM. After pausing services and verifying the pre-migration backup, `gcloud run jobs execute` runs Goose and River migrations against the database, deletes the retired objects from the image bucket, and waits.
-4. A fresh full plan and `terraform apply` point both Cloud Run services and their converter sidecars at SHA-tagged images. Cloud Run creates new revisions and routes traffic to them. Previous revisions remain available for rollback.
+1. Run checks, compile three Go binaries, and bundle the Bun converter.
+2. Build four targets through `docker-bake.hcl` and push full-commit-SHA and `latest` tags.
+3. Start an on-demand database backup while planning the complete Terraform configuration.
+4. Verify backup completion, then update the migration job through a targeted apply.
+5. Pause API, worker, and maintenance scheduler; run migrations and the retired-object sweep.
+6. Create a fresh full plan and apply the release images, restoring automatic scaling.
+7. Verify ingress and worker invocation restrictions.
 
-Terraform owns the deployed Cloud Run services, jobs, load balancer, and supporting IAM. The October 3, 2026 authenticated production plan confirmed that managed resources match the configuration. The workflow supplies `TF_VAR_api_image`, `TF_VAR_worker_image`, `TF_VAR_migrate_image`, and `TF_VAR_converter_image`. It needs the `TF_STATE_BUCKET`, `CLOUDFLARE_API_TOKEN`, and `CLOUDFLARE_ACCOUNT_ID` repository secrets alongside the existing workload-identity secrets. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
-
-Trigger: a push to `main` after the dev-to-main PR is merged, or a manual dispatch on `main`. Both jobs explicitly reject other refs, so dispatching from `dev` or any other branch cannot publish images or change production. All production runs share one concurrency group.
-
-A complete plan runs before the targeted migration update. Missing secrets, missing Cloudflare DNS permissions, or invalid import IDs stop deployment before any Terraform apply. The first deployment also needs the state bucket, credentials, and imports described in [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
+- Terraform owns services, jobs, load balancing, and IAM. `gcloud` executes the migration job and reads deployment status.
+- Deploy forwards `TF_VAR_api_image`, `TF_VAR_worker_image`, `TF_VAR_migrate_image`, and `TF_VAR_converter_image`.
+- Bootstrap secrets, backend, credentials, and imports must exist before planning. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
 
 ## Build caching
 
-A small change does not rebuild the whole stack. Two caches carry unchanged work between runs.
+| Cache | Writer | Reader | Key |
+| --- | --- | --- | --- |
+| Go module/build | `checks.yml`, non-PR runs | Checks and deploy build | OS, `go.sum` hash, UTC date, with fallback prefixes |
+| Pages build | Cloudflare Pages | Pages builds | Platform-managed |
 
-| Cache | Where | Key |
-| ----- | ----- | --- |
-| Go module and build cache, written | `checks.yml` | `apps/api/go.sum` hash plus the UTC date |
-| Go module and build cache, read | `deploy.yml` build job | the same key, restore only |
-
-`actions/setup-go` caching is off on purpose. It restores on an exact key match only, so a `go.sum` bump starts from nothing: the release that merged PR #43 spent 65s in `go test` and another 25s saving. `cache: false` plus an explicit `actions/cache` with `restore-keys` means a dependency bump falls back to the previous entry instead. On commits that do not touch `go.sum` the old behaviour was already fine, at roughly 3s, so this is insurance for the bump, not a saving on every run.
-
-The release compiles against the entry the checks job wrote minutes earlier on the same commit, so the binaries build incrementally. Only `checks` writes; two jobs racing one key would be undefined.
-
-### Why the keys carry a date
-
-The Actions cache is 10 GB per repository and evicts by least recent access. The Go entry is about 265 MB, so keying it on the commit would write a new one on every run and churn the budget. A UTC date bounds writes to one per branch per day while `restore-keys` still falls back to the newest existing entry.
-
-The save is skipped entirely on a pull request. A cache written by a `pull_request` run is scoped to that run's merge ref and can only be restored by a re-run of the same pull request, so it would never be read. Pull requests still restore from the base branch normally.
-
-Cache scope is per branch throughout: a run reads its own branch, the default branch, and for a pull request its base. Entries written on `dev` are invisible to `main` and the reverse, so the `checks` job called by `deploy.yml` restores from previous `main` runs only.
-
-### What is deliberately not cached
-
-**Docker layers.** The Go images copy one binary onto `scratch`, and the converter image copies one Bun bundle into a pinned Bun runtime. A `.dockerignore` keeps the build context to `dist/`; without it the whole repository, `.git` and `node_modules` included, would be uploaded to the builder.
-
-**BuildKit cache mounts.** The binaries were once compiled inside the image behind `--mount=type=cache`. Layer cache and cache-mount contents are separate mechanisms and `type=gha` carries only the former, so those mounts started empty on every run. `buildkit-cache-dance` fixed that and was measured over two releases: a warm cache took the bake from 88s to 37s, but injecting and extracting cost 17s and 52s, so 69s of overhead bought 51s of compile. Compiling on the runner removes the problem instead of paying for it.
-
-**Terraform providers.** `TF_PLUGIN_CACHE_DIR` backed by `actions/cache` was tried and measured at net zero: fetching `hashicorp/google` and `cloudflare/cloudflare` from the registry took 2.45s, serving them from a restored cache took 0.5s, and restoring the 39 MB entry cost the 2s difference back. The plugin cache exists to share one download across several configurations, or to help on a slow or metered connection, and this repository has two providers, one working directory, and a runner with fast egress. It is also explicitly not concurrency safe, which would matter if the Terraform jobs were ever parallelised over a shared workspace.
-
-Revisit that last one if the provider count grows past roughly five, more Terraform configurations are added, or CI moves to self-hosted runners. If the goal is ever independence from the registry rather than speed, use a provider mirror, which is deterministic, rather than a best-effort cache.
+- Disable `actions/setup-go` caching; explicit restore prefixes retain useful entries after dependency changes.
+- Only checks writes Go entries. Daily keys limit churn; branch scope controls which entries are readable.
+- PRs restore base-branch caches without saving merge-ref-only entries.
+- Docker images copy prebuilt artifacts. `.dockerignore` limits context to `dist/`.
+- Docker layers, BuildKit mounts, and Terraform providers are not cached in this workflow.
+- Pages pins `BUN_VERSION` and enables `build_caching` in `infra/prod/edge.tf`.
 
 ### Path filtering
 
-A change confined to `apps/web` skips the Go test, vet, and build steps; a change confined to `apps/api` skips the type check, the TypeScript tests, and the web build; a change touching neither, such as documentation, skips both sets.
-
-Anything that changes how a release is built or shipped is in both filters, not neither: `checks.yml`, `deploy.yml`, and `docker-bake.hcl`. A release whose only change is to the pipeline would otherwise report a green gate having run nothing, which is how the first run of this arrangement reached production.
-
-This applies to pushes as well as pull requests. A pull request is diffed through the API against its base; a push is diffed against the commit the branch moved from, which requires that commit to be in the checkout, hence `fetch-depth: 50` on a push.
-
-Every way of failing to resolve a base runs the whole suite: a first push to a new branch, a force push, a range deeper than the checkout, or an error inside the filter. A check that silently narrows itself is worse than one that occasionally does too much. The filtering also stays inside the single `test-and-build` job rather than splitting it, so the check name branch protection requires is always reported.
-
-Cloudflare Pages has its own build cache enabled through `build_caching` in `infra/prod/edge.tf`, and `BUN_VERSION` is pinned there so a deployment builds on the same Bun the checks ran on rather than the older Pages default. Preview deployments are not pinned.
+- API changes run Go checks; web changes run TypeScript checks. Converter, cards, shared contracts, and release-pipeline changes can trigger both.
+- Documentation-only changes skip both application suites.
+- PR comparison uses the base branch; push comparison uses the previous commit, with checkout depth 50.
+- Unresolvable bases or filter failures run the complete suite.
+- Filtering stays inside `test-and-build`, preserving the branch-protection check name.
 
 ## Artifact Registry layout
 
-Location is `asia-south1`, repository `slidesage`.
-
 ```text
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/api:<sha>
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/api:latest
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/worker:<sha>
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/worker:latest
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/migrate:<sha>
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/migrate:latest
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/converter:<sha>
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/converter:latest
+asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/<target>:<commit-sha>
+asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/<target>:latest
 ```
 
-Cloud Run runs in `asia-south1`. Change `RUN_REGION` and `REGISTRY_LOCATION` in `.github/workflows/deploy.yml` if you move regions.
-
-The production API is served at `https://api.slidesage.app` through a global external HTTPS load balancer. Its reserved IPv4 address is `34.107.143.198`; the Cloudflare `api` record must be a DNS-only `A` record pointing to that address. Cloud Run custom domain mappings are unavailable in `asia-south1`, so the load balancer connects to the `api` service through the `slidesage-api-neg` serverless NEG.
-
-Cloudflare Pages runs `bun install --frozen-lockfile && bun run build` from `apps/web`. Vite bundles the React application into `apps/web/dist`, handles route-level code splitting, processes Tailwind through `@tailwindcss/vite`, and copies static files from `apps/web/public`.
-
-The Pages deployment copies `apps/web/public/_headers` into the build and sends `Cache-Control: no-cache` for the application and its assets. Do not add a Cloudflare Browser TTL or Cache Everything rule for `slidesage.app`. Pages manages its own CDN cache, and an extra zone cache can keep HTML from one deployment while its hashed JavaScript chunks come from another. The web entry point also listens for Vite's `vite:preloadError` event. If an open tab requests a chunk removed by a newer deployment, it reloads once to fetch the current HTML and then leaves any repeated failure to the route error page instead of entering a reload loop.
+- Targets are `api`, `worker`, `migrate`, and `converter`. Terraform deploys SHA tags.
+- Registry and Cloud Run use `asia-south1`; change `REGISTRY_LOCATION` and `RUN_REGION` in deploy configuration to move regions.
+- Public API is `https://api.slidesage.app` through the HTTPS load balancer. Keep its DNS-only A record pointed at the reserved address.
+- Pages builds with `bun install --frozen-lockfile && bun run build` from `apps/web`, producing `dist`.
+- `public/_headers` sets `Cache-Control: no-cache`. Extra Browser TTL or Cache Everything rules can leave stale HTML referencing missing chunks.
+- `vite:preloadError` triggers one reload for a removed chunk, then leaves repeated failure to the route error page.
 
 ## One-time GCP bootstrap
 
-Run these once with the account that owns the project. Set `PROJECT_ID` to `slidesage-504414` and `PROJECT_NUMBER` to the project number (see `gcloud projects describe $PROJECT_ID`).
+Set project and repository values before provisioning the CI identity:
 
 ```bash
 PROJECT_ID=slidesage-504414
-PROJECT_NUMBER=94621805506
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 REPO_URL=SINGH-RAJVEER/slidesage
 
+gcloud config set project "$PROJECT_ID"
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
-gcloud config set project $PROJECT_ID
 
 gcloud artifacts repositories create slidesage \
-  --repository-format=docker \
-  --location=asia-south1 \
-  --project=$PROJECT_ID
+	--repository-format=docker \
+	--location=asia-south1 \
+	--project="$PROJECT_ID"
 
 gcloud iam service-accounts create slidesage-deploy \
-  --display-name="SlideSage CI deploy" \
-  --project=$PROJECT_ID
+	--display-name="SlideSage CI deploy" \
+	--project="$PROJECT_ID"
 
 gcloud iam workload-identity-pools create slidesage \
-  --location=global \
-  --display-name="SlideSage CI pool" \
-  --project=$PROJECT_ID
+	--location=global \
+	--display-name="SlideSage CI pool" \
+	--project="$PROJECT_ID"
 
 gcloud iam workload-identity-pools providers create-oidc github \
-  --location=global \
-  --workload-identity-pool=slidesage \
-  --issuer-uri=https://token.actions.githubusercontent.com \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.actor=assertion.actor" \
-  --attribute-condition="attribute.repository == '$REPO_URL'" \
-  --project=$PROJECT_ID
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role=roles/artifactregistry.writer
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-	--member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-	--role=roles/run.admin
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-	--member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-	--role=roles/cloudtasks.admin
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-	--member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-	--role=roles/cloudscheduler.admin
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-	--member="serviceAccount:slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-	--role=roles/iam.serviceAccountUser
+	--location=global \
+	--workload-identity-pool=slidesage \
+	--issuer-uri=https://token.actions.githubusercontent.com \
+	--attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.actor=assertion.actor" \
+	--attribute-condition="attribute.repository == '$REPO_URL'" \
+	--project="$PROJECT_ID"
 
 gcloud iam service-accounts add-iam-policy-binding \
-  slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com \
-  --role=roles/iam.workloadIdentityUser \
-  --member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/slidesage/attribute.repository/$REPO_URL"
+	"slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
+	--role=roles/iam.workloadIdentityUser \
+	--member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/slidesage/attribute.repository/$REPO_URL"
 ```
 
-The workflow signs in to GCP through Workload Identity Federation using short-lived OIDC tokens from GitHub, so no long-lived service account keys are stored anywhere.
-
-The commands above describe the existing image-build and Cloud Run identity bootstrap. They are not a complete Terraform permission setup. Before adoption, authorize the CI identity to manage the resources in `infra/prod`, including Compute load balancing, Cloud SQL, Artifact Registry, service accounts, project services/IAM, Secret Manager IAM, and storage buckets/IAM. It also needs object access to the Terraform state bucket. Grant permissions at the narrowest supported scope through a separately approved IAM change; no permissions are granted by editing this repository.
-
-Do not reduce the identity to the old service-scoped Cloud Run roles while expecting it to manage the full Terraform stack. Runtime service accounts remain separate from the deployment identity.
+- CI uses short-lived GitHub OIDC credentials, without service-account keys.
+- Authorize the deploy identity for Terraform-managed Cloud Run, Cloud Tasks, Cloud Scheduler, Cloud SQL, Artifact Registry, Compute, service accounts, project services/IAM, Secret Manager IAM, and storage resources.
+- Include runtime-account `actAs` and state-bucket object access. Image building requires `roles/artifactregistry.writer`.
+- These commands create the identity; they do not grant the complete deployment permissions.
+- Keep runtime and deployment accounts separate. Use [Bootstrap](PRODUCTION_INFRASTRUCTURE.md#bootstrap) for backend and resource adoption.
 
 ## GitHub repository setup
 
-Create secrets in Settings -> Secrets and variables -> Actions:
-
-| Secret                | Value                                                       |
-| --------------------- | ----------------------------------------------------------- |
-| `GCP_PROJECT_ID`      | `slidesage-504414`                                          |
-| `GCP_WIF_PROVIDER`    | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/slidesage/providers/github` |
+| Secret | Value |
+| --- | --- |
+| `GCP_PROJECT_ID` | `slidesage-504414` |
+| `GCP_WIF_PROVIDER` | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/slidesage/providers/github` |
 | `GCP_SERVICE_ACCOUNT` | `slidesage-deploy@slidesage-504414.iam.gserviceaccount.com` |
-| `TF_STATE_BUCKET` | `slidesage-504414-tfstate`, after the versioned bucket exists |
-| `CLOUDFLARE_ACCOUNT_ID` | `1f4b64abf5ce89626a42b88a12d71cdc` |
-| `CLOUDFLARE_API_TOKEN` | Token with Zone Read, DNS Read/Edit, and Pages Read/Edit |
+| `TF_STATE_BUCKET` | `slidesage-504414-tfstate` |
+| `CLOUDFLARE_ACCOUNT_ID` | Account containing Pages and the zone |
+| `CLOUDFLARE_API_TOKEN` | Zone Read, DNS Read/Edit, Pages Read/Edit |
 
-API invocation policy is defined by `google_cloud_run_v2_service_iam_member.api_public_invoker`. The old `API_AUTH_FLAG` variable is no longer used. Application authentication still protects private routes.
-
-Both plan and deploy workflows pass the `UNSPLASH_ENABLED` repository variable as `TF_VAR_unsplash_enabled`, defaulting to `false` when it is unset. Terraform's `unsplash_enabled` is a boolean with default `false`. Leave it false for now; Terraform does not look up or inject `UNSPLASH_ACCESS_KEY` into the API or worker while disabled.
+- `PRESENTATION_GCS_BUCKET` optionally overrides the existing image bucket name. Preserve that name.
+- `UNSPLASH_ENABLED` defaults to `false`. [Production bootstrap](PRODUCTION_INFRASTRUCTURE.md#bootstrap) describes enabling stock photos.
+- Datadog variables are documented in [Observability](OBSERVABILITY.md#datadog-on-cloud-run).
 
 ## Secret Manager
 
-`DATABASE_URL`, `AUTH_SECRET`, `RATE_LIMIT_HASH_SECRET`, OAuth credentials, `EXA_API_KEY`, `OPEN_ROUTER_API_KEY`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` are referenced by the pipeline and must exist as Secret Manager secrets (secret name + `:latest` version). Leave `UNSPLASH_ACCESS_KEY` out for now. Without the key, generation drafts text-only decks and stock routes return `503`; image uploads remain available. Unsplash remains the only stock-photo provider.
-
-```bash
-printf "postgresql://user:pass@.../slidesage" | \
-  gcloud secrets create DATABASE_URL --data-file=- --project=$PROJECT_ID
-printf "<32+ char random secret>" | \
-  gcloud secrets create AUTH_SECRET --data-file=- --project=$PROJECT_ID
-printf "<independent random secret>" | \
-  gcloud secrets create RATE_LIMIT_HASH_SECRET --data-file=- --project=$PROJECT_ID
-printf "<Google OAuth client ID>" | \
-  gcloud secrets create GOOGLE_CLIENT_ID --data-file=- --project=$PROJECT_ID
-printf "<Google OAuth client secret>" | \
-  gcloud secrets create GOOGLE_CLIENT_SECRET --data-file=- --project=$PROJECT_ID
-printf "<GitHub OAuth client ID>" | \
-  gcloud secrets create GITHUB_CLIENT_ID --data-file=- --project=$PROJECT_ID
-printf "<GitHub OAuth client secret>" | \
-  gcloud secrets create GITHUB_CLIENT_SECRET --data-file=- --project=$PROJECT_ID
-printf "<Exa API key>" | \
-  gcloud secrets create EXA_API_KEY --data-file=- --project=$PROJECT_ID
-printf "<OpenRouter API key>" | \
-  gcloud secrets create OPEN_ROUTER_API_KEY --data-file=- --project=$PROJECT_ID
-printf "<Resend API key>" | \
-  gcloud secrets create RESEND_API_KEY --data-file=- --project=$PROJECT_ID
-printf "<verified SlideSage sender on slidesage.app>" | \
-  gcloud secrets create RESEND_FROM_EMAIL --data-file=- --project=$PROJECT_ID
-```
-
-To enable stock photos later, first provision `UNSPLASH_ACCESS_KEY` in Secret Manager with an enabled version available as `latest`. Then set the `UNSPLASH_ENABLED` repository variable to `true` and deploy. Terraform looks up the secret, grants runtime access, and injects it into both the API and worker only when `unsplash_enabled=true`.
-
-Billing additionally needs the three Razorpay secrets. `terraform plan` fails with a "secret not found" error until all three exist:
-
-```bash
-printf "<Razorpay key ID>" | \
-  gcloud secrets create RAZORPAY_KEY_ID --data-file=- --project=$PROJECT_ID
-printf "<Razorpay key secret>" | \
-  gcloud secrets create RAZORPAY_KEY_SECRET --data-file=- --project=$PROJECT_ID
-printf "<Razorpay webhook signing secret>" | \
-  gcloud secrets create RAZORPAY_WEBHOOK_SECRET --data-file=- --project=$PROJECT_ID
-```
-
-Payments are not optional. Terraform lists these secrets unconditionally, and the API refuses to start if any value is absent. This prevents a deployment from booting with dead checkout or webhook endpoints.
-
-The API deployment sets `BASE_URL=https://api.slidesage.app` and trusts `https://slidesage.app`, `https://www.slidesage.app`, and `https://slide-sage.pages.dev` for browser authentication callbacks. Configure the provider callback URLs as `https://api.slidesage.app/auth/callback/google` and `https://api.slidesage.app/auth/callback/github`.
-
-`PRESENTATION_GCS_BUCKET` reaches the API and worker for image storage and the migration job, which deletes the retired objects from it, from `infra/prod/main.tf`. Document bodies live in PostgreSQL JSONB. Set the `PRESENTATION_GCS_BUCKET` repository variable if the existing bucket differs from `<project-id>-presentation-revisions`; both plan and deploy workflows pass the same value to Terraform. Preserve the existing bucket name and resource addresses. `CARD_CONVERTER_URL` reaches the API and worker; the Go containers reach their colocated converter over localhost, and only the Go ports receive Cloud Run ingress. Change runtime configuration in Terraform, since a direct `gcloud run deploy` replaces the whole container specification and the next Terraform plan reverts it.
-
-The Cloud SQL socket mount and the `roles/cloudsql.client` grant on the runtime service account are declared in `infra/prod`.
+- Provision required secret values before planning. `infra/prod/main.tf` lists the names; [Environment variables](ENVIRONMENT_VARIABLES.md) explains their use.
+- Required API secrets include database, auth, rate-limit hash, OAuth, Exa, OpenRouter, Resend, and all three Razorpay credentials.
+- Missing Razorpay secrets fail planning and API startup.
+- Use enabled `latest` versions. BYOK deployments also need encryption keys for API and worker.
+- Unsplash and Datadog secrets are conditional on their deployment settings.
+- Set provider OAuth callbacks to `https://api.slidesage.app/auth/callback/google` and `/github`.
+- Change runtime configuration in Terraform. Direct service deployment can replace sidecars and will drift from the next plan.
 
 ## Cloud Run service settings
 
-| Service | Port | Instances     | Concurrency | Notes                       |
-| ------- | ---- | ------------- | ----------- | --------------------------- |
-| `api`   | 8000 | min 0, max 10 | 80          | Scales from zero on traffic; converter sidecar listens on localhost:8090 |
-| `worker` | 8080 | min 0, max 10 | 1           | An authenticated Cloud Task owns the River client while work is active; converter sidecar listens on localhost:8090 |
+| Service | Port | Instances | HTTP concurrency | Runtime |
+| --- | --- | --- | --- | --- |
+| `api` | 8000 | 0 to 10 | 80 | API and private converter |
+| `worker` | 8080 | 0 to 10 | 1 | Request-owned River client and private converter |
 
-The queue worker has no minimum instance and keeps CPU available while an instance exists (`cpu_idle = false`). After committing a River job, the API creates an authenticated Cloud Task that starts a worker and holds `/drain` open. River uses row-level `SKIP LOCKED`, so concurrent request-owned clients can claim jobs safely. Monitor queue latency, task dispatch, provider limits, and database connections together.
+- Converters listen on localhost `8090` with no public port.
+- Worker keeps `cpu_idle=false`; Cloud Tasks holds `/drain` while River owns claims.
+- Monitor dispatch, queue latency, provider capacity, and database connections together.
 
 ### Ingress and invocation
 
-The deployment workflow pins each service's ingress instead of inheriting a mutable Cloud Run default:
+| Resource | Ingress | Invocation |
+| --- | --- | --- |
+| `api` | `internal-and-cloud-load-balancing` | Public IAM access; application auth protects private routes |
+| `worker` | `internal` | Runtime service account only, no `allUsers` binding |
+| `slidesage-migrate` | Job, no service ingress | CI execution |
 
-| Resource            | Ingress                             | Invocation policy                                                                                                                                                                                                     |
-| ------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api`               | `internal-and-cloud-load-balancing` | Public at the Cloud Run IAM layer by default because browsers and external webhooks call it; application authentication protects private routes. Internet traffic must pass through the external HTTPS load balancer. |
-| `worker`            | `internal`                          | Private. Same-project Cloud Tasks invokes `/drain` as the runtime service account, which is the only identity with `roles/run.invoker`. There is no `allUsers` binding.                                              |
-| `slidesage-migrate` | Not applicable                      | Cloud Run Job executed by the authenticated CI/CD identity. Jobs do not have service ingress settings.                                                                                                                |
-
-The API ingress setting blocks direct internet requests to its `run.app` URL. It also makes the external load balancer the enforcement point for any attached Cloud Armor policy. Do not change the API to `ingress=all` while the load balancer is the documented production entry point.
-
-After deployment, the workflow verifies both ingress values and fails if the worker has an `allUsers` invoker binding.
-
-To bring existing services in line with the workflow without waiting for another deployment, run:
-
-```bash
-gcloud run services update api \
-  --project=slidesage-504414 \
-  --region=asia-south1 \
-  --ingress=internal-and-cloud-load-balancing
-
-gcloud run services update worker \
-  --project=slidesage-504414 \
-  --region=asia-south1 \
-  --ingress=internal \
-  --invoker-iam-check
-```
-
-The gcloud equivalent below is for manual recovery only. Normal releases update the job through Terraform and execute it with `gcloud run jobs execute`. Before using this command, verify the backup, pause API/worker and the maintenance scheduler, and confirm the runtime account has the bucket viewer and conditional delete grants; without them the sweep only logs its failure. Set `PRESENTATION_GCS_BUCKET` explicitly if the existing bucket differs from the project default:
-
-```bash
-gcloud run jobs deploy slidesage-migrate \
-	--project=slidesage-504414 \
-	--image="$REGISTRY_LOCATION-docker.pkg.dev/$PROJECT_ID/$REGISTRY_REPOSITORY/migrate:$IMAGE_VERSION" \
-	--region=asia-south1 \
-	--service-account="slidesage-runtime@$PROJECT_ID.iam.gserviceaccount.com" \
-	--set-cloudsql-instances="$PROJECT_ID:$RUN_REGION:slidesage-postgres" \
-	--set-secrets=DATABASE_URL=DATABASE_URL:latest \
-	--set-env-vars="PRESENTATION_GCS_BUCKET=${PRESENTATION_GCS_BUCKET:-$PROJECT_ID-presentation-revisions}" \
-	--task-timeout=1200s \
-	--max-retries=3 \
-	--execute-now \
-	--wait
-```
-
-The CI identity needs both job update and execution permissions, alongside the Terraform permissions described above.
+- API internet traffic passes through the load balancer; direct internet `run.app` traffic is blocked.
+- Same-project Cloud Tasks invokes the private worker's default URL.
+- Release checks assert ingress and absence of public worker invocation.
 
 ## Rollback
 
-Every deploy is a Cloud Run revision pinned to an immutable SHA image. Traffic can be switched to an earlier revision only if that binary is compatible with the current database schema:
+- Select earlier Cloud Run revisions only when their binaries support the current schema.
+- GCS-only writers are incompatible after migration 33; writers using `object_key` are incompatible after migration 35.
+- Migrations 33 and 35 refuse downgrade. Recovery requires a database restore with runtimes paused.
+- Restore compatible API, worker, and converter versions together, then reconcile Terraform.
 
 ```bash
 gcloud run services update-traffic api \
-  --region=asia-south1 \
-  --to-revisions=api-20260810-1200=100
+	--region=asia-south1 \
+	--to-revisions="<compatible-api-revision>=100"
 
 gcloud run services update-traffic worker \
-  --region=asia-south1 \
-  --to-revisions=worker-20260810-1200=100
+	--region=asia-south1 \
+	--to-revisions="<compatible-worker-revision>=100"
 ```
-
-or atomically in the console: Cloud Run -> service -> Revisions -> select revision -> Manage traffic.
-
-After migration 33, GCS-only writers are incompatible with the required JSONB bodies, and after migration 35 any writer that sets `object_key` fails. Do not route traffic to those revisions. Migrations 33 and 35 refuse to downgrade; recovery needs a database restore while services stay paused.
 
 ## Manual equivalents
 
+Build and push images:
+
 ```bash
 gcloud auth configure-docker asia-south1-docker.pkg.dev
-
-# The images copy prebuilt binaries, so compile them first:
 just binaries
-
-# One image:
-docker build --target api --file apps/api/Dockerfile --tag asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev .
-docker push asia-south1-docker.pkg.dev/slidesage-504414/slidesage/api:dev
-
-# Or all four, the way CI does, after bundling the converter:
 bun install --frozen-lockfile
-bun build apps/converter/src/main.ts --target bun --outfile dist/converter.js
+just converter-bundle
 PROJECT_ID=slidesage-504414 IMAGE_VERSION=dev docker buildx bake -f docker-bake.hcl --push
 ```
 
+- These commands build images only. Use the release workflow for backup, pause, migrations, and runtime updates.
+
 ## Troubleshooting
 
-- `403` pushing to Artifact Registry: re-run `gcloud auth configure-docker asia-south1-docker.pkg.dev` and confirm the service account has `roles/artifactregistry.writer`.
-- `Permission 'iam.serviceAccounts.actAs' denied` during deploy: re-apply the `roles/iam.serviceAccountUser` binding.
-- WIF auth step fails: confirm `GCP_WIF_PROVIDER`/`GCP_SERVICE_ACCOUNT` match the pool that was created and that the binding uses the same `REPO_URL` casing as the repository.
-- `error loading dynamically imported module` after a web deploy: confirm the failed `/assets/*.js` URL belongs to an older build, then check Cloudflare Cache Rules for a custom Browser TTL or Cache Everything rule and remove it. Pages should return `Cache-Control: no-cache` from `public/_headers`. Purge the zone cache once after removing the rule so cached SPA HTML is not served for missing asset URLs.
+- Registry `403`: configure Docker auth and verify Artifact Registry writer permission.
+- `iam.serviceAccounts.actAs` denied: verify deploy identity can use the runtime account.
+- WIF failure: verify provider/account paths and repository casing in the binding.
+- Missing secret or DNS access: provision the secret or correct Cloudflare token permissions before applying.
+- Missing dynamic chunk: remove custom Browser TTL/Cache Everything rules, verify `_headers`, and purge stale zone cache once.
 
 ## Migration cutover
 
-Every production release takes an on-demand Cloud SQL backup before running migrations. The backup starts as soon as the release job authenticates and runs alongside Terraform planning. The workflow verifies completion before the first targeted apply. It does not trust the exit status of `gcloud sql operations wait`, which documents a timeout and nothing about what it returns for an operation that finished with an error. The operation is read back and its status and error fields are checked, so a failed backup stops the release before any apply. Terraform then updates the migration job and sets the existing API and queue services to manual scaling with zero instances, preserving their previous images for this phase, and pauses the maintenance scheduler. This stops new submissions and queue processing while schema changes run. The API is temporarily unavailable during the cutover.
+- Every release starts an on-demand Cloud SQL backup and verifies its completion/error fields before the first apply.
+- Update the migration job, then set API and worker to manual scaling with zero instances and pause the maintenance scheduler.
+- Preserve old runtime images while paused. API is unavailable during cutover.
+- Run migrations with a 20-minute attempt limit and three retries. The object sweep retains image assets; failures log without failing the release.
+- After success, re-plan the full release and restore automatic scaling with new images.
+- If migration or release apply fails, leave services paused while investigating. Old binaries may be incompatible with the changed schema.
+- Database changes that restart Cloud SQL need a separate rollout with a verified backup and independent runtime/scheduler pause before the database apply.
 
-The full release apply restores automatic scaling with the new API and generation-worker images. If migration or release apply fails, services remain paused; inspect the failure before retrying rather than restarting an old binary against a changed schema.
+| Migration | Destructive effect |
+| --- | --- |
+| 14 | Resets pre-launch user/accounting data |
+| 25 | Deletes decks without committed PPTX revisions |
+| 26 | Drops retired semantic memory and outline caches |
+| 34 | Drops legacy PPTX revision rows; downgrade restores schema only |
+| 35 | Deletes decks without card bodies and drops remaining pgvector tables; no downgrade |
+| 36 | Replaces legacy password hashes; affected users must reset passwords |
 
-Old writers must remain paused during cutover. The migration job has 20 minutes per attempt and retains three retries. After the migrations it deletes every object under `presentations/<id>/objects/`, `revisions/`, and `cards/`; image assets stay. A failed sweep is logged and does not fail the release; the next run deletes what is left. See [Card storage](CARD_DOCUMENTS.md#storage).
-
-Cloud SQL settings remain unchanged for this cutover. The optional automated-backup, PITR, and disk-growth changes were removed because PITR enablement would restart the database during the migration-job apply, before runtimes were paused. The pause apply also depends on Cloud SQL, so moving it earlier would not isolate that restart. A future restart-producing database change requires a separate rollout with successful backup verification and an independent API/worker/scheduler pause before any database apply. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
-
-Migration 25 deletes presentations without a committed PPTX revision, as required by the canonical-only transition. The backup preserves the pre-release database for recovery; it does not make the deletion reversible through a schema downgrade. Migration 34 drops the legacy PPTX revision table the same way: its downgrade restores the schema but not the rows. Migration 35 deletes every presentation without a card document, the pgvector tables, and the extension, and has no downgrade. Migration 36 overwrites unsalted SHA-256 and PBKDF2 password hashes, so those users must reset their password. For all of these, the pre-release backup is the only copy.
+- Recover deleted database data from the pre-release backup. GCS recovery depends on bucket retention.
+- Storage details are in [Card storage](CARD_DOCUMENTS.md#storage).
