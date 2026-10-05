@@ -5,10 +5,35 @@ import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
 import { getPresentationRetryDestination } from "@slidesage/ui/lib/presentation-retry";
 import { RotateCcw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+
+type LoadResult = { presentation: PresentationResponse["presentation"] } | { error: string };
+
+async function loadFailedPresentation(presentationId: string): Promise<LoadResult> {
+	try {
+		const response = await fetch(`${API_URL}/presentations/${presentationId}`, {
+			credentials: "include",
+		});
+		const result = await readJsonResponse<PresentationResponse | ApiErrorResponse>(response);
+
+		if (response.status === 401) return { error: "Your session expired. Please sign in again." };
+		if (!result) {
+			return { error: "The presentation service returned an invalid response. Try again." };
+		}
+		if (!response.ok || "error" in result) {
+			const message = "error" in result ? result.error.message : undefined;
+			return { error: message || "Unable to open this retry." };
+		}
+		return { presentation: result.presentation };
+	} catch (requestError) {
+		return {
+			error: requestError instanceof Error ? requestError.message : "Unable to open this retry.",
+		};
+	}
+}
 
 interface PresentationErrorPageProps {
 	presentationId?: number | string;
@@ -24,10 +49,39 @@ export default function PresentationErrorPage({
 	const [searchParams] = useSearchParams();
 	const [isRetrying, setIsRetrying] = useState(false);
 	const [retryError, setRetryError] = useState("");
+	const [failureMessage, setFailureMessage] = useState("");
+	const load = useRef<{ id: string; result: Promise<LoadResult> } | null>(null);
 
 	// A reload drops history state, so the id in the URL keeps retry reachable.
 	const presentationId =
 		location.state?.presentationId || propPresentationId || searchParams.get("id") || undefined;
+
+	// Retry reuses the load that showed the failure, including one still in
+	// flight, so opening the page and retrying asks the API once.
+	const loadPresentation = useCallback((id: string) => {
+		if (load.current?.id !== id) load.current = { id, result: loadFailedPresentation(id) };
+		return load.current.result;
+	}, []);
+
+	// The saved failure says why generation stopped, so the reason survives a
+	// reload and a visit from the library rather than leaving with the stream.
+	useEffect(() => {
+		if (!presentationId) return;
+		const id = String(presentationId);
+		let active = true;
+		void loadPresentation(id).then((result) => {
+			if (!active) return;
+			if ("error" in result) {
+				if (load.current?.id === id) load.current = null;
+				return;
+			}
+			const slidesData = result.presentation.slides_data;
+			setFailureMessage(slidesData.status === "failed" ? (slidesData.failure?.message ?? "") : "");
+		});
+		return () => {
+			active = false;
+		};
+	}, [loadPresentation, presentationId]);
 
 	const handleRetry = async () => {
 		if (!presentationId || isRetrying) return;
@@ -35,47 +89,26 @@ export default function PresentationErrorPage({
 		setIsRetrying(true);
 		setRetryError("");
 
-		try {
-			const response = await fetch(`${API_URL}/presentations/${presentationId}`, {
-				credentials: "include",
-			});
-			const result = await readJsonResponse<PresentationResponse | ApiErrorResponse>(response);
+		const id = String(presentationId);
+		const result = await loadPresentation(id);
+		setIsRetrying(false);
 
-			if (response.status === 401) {
-				setRetryError("Your session expired. Please sign in again.");
-				return;
-			}
-
-			if (!result) {
-				setRetryError("The presentation service returned an invalid response. Try again.");
-				return;
-			}
-
-			if (!response.ok || "error" in result) {
-				const message = "error" in result ? result.error.message : undefined;
-				setRetryError(message || "Unable to open this retry.");
-				return;
-			}
-
-			const destination = getPresentationRetryDestination(
-				result.presentation.slides_data,
-				result.presentation.id,
-			);
-			if (!destination) {
-				setRetryError("The saved retry settings are unavailable.");
-				return;
-			}
-
-			navigate(destination.to, { state: destination.state });
-		} catch (retryRequestError) {
-			setRetryError(
-				retryRequestError instanceof Error
-					? retryRequestError.message
-					: "Unable to open this retry.",
-			);
-		} finally {
-			setIsRetrying(false);
+		if ("error" in result) {
+			if (load.current?.id === id) load.current = null;
+			setRetryError(result.error);
+			return;
 		}
+
+		const destination = getPresentationRetryDestination(
+			result.presentation.slides_data,
+			result.presentation.id,
+		);
+		if (!destination) {
+			setRetryError("The saved retry settings are unavailable.");
+			return;
+		}
+
+		navigate(destination.to, { state: destination.state });
 	};
 
 	const handleDelete = async () => {
@@ -110,6 +143,11 @@ export default function PresentationErrorPage({
 						>
 							We couldn&apos;t finish this presentation
 						</h1>
+						{failureMessage && (
+							<p role="alert" className="mt-3 text-sm leading-6 text-red-200">
+								{failureMessage}
+							</p>
+						)}
 						{presentationId && (
 							<p className="mt-3 text-sm leading-6 text-white/45">
 								Your prompt, generation settings, and available research sources are saved with this
