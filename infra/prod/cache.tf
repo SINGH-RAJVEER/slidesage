@@ -14,52 +14,77 @@ resource "google_compute_subnetwork" "cache" {
   private_ip_google_access = true
 }
 
-resource "google_redis_instance" "cache" {
-  count                   = var.cache_enabled ? 1 : 0
-  name                    = "slidesage-read-cache"
-  region                  = var.gcp_region
-  tier                    = var.cache_tier
-  memory_size_gb          = var.cache_memory_gb
-  redis_version           = "REDIS_7_2"
-  authorized_network      = google_compute_network.cache[0].id
-  connect_mode            = "DIRECT_PEERING"
-  reserved_ip_range       = "10.82.0.0/29"
-  auth_enabled            = true
-  transit_encryption_mode = "SERVER_AUTHENTICATION"
-  redis_configs = {
+# Memorystore for Valkey only connects through Private Service Connect. The
+# policy lets it reserve primary and reader endpoint addresses in this subnet.
+resource "google_compute_subnetwork" "cache_endpoints" {
+  count         = var.cache_enabled ? 1 : 0
+  name          = "slidesage-cache-psc"
+  region        = var.gcp_region
+  network       = google_compute_network.cache[0].id
+  ip_cidr_range = "10.83.0.0/28"
+}
+
+resource "google_network_connectivity_service_connection_policy" "cache" {
+  count         = var.cache_enabled ? 1 : 0
+  name          = "slidesage-cache"
+  location      = var.gcp_region
+  service_class = "gcp-memorystore"
+  network       = google_compute_network.cache[0].id
+  psc_config {
+    subnetworks = [google_compute_subnetwork.cache_endpoints[0].id]
+  }
+  depends_on = [google_project_service.required]
+}
+
+resource "google_memorystore_instance" "cache" {
+  count                       = var.cache_enabled ? 1 : 0
+  instance_id                 = "slidesage-read-cache"
+  location                    = var.gcp_region
+  mode                        = "CLUSTER_DISABLED"
+  shard_count                 = 1
+  replica_count               = var.cache_replica_count
+  node_type                   = var.cache_node_type
+  engine_version              = "VALKEY_9_0"
+  authorization_mode          = "IAM_AUTH"
+  transit_encryption_mode     = "SERVER_AUTHENTICATION"
+  deletion_protection_enabled = false
+  engine_configs = {
     maxmemory-policy = "allkeys-lru"
   }
-  depends_on = [google_project_service.required]
-}
-
-# Terraform manages this generated credential, unlike the existing application
-# secrets. Never put the sensitive auth string directly into a Cloud Run env var.
-resource "google_secret_manager_secret" "cache_password" {
-  count     = var.cache_enabled ? 1 : 0
-  secret_id = "CACHE_REDIS_PASSWORD"
-  replication {
-    auto {}
+  desired_auto_created_endpoints {
+    network    = google_compute_network.cache[0].id
+    project_id = data.google_project.current.project_id
   }
-  depends_on = [google_project_service.required]
+  depends_on = [google_network_connectivity_service_connection_policy.cache]
 }
 
-resource "google_secret_manager_secret_version" "cache_password" {
-  count       = var.cache_enabled ? 1 : 0
-  secret      = google_secret_manager_secret.cache_password[0].id
-  secret_data = google_redis_instance.cache[0].auth_string
-}
-
-resource "google_secret_manager_secret_iam_member" "cache_password" {
-  count     = var.cache_enabled ? 1 : 0
-  secret_id = google_secret_manager_secret.cache_password[0].id
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.runtime.email}"
+# IAM authentication replaces a stored password: the runtime account presents
+# its own access token when the API opens a connection.
+resource "google_project_iam_member" "runtime_cache_connect" {
+  count   = var.cache_enabled ? 1 : 0
+  project = var.gcp_project_id
+  role    = "roles/memorystore.dbConnectionUser"
+  member  = "serviceAccount:${google_service_account.runtime.email}"
 }
 
 locals {
+  # The reader endpoint rejects writes, so the API uses only the primary.
+  cache_primary_endpoint = var.cache_enabled ? one(flatten([
+    for endpoint in google_memorystore_instance.cache[0].endpoints : [
+      for connection in endpoint.connections : [
+        for psc in connection.psc_auto_connection : psc if psc.connection_type == "CONNECTION_TYPE_PRIMARY"
+      ]
+    ]
+  ])) : null
+
   cache_environment = var.cache_enabled ? {
-    CACHE_REDIS_ADDR   = "${google_redis_instance.cache[0].host}:${google_redis_instance.cache[0].port}"
-    CACHE_REDIS_CA_PEM = join("\n", [for ca in google_redis_instance.cache[0].server_ca_certs : ca.cert])
-    CACHE_TIMEOUT_MS   = "100"
+    CACHE_VALKEY_ADDR = "${local.cache_primary_endpoint.ip_address}:${local.cache_primary_endpoint.port}"
+    CACHE_VALKEY_AUTH = "iam"
+    CACHE_VALKEY_CA_PEM = join("\n", flatten([
+      for server_ca in google_memorystore_instance.cache[0].managed_server_ca : [
+        for chain in server_ca.ca_certs : chain.certificates
+      ]
+    ]))
+    CACHE_TIMEOUT_MS = "100"
   } : {}
 }

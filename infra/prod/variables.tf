@@ -10,28 +10,28 @@ variable "gcp_region" {
 }
 
 variable "cache_enabled" {
-  description = "Provision a private Memorystore read cache and attach the API through Direct VPC egress."
+  description = "Provision a private Memorystore for Valkey read cache and attach the API through Direct VPC egress."
   type        = bool
   default     = false
 }
 
-variable "cache_tier" {
-  description = "BASIC is a disposable single-node cache; STANDARD_HA adds automatic failover. Changing tier replaces the cache."
+variable "cache_node_type" {
+  description = "Memorystore for Valkey node type, billed per node even when idle. SHARED_CORE_NANO holds about 1.4 GB."
   type        = string
-  default     = "BASIC"
+  default     = "SHARED_CORE_NANO"
   validation {
-    condition     = contains(["BASIC", "STANDARD_HA"], var.cache_tier)
-    error_message = "cache_tier must be BASIC or STANDARD_HA."
+    condition     = contains(["SHARED_CORE_NANO", "STANDARD_SMALL", "HIGHMEM_MEDIUM", "HIGHMEM_XLARGE"], var.cache_node_type)
+    error_message = "cache_node_type must be SHARED_CORE_NANO, STANDARD_SMALL, HIGHMEM_MEDIUM, or HIGHMEM_XLARGE."
   }
 }
 
-variable "cache_memory_gb" {
-  description = "Provisioned Memorystore capacity in GiB, billed even when idle."
+variable "cache_replica_count" {
+  description = "Read replicas behind the primary. 0 is a disposable single node; 1 or more adds automatic failover and bills each replica."
   type        = number
-  default     = 1
+  default     = 0
   validation {
-    condition     = var.cache_memory_gb >= 1 && var.cache_memory_gb <= 300 && floor(var.cache_memory_gb) == var.cache_memory_gb
-    error_message = "cache_memory_gb must be an integer between 1 and 300."
+    condition     = var.cache_replica_count >= 0 && var.cache_replica_count <= 5 && floor(var.cache_replica_count) == var.cache_replica_count
+    error_message = "cache_replica_count must be an integer between 0 and 5."
   }
 }
 

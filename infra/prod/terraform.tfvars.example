@@ -19,7 +19,7 @@ otel_logs_exporter = "otlp"
 # Create UNSPLASH_ACCESS_KEY in Secret Manager before enabling stock photos.
 unsplash_enabled = false
 
-# Enable after reviewing the recurring Memorystore cost and deployment plan.
-cache_enabled   = false
-cache_tier      = "BASIC"
-cache_memory_gb = 1
+# Enable after reviewing the recurring Memorystore for Valkey cost and deployment plan.
+cache_enabled       = false
+cache_node_type     = "SHARED_CORE_NANO"
+cache_replica_count = 0
