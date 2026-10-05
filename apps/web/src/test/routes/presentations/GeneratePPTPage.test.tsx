@@ -88,6 +88,47 @@ it("takes the retried settings to the outline", async () => {
 	});
 });
 
+it("offers a research result count only with web research on and takes it to research", async () => {
+	const view = render(
+		<MemoryRouter
+			initialEntries={[
+				{
+					pathname: "/generate",
+					state: {
+						retry: {
+							prompt: "Research how many sources",
+							slide_count: 7,
+							detail_level: "balanced",
+							tonality: "professional",
+							research_enabled: false,
+							theme: "grove",
+						},
+					},
+				},
+			]}
+		>
+			<StreamingProvider>
+				<Routes>
+					<Route path="/generate" element={<GeneratePPTPage />} />
+					<Route path="/generate/research" element={<RouteStateProbe />} />
+				</Routes>
+			</StreamingProvider>
+		</MemoryRouter>,
+	);
+
+	expect(view.queryByRole("slider", { name: "Research results" })).toBeNull();
+	fireEvent.click(view.getByRole("button", { name: /Web Research/ }));
+	const slider = view.getByRole("slider", { name: "Research results" });
+	expect(slider).toHaveTextContent("5");
+	fireEvent.keyDown(slider, { key: "ArrowRight" });
+	expect(slider).toHaveTextContent("6");
+
+	fireEvent.click(view.getByRole("button", { name: "Generate" }));
+
+	const state = JSON.parse((await view.findByText(/"prompt"/)).textContent ?? "{}");
+	expect(state.maxResults).toBe(6);
+});
+
 it("asks for a template before generating", async () => {
 	const view = render(
 		<MemoryRouter

@@ -2,7 +2,11 @@ import { CARD_TEMPLATES, getCardTemplate } from "@slidesage/cards";
 import type { PresentationRetryOptions } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
-import { GenerateForm, GenerateOptionsBar } from "@slidesage/ui/components/Generate";
+import {
+	DEFAULT_RESEARCH_RESULTS,
+	GenerateForm,
+	GenerateOptionsBar,
+} from "@slidesage/ui/components/Generate";
 import { useDebouncedCallback } from "@tanstack/react-pacer/debouncer";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -29,6 +33,7 @@ export default function GeneratePPTPage() {
 	const [detailLevel, setDetailLevel] = useState(retry?.detail_level ?? "balanced");
 	const [tonality, setTonality] = useState(retry?.tonality ?? "professional");
 	const [useWebResearch, setUseWebResearch] = useState(retry?.research_enabled ?? false);
+	const [researchResultCount, setResearchResultCount] = useState(DEFAULT_RESEARCH_RESULTS);
 	// A retried presentation names the theme it was generated in. Standing a
 	// default in for one this build does not carry would generate the retry in a
 	// template the reader never chose, so an unknown theme leaves nothing selected.
@@ -102,6 +107,7 @@ export default function GeneratePPTPage() {
 					slideCount: count,
 					detailLevel,
 					tonality,
+					maxResults: researchResultCount,
 					retryPresentationId,
 					theme,
 					...(retry?.ai ? { ai: retry.ai } : {}),
@@ -185,12 +191,14 @@ export default function GeneratePPTPage() {
 					detailLevel={detailLevel}
 					tonality={tonality}
 					useWebResearch={useWebResearch}
+					researchResultCount={researchResultCount}
 					slideCount={slideCount}
 					selectedTemplateId={selectedTemplateId}
 					installedTemplateIds={library.ids}
 					onDetailLevelChange={setDetailLevel}
 					onTonalityChange={setTonality}
 					onUseWebResearchChange={setUseWebResearch}
+					onResearchResultCountChange={setResearchResultCount}
 					onSlideCountChange={setSlideCount}
 					onTemplateChange={handleTemplateChange}
 					onTemplateRemove={handleTemplateRemove}

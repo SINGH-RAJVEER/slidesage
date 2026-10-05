@@ -2,6 +2,7 @@ import { Button } from "@slidesage/ui/components/button";
 import { Globe } from "lucide-react";
 import type React from "react";
 import { DetailLevelSelector } from "./DetailLevelSelector";
+import { ResearchResultCountSelector } from "./ResearchResultCountSelector";
 import { SlideCountSelector } from "./SlideCountSelector";
 import TemplateSelector from "./TemplateSelector";
 import { TonalitySelector } from "./TonalitySelector";
@@ -10,6 +11,8 @@ interface GenerateOptionsBarProps {
 	detailLevel: string;
 	tonality: string;
 	useWebResearch: boolean;
+	/** How many sources a web research search retrieves. */
+	researchResultCount: number;
 	slideCount: string;
 	/** Undefined until the reader picks one; there is no default to assume. */
 	selectedTemplateId?: string;
@@ -17,6 +20,7 @@ interface GenerateOptionsBarProps {
 	onDetailLevelChange: (level: string) => void;
 	onTonalityChange: (tonality: string) => void;
 	onUseWebResearchChange: (enabled: boolean) => void;
+	onResearchResultCountChange: (count: number) => void;
 	onSlideCountChange: (count: string) => void;
 	onTemplateChange: (templateId: string) => void;
 	onTemplateRemove?: (templateId: string) => void;
@@ -26,12 +30,14 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 	detailLevel,
 	tonality,
 	useWebResearch,
+	researchResultCount,
 	slideCount,
 	selectedTemplateId,
 	installedTemplateIds = [],
 	onDetailLevelChange,
 	onTonalityChange,
 	onUseWebResearchChange,
+	onResearchResultCountChange,
 	onSlideCountChange,
 	onTemplateChange,
 	onTemplateRemove,
@@ -55,6 +61,12 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 							<span className="translate-y-px">Web Research</span>
 						</span>
 					</Button>
+					{useWebResearch && (
+						<ResearchResultCountSelector
+							resultCount={researchResultCount}
+							onResultCountChange={onResearchResultCountChange}
+						/>
+					)}
 				</div>
 
 				<TemplateSelector
