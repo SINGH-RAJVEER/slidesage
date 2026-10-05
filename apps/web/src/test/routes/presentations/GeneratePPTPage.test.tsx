@@ -50,7 +50,7 @@ it("restores the generate setup after leaving for another section", async () => 
 	fireEvent.click(view.getByText("Return to setup"));
 	expect(view.getByRole("textbox", { name: "Prompt" })).toHaveValue("My edited prompt");
 	expect(view.getByRole("slider", { name: "Slide count" })).toHaveTextContent("13");
-	expect(view.getByRole("slider", { name: "Research results" })).toHaveTextContent("6");
+	expect(view.getByRole("slider", { name: "Research results" })).toHaveAttribute("aria-valuenow", "6");
 	expect(view.getByText("Comprehensive")).toBeInTheDocument();
 	expect(view.getByText("Casual")).toBeInTheDocument();
 	fireEvent.click(view.getByRole("button", { name: "Generate" }));
@@ -227,9 +227,9 @@ it("offers a research result count only with web research on and takes it to res
 	expect(view.queryByRole("slider", { name: "Research results" })).toBeNull();
 	fireEvent.click(view.getByRole("button", { name: /Web Research/ }));
 	const slider = view.getByRole("slider", { name: "Research results" });
-	expect(slider).toHaveTextContent("5");
+	expect(slider).toHaveAttribute("aria-valuenow", "5");
 	fireEvent.keyDown(slider, { key: "ArrowRight" });
-	expect(slider).toHaveTextContent("6");
+	expect(slider).toHaveAttribute("aria-valuenow", "6");
 
 	fireEvent.click(view.getByRole("button", { name: "Generate" }));
 
