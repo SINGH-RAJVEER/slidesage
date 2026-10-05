@@ -177,6 +177,17 @@ export interface ProfileAvatarResponse {
 	user: Pick<UserProfile, "id" | "image">;
 }
 
+/** Longest feedback message the API accepts, in characters. */
+export const FEEDBACK_MAX_LENGTH = 4000;
+
+export interface FeedbackRequest {
+	message: string;
+}
+
+export interface FeedbackResponse {
+	feedback: { id: string; created_at: string };
+}
+
 export type BillingPackName = "starter" | "pro" | "premium" | "custom";
 
 export interface BillingBalanceResponse {

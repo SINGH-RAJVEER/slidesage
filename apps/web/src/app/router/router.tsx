@@ -46,6 +46,7 @@ export const router = createBrowserRouter([
 				children: [
 					{ path: "profile", element: <ProfilePage /> },
 					{ path: "settings", element: <SettingsPage /> },
+					{ path: "feedback", lazy: lazyRoute(() => import("../../routes/feedback/FeedbackPage")) },
 					{
 						path: "generate",
 						lazy: lazyRoute(() => import("../../routes/presentations/GeneratePPTPage")),
