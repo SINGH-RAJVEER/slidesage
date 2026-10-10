@@ -18,8 +18,6 @@ export function normalizeApiUrl(value: string | undefined): string {
 }
 
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]"]);
-const CLOUDFLARE_PAGES_HOST_SUFFIX = ".pages.dev";
-const DEPLOYED_API_URL = "https://api.slidesage.app";
 
 export function resolveApiUrl(
 	value: string | undefined,
@@ -35,16 +33,6 @@ export function resolveApiUrl(
 					return `${frontendUrl.protocol}//${frontendUrl.hostname}:8000`;
 				}
 			} catch {}
-		}
-		if (isProduction && !normalizedUrl && frontendOrigin) {
-			try {
-				const frontendHostname = new URL(frontendOrigin).hostname.toLowerCase();
-				if (frontendHostname.endsWith(CLOUDFLARE_PAGES_HOST_SUFFIX)) {
-					return DEPLOYED_API_URL;
-				}
-			} catch {
-				return normalizedUrl;
-			}
 		}
 		return normalizedUrl;
 	}

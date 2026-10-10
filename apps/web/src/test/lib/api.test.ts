@@ -66,17 +66,8 @@ describe("resolveApiUrl", () => {
 		expect(resolveApiUrl("http://localhost:8000", true, "https://slidesage.app/sign-in")).toBe("");
 	});
 
-	it("keeps the deployed API origin for Cloudflare Pages previews", () => {
-		expect(
-			resolveApiUrl("https://api.slidesage.app", true, "https://slidesage.pages.dev/profile"),
-		).toBe("https://api.slidesage.app");
-	});
-
-	it("uses the deployed API for Cloudflare Pages when the build variable is missing", () => {
-		expect(resolveApiUrl(undefined, true, "https://slidesage.pages.dev/settings")).toBe(
-			"https://api.slidesage.app",
-		);
-		expect(resolveApiUrl(undefined, true, "https://feature.slidesage.pages.dev/settings")).toBe(
+	it("keeps the deployed API origin in a production build", () => {
+		expect(resolveApiUrl("https://api.slidesage.app", true, "https://slidesage.app/profile")).toBe(
 			"https://api.slidesage.app",
 		);
 	});
