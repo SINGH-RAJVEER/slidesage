@@ -14,7 +14,8 @@
 | Keyboard | At once, on focus. |
 
 - `withPrefetchIntent(props, intent)` merges the handlers with ones the target already has, such as those a Radix `asChild` parent passes.
-- `PrefetchLink` in `apps/web/src/app/PrefetchLink.tsx` is a `Link` that prefetches its destination. It skips the page already open.
+- `PrefetchLink` in `apps/web/src/app/PrefetchLink.tsx` is a `Link` that prefetches its destination. It and the header use `useRoutePrefetch`, which skips the page already open.
+- `DeckViewer` takes `onBackPrefetch` for its Back button.
 - Data is read only for a signed-in user. Code is fetched for anyone.
 
 ## Cache
@@ -43,6 +44,7 @@
 | Account menu: Settings | Eagerly loaded | `/ai/config` |
 | Points button | Purchase page | `/billing/balance` |
 | Generation indicator | Presentation page or library | None: a generating deck streams its own progress |
+| Deck viewer Back | Library, marketplace, or landing page | First page of `/presentations` when going back to the library |
 | Landing orb | Its destination | As its destination's row above |
 | Marketplace card, Open marketplace link | Preview page, marketplace | None: templates are bundled |
 
