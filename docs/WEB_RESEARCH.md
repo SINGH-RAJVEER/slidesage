@@ -9,7 +9,7 @@
 
 1. With Web Research on, the generate page offers a Results slider for how many sources the search retrieves, from one to eight (default five). The research page sends it as `research.maxResults`.
 2. The API validates the research request and calls Exa. Every search costs the same one point regardless of the result count.
-3. The web application displays returned sources for review. The sources table and Proceed to Generate appear only after a successful search; a failed search shows an error notice and a Retry research button.
+3. The web application displays returned sources for review. The sources table and Proceed to Generate appear only after a successful search; a failed search keeps its reason on the page with a Retry research button.
 4. The user may remove sources they do not want cited, and can restore them until research runs again. Removing sources does not refund the search.
 5. The user proceeds with the remaining sources as the reviewed payload. Removing every source proceeds without research sources and does not trigger another search.
 6. The Go generation route includes those sources in the provider prompt.

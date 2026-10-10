@@ -178,7 +178,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 
 - `DeckViewer.tsx` at `/presentations/:presentationId` shows a carousel and synchronized thumbnails.
 - During generation, drafted cards appear beside planned placeholders, and the viewer moves to each card as it arrives until the user picks a slide. Completion loads and validates the saved document.
-- Failed decks open `/presentation-error`. Initial load failures return to the library with a notice; later reload failures keep the current deck visible.
+- Failed decks open `/presentation-error`, which loads the deck and shows its saved `failure.message`. Initial load failures return to the library with a notice; later reload failures keep the current deck visible.
 - Changing decks resets loading and editor state. Late responses from the previous deck are ignored.
 - Cards stay 16:9 and scale in container units. `CardView` refits text and spacing down to half size on edits and resize; `data-text-scale` records shrinking.
 - Content exceeding the minimum fit clips at the bottom. `CardSlide` letterboxes other viewport ratios.

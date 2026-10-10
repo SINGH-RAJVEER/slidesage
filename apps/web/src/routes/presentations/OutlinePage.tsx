@@ -5,6 +5,7 @@ import type {
 	Outline,
 	OutlineEntry,
 	OutlineResponse,
+	PresentationRetryOptions,
 	ResearchPayload,
 } from "@slidesage/types";
 import { useAuth, useStreaming } from "@slidesage/ui";
@@ -131,7 +132,9 @@ function OutlineVisit() {
 		}));
 	const { streamingState, generate } = useStreaming();
 	const [error, setError] = useState<string | null>(null);
-	const [loadFailed, setLoadFailed] = useState(false);
+	// Why the outline could not be prepared. It replaces the outline, so it
+	// stays on the page rather than in the transient notice.
+	const [loadError, setLoadError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
 	const requested = useRef(false);
 	const submitted = useRef(false);
@@ -167,8 +170,7 @@ function OutlineVisit() {
 					| (Partial<OutlineResponse> & Partial<ApiErrorResponse>)
 					| null;
 				if (!response.ok || !body?.plan) {
-					setError(body?.error?.message ?? "The outline could not be prepared.");
-					setLoadFailed(true);
+					setLoadError(body?.error?.message ?? "The outline could not be prepared.");
 					return;
 				}
 				publishPointsBalance(body.slide_tokens_remaining);
@@ -178,8 +180,7 @@ function OutlineVisit() {
 					outline: body.plan as Outline,
 				}));
 			} catch {
-				setError("The outline could not be prepared. Check your connection.");
-				setLoadFailed(true);
+				setLoadError("The outline could not be prepared. Check your connection.");
 			}
 		})();
 	}, [outline, request, setDraftState]);
@@ -274,6 +275,29 @@ function OutlineVisit() {
 
 	const problem = outline ? outlineProblem(outline) : null;
 
+	// Leaving a failed outline keeps what the user chose. Reviewed sources go
+	// back to the research page, which shows them without another paid search;
+	// otherwise the generate form is refilled the way a saved retry refills it.
+	const back = () => {
+		if (!request) return;
+		if (request.researchPayload) {
+			navigate(ROUTES.research, { state: request });
+			return;
+		}
+		const retry: PresentationRetryOptions = {
+			prompt: request.prompt,
+			slide_count: request.slideCount,
+			detail_level: request.detailLevel,
+			tonality: request.tonality,
+			research_enabled: false,
+			...(request.ai ? { ai: request.ai } : {}),
+			...(request.theme ? { theme: request.theme } : {}),
+		};
+		navigate(ROUTES.generate, {
+			state: { retry, retryPresentationId: request.retryPresentationId },
+		});
+	};
+
 	const draft = async () => {
 		if (!outline || !request || problem || submitting) return;
 		setSubmitting(true);
@@ -313,7 +337,7 @@ function OutlineVisit() {
 			<Header />
 			<FloatingNotice error={error} onDismiss={() => setError(null)} />
 			<main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10 md:px-8">
-				{!outline && !loadFailed && (
+				{!outline && !loadError && (
 					<section
 						className="flex flex-1 flex-col items-center justify-center gap-4"
 						aria-live="polite"
@@ -322,11 +346,13 @@ function OutlineVisit() {
 						<p className="text-sm text-white/70">Planning your presentation</p>
 					</section>
 				)}
-				{loadFailed && !outline && (
-					<section className="flex flex-1 flex-col items-center justify-center gap-4" role="alert">
-						<p className="text-sm text-white/70">The outline could not be prepared.</p>
-						<Button variant="ghost" onClick={() => navigate(ROUTES.generate)}>
-							Back to generate
+				{loadError && !outline && (
+					<section className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+						<p role="alert" className="max-w-xl text-sm leading-6 text-red-200">
+							{loadError}
+						</p>
+						<Button variant="ghost" onClick={back}>
+							{request?.researchPayload ? "Back to research" : "Back to generate"}
 						</Button>
 					</section>
 				)}
