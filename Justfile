@@ -17,6 +17,11 @@ db-shell:
 migrate:
 	CGO_ENABLED=0 go -C apps/api run ./cmd/migrate
 
+# Add the documented test user to the local database. Pass --session to also
+# print a signed-in cookie. Refuses any DATABASE_URL that is not on this machine.
+seed *args:
+	DATABASE_URL="${DATABASE_URL:-postgresql://slidesage:slidesage@127.0.0.1:${PGPORT:-5432}/slidesage}" CGO_ENABLED=0 go -C apps/api run ./cmd/seed {{args}}
+
 # Create a new Goose SQL migration
 db-generate name:
     goose -dir apps/api/migrations create "{{name}}" sql
