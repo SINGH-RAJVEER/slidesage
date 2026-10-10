@@ -48,3 +48,8 @@ apps/api/migrate
 
 # Python environments are recreated from uv.lock.
 .venv/
+
+# VPS deployment state that lives only on the server
+infra/compose/certs/
+infra/compose/secrets/
+infra/compose/backups/

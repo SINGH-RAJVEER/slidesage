@@ -1,0 +1,192 @@
+{
+	"name": "slidesage",
+	"services": {
+		"nginx": {
+			"image": "docker.io/library/nginx:1.30-alpine",
+			"restart": "unless-stopped",
+			"ports": ["80:80", "443:443"],
+			"environment": {
+				"API_DOMAIN": "${API_DOMAIN:?set API_DOMAIN in .env}"
+			},
+			"volumes": [
+				"./nginx/templates:/etc/nginx/templates:ro",
+				"./nginx/cloudflare.conf:/etc/nginx/conf.d/cloudflare.conf:ro",
+				"./certs:/etc/nginx/certs:ro"
+			],
+			"depends_on": {
+				"api": { "condition": "service_started" }
+			},
+			"networks": ["public"],
+			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
+		},
+		"api": {
+			"image": "${IMAGE_REGISTRY:?set IMAGE_REGISTRY in .env}/api:${IMAGE_TAG:?set IMAGE_TAG in .env}",
+			"restart": "unless-stopped",
+			"env_file": [".env"],
+			"environment": {
+				"NODE_ENV": "production",
+				"HOST": "0.0.0.0",
+				"PORT": "8000",
+				"GOMEMLIMIT": "400MiB",
+				"BASE_URL": "https://${API_DOMAIN}",
+				"CORS_ORIGINS": "${WEB_ORIGINS:?set WEB_ORIGINS in .env}",
+				"BETTER_AUTH_TRUSTED_ORIGINS": "${WEB_ORIGINS}",
+				"TRUST_PROXY_HEADERS": "true",
+				"DATABASE_URL": "postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-slidesage}?sslmode=disable",
+				"CACHE_VALKEY_ADDR": "valkey:6379",
+				"CACHE_VALKEY_AUTH": "password",
+				"CACHE_VALKEY_PASSWORD": "${VALKEY_PASSWORD:?set VALKEY_PASSWORD in .env}",
+				"CARD_CONVERTER_URL": "http://converter:8090",
+				"WORKER_WAKE_URL": "",
+				"GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/gcs-key"
+			},
+			"secrets": ["gcs-key"],
+			"depends_on": {
+				"migrate": { "condition": "service_completed_successfully" },
+				"valkey": { "condition": "service_healthy" },
+				"converter": { "condition": "service_healthy" }
+			},
+			"networks": ["public", "private"],
+			"mem_limit": "512m",
+			"cap_drop": ["ALL"],
+			"security_opt": ["no-new-privileges:true"],
+			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
+		},
+		"worker": {
+			"image": "${IMAGE_REGISTRY}/worker:${IMAGE_TAG}",
+			"restart": "unless-stopped",
+			"env_file": [".env"],
+			"environment": {
+				"NODE_ENV": "production",
+				"GOMEMLIMIT": "800MiB",
+				"DATABASE_URL": "postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-slidesage}?sslmode=disable",
+				"WORKER_CONCURRENCY": "${WORKER_CONCURRENCY:-2}",
+				"WORKER_REQUEST_LEASED": "false",
+				"WORKER_DRAIN_TIMEOUT": "20",
+				"WORKER_HEALTH_PORT": "8080",
+				"CARD_CONVERTER_URL": "http://converter:8090",
+				"GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/gcs-key"
+			},
+			"secrets": ["gcs-key"],
+			"depends_on": {
+				"migrate": { "condition": "service_completed_successfully" },
+				"converter": { "condition": "service_healthy" }
+			},
+			"networks": ["public", "private"],
+			"mem_limit": "1g",
+			"stop_grace_period": "30s",
+			"cap_drop": ["ALL"],
+			"security_opt": ["no-new-privileges:true"],
+			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
+		},
+		"migrate": {
+			"image": "${IMAGE_REGISTRY}/migrate:${IMAGE_TAG}",
+			"restart": "no",
+			"environment": {
+				"DATABASE_URL": "postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-slidesage}?sslmode=disable",
+				"PRESENTATION_GCS_BUCKET": "${PRESENTATION_GCS_BUCKET:-}",
+				"GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/gcs-key"
+			},
+			"secrets": ["gcs-key"],
+			"depends_on": {
+				"postgres": { "condition": "service_healthy" }
+			},
+			"networks": ["public", "private"],
+			"cap_drop": ["ALL"],
+			"security_opt": ["no-new-privileges:true"],
+			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
+		},
+		"maintenance": {
+			"image": "${IMAGE_REGISTRY}/worker:${IMAGE_TAG}",
+			"profiles": ["jobs"],
+			"command": ["--maintenance"],
+			"restart": "no",
+			"env_file": [".env"],
+			"environment": {
+				"NODE_ENV": "production",
+				"DATABASE_URL": "postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-slidesage}?sslmode=disable",
+				"WORKER_WAKE_URL": "",
+				"GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/gcs-key"
+			},
+			"secrets": ["gcs-key"],
+			"networks": ["public", "private"],
+			"cap_drop": ["ALL"],
+			"security_opt": ["no-new-privileges:true"],
+			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
+		},
+		"converter": {
+			"image": "${IMAGE_REGISTRY}/converter:${IMAGE_TAG}",
+			"restart": "unless-stopped",
+			"environment": {
+				"CARD_CONVERTER_HOST": "0.0.0.0",
+				"CARD_CONVERTER_PORT": "8090"
+			},
+			"healthcheck": {
+				"test": ["CMD", "/usr/local/bin/bun", "-e", "const response = await fetch('http://127.0.0.1:8090/health'); process.exit(response.ok ? 0 : 1)"],
+				"interval": "10s",
+				"timeout": "3s",
+				"retries": 5,
+				"start_period": "10s"
+			},
+			"networks": ["private"],
+			"mem_limit": "512m",
+			"cap_drop": ["ALL"],
+			"security_opt": ["no-new-privileges:true"],
+			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
+		},
+		"postgres": {
+			"image": "docker.io/pgvector/pgvector:0.8.7-pg18",
+			"restart": "unless-stopped",
+			"environment": {
+				"POSTGRES_USER": "${POSTGRES_USER:-slidesage}",
+				"POSTGRES_PASSWORD": "${POSTGRES_PASSWORD}",
+				"POSTGRES_DB": "${POSTGRES_DB:-slidesage}"
+			},
+			"volumes": ["postgres-data:/var/lib/postgresql"],
+			"shm_size": "256m",
+			"healthcheck": {
+				"test": ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""],
+				"interval": "5s",
+				"timeout": "3s",
+				"retries": 10,
+				"start_period": "30s"
+			},
+			"networks": ["private"],
+			"stop_grace_period": "60s",
+			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
+		},
+		"valkey": {
+			"image": "docker.io/valkey/valkey:9.0-alpine",
+			"restart": "unless-stopped",
+			"command": [
+				"valkey-server",
+				"--requirepass", "${VALKEY_PASSWORD}",
+				"--save", "",
+				"--appendonly", "no",
+				"--maxmemory", "${VALKEY_MAXMEMORY:-256mb}",
+				"--maxmemory-policy", "allkeys-lru"
+			],
+			"environment": {
+				"VALKEYCLI_AUTH": "${VALKEY_PASSWORD}"
+			},
+			"healthcheck": {
+				"test": ["CMD-SHELL", "valkey-cli ping | grep -q PONG"],
+				"interval": "5s",
+				"timeout": "3s",
+				"retries": 10
+			},
+			"networks": ["private"],
+			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
+		}
+	},
+	"networks": {
+		"public": {},
+		"private": { "internal": true }
+	},
+	"volumes": {
+		"postgres-data": {}
+	},
+	"secrets": {
+		"gcs-key": { "file": "./secrets/gcs-key.json" }
+	}
+}
