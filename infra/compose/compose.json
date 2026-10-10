@@ -23,6 +23,7 @@
 			"env_file": [".env"],
 			"environment": {
 				"NODE_ENV": "production",
+				"OTEL_SERVICE_VERSION": "${IMAGE_TAG}",
 				"HOST": "0.0.0.0",
 				"PORT": "8000",
 				"GOMEMLIMIT": "400MiB",
@@ -56,6 +57,7 @@
 			"env_file": [".env"],
 			"environment": {
 				"NODE_ENV": "production",
+				"OTEL_SERVICE_VERSION": "${IMAGE_TAG}",
 				"GOMEMLIMIT": "800MiB",
 				"DATABASE_URL": "postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-slidesage}?sslmode=disable",
 				"WORKER_CONCURRENCY": "${WORKER_CONCURRENCY:-2}",
@@ -102,6 +104,7 @@
 			"env_file": [".env"],
 			"environment": {
 				"NODE_ENV": "production",
+				"OTEL_SERVICE_VERSION": "${IMAGE_TAG}",
 				"DATABASE_URL": "postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-slidesage}?sslmode=disable",
 				"WORKER_WAKE_URL": "",
 				"GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/gcs-key"
