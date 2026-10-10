@@ -55,6 +55,7 @@ Run from the repository root inside `devenv shell`:
 | `just db-shell` | Open PostgreSQL shell |
 | `just migrate` | Apply Goose and River migrations and sweep retired objects |
 | `just db-generate <name>` | Create a Goose SQL migration |
+| `just seed` | Add the local test user |
 | `just test` | Run all tests |
 | `just test-api` | Run Go tests |
 | `just test-web` | Run web tests |
@@ -83,6 +84,21 @@ just migrate
 - Migration 35 deletes decks without card documents and refuses downgrade. See [Card storage](CARD_DOCUMENTS.md#storage).
 - Migration 36 invalidates legacy password hashes. See [Password and email changes](AUTH_API.md#password-and-email-changes).
 - Apply migrations before API and worker startup. Production uses the separate `migrate` image target.
+
+## Test user
+
+`just seed` adds a verified email-and-password user to the local database:
+
+| Field | Value |
+| --- | --- |
+| Email | `test@slidesage.local` |
+| Password | `slidesage-test` |
+| Balance | 500 points |
+
+- Run `just migrate` first. The command uses `DATABASE_URL`, defaulting to the local PostgreSQL on `PGPORT`.
+- Running it again resets the password and marks the email verified. It does not change the balance of an existing user.
+- `just seed --session` also prints a `slidesage_token` cookie for browser automation. It signs with `AUTH_SECRET`, so set the same value the API uses.
+- The password is public, so the command refuses any database host other than `localhost`, a loopback address, or a Unix socket.
 
 ## Local URLs
 
