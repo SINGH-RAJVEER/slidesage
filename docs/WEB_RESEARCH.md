@@ -11,7 +11,7 @@
 2. The API validates the research request and calls Exa. Every search costs the same one point regardless of the result count.
 3. The web application displays returned sources for review. The sources table and Proceed to Generate appear only after a successful search; a failed search keeps its reason on the page with a Retry research button.
 4. The user may remove sources they do not want cited, and can restore them until research runs again. Removing sources does not refund the search.
-5. The user proceeds with the remaining sources as the reviewed payload. Removing every source proceeds without research sources and does not trigger another search.
+5. The user proceeds with the remaining sources as the reviewed payload. Removing every source proceeds without research sources and does not trigger another search. A retried deck's approved outline goes along only while the sources are exactly the saved ones.
 6. The Go generation route includes those sources in the provider prompt.
 7. The resulting presentation stores the reviewed sources for attribution.
 

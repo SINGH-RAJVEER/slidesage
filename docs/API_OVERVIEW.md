@@ -71,7 +71,7 @@ Owner authentication is required except for `/shared` routes:
 - Documents use versioned cards in PostgreSQL JSONB. Stored images require `PRESENTATION_GCS_BUCKET`; text-only documents do not.
 - Editing, outlines, photos, shares, and export contracts are in [Card documents](CARD_DOCUMENTS.md).
 - List pagination uses `limit` from 1 to 100, default 20, and non-negative `offset`, default 0, bounded by JavaScript's maximum safe integer. Responses include `presentations`, `total`, `limit`, `offset`, and `has_more`.
-- Summaries expose `generating`, `ready`, or `failed` status and `has_research`. Failed decks retain `failure.retry` settings for recovery.
+- Summaries expose `generating`, `ready`, or `failed` status and `has_research`. Failed decks retain `failure.retry` settings for recovery, including the approved outline as `plan` when the job had one.
 
 ### Input limits
 

@@ -95,6 +95,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Users can edit, reorder, add, or remove entries and change layouts or photo searches.
 - The browser keeps the latest unfinished outline and its request settings per account. Returning or refreshing restores edits and photo availability without another planning charge. Starting a new outline replaces this draft; an accepted generation clears it.
 - Submit the approved `plan` to `/presentation-jobs` with `slide_count` matching its length. Submission and worker validate it; drafting follows its order.
+- A deck that fails after an approved outline saves it as `failure.retry.plan`. Retrying opens that outline instead of planning, and charging for, a new one while the prompt and slide count are unchanged and, with research, while the reviewed sources are exactly the saved ones, since the plan cites them by position. Changing any of these plans afresh. A restored outline offers photo layouts only if it already used one.
 
 ## Photos
 
