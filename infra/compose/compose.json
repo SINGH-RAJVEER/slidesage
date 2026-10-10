@@ -2,10 +2,11 @@
 	"name": "slidesage",
 	"services": {
 		"nginx": {
-			"image": "docker.io/library/nginx:1.30-alpine",
+			"image": "${IMAGE_REGISTRY:?set IMAGE_REGISTRY in .env}/web:${IMAGE_TAG:?set IMAGE_TAG in .env}",
 			"restart": "unless-stopped",
 			"ports": ["80:80", "443:443"],
 			"environment": {
+				"WEB_DOMAIN": "${WEB_DOMAIN:?set WEB_DOMAIN in .env}",
 				"API_DOMAIN": "${API_DOMAIN:?set API_DOMAIN in .env}"
 			},
 			"volumes": [
@@ -13,14 +14,11 @@
 				"./nginx/cloudflare.conf:/etc/nginx/conf.d/cloudflare.conf:ro",
 				"./certs:/etc/nginx/certs:ro"
 			],
-			"depends_on": {
-				"api": { "condition": "service_started" }
-			},
 			"networks": ["public"],
 			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
 		},
 		"api": {
-			"image": "${IMAGE_REGISTRY:?set IMAGE_REGISTRY in .env}/api:${IMAGE_TAG:?set IMAGE_TAG in .env}",
+			"image": "${IMAGE_REGISTRY}/api:${IMAGE_TAG}",
 			"restart": "unless-stopped",
 			"env_file": [".env"],
 			"environment": {
