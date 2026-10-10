@@ -1,3 +1,1 @@
-nixpkgs:
-  permitted_unfree_packages:
-    - terraform
+{}
