@@ -6,4 +6,5 @@ After=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/slidesage
-ExecStart=/opt/slidesage/backup.sh
+# deploy.sh takes its own backup while holding the lock, so skip this run then.
+ExecStart=/usr/bin/flock --nonblock --conflict-exit-code 0 /opt/slidesage/.deploy.lock /opt/slidesage/backup.sh

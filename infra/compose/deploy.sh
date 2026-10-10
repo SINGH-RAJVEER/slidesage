@@ -20,8 +20,16 @@ for required in .env certs/origin.pem certs/origin.key secrets/gcs-key.json; do
 	fi
 done
 
+# The maintenance and backup timers skip their run while this lock is held,
+# so no sweep runs the new worker against a half-migrated schema. Waiting here
+# lets a sweep that already started finish first.
+exec 9>.deploy.lock
+flock 9
+
+# Pull before recording the tag, so a mistyped tag leaves .env on the release
+# that is still running.
+IMAGE_TAG="$tag" docker compose pull --quiet
 sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$tag/" .env
-docker compose pull --quiet
 
 docker compose up --detach --wait postgres
 ./backup.sh

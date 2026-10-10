@@ -6,4 +6,5 @@ After=docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/slidesage
-ExecStart=/usr/bin/docker compose run --rm maintenance
+# Skips the run while deploy.sh holds the lock.
+ExecStart=/usr/bin/flock --nonblock --conflict-exit-code 0 /opt/slidesage/.deploy.lock /usr/bin/docker compose run --rm maintenance
