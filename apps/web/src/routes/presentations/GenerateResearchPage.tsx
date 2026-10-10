@@ -1,4 +1,4 @@
-import type { AIModelSelection, ResearchPayload } from "@slidesage/types";
+import type { AIModelSelection, Outline, ResearchPayload } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
@@ -21,6 +21,8 @@ interface ResearchRouteState {
 	ai?: AIModelSelection;
 	/** The theme of the template chosen on the generate page. */
 	theme?: string;
+	/** A failed deck's approved outline, which cites the saved sources. */
+	plan?: Outline;
 }
 
 type ResearchStatus = "loading" | "ready" | "error";
@@ -46,6 +48,7 @@ export default function GenerateResearchPage() {
 	const retryPresentationId = routeState?.retryPresentationId;
 	const ai = routeState?.ai;
 	const theme = routeState?.theme;
+	const savedPlan = routeState?.plan;
 
 	const [isProceeding, setIsProceeding] = useState(false);
 	const [researchAttempt, setResearchAttempt] = useState(0);
@@ -139,6 +142,16 @@ export default function GenerateResearchPage() {
 			...(estimatedTokens === null ? {} : { estimated_tokens: estimatedTokens }),
 		};
 
+		// The outline cites sources by their position, so it is reused only
+		// while the sources are exactly the ones it was approved with.
+		const savedUrls = savedResearch?.sources.map((source) => source.url) ?? [];
+		const plan =
+			savedPlan &&
+			sources.length === savedUrls.length &&
+			sources.every((source, index) => source.url === savedUrls[index])
+				? savedPlan
+				: undefined;
+
 		navigate(ROUTES.outline, {
 			state: {
 				prompt,
@@ -149,10 +162,13 @@ export default function GenerateResearchPage() {
 				retryPresentationId,
 				...(ai ? { ai } : {}),
 				...(theme ? { theme } : {}),
+				...(plan ? { plan } : {}),
 			},
 		});
 	}, [
 		navigate,
+		savedPlan,
+		savedResearch,
 		theme,
 		detailLevel,
 		estimatedTokens,

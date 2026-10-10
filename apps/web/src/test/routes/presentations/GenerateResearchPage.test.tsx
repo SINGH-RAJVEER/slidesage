@@ -26,6 +26,18 @@ function AwayPage() {
 
 describe("GenerateResearchPage", () => {
 	it("shows saved retry sources without repeating the research request", async () => {
+		const plan = {
+			title: "Saved research topic",
+			cards: [
+				{
+					position: 1,
+					takeaway: "The saved point",
+					role: "opening",
+					layout: "title",
+					sourceIds: ["s1"],
+				},
+			],
+		};
 		const originalFetch = globalThis.fetch;
 		const fetchMock = mock(async () => new Response(null, { status: 500 }));
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -51,6 +63,7 @@ describe("GenerateResearchPage", () => {
 									],
 									estimated_tokens: 8.4,
 								},
+								plan,
 							},
 						},
 					]}
@@ -58,6 +71,7 @@ describe("GenerateResearchPage", () => {
 					<StreamingProvider>
 						<Routes>
 							<Route path="/generate/research" element={<GenerateResearchPage />} />
+							<Route path="/generate/outline" element={<OutlineStateProbe />} />
 						</Routes>
 					</StreamingProvider>
 				</MemoryRouter>,
@@ -67,6 +81,11 @@ describe("GenerateResearchPage", () => {
 			expect(view.getAllByText("Stored with the failed presentation.")).not.toHaveLength(0);
 			expect(view.getByText("Proceed to Generate").closest("button")).not.toBeDisabled();
 			expect(fetchMock).not.toHaveBeenCalled();
+
+			// The sources the outline cites are unchanged, so it goes along.
+			fireEvent.click(view.getByText("Proceed to Generate"));
+			const state = JSON.parse((await view.findByTestId("outline-state")).textContent ?? "{}");
+			expect(state.plan).toEqual(plan);
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
@@ -129,6 +148,18 @@ describe("GenerateResearchPage", () => {
 									{ url: "https://example.com/third", title: "Third source" },
 								],
 							},
+							plan: {
+								title: "Coastal erosion",
+								cards: [
+									{
+										position: 1,
+										takeaway: "Coasts are retreating",
+										role: "opening",
+										layout: "title",
+										sourceIds: ["s1"],
+									},
+								],
+							},
 						},
 					},
 				]}
@@ -162,6 +193,8 @@ describe("GenerateResearchPage", () => {
 			"https://example.com/second",
 			"https://example.com/third",
 		]);
+		// The saved outline cited the removed source by position, so it is not reused.
+		expect(state.plan).toBeUndefined();
 	});
 
 	it("shows the sources table and Proceed only once research succeeds", async () => {
