@@ -1,7 +1,7 @@
 # Environment variables
 
 - Copy `.env.example` to `.env`; devenv loads it for API, worker, and Bun processes.
-- Keep `.env` out of version control. Store production secrets in Secret Manager.
+- Keep `.env` out of version control. Store VPS production secrets in `/opt/slidesage/.env`, copied from `infra/env.example`, with mode `600`. Compose supplies the internal database, cache, converter, and public API addresses.
 
 ## Core
 
@@ -108,7 +108,7 @@
 
 - Development without a Resend key skips delivery and never logs OTPs. Production delivery failures return `503`.
 - OAuth callbacks use `${BASE_URL}/auth/callback/google` and `${BASE_URL}/auth/callback/github`.
-- Without explicit `BASE_URL`, auth can use `CF_PAGES_URL` or `VERCEL_URL`.
+- The VPS sets `BASE_URL=https://${API_DOMAIN}` explicitly.
 - See [Authentication](AUTH_API.md) for cookie and email behavior.
 
 ## Billing
