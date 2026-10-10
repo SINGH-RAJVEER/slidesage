@@ -32,6 +32,7 @@ Justfile        Common development commands
 - [Environment variables](docs/ENVIRONMENT_VARIABLES.md)
 - [CI/CD: Artifact Registry and Cloud Run](docs/CI_CD.md)
 - [Production infrastructure](docs/PRODUCTION_INFRASTRUCTURE.md)
+- [VPS deployment: Docker Compose and nginx](docs/VPS_DEPLOYMENT.md)
 - [Architecture](docs/API_ARCHITECTURE.md)
 - [Card document architecture](docs/CARD_ARCHITECTURE.md)
 - [Card documents](docs/CARD_DOCUMENTS.md)

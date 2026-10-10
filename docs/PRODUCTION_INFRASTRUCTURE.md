@@ -3,6 +3,7 @@
 - `infra/prod` manages Google Cloud and Cloudflare resources. Merged `dev`-to-`main` changes deploy through the main-only workflow.
 - Terraform reads existing Secret Manager values and grants runtime access; it does not create application credentials.
 - Cloudflare Pages builds the frontend separately from GitHub.
+- [VPS deployment](VPS_DEPLOYMENT.md) describes a single-server Docker Compose alternative to this stack.
 
 ## Cloud SQL connectivity
 
