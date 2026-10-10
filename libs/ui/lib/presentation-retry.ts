@@ -8,7 +8,8 @@ export function getPresentationRetryDestination(
 	if (!retry) return null;
 
 	// A retry with reviewed sources returns to the research page so the saved
-	// sources are not lost.
+	// sources are not lost. The approved outline goes with them; it cites those
+	// sources by position.
 	if (retry.research_payload?.sources.length) {
 		return {
 			to: "/generate/research",
@@ -21,6 +22,7 @@ export function getPresentationRetryDestination(
 				retryPresentationId: presentationId,
 				...(retry.ai ? { ai: retry.ai } : {}),
 				...(retry.theme ? { theme: retry.theme } : {}),
+				...(retry.plan ? { plan: retry.plan } : {}),
 			},
 		};
 	}

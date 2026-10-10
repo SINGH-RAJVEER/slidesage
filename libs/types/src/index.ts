@@ -80,6 +80,8 @@ export interface PresentationRetryOptions {
 	ai?: AIModelSelection;
 	/** The theme the deck was to be styled with; absent means the default. */
 	theme?: string;
+	/** The outline the user approved, so a retry need not plan and charge again. */
+	plan?: Outline;
 }
 
 export interface PresentationFailure {
