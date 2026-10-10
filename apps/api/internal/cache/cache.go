@@ -47,11 +47,18 @@ func FromEnv() (*Client, error) {
 		return nil, nil
 	}
 	authMode := os.Getenv("CACHE_VALKEY_AUTH")
-	if authMode != "" && authMode != "iam" {
-		return nil, errors.New("CACHE_VALKEY_AUTH must be empty or iam")
+	if authMode != "" && authMode != "iam" && authMode != "password" {
+		return nil, errors.New("CACHE_VALKEY_AUTH must be empty, iam, or password")
 	}
-	if os.Getenv("NODE_ENV") == "production" && (os.Getenv("CACHE_VALKEY_CA_PEM") == "" || authMode != "iam") {
-		return nil, errors.New("production cache requires TLS CA and IAM authentication")
+	password := os.Getenv("CACHE_VALKEY_PASSWORD")
+	if authMode == "password" && password == "" {
+		return nil, errors.New("CACHE_VALKEY_AUTH=password requires CACHE_VALKEY_PASSWORD")
+	}
+	// Memorystore needs TLS and IAM. A self-hosted Valkey that is reachable only
+	// over a private container network needs a password instead.
+	managed := authMode == "iam" && os.Getenv("CACHE_VALKEY_CA_PEM") != ""
+	if os.Getenv("NODE_ENV") == "production" && !managed && authMode != "password" {
+		return nil, errors.New("production cache requires TLS CA with IAM authentication, or a password")
 	}
 	timeout := 100 * time.Millisecond
 	if raw := os.Getenv("CACHE_TIMEOUT_MS"); raw != "" {
@@ -74,6 +81,8 @@ func FromEnv() (*Client, error) {
 			return nil, fmt.Errorf("cache IAM credentials: %w", err)
 		}
 		options.CredentialsProviderContext = iamCredentials(source)
+	} else if authMode == "password" {
+		options.Password = password
 	}
 	if pem := os.Getenv("CACHE_VALKEY_CA_PEM"); pem != "" {
 		roots := x509.NewCertPool()
