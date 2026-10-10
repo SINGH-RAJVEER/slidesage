@@ -40,14 +40,14 @@
 - API uses Direct VPC egress from a separate `/26` subnet with `PRIVATE_RANGES_ONLY`. Worker needs no cache access or VPC attachment; database triggers invalidate its writes.
 - TLS and IAM authentication are enabled. Memorystore for Valkey has no generated AUTH password, so nothing is stored in Secret Manager or Terraform state. Terraform supplies the instance CA chain through `CACHE_VALKEY_CA_PEM`, sets `CACHE_VALKEY_AUTH=iam`, and grants the runtime account `roles/memorystore.dbConnectionUser`.
 - With IAM auth, each new connection sends a runtime service account access token through Valkey AUTH. Authenticated connections outlive token expiry. A token refresh slower than the operation budget fails that operation and starts the five-second bypass.
-- Production rejects a configured cache without both the CA and IAM auth.
+- Production rejects a configured cache unless it has both the CA and IAM auth, or uses password auth. Password auth is for a self-hosted Valkey reachable only over a private network, as on the [VPS deployment](VPS_DEPLOYMENT.md#valkey).
 - `cache_node_type` accepts `SHARED_CORE_NANO`, `STANDARD_SMALL`, `HIGHMEM_MEDIUM`, or `HIGHMEM_XLARGE`. `cache_replica_count` accepts 0 to 5; one or more adds automatic failover.
 - Zero replicas permit cold restarts and flushes. Every node is billed while idle, and PostgreSQL fallback is required either way. See [Memorystore for Valkey pricing](https://cloud.google.com/memorystore/valkey/pricing).
 
 ## Local development and checks
 
 - devenv starts Valkey on `127.0.0.1:6379` as the `cache` process, without persistence, and points the API at it. Apply migrations before relying on it; devenv orders them first.
-- Non-production Valkey may omit IAM auth and CA. Variables are listed in [Environment variables](ENVIRONMENT_VARIABLES.md#database-read-cache).
+- Non-production Valkey may omit auth and CA. Variables are listed in [Environment variables](ENVIRONMENT_VARIABLES.md#database-read-cache).
 - Outside devenv, run a disposable server:
 
 ```bash
