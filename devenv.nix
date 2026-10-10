@@ -8,7 +8,6 @@
 		pkgs.watchexec
         pkgs.goose
         pkgs.just
-        pkgs.terraform
         pkgs.fake-gcs-server
         pkgs.valkey
 		pkgs.uv

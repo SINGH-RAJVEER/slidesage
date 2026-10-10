@@ -9,11 +9,6 @@ node_modules/
 .claude/
 .agents/
 
-# Terraform
-**/.terraform/
-*.tfstate
-*.tfstate.*
-
 # web
 apps/web/node_modules
 apps/web/out
