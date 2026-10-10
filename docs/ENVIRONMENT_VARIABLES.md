@@ -42,10 +42,10 @@
 | `CACHE_VALKEY_ADDR` | No | Empty | Valkey host:port; empty disables caching |
 | `CACHE_VALKEY_AUTH` | Production cache | Empty | `iam` sends IAM access tokens through Valkey AUTH; `password` sends `CACHE_VALKEY_PASSWORD`; empty skips AUTH |
 | `CACHE_VALKEY_PASSWORD` | With `password` auth | Empty | Valkey `requirepass` value for a self-hosted server |
-| `CACHE_VALKEY_CA_PEM` | Memorystore | Empty | Trusted TLS CA certificates |
+| `CACHE_VALKEY_CA_PEM` | Memorystore only | Empty | Trusted TLS CA certificates |
 | `CACHE_TIMEOUT_MS` | No | `100` | Operation timeout, 1 to 1,000 milliseconds |
 
-- GitHub `CACHE_ENABLED` controls Terraform provisioning and defaults to `false`.
+- The VPS stack always runs Valkey and sets the address and password auth itself.
 - See [Database cache](DATABASE_CACHE.md) for read paths, invalidation, fallback, and production setup.
 
 ## Generation worker
@@ -60,14 +60,14 @@
 | `WORKER_DRAIN_IDLE_SECONDS` | No | `30` | How long the queue must stay empty before `POST /drain` returns |
 | `WORKER_DRAIN_ACCEPT_SECONDS` | No | `1200` | How long a request-owned River client may claim new jobs |
 | `WORKER_DRAIN_HANDOFF_SECONDS` | No | `480` | Time reserved for active work to finish before lease renewal |
-| `WORKER_REQUEST_LEASED` | No | `false` | Start River only inside `/drain`; production sets this to `true` |
+| `WORKER_REQUEST_LEASED` | No | `false` | Start River only inside `/drain`; the VPS sets `false` and runs River continuously |
 
 - Worker needs the same database, provider, and BYOK encryption settings as API.
 - Health probes, lease behavior, and shutdown are in [Worker operation](GENERATION_WORKER.md#process-configuration).
 
 ## Worker wake signal
 
-- Set wake variables for production scale-to-zero operation. Leave `WORKER_WAKE_URL` unset locally.
+- Wake variables serve a scale-to-zero worker host. The VPS runs the worker continuously and leaves `WORKER_WAKE_URL` empty, as does local development.
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
@@ -77,7 +77,7 @@
 | `WORKER_WAKE_DEADLINE_SECONDS` | No | `1800` | How long Cloud Tasks holds the drain request open |
 
 - Scheduled maintenance uses the same wake settings to re-wake due work.
-- Size worker slots, instance limits, database pools, and provider capacity together. Production requires instance-based billing with CPU throttling disabled.
+- Size worker slots, database pools, and provider capacity together.
 - See [Generation worker](GENERATION_WORKER.md) for lease and scaling behavior.
 
 ## AI and research
@@ -134,8 +134,7 @@
 | `UNSPLASH_ACCESS_KEY` | Stock photos | Yes | Unsplash key; without it stock routes return `503` and generation uses text layouts. Uploads remain available |
 | `UNSPLASH_API_BASE` | No | No | Unsplash API base URL; defaults to `https://api.unsplash.com`. Only for tests and local stubs |
 
-- `UNSPLASH_ENABLED` is a GitHub repository variable, passed to Terraform as `TF_VAR_unsplash_enabled`, default `false`.
-- Enable photos by provisioning an enabled `UNSPLASH_ACCESS_KEY:latest`, setting `UNSPLASH_ENABLED=true`, and deploying. Disabled deployments skip the secret lookup and injection.
+- Production enables photos when `UNSPLASH_ACCESS_KEY` is set in the server `.env`, and disables them when it is empty.
 
 ## Observability
 

@@ -60,7 +60,7 @@
 
 ## Deployment
 
-- Build API, worker, migration, and converter images from the same commit.
-- Cloud Run runs a converter sidecar beside each Go service.
-- Authenticated Cloud Tasks requests own production River clients so active work has an HTTP lease while the worker scales from zero.
-- Run migrations before updating runtimes. See [CI/CD](CI_CD.md) for the release sequence.
+- Build API, worker, migration, converter, and web images from the same commit.
+- Docker Compose runs them on one VPS behind nginx; API and worker call a separate converter container.
+- The worker runs a continuous River client. The Cloud Tasks wake path for a scaled-to-zero worker remains in the code but is unused.
+- Run migrations before updating runtimes. See [VPS deployment](VPS_DEPLOYMENT.md#releasing) for the release sequence.

@@ -49,31 +49,19 @@ OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>
 - Filter Datadog on `env:development` for local runs.
 - Local telemetry is billed. Leave the endpoint empty when unused or reduce `OTEL_TRACES_SAMPLING_RATIO`.
 
-## Datadog on Cloud Run
+## Datadog in production
 
-- Production uses direct intake at `https://otlp.us5.datadoghq.com`. Other sites use their own [serverless OTLP endpoints](https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest/serverless/).
+- Telemetry settings live in the server `.env`. An empty `OTEL_EXPORTER_OTLP_ENDPOINT` disables export; `deploy.sh` applies a change on the next release, or `docker compose up --detach` applies it at once.
+- The compose stack sets `OTEL_SERVICE_VERSION` to the deployed image tag, the commit SHA. Keep service names unset to retain separate API and worker defaults.
 - Metrics export delta temporality.
-- Keep service names unset to retain separate API and worker defaults. GCP detection adds project, region, service, revision, and instance attributes.
-- Store the complete header value in Secret Manager:
+- The earlier Cloud Run setup used Datadog's direct serverless intake at `https://otlp.us5.datadoghq.com` with `dd-otlp-source=serverless` in the headers. That intake is documented for serverless runtimes; for a VPS, Datadog's documented route is the Datadog Agent with OTLP ingest enabled. Run it as another container on the `public` network and point the services at it:
 
 ```bash
-gcloud secrets create DATADOG_OTLP_HEADERS --replication-policy=automatic
-printf '%s' 'dd-api-key=<api-key>,dd-otlp-source=serverless,compute_stats=true' \
-	| gcloud secrets versions add DATADOG_OTLP_HEADERS --data-file=-
+OTEL_EXPORTER_OTLP_ENDPOINT=http://datadog-agent:4318
+OTEL_EXPORTER_OTLP_HEADERS=
 ```
 
-Configure `infra/prod`:
-
-```hcl
-otel_exporter_otlp_endpoint = "https://otlp.us5.datadoghq.com"
-otel_service_version        = "<git-sha>"
-otel_logs_exporter          = "otlp"
-```
-
-- Terraform injects the secret and grants runtime access.
-- Set `otel_logs_exporter="none"` when Datadog's GCP integration already ingests stdout, avoiding duplicate logs.
-- In GitHub, set `DATADOG_OTLP_ENDPOINT` and optional `OTEL_LOGS_EXPORTER`; deploy forwards them to Terraform and sets service version to the commit SHA.
-- Unsetting `DATADOG_OTLP_ENDPOINT` disables export on the next deployment.
+- The Agent holds the Datadog API key, so the services need no headers. It can also collect container stdout; set `OTEL_LOGS_EXPORTER=none` then to avoid duplicate logs.
 
 ### Check ingestion
 

@@ -117,7 +117,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 | `GET` | `/presentations/{id}/assets/{sha256}` | Serve owned stored image or redirect to hotlink |
 
 - Without `UNSPLASH_ACCESS_KEY`, stock routes return `503` and generation uses text layouts. Uploads remain available.
-- Production stock photos are disabled by default. Enable them through [Production bootstrap](PRODUCTION_INFRASTRUCTURE.md#bootstrap).
+- Production stock photos are enabled by setting `UNSPLASH_ACCESS_KEY` in the server `.env`. See [VPS deployment](VPS_DEPLOYMENT.md).
 - AI image generation remains disabled until priced.
 
 ## Storage

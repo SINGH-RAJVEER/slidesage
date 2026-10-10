@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Install Nix and [devenv](https://devenv.sh/getting-started/). The shell provides Go, Watchexec, Bun, PostgreSQL, Goose, `just`, Terraform, and `fake-gcs-server`.
+- Install Nix and [devenv](https://devenv.sh/getting-started/). The shell provides Go, Watchexec, Bun, PostgreSQL, Goose, `just`, and `fake-gcs-server`.
 - `apps/api` targets Go 1.27.1. The pinned shell ships Go 1.26; `GOTOOLCHAIN=auto` downloads and caches the required toolchain on first use. That build needs network access.
 
 ```bash

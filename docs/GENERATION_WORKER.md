@@ -56,18 +56,18 @@
 
 ## Waking a scaled-to-zero worker
 
+- Production runs the worker continuously on the VPS, so this mode is off there: `WORKER_WAKE_URL` is empty and `WORKER_REQUEST_LEASED=false`. The code remains for a host that scales the worker to zero.
 - After submission commits, the API creates an authenticated Cloud Task to call worker `POST /drain`. Idempotent resubmission sends another wake signal.
 - Tasks carry no generation payload; the worker claims durable PostgreSQL jobs.
 - The inbound request keeps the instance active. With request leasing, River starts only inside `/drain`, so the protected instance claims the work.
 - Each drain stops claiming after 20 minutes and allows eight more minutes for its active attempt.
 - Pending work, including delayed retries, returns `500` before the 30-minute task deadline so Cloud Tasks retries. An empty queue returns `204` after its settle window and client shutdown.
 - Unexpected request cancellation hard-stops local work for River recovery.
-- Each submission creates a task. Production uses one River execution slot per request-owned instance.
-- Worker ingress is internal, with invocation granted only to the runtime service account. Same-project tasks call its default `run.app` URL.
+- Each submission creates a task. Request-owned instances use one River execution slot each.
 
 ## Recovery and cleanup
 
-- `slidesage-maintenance` runs `cmd/worker --maintenance` every 15 minutes through Cloud Scheduler.
+- The `slidesage-maintenance` systemd timer runs `cmd/worker --maintenance` every 15 minutes. See [VPS deployment](VPS_DEPLOYMENT.md#operations).
 - It recovers terminated generation jobs and expired reservations, removes expired rate-limit rows and unverified accounts, and re-wakes due queue work.
 - Future scheduled/retryable rows do not wake the worker before `scheduled_at`.
 - Each sweep handles at most 100 terminated jobs and 100 affected users, with two concurrent recovery transactions and bounded cleanup batches.
@@ -105,15 +105,14 @@ All endpoints require the job owner:
 - API and worker need matching database, provider, and BYOK encryption settings.
 - Worker concurrency, pools, lease timing, and wake variables are listed in [Environment variables](ENVIRONMENT_VARIABLES.md#generation-worker).
 - `/live` returns `204` while the health server runs. `/ready` returns `204` while accepting work with PostgreSQL reachable, and `503` during shutdown.
-- Size the instance limit, River slots, database pools, task dispatch concurrency, and provider limits together.
+- Size `WORKER_CONCURRENCY`, database pools, and provider limits together.
 
 ## Deployment
 
-- API and worker are Cloud Run services; converter sidecars share their network namespace.
-- Worker uses instance-based billing with `cpu_idle=false`, no minimum instance, and request-owned River clients.
-- Cloud Tasks request count drives scaling; PostgreSQL queue depth does not.
-- Run the migration image before updating runtimes. API and worker startup never applies migrations.
-- Follow [Migration cutover](CI_CD.md#migration-cutover) for verified backups, service pauses, irreversible migrations, and recovery.
+- API, worker, and the card converter are separate containers in one Docker Compose stack. Both Go services reach the converter at `http://converter:8090`.
+- One worker container runs a continuous River client with `WORKER_CONCURRENCY` slots, 2 by default. Raise it, or the VPS size, when queue latency grows.
+- Run the migration image before updating runtimes. API and worker startup never applies migrations; the compose stack starts them only after `migrate` succeeds.
+- Follow [Releasing](VPS_DEPLOYMENT.md#releasing) for verified backups, service pauses, irreversible migrations, and recovery.
 
 ## Local development
 
