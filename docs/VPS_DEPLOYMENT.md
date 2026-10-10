@@ -56,10 +56,11 @@ chmod 600 .env
 ```
 
 4. Fill in `.env`. Generate `POSTGRES_PASSWORD`, `VALKEY_PASSWORD`, `AUTH_SECRET`, and `RATE_LIMIT_HASH_SECRET` with `openssl rand -hex 32`, and `BYOK_ENCRYPTION_KEY` with `openssl rand -base64 32`. Reuse the production values from Secret Manager when moving an existing deployment, or existing sessions, rate-limit identities, and stored BYOK credentials break.
-5. Log in to GHCR with a token that has `read:packages`: `docker login ghcr.io`.
-6. Install the timers:
+5. Log in to GHCR as root with a token that has `read:packages`: `sudo docker login ghcr.io`. The timers run as root, and `deploy.sh` must too, so the backups directory and the registry login belong to one user.
+6. Finish the Cloudflare and card image storage steps below, then run the first release and install the timers after it succeeds. Before that, the maintenance timer would fail against the placeholder tag.
 
 ```bash
+sudo ./deploy.sh <commit-sha>
 sudo cp systemd/* /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now slidesage-maintenance.timer slidesage-backup.timer
@@ -71,6 +72,7 @@ sudo systemctl enable --now slidesage-maintenance.timer slidesage-backup.timer
 - Set the zone's SSL/TLS mode to Full (strict), and enable Always Use HTTPS.
 - Point a proxied `A` record for `api` at the VPS address. Without an `AAAA` record Cloudflare reaches the origin over IPv4, where Docker preserves the client address that the gate checks.
 - Rerun `nginx/refresh-cloudflare-ips.sh` when Cloudflare changes its ranges, then `docker compose exec nginx nginx -s reload`.
+- Proxying adds Cloudflare's 100-second limit on a response starting, which the DNS-only Cloud Run record never had. `POST /presentation-outlines` runs research and the outline model call inside the request, with a three-minute provider timeout, so an outline that takes longer than 100 seconds fails with a Cloudflare `524`. Generation itself is unaffected: it runs in the worker and streams progress over SSE.
 
 ### Card image storage
 
@@ -89,20 +91,24 @@ docker login ghcr.io
 just vps-images "$(git rev-parse HEAD)"
 ```
 
-Then deploy on the server:
+Sync the stack files, then deploy on the server:
 
 ```bash
-cd /opt/slidesage
-./deploy.sh <commit-sha>
+rsync -a infra/compose/ vps:/opt/slidesage/
+ssh vps 'cd /opt/slidesage && sudo ./deploy.sh <commit-sha>'
 ```
+
+- The sync leaves `.env`, `certs/`, `secrets/`, and `backups/` alone; do not add `--delete`.
+- nginx renders its template only at container start. After a change under `nginx/`, run `docker compose restart nginx`.
 
 `deploy.sh` follows the same cutover discipline as the [Cloud Run release](CI_CD.md#migration-cutover):
 
-1. Records the tag in `.env` and pulls all images.
-2. Starts PostgreSQL and writes a verified dump to `backups/`.
-3. Stops the API and worker so no old binary runs during migration.
-4. Runs `docker compose up`. `migrate` applies Goose and River migrations and sweeps retired bucket objects; API and worker start only after it exits successfully.
-5. Polls the API's `/health` through the compose network for one minute.
+1. Takes `.deploy.lock`, waiting for a running maintenance sweep to finish. Timers skip their runs while the lock is held, so no sweep runs the new worker against a half-migrated schema.
+2. Pulls all images for the tag, then records it in `.env`. A tag that fails to pull leaves `.env` on the running release.
+3. Starts PostgreSQL and writes a verified dump to `backups/`.
+4. Stops the API and worker so no old binary runs during migration.
+5. Runs `docker compose up`. `migrate` applies Goose and River migrations and sweeps retired bucket objects; API and worker start only after it exits successfully.
+6. Polls the API's `/health` through the compose network for one minute.
 
 - If `migrate` fails, API and worker stay stopped. Inspect `docker compose logs migrate`; do not start an older tag against a partly migrated schema. Restore the pre-release dump instead.
 - Rolling back to an older tag is safe only when its binaries support the current schema. See [Rollback](CI_CD.md#rollback).
@@ -115,14 +121,15 @@ Do this once, before the first `deploy.sh`, with the Cloud Run services paused s
 ```bash
 # On a machine with access to Cloud SQL, through cloud-sql-proxy or an authorized network
 pg_dump --format=custom --no-owner --no-acl -d "$CLOUD_SQL_URL" > cloudsql.dump
-scp cloudsql.dump vps:/opt/slidesage/backups/
+scp cloudsql.dump vps:/tmp/
 
 # On the VPS
 docker compose up --detach --wait postgres
-docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl' < backups/cloudsql.dump
+docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl --exit-on-error' < /tmp/cloudsql.dump
 ./deploy.sh <commit-sha>
 ```
 
+- Run the VPS commands as root, like the rest of this page.
 - Restore into the empty database the first `postgres` start creates. `migrate` then finds the schema current and applies only newer migrations.
 - Keep the Cloud SQL instance and its backups until the VPS has served traffic successfully.
 
@@ -144,7 +151,7 @@ Restore a dump:
 
 ```bash
 docker compose stop api worker
-docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' < backups/<dump>
+docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --exit-on-error' < backups/<dump>
 docker compose up --detach
 ```
 
