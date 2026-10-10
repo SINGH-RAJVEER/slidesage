@@ -22,6 +22,10 @@ interface GenerateRouteState {
 	retryPresentationId?: string;
 }
 
+function retrySlideCount(retry: PresentationRetryOptions): number {
+	return Math.min(40, Math.max(5, retry.slide_count));
+}
+
 export default function GeneratePPTPage() {
 	useHorizonPageReady();
 	const location = useLocation();
@@ -31,7 +35,7 @@ export default function GeneratePPTPage() {
 		"generate",
 		{
 			prompt: routeState?.retry?.prompt.trim() ?? "",
-			slideCount: Math.min(40, Math.max(5, routeState?.retry?.slide_count ?? 5)).toString(),
+			slideCount: (routeState?.retry ? retrySlideCount(routeState.retry) : 5).toString(),
 			detailLevel: routeState?.retry?.detail_level ?? "balanced",
 			tonality: routeState?.retry?.tonality ?? "professional",
 			useWebResearch: routeState?.retry?.research_enabled ?? false,
@@ -137,6 +141,13 @@ export default function GeneratePPTPage() {
 			return;
 		}
 
+		// A failed deck's approved outline still fits while the topic and length
+		// are unchanged, so it is offered again instead of a new, paid one.
+		const plan =
+			retry?.plan && normalizedPrompt === retry.prompt.trim() && count === retrySlideCount(retry)
+				? retry.plan
+				: undefined;
+
 		navigate(ROUTES.outline, {
 			state: {
 				prompt: normalizedPrompt,
@@ -146,6 +157,7 @@ export default function GeneratePPTPage() {
 				retryPresentationId,
 				theme,
 				...(retry?.ai ? { ai: retry.ai } : {}),
+				...(plan ? { plan } : {}),
 			},
 		});
 	};

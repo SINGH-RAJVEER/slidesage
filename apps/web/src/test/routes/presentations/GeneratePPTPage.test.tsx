@@ -139,6 +139,63 @@ it("takes the retried settings to the outline", async () => {
 	});
 });
 
+it("offers a failed deck's approved outline again until the topic changes", async () => {
+	const plan = {
+		title: "Retry this market analysis",
+		cards: [1, 2, 3, 4, 5].map((position) => ({
+			position,
+			takeaway: `Point ${position}`,
+			role: "insight",
+			layout: "statement",
+		})),
+	};
+	const renderRetry = () =>
+		render(
+			<MemoryRouter
+				initialEntries={[
+					{
+						pathname: "/generate",
+						state: {
+							retry: {
+								prompt: "Retry this market analysis",
+								slide_count: 5,
+								detail_level: "balanced",
+								tonality: "professional",
+								research_enabled: false,
+								theme: "grove",
+								plan,
+							},
+							retryPresentationId: "failed_1",
+						},
+					},
+				]}
+			>
+				<StreamingProvider>
+					<Routes>
+						<Route path="/generate" element={<GeneratePPTPage />} />
+						<Route path="/generate/outline" element={<RouteStateProbe />} />
+					</Routes>
+				</StreamingProvider>
+			</MemoryRouter>,
+		);
+
+	const unchanged = renderRetry();
+	fireEvent.click(unchanged.getByRole("button", { name: "Generate" }));
+	expect(JSON.parse((await unchanged.findByText(/"prompt"/)).textContent ?? "{}").plan).toEqual(
+		plan,
+	);
+	unchanged.unmount();
+
+	const changed = renderRetry();
+	fireEvent.change(changed.container.querySelector("#prompt") as HTMLElement, {
+		target: { value: "A different market" },
+	});
+	fireEvent.click(changed.getByRole("button", { name: "Generate" }));
+	const state = JSON.parse((await changed.findByText(/"prompt"/)).textContent ?? "{}");
+	expect(state.prompt).toBe("A different market");
+	expect(state.plan).toBeUndefined();
+});
+
 it("offers a research result count only with web research on and takes it to research", async () => {
 	const view = render(
 		<MemoryRouter
