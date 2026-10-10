@@ -141,7 +141,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Conflicts stop autosave and offer reload. Navigation saves pending edits first; dropping unsavable edits requires confirmation. Closing an unsaved tab requests browser confirmation.
 - Edit activates the centered slide and header controls for title, theme, undo, and redo. The toolbar offers compatible layouts, widget insertion, AI revision, photos, movement, duplication, and insertion.
 - Widget controls edit chart data/kind, meter values, table cells, tone, size, and removal where valid. Chart data passes schema checks before saving.
-- Deleting the displayed slide requires confirmation.
+- Deleting the displayed slide takes one click and autosaves the deck without it. An Undo action on the floating notice puts the card back at its position for a few seconds.
 
 ## Sharing
 
