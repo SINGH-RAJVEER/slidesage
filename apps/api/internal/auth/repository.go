@@ -91,6 +91,10 @@ func (repository *Repository) CredentialByUserID(ctx context.Context, userID str
 	return id, password, err
 }
 
+func (repository *Repository) MarkEmailVerified(ctx context.Context, userID string) (User, error) {
+	return scanUser(repository.database.QueryRowContext(ctx, `UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1 RETURNING id, name, email, email_verified, image, balance_millis::double precision / 1000, landing_page, created_at, updated_at`, userID))
+}
+
 func (repository *Repository) UpdateCredentialPassword(ctx context.Context, id, password string) error {
 	_, err := repository.database.ExecContext(ctx, `UPDATE accounts SET password = $2, updated_at = NOW() WHERE id = $1`, id, password)
 	return err
