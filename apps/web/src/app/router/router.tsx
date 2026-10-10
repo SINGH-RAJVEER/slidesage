@@ -1,6 +1,7 @@
 import { LoadingScreen } from "@slidesage/ui/components/loading-screen";
 import type { ComponentType } from "react";
 import { createBrowserRouter } from "react-router-dom";
+import CreatePasswordPage from "../../routes/auth/CreatePasswordPage";
 import ForgotPasswordPage from "../../routes/auth/ForgotPasswordPage";
 import ResetPasswordPage from "../../routes/auth/ResetPasswordPage";
 import SignInPage from "../../routes/auth/SignInPage";
@@ -33,6 +34,8 @@ export const router = createBrowserRouter([
 			   reach it even when it is not their default page */
 			{ path: "landing", lazy: lazyRoute(routeModules.landing) },
 			{ path: "sign-in/*", element: <SignInPage /> },
+			{ path: "sign-in/verify", element: <VerifyEmailPage /> },
+			{ path: "sign-in/create-password", element: <CreatePasswordPage /> },
 			{ path: "sign-up/*", element: <SignUpPage /> },
 			{ path: "sign-up/verify-email", element: <VerifyEmailPage /> },
 			{ path: "forgot-password", element: <ForgotPasswordPage /> },

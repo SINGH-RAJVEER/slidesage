@@ -130,6 +130,66 @@ it("sends a pending email change to its verification route", async () => {
 	}
 });
 
+it("sets a first password with an emailed code when the account has none", async () => {
+	const originalFetch = globalThis.fetch;
+	const requests: { input: string; body: unknown }[] = [];
+	const user = {
+		id: "user_1",
+		name: "Test User",
+		email: "user@example.com",
+		image: null,
+		emailVerified: true,
+		slideTokens: 50,
+		createdAt: "2026-07-14T10:00:00.000Z",
+	};
+
+	globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+		requests.push({
+			input: String(input),
+			body: init?.body ? JSON.parse(String(init.body)) : null,
+		});
+		if (String(input).includes("/auth/email-otp/")) {
+			return Response.json({ success: true });
+		}
+		return Response.json({ user, hasPassword: false });
+	}) as unknown as typeof fetch;
+
+	try {
+		const { default: ProfilePage } = await import("../../../routes/settings/ProfilePage");
+		const view = render(
+			<MemoryRouter initialEntries={["/profile"]}>
+				<ProfilePage />
+			</MemoryRouter>,
+		);
+
+		await view.findByText("Not set. You sign in with a code sent to your email.");
+		fireEvent.click(view.getByRole("button", { name: "Set password" }));
+		expect(view.queryByPlaceholderText("Enter current password")).toBeNull();
+		fireEvent.change(view.getByLabelText("New Password"), { target: { value: "new-password" } });
+		fireEvent.change(view.getByLabelText("Confirm Password"), {
+			target: { value: "new-password" },
+		});
+		fireEvent.click(view.getByRole("button", { name: "Email me a code" }));
+
+		fireEvent.change(await view.findByLabelText("Verification Code"), {
+			target: { value: "123456" },
+		});
+		fireEvent.click(view.getByRole("button", { name: "Set Password" }));
+
+		await view.findByText("Password set. You can now sign in with it.");
+		expect(
+			requests.find(({ input }) => input.endsWith("/auth/email-otp/reset-password"))?.body,
+		).toEqual({
+			email: "user@example.com",
+			otp: "123456",
+			password: "new-password",
+		});
+		expect(view.getByText("••••••••")).toBeInTheDocument();
+	} finally {
+		globalThis.fetch = originalFetch;
+	}
+});
+
 it("updates the profile picture automatically after entering an image URL", async () => {
 	refreshSession.mockClear();
 	const originalFetch = globalThis.fetch;

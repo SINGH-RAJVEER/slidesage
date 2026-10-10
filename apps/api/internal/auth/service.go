@@ -45,8 +45,9 @@ func NewService(config Config) (*Service, error) {
 func (service *Service) SignUp(ctx context.Context, name, email, password string) (User, error) {
 	name = strings.TrimSpace(name)
 	email = normalizeEmail(email)
-	if name == "" || len(name) > 100 || email == "" || len(password) < 8 {
-		return User{}, errors.New("name, valid email, and a password of at least 8 characters are required")
+	// The password is optional: an account without one signs in with emailed codes.
+	if name == "" || len(name) > 100 || email == "" || (password != "" && len(password) < 8) {
+		return User{}, errors.New("name and valid email are required, and a password must have at least 8 characters")
 	}
 	if existingUser, err := service.repository.UserByEmail(ctx, email); err == nil {
 		if !existingUser.EmailVerified {
@@ -56,9 +57,12 @@ func (service *Service) SignUp(ctx context.Context, name, email, password string
 	} else if !errors.Is(err, ErrNotFound) {
 		return User{}, err
 	}
-	hash, err := hashPassword(password)
-	if err != nil {
-		return User{}, err
+	hash := ""
+	if password != "" {
+		var err error
+		if hash, err = hashPassword(password); err != nil {
+			return User{}, err
+		}
 	}
 	now := service.config.Now().UTC()
 	userID, err := randomID()
@@ -216,6 +220,114 @@ func (service *Service) SendPasswordResetOTP(ctx context.Context, email string) 
 	return nil
 }
 
+func (service *Service) SendSignInOTP(ctx context.Context, email string) error {
+	email = normalizeEmail(email)
+	if email == "" {
+		return errors.New("enter a valid email address")
+	}
+	// Sign-in codes never create accounts; an unknown address is sent to sign-up.
+	user, err := service.repository.UserByEmail(ctx, email)
+	if errors.Is(err, ErrNotFound) {
+		return ErrAccountNotFound
+	}
+	if err != nil {
+		return err
+	}
+	code, err := randomOTP()
+	if err != nil {
+		return err
+	}
+	id, err := randomID()
+	if err != nil {
+		return err
+	}
+	now := service.config.Now().UTC()
+	identifier := "sign-in-otp-" + email
+	verification := Verification{ID: id, Identifier: identifier, Value: service.emailChangeHash(user.ID, email, code), ExpiresAt: now.Add(15 * time.Minute), CreatedAt: now}
+	if err = service.repository.ReplaceVerification(ctx, verification, identifier); err != nil {
+		return err
+	}
+	if service.config.EmailSender != nil {
+		if err = service.config.EmailSender.SendOTP(ctx, email, code, "sign-in", user.Name); err != nil {
+			_ = service.repository.DeleteVerification(ctx, verification.ID)
+			return err
+		}
+	}
+	return nil
+}
+
+// HasPassword reports whether the account owning email can sign in with a
+// password, which decides where the sign-in page sends the password choice.
+func (service *Service) HasPassword(ctx context.Context, email string) (bool, error) {
+	email = normalizeEmail(email)
+	if email == "" {
+		return false, errors.New("enter a valid email address")
+	}
+	user, err := service.repository.UserByEmail(ctx, email)
+	if errors.Is(err, ErrNotFound) {
+		return false, ErrAccountNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+	return service.userHasPassword(ctx, user.ID)
+}
+
+func (service *Service) userHasPassword(ctx context.Context, userID string) (bool, error) {
+	_, hash, err := service.repository.CredentialByUserID(ctx, userID)
+	if errors.Is(err, ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return isPasswordHash(hash), nil
+}
+
+// SignInWithOTP consumes a sign-in code and issues a JWT. The code proves the
+// user controls the address, so it also marks the email verified. A non-empty
+// password is saved as the account password in the same step.
+func (service *Service) SignInWithOTP(ctx context.Context, email, code, password string) (JWTAuth, User, error) {
+	if password != "" && len(password) < 8 {
+		return JWTAuth{}, User{}, errors.New("password must be at least 8 characters")
+	}
+	email = normalizeEmail(email)
+	if email == "" || !regexp.MustCompile(`^\d{6}$`).MatchString(code) {
+		return JWTAuth{}, User{}, ErrInvalidOTP
+	}
+	hash, newAccountID := "", ""
+	if password != "" {
+		var err error
+		if hash, err = hashPassword(password); err != nil {
+			return JWTAuth{}, User{}, err
+		}
+		if newAccountID, err = randomID(); err != nil {
+			return JWTAuth{}, User{}, err
+		}
+	}
+	user, err := service.repository.UserByEmail(ctx, email)
+	if err != nil {
+		return JWTAuth{}, User{}, ErrInvalidOTP
+	}
+	identifier := "sign-in-otp-" + email
+	verification, err := service.repository.VerificationByIdentifier(ctx, identifier, service.config.Now().UTC())
+	if err != nil || subtle.ConstantTimeCompare([]byte(verification.Value), []byte(service.emailChangeHash(user.ID, email, code))) != 1 {
+		return JWTAuth{}, User{}, ErrInvalidOTP
+	}
+	verified, err := service.repository.VerifyUserEmail(ctx, user.ID, verification.ID, identifier, newAccountID, hash, service.config.Now().UTC())
+	if errors.Is(err, ErrNotFound) {
+		return JWTAuth{}, User{}, ErrInvalidOTP
+	}
+	if err != nil {
+		return JWTAuth{}, User{}, err
+	}
+	session, err := service.issueJWT(ctx, verified.ID)
+	if err != nil {
+		return JWTAuth{}, User{}, err
+	}
+	return session, verified, nil
+}
+
 func (service *Service) ResetPassword(ctx context.Context, email, code, password string) error {
 	email = normalizeEmail(email)
 	if email == "" || !regexp.MustCompile(`^\d{6}$`).MatchString(code) || len(password) < 8 {
@@ -230,7 +342,8 @@ func (service *Service) ResetPassword(ctx context.Context, email, code, password
 	if err != nil || subtle.ConstantTimeCompare([]byte(verification.Value), []byte(service.emailChangeHash(user.ID, email, code))) != 1 {
 		return ErrInvalidOTP
 	}
-	accountID, _, err := service.repository.CredentialByUserID(ctx, user.ID)
+	// A user without a password gets one here, so the reset flow doubles as "set a password".
+	newAccountID, err := randomID()
 	if err != nil {
 		return err
 	}
@@ -238,7 +351,7 @@ func (service *Service) ResetPassword(ctx context.Context, email, code, password
 	if err != nil {
 		return err
 	}
-	return service.repository.ResetPassword(ctx, user.ID, accountID, verification.ID, identifier, hash, service.config.Now().UTC())
+	return service.repository.ResetPassword(ctx, user.ID, newAccountID, verification.ID, identifier, hash, service.config.Now().UTC())
 }
 
 func (service *Service) VerifyAccountEmail(ctx context.Context, email, code string) (User, error) {
@@ -255,7 +368,7 @@ func (service *Service) VerifyAccountEmail(ctx context.Context, email, code stri
 	if err != nil || subtle.ConstantTimeCompare([]byte(verification.Value), []byte(service.emailChangeHash(user.ID, email, code))) != 1 {
 		return User{}, ErrInvalidOTP
 	}
-	verified, err := service.repository.VerifyUserEmail(ctx, user.ID, verification.ID, identifier, service.config.Now().UTC())
+	verified, err := service.repository.VerifyUserEmail(ctx, user.ID, verification.ID, identifier, "", "", service.config.Now().UTC())
 	if errors.Is(err, ErrNotFound) {
 		return User{}, ErrInvalidOTP
 	}
