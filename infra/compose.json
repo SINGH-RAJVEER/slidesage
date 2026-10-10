@@ -7,13 +7,21 @@
 			"ports": ["80:80", "443:443"],
 			"environment": {
 				"WEB_DOMAIN": "${WEB_DOMAIN:?set WEB_DOMAIN in .env}",
-				"API_DOMAIN": "${API_DOMAIN:?set API_DOMAIN in .env}"
+				"API_DOMAIN": "${API_DOMAIN:?set API_DOMAIN in .env}",
+				"NGINX_ENVSUBST_FILTER": "^(WEB_DOMAIN|API_DOMAIN)$"
 			},
 			"volumes": [
-				"./nginx/templates:/etc/nginx/templates:ro",
+				"./templates:/etc/nginx/templates:ro",
 				"./nginx/cloudflare.conf:/etc/nginx/conf.d/cloudflare.conf:ro",
 				"./certs:/etc/nginx/certs:ro"
 			],
+			"healthcheck": {
+				"test": ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8081/health"],
+				"interval": "10s",
+				"timeout": "3s",
+				"retries": 5,
+				"start_period": "10s"
+			},
 			"networks": ["public"],
 			"logging": { "driver": "json-file", "options": { "max-size": "10m", "max-file": "5" } }
 		},

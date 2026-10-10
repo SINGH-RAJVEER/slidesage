@@ -128,7 +128,7 @@ jobs:
       # Without --delete, the server-only .env, certs/, secrets/, and backups/
       # survive the sync.
       - name: Sync the stack files
-        run: rsync -a infra/compose/ "$VPS_USER@$VPS_HOST:/opt/slidesage/"
+        run: rsync -a infra/ "$VPS_USER@$VPS_HOST:/opt/slidesage/"
 
       - name: Back up, migrate, and roll the release
         run: |
@@ -146,4 +146,5 @@ jobs:
             test "$attempt" -lt 10
             sleep 3
           done
-          curl -fsS -o /dev/null "https://$WEB_DOMAIN/"
+          curl -fsS "https://$WEB_DOMAIN/" | grep -q 'id="root"'
+          curl -fsS -o /dev/null "https://$WEB_DOMAIN/sign-in"

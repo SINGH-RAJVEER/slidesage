@@ -5,9 +5,14 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 umask 077
+export COMPOSE_FILE=compose.json
 
 keep=$(sed -n 's/^BACKUP_KEEP=//p' .env 2>/dev/null | tail -n 1)
 keep=${keep:-14}
+if [[ ! $keep =~ ^[1-9][0-9]*$ ]]; then
+	echo "BACKUP_KEEP must be a positive integer" >&2
+	exit 1
+fi
 mkdir -p backups
 target="backups/slidesage-$(date -u +%Y%m%dT%H%M%SZ).dump"
 

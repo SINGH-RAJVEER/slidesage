@@ -1,6 +1,5 @@
 node_modules/
 .env
-.wrangler/tmp
 .jj
 .git
 .devenv/
@@ -14,7 +13,6 @@ apps/web/node_modules
 apps/web/out
 apps/web/dist
 apps/web/*.tgz
-apps/web/.wrangler
 apps/web/.vercel
 apps/web/logs
 apps/web/_.log
@@ -45,7 +43,8 @@ apps/api/migrate
 .venv/
 
 # VPS deployment state that lives only on the server
-infra/compose/certs/
-infra/compose/secrets/
-infra/compose/backups/
-infra/compose/.deploy.lock
+infra/certs/
+infra/secrets/
+infra/backups/
+infra/.deploy.lock
+infra/.deploy-incomplete
