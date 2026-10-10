@@ -8,7 +8,6 @@ import { usePrefetchIntent } from "../../hooks/usePrefetchIntent";
 
 interface PresentationCardProps {
 	presentation: PresentationSummary;
-	isDeleting: boolean;
 	isOpening: boolean;
 	onCardClick: (id: string) => void;
 	/** Called once the user looks about to open the card. */
@@ -19,7 +18,6 @@ interface PresentationCardProps {
 
 export const PresentationCard: React.FC<PresentationCardProps> = ({
 	presentation,
-	isDeleting,
 	isOpening,
 	onCardClick,
 	onPrefetch,
@@ -54,9 +52,8 @@ export const PresentationCard: React.FC<PresentationCardProps> = ({
 						className="h-8 w-8 text-white/40 hover:text-red-400 hover:bg-red-500/10 flex-shrink-0 ml-2 -mt-0.5"
 						aria-label="Delete presentation"
 						onClick={(e) => onDelete(e, presentation.id)}
-						disabled={isDeleting}
 					>
-						{isDeleting ? <ThinkingOrb size={20} /> : <Trash2 className="h-4 w-4" />}
+						<Trash2 className="h-4 w-4" />
 					</Button>
 				</CardTitle>
 			</CardHeader>

@@ -3,7 +3,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { StreamingProvider } from "@slidesage/ui";
 import { PRESENTATIONS_UPDATED_EVENT } from "@slidesage/ui/lib/presentation-events";
-import { act, fireEvent, render, waitFor, waitForElementToBeRemoved } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import GenerateResearchPage from "../../../routes/presentations/GenerateResearchPage";
 import PresentationsGridPage from "../../../routes/presentations/PresentationsGridPage";
@@ -314,9 +314,9 @@ it("loads additional presentations from the pagination offset", async () => {
 	}
 });
 
-// Rendering the grid and driving the confirm dialog runs past the default
-// 5s timeout on a loaded CI runner.
-it("removes a presentation after an empty 204 delete response", async () => {
+// The delete request waits out the Undo window, which runs past the default
+// 5s timeout.
+it("hides a presentation in one click, restores it on Undo, and deletes it after the window", async () => {
 	const originalFetch = globalThis.fetch;
 	const fetchMock = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
 		if (init?.method === "DELETE") return new Response(null, { status: 204 });
@@ -349,19 +349,23 @@ it("removes a presentation after an empty 204 delete response", async () => {
 			</MemoryRouter>,
 		);
 
-		const title = await view.findByText("Delete this deck");
-		const card = title.closest('[data-slot="card"]');
-		const deleteButton = card?.querySelector("button");
-		expect(deleteButton).not.toBeNull();
-		fireEvent.click(deleteButton as HTMLButtonElement);
-		fireEvent.click(view.getByRole("button", { name: "Delete" }));
+		const deleted = () => fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE");
+		await view.findByText("Delete this deck");
+		fireEvent.click(view.getByRole("button", { name: "Delete presentation" }));
 
-		await waitForElementToBeRemoved(() => view.queryByText("Delete this deck"));
-		expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(true);
+		expect(view.queryByText("Delete this deck")).toBeNull();
+		fireEvent.click(view.getByRole("button", { name: "Undo" }));
+		expect(view.getByText("Delete this deck")).toBeInTheDocument();
+		expect(deleted()).toBe(false);
+
+		fireEvent.click(view.getByRole("button", { name: "Delete presentation" }));
+		expect(view.queryByText("Delete this deck")).toBeNull();
+		await waitFor(() => expect(deleted()).toBe(true), { timeout: 8000 });
+		expect(view.queryByText("Delete this deck")).toBeNull();
 	} finally {
 		globalThis.fetch = originalFetch;
 	}
-});
+}, 15000);
 
 it("shows why a presentation could not be opened", async () => {
 	const originalFetch = globalThis.fetch;
