@@ -196,6 +196,11 @@ func generationFailureDocument(job streamJob, message string) map[string]any {
 	if job.theme != "" {
 		retry["theme"] = job.theme
 	}
+	// The approved outline was paid for, so a retry offers it again instead of
+	// planning, and charging for, a new one.
+	if job.plan != nil {
+		retry["plan"] = job.plan
+	}
 	failed := map[string]any{
 		"title":   "Generation failed",
 		"slides":  []any{},
