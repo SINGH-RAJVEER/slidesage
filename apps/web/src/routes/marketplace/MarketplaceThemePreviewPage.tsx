@@ -2,7 +2,9 @@ import { type CardTemplate, getCardTemplate } from "@slidesage/cards";
 import { deckFromDocument } from "@slidesage/ui/components/Viewer";
 import { useMemo } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { prefetchModule } from "../../app/prefetch";
 import { ROUTES } from "../../app/router/paths";
+import { routeModules } from "../../app/router/route-modules";
 import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
 import { DeckViewer } from "../presentations/DeckViewer";
 
@@ -29,6 +31,7 @@ function TemplateViewer({ template }: { template: CardTemplate }) {
 			title={template.name}
 			deck={deck}
 			onBack={() => navigate(ROUTES.marketplace)}
+			onBackPrefetch={() => prefetchModule(routeModules.marketplace)}
 			backLabel="Back to marketplace"
 		/>
 	);

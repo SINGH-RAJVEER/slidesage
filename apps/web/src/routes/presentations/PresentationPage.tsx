@@ -7,6 +7,7 @@ import { CenteredStatusScreen, deckFromPreview } from "@slidesage/ui/components/
 import { API_URL } from "@slidesage/ui/lib/api";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { prefetchRoute } from "../../app/prefetch";
 import { ROUTES } from "../../app/router/paths";
 import { DeckViewer } from "./DeckViewer";
 import { DeckWorkspace } from "./DeckWorkspace";
@@ -166,6 +167,7 @@ export default function PresentationPage() {
 						: null
 				}
 				onBack={() => navigate(ROUTES.presentations)}
+				onBackPrefetch={() => prefetchRoute(ROUTES.presentations, { signedIn: true })}
 				isWaiting
 				generation={
 					generatingHere

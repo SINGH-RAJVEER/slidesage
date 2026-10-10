@@ -6,7 +6,9 @@ import { CenteredStatusScreen, deckFromDocument } from "@slidesage/ui/components
 import { API_URL } from "@slidesage/ui/lib/api";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { prefetchModule } from "../../app/prefetch";
 import { ROUTES } from "../../app/router/paths";
+import { routeModules } from "../../app/router/route-modules";
 import { DeckViewer } from "./DeckViewer";
 
 type SharedState =
@@ -84,6 +86,7 @@ export default function SharedPresentationPage() {
 					assetUrl: (assetId) => `${sharedUrl}/assets/${assetId}`,
 				})}
 				onBack={() => navigate(ROUTES.landing)}
+				onBackPrefetch={() => prefetchModule(routeModules.landing)}
 				backLabel="SlideSage home"
 			/>
 		);

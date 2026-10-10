@@ -1,4 +1,5 @@
 import { Button } from "@slidesage/ui/components/button";
+import { usePrefetchIntent } from "@slidesage/ui/hooks/usePrefetchIntent";
 import { ArrowLeft, Presentation, Sparkles } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";
@@ -9,6 +10,8 @@ interface ViewerHeaderControlsProps {
 	onBack: () => void;
 	/** Names where Back goes. */
 	backLabel?: string;
+	/** Loads where Back goes once the user looks about to press it. */
+	onBackPrefetch?: () => void;
 	onIterate: () => void;
 	onPresent: () => void;
 	presentDisabled?: boolean;
@@ -26,6 +29,7 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 	canIterate,
 	onBack,
 	backLabel = "Back to presentations",
+	onBackPrefetch,
 	onIterate,
 	onPresent,
 	presentDisabled = false,
@@ -34,6 +38,7 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 	tools,
 	actions,
 }) => {
+	const backIntent = usePrefetchIntent(onBackPrefetch);
 	return (
 		<header
 			className="viewer-header grid flex-shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 py-4 lg:px-6"
@@ -41,6 +46,7 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 		>
 			<div className="viewer-header__identity flex min-w-0 items-center gap-4">
 				<Button
+					{...backIntent}
 					onClick={onBack}
 					aria-label={backLabel}
 					className="viewer-header__back bg-transparent hover:bg-white/5 text-white/40 hover:text-white transition-all duration-300 rounded-full p-2 h-10 w-10 border-none shadow-none"

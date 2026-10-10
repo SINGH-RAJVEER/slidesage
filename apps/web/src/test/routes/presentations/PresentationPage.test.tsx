@@ -140,7 +140,7 @@ describe("PresentationPage", () => {
 		expect(saves[1]?.document).not.toContain("Deck one");
 	}, 15000);
 
-	it("opens a hovered card from what the hover prefetched", async () => {
+	it("opens a hovered card, and returns to the library, from what the hovers prefetched", async () => {
 		const requests: string[] = [];
 		globalThis.fetch = mock(async (input: string | URL | Request) => {
 			const url = String(input);
@@ -198,5 +198,13 @@ describe("PresentationPage", () => {
 		expect(await view.findByRole("article")).toHaveAccessibleName("Card 1: Storage is now cheap");
 		expect(requests.filter((url) => url === "/presentations/pres_1")).toHaveLength(1);
 		expect(requests.filter((url) => url === "/presentations/pres_1/document")).toHaveLength(1);
+
+		const library = () => requests.filter((url) => url.startsWith("/presentations?"));
+		fireEvent.focus(view.getByRole("button", { name: "Back to presentations" }));
+		await waitFor(() => expect(library()).toHaveLength(2));
+		fireEvent.click(view.getByRole("button", { name: "Back to presentations" }));
+
+		expect(await view.findByText("Grid storage")).toBeInTheDocument();
+		expect(library()).toHaveLength(2);
 	});
 });

@@ -42,6 +42,7 @@ import { API_URL } from "@slidesage/ui/lib/api";
 import { Check, Link2, Pencil, Redo2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBlocker, useNavigate } from "react-router-dom";
+import { prefetchRoute } from "../../app/prefetch";
 import { ROUTES } from "../../app/router/paths";
 import { TemplatePicker } from "../marketplace/TemplatePicker";
 import { DeckViewer } from "./DeckViewer";
@@ -353,6 +354,7 @@ export function DeckWorkspace({
 			title={editor.document.title}
 			deck={deck}
 			onBack={() => navigate(ROUTES.presentations)}
+			onBackPrefetch={() => prefetchRoute(ROUTES.presentations, { signedIn: true })}
 			edit={editAllowed ? editor.edit : undefined}
 			iterate={{
 				canIterate: canEdit,
