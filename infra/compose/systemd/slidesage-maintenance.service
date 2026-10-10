@@ -1,0 +1,9 @@
+[Unit]
+Description=SlideSage recovery and cleanup sweep
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/slidesage
+ExecStart=/usr/bin/docker compose run --rm maintenance

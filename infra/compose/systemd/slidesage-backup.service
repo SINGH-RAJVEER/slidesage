@@ -1,0 +1,9 @@
+[Unit]
+Description=SlideSage database backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/slidesage
+ExecStart=/opt/slidesage/backup.sh

@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up the SlideSage database daily
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target
