@@ -1,7 +1,9 @@
 import { useAuth } from "@slidesage/ui";
 import { type HeaderRoutes, Header as HeaderView } from "@slidesage/ui/components/Header";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { PrefetchLink } from "./PrefetchLink";
 import { ROUTES } from "./router/paths";
+import { useRoutePrefetch } from "./useRoutePrefetch";
 
 const HEADER_ROUTES: HeaderRoutes = {
 	home: ROUTES.home,
@@ -21,15 +23,17 @@ export default function Header({ sticky = false }: { sticky?: boolean }) {
 	const { user, signOut } = useAuth();
 	const location = useLocation();
 	const navigate = useNavigate();
+	const prefetchPath = useRoutePrefetch();
 
 	return (
 		<HeaderView
 			currentPath={location.pathname}
 			routes={HEADER_ROUTES}
-			LinkComponent={Link}
+			LinkComponent={PrefetchLink}
 			user={user}
 			sticky={sticky}
 			onNavigate={navigate}
+			onPrefetch={prefetchPath}
 			onSignOut={signOut}
 		/>
 	);

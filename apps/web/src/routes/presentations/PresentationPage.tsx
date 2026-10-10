@@ -1,5 +1,5 @@
 import { type CardDocument, validateCardDocument } from "@slidesage/cards";
-import type { ApiErrorResponse, PresentationResponse, Source } from "@slidesage/types";
+import type { Source } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
 import type { CardAsset } from "@slidesage/ui/components/Cards";
 import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
@@ -7,9 +7,11 @@ import { CenteredStatusScreen, deckFromPreview } from "@slidesage/ui/components/
 import { API_URL } from "@slidesage/ui/lib/api";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { prefetchRoute } from "../../app/prefetch";
 import { ROUTES } from "../../app/router/paths";
 import { DeckViewer } from "./DeckViewer";
 import { DeckWorkspace } from "./DeckWorkspace";
+import { loadPresentationDetail, loadPresentationDocument } from "./presentation-data";
 
 type LoadState =
 	| { status: "loading" }
@@ -27,11 +29,6 @@ type LoadState =
 /** What the library shows when a presentation cannot be opened. */
 export interface LibraryNotice {
 	notice: string;
-}
-
-async function errorMessage(response: Response, fallback: string): Promise<string> {
-	const body = (await response.json().catch(() => null)) as ApiErrorResponse | null;
-	return body?.error?.message ?? fallback;
 }
 
 /** Opens a presentation: live progress while it generates, then its saved card document. */
@@ -68,20 +65,22 @@ export default function PresentationPage() {
 		[navigate],
 	);
 
+	// The first load of a deck may use what hovering its card prefetched. Every
+	// later one, after a generation, a revision, or a retry, asks the server.
+	const loadedId = useRef<string | null>(null);
+
 	const load = useCallback(async () => {
 		const request = ++latestLoad.current;
 		const current = () => request === latestLoad.current;
+		const fresh = loadedId.current === presentationId;
 		try {
-			const detailResponse = await fetch(`${API_URL}/presentations/${presentationId}`, {
-				credentials: "include",
-			});
+			const detail = await loadPresentationDetail(presentationId, { fresh });
 			if (!current()) return;
-			if (!detailResponse.ok) {
-				fail(await errorMessage(detailResponse, "Presentation not found"));
+			if (!detail.ok) {
+				fail(detail.message ?? "Presentation not found");
 				return;
 			}
-			const detail = (await detailResponse.json()) as PresentationResponse;
-			const summary = detail.presentation.slides_data;
+			const summary = detail.data.presentation.slides_data;
 			if (summary.status === "failed") {
 				navigate(`${ROUTES.presentationError}?id=${encodeURIComponent(presentationId)}`, {
 					replace: true,
@@ -92,20 +91,13 @@ export default function PresentationPage() {
 				setState({ status: "generating" });
 				return;
 			}
-			const documentResponse = await fetch(`${API_URL}/presentations/${presentationId}/document`, {
-				credentials: "include",
-			});
+			const documentResult = await loadPresentationDocument(presentationId, { fresh });
 			if (!current()) return;
-			if (!documentResponse.ok) {
-				fail(await errorMessage(documentResponse, "Unable to load the presentation"));
+			if (!documentResult.ok) {
+				fail(documentResult.message ?? "Unable to load the presentation");
 				return;
 			}
-			const body = (await documentResponse.json()) as {
-				document: unknown;
-				revision: { revision: number };
-				assets?: Record<string, CardAsset>;
-			};
-			if (!current()) return;
+			const body = documentResult.data;
 			// The document is checked against the same schema the converter
 			// enforced, so a malformed object is reported rather than rendered.
 			const assets = body.assets ?? {};
@@ -126,6 +118,10 @@ export default function PresentationPage() {
 			});
 		} catch {
 			if (current()) fail("Unable to load the presentation. Check your connection.");
+		} finally {
+			// Set only once a load settles, so the second run of a StrictMode
+			// effect still shares the first one's prefetched answer.
+			if (current()) loadedId.current = presentationId;
 		}
 	}, [fail, navigate, presentationId]);
 
@@ -133,11 +129,13 @@ export default function PresentationPage() {
 	// document replaces the progress view the moment it is committed.
 	useEffect(() => {
 		if (generatingHere) {
+			// Whatever was prefetched predates this generation.
+			loadedId.current = presentationId;
 			setState({ status: "generating" });
 			return;
 		}
 		void load();
-	}, [generatingHere, revisingHere, load]);
+	}, [generatingHere, revisingHere, load, presentationId]);
 
 	const [isCancelling, setIsCancelling] = useState(false);
 	const cancel = async () => {
@@ -169,6 +167,7 @@ export default function PresentationPage() {
 						: null
 				}
 				onBack={() => navigate(ROUTES.presentations)}
+				onBackPrefetch={() => prefetchRoute(ROUTES.presentations, { signedIn: true })}
 				isWaiting
 				generation={
 					generatingHere

@@ -1,6 +1,6 @@
 import { SlideSageLogo } from "@slidesage/ui/components/SlideSageLogo";
 import { useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { PrefetchLink } from "../../app/PrefetchLink";
 import { useHorizonTransition } from "../../app/transitions/HorizonTransition";
 import { WORDMARK_ORB_FRAGMENT_SHADER, WORDMARK_ORB_VERTEX_SHADER } from "./wordmark-orb-shaders";
 
@@ -397,7 +397,7 @@ export function WordmarkOrb() {
 	return (
 		<div ref={hostRef} className="pointer-events-none absolute inset-0 z-10">
 			<canvas ref={starCanvasRef} className="absolute inset-0 h-full w-full" />
-			<Link
+			<PrefetchLink
 				to={destination}
 				aria-label={destinationLabel}
 				ref={stageRef}
@@ -429,13 +429,13 @@ export function WordmarkOrb() {
 						transform: "scale(var(--horizon-scale, 0.333333))",
 					}}
 				/>
-			</Link>
+			</PrefetchLink>
 			<div
 				ref={fallbackRef}
 				style={{ display: "none" }}
 				className="absolute inset-0 place-items-center"
 			>
-				<Link
+				<PrefetchLink
 					to={destination}
 					aria-label={destinationLabel}
 					onPointerDown={(event) => {
@@ -464,7 +464,7 @@ export function WordmarkOrb() {
 							style={{ opacity: "var(--horizon-wordmark, 0)" }}
 						/>
 					</div>
-				</Link>
+				</PrefetchLink>
 			</div>
 		</div>
 	);

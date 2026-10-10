@@ -80,7 +80,11 @@ it("refreshes an open presentations page after a generated deck is saved", async
 		});
 
 		await act(async () => {
-			window.dispatchEvent(new CustomEvent(PRESENTATIONS_UPDATED_EVENT));
+			window.dispatchEvent(
+				new CustomEvent(PRESENTATIONS_UPDATED_EVENT, {
+					detail: { presentationId: "presentation_1" },
+				}),
+			);
 		});
 
 		await waitFor(() => {

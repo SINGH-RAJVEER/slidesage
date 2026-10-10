@@ -24,6 +24,8 @@ export interface DeckViewerProps {
 	deck: ViewerDeck | null;
 	onBack: () => void;
 	backLabel?: string;
+	/** Loads where Back goes once the user looks about to press it. */
+	onBackPrefetch?: () => void;
 	/** Shows the waiting slide in place of a deck that has no slides yet. */
 	isWaiting?: boolean;
 	/** Set while the deck generates, so waiting slides can report progress. */
@@ -64,6 +66,7 @@ export function DeckViewer({
 	deck,
 	onBack,
 	backLabel,
+	onBackPrefetch,
 	isWaiting = false,
 	generation,
 	edit,
@@ -251,6 +254,7 @@ export function DeckViewer({
 						showIterate={!!iterate}
 						onBack={onBack}
 						backLabel={backLabel}
+						onBackPrefetch={onBackPrefetch}
 						onIterate={() => iterate?.onIterate()}
 						onPresent={() => void enterFullscreen()}
 						presentDisabled={!hasCards || presentDisabled}

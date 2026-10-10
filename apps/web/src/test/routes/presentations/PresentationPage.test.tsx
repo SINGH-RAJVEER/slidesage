@@ -6,6 +6,7 @@ import { StreamingProvider } from "@slidesage/ui";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import PresentationPage from "../../../routes/presentations/PresentationPage";
+import PresentationsGridPage from "../../../routes/presentations/PresentationsGridPage";
 
 const originalFetch = globalThis.fetch;
 
@@ -138,4 +139,72 @@ describe("PresentationPage", () => {
 		expect(saves[1]?.url).toEndWith("/presentations/pres_2/document");
 		expect(saves[1]?.document).not.toContain("Deck one");
 	}, 15000);
+
+	it("opens a hovered card, and returns to the library, from what the hovers prefetched", async () => {
+		const requests: string[] = [];
+		globalThis.fetch = mock(async (input: string | URL | Request) => {
+			const url = String(input);
+			requests.push(url.replace(/^.*\/presentations/, "/presentations"));
+			if (url.includes("/presentations?")) {
+				return Response.json({
+					presentations: [
+						{
+							id: "pres_1",
+							title: "Grid storage",
+							prompt: "Storage",
+							slide_count: 1,
+							status: "ready",
+							has_research: false,
+							created_at: "2026-10-06T10:00:00.000Z",
+							updated_at: "2026-10-06T10:00:00.000Z",
+						},
+					],
+					total: 1,
+					limit: 20,
+					offset: 0,
+					has_more: false,
+				});
+			}
+			if (url.endsWith("/presentations/pres_1/document")) {
+				return Response.json({ revision: { revision: 1 }, document: savedDocument() });
+			}
+			return Response.json({
+				presentation: {
+					id: "pres_1",
+					title: "Grid storage",
+					slides_data: { title: "Grid storage", status: "ready" },
+				},
+			});
+		}) as unknown as typeof fetch;
+		const router = createMemoryRouter(
+			[
+				{ path: "/presentations", element: <PresentationsGridPage /> },
+				{ path: "/presentations/:presentationId", element: <PresentationPage /> },
+			],
+			{ initialEntries: ["/presentations"] },
+		);
+		const view = render(
+			<StreamingProvider>
+				<RouterProvider router={router} />
+			</StreamingProvider>,
+		);
+
+		const card = (await view.findByText("Grid storage")).closest("[data-slot='card']");
+		if (!card) throw new Error("presentation card not found");
+		fireEvent.focus(card);
+		await waitFor(() => expect(requests).toContain("/presentations/pres_1/document"));
+		fireEvent.click(card);
+
+		expect(await view.findByRole("article")).toHaveAccessibleName("Card 1: Storage is now cheap");
+		expect(requests.filter((url) => url === "/presentations/pres_1")).toHaveLength(1);
+		expect(requests.filter((url) => url === "/presentations/pres_1/document")).toHaveLength(1);
+
+		const library = () => requests.filter((url) => url.startsWith("/presentations?"));
+		fireEvent.focus(view.getByRole("button", { name: "Back to presentations" }));
+		await waitFor(() => expect(library()).toHaveLength(2));
+		fireEvent.click(view.getByRole("button", { name: "Back to presentations" }));
+
+		expect(await view.findByText("Grid storage")).toBeInTheDocument();
+		expect(library()).toHaveLength(2);
+	});
 });

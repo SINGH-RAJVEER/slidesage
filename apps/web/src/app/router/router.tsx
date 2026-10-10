@@ -13,6 +13,7 @@ import SettingsPage from "../../routes/settings/SettingsPage";
 import EntranceRoute from "./EntranceRoute";
 import RequireSignedInLayout from "./RequireSignedInLayout";
 import RootLayout from "./RootLayout";
+import { routeModules } from "./route-modules";
 
 function lazyRoute<T extends { default: ComponentType }>(importer: () => Promise<T>) {
 	return async () => {
@@ -30,7 +31,7 @@ export const router = createBrowserRouter([
 			{ index: true, element: <EntranceRoute /> },
 			/* the landing page is always public, so a signed-in user can still
 			   reach it even when it is not their default page */
-			{ path: "landing", lazy: lazyRoute(() => import("../../routes/landing/LandingPage")) },
+			{ path: "landing", lazy: lazyRoute(routeModules.landing) },
 			{ path: "sign-in/*", element: <SignInPage /> },
 			{ path: "sign-up/*", element: <SignUpPage /> },
 			{ path: "sign-up/verify-email", element: <VerifyEmailPage /> },
@@ -39,7 +40,7 @@ export const router = createBrowserRouter([
 			/* share links open without an account */
 			{
 				path: "s/:token",
-				lazy: lazyRoute(() => import("../../routes/presentations/SharedPresentationPage")),
+				lazy: lazyRoute(routeModules.shared),
 			},
 			{
 				element: <RequireSignedInLayout />,
@@ -49,39 +50,39 @@ export const router = createBrowserRouter([
 					{ path: "feedback", lazy: lazyRoute(() => import("../../routes/feedback/FeedbackPage")) },
 					{
 						path: "generate",
-						lazy: lazyRoute(() => import("../../routes/presentations/GeneratePPTPage")),
+						lazy: lazyRoute(routeModules.generate),
 					},
 					{
 						path: "generate/outline",
-						lazy: lazyRoute(() => import("../../routes/presentations/OutlinePage")),
+						lazy: lazyRoute(routeModules.outline),
 					},
 					{
 						path: "generate/research",
-						lazy: lazyRoute(() => import("../../routes/presentations/GenerateResearchPage")),
+						lazy: lazyRoute(routeModules.research),
 					},
 					{
 						path: "marketplace",
-						lazy: lazyRoute(() => import("../../routes/marketplace/MarketplacePage")),
+						lazy: lazyRoute(routeModules.marketplace),
 					},
 					{
 						path: "marketplace/:marketplaceId/preview",
-						lazy: lazyRoute(() => import("../../routes/marketplace/MarketplaceThemePreviewPage")),
+						lazy: lazyRoute(routeModules.marketplacePreview),
 					},
 					{
 						path: "presentations",
-						lazy: lazyRoute(() => import("../../routes/presentations/PresentationsGridPage")),
+						lazy: lazyRoute(routeModules.presentations),
 					},
 					{
 						path: "presentations/:presentationId",
-						lazy: lazyRoute(() => import("../../routes/presentations/PresentationPage")),
+						lazy: lazyRoute(routeModules.presentation),
 					},
 					{
 						path: "presentation-error",
-						lazy: lazyRoute(() => import("../../routes/presentations/PresentationErrorPage")),
+						lazy: lazyRoute(routeModules.presentationError),
 					},
 					{
 						path: "purchase",
-						lazy: lazyRoute(() => import("../../routes/billing/PurchaseTokensPage")),
+						lazy: lazyRoute(routeModules.purchase),
 					},
 				],
 			},
