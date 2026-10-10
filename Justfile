@@ -73,6 +73,11 @@ converter-bundle:
 converter:
 	bun run dev:converter
 
+# Build and push the four VPS images to GHCR under a tag, normally the commit SHA
+vps-images tag owner="singh-rajveer": binaries converter-bundle
+	REGISTRY=ghcr.io PROJECT_ID={{owner}} REPOSITORY=slidesage IMAGE_VERSION={{tag}} \
+		docker buildx bake -f docker-bake.hcl --push
+
 # Build a container image from the repo root context. Run `just binaries` first.
 image target="api": binaries
 	docker build --target {{target}} --file apps/api/Dockerfile --tag slidesage-{{target}} .
