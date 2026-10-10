@@ -35,5 +35,8 @@ fi
 	done <<<"$ranges"
 	echo "}"
 } >"$target.tmp"
-mv "$target.tmp" "$target"
+# Overwrite in place rather than renaming: nginx sees this file through a
+# single-file bind mount, which keeps pointing at the original inode.
+cat "$target.tmp" >"$target"
+rm "$target.tmp"
 echo "wrote $(wc -l <<<"$ranges") ranges to $target"
