@@ -17,9 +17,9 @@
 | `DATABASE_POOL_MAX` | No | `5` | Maximum open and idle connections in the Go API pool |
 | `RATE_LIMIT_HASH_SECRET` | Production | `AUTH_SECRET` | Independent secret mixed into hashed rate-limit identities |
 | `TRUST_PROXY_HEADERS` | No | `false` | Allows Go to use proxy-supplied client-IP headers; enable only behind a proxy that replaces them |
-| `CORS_ORIGINS` | No | Local frontend origins, `https://slidesage.pages.dev`, `https://slidesage.app`, and `https://www.slidesage.app` | Comma-separated allowed web origins; trailing slashes are normalized |
+| `CORS_ORIGINS` | No | Local frontend origins, `https://slidesage.app`, and `https://www.slidesage.app` | Comma-separated allowed web origins; trailing slashes are normalized |
 | `CORS_ORIGIN` | No | Default CORS origins | Single-origin fallback; trailing slashes are normalized |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | No | Local frontend, `https://slidesage.pages.dev`, `https://slidesage.app`, and `https://www.slidesage.app` | Comma-separated auth callback origins; trailing slashes are normalized |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | No | `CORS_ORIGINS`, else the local frontend origins | Comma-separated auth callback origins; trailing slashes are normalized |
 | `VITE_API_URL` | No | `http://localhost:8000` | Browser API origin without a path suffix; set production to `https://api.slidesage.app` |
 | `NODE_ENV` | No | `development` in devenv | Controls production auth and email-delivery safeguards; OTP values are never logged |
 

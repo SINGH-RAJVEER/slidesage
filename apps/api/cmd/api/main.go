@@ -176,7 +176,7 @@ func notFoundHandler(writer http.ResponseWriter, _ *http.Request) {
 
 func withSecurity(next http.Handler) http.Handler {
 	allowed := map[string]bool{}
-	defaults := "http://localhost:5173,http://127.0.0.1:5173,https://slidesage.pages.dev,https://slidesage.app,https://www.slidesage.app"
+	defaults := "http://localhost:5173,http://127.0.0.1:5173,https://slidesage.app,https://www.slidesage.app"
 	for _, origin := range strings.Split(env("CORS_ORIGINS", env("CORS_ORIGIN", defaults)), ",") {
 		allowed[strings.TrimSpace(origin)] = true
 	}
