@@ -47,6 +47,8 @@ interface OutlineRouteState {
 	ai?: AIModelSelection;
 	/** The theme of the template chosen on the generate page. */
 	theme?: string;
+	/** An outline approved before a failed attempt, reused instead of planning again. */
+	plan?: Outline;
 }
 
 const MAX_CARDS = 40;
@@ -118,8 +120,10 @@ function OutlineVisit() {
 		"outline",
 		{
 			request: routeRequest,
-			outline: null,
-			photos: false,
+			outline: routeRequest?.plan ?? null,
+			// A saved outline has no planning response to say whether photos are
+			// available; one that already chose a photo layout had them.
+			photos: Boolean(routeRequest?.plan?.cards.some((entry) => isImageLayout(entry.layout))),
 		},
 		isOutlineDraft,
 		routeRequest ? location.key : undefined,
@@ -144,7 +148,7 @@ function OutlineVisit() {
 		if (!request?.prompt && !completed.current) navigate(ROUTES.generate, { replace: true });
 	}, [navigate, request]);
 
-	// Reuse a saved outline on return. Planning is paid for, so restoring edits
+	// Reuse a saved or retried outline. Planning is paid for, so restoring edits
 	// must not make another request or charge the user again.
 	useEffect(() => {
 		if (!request?.prompt || outline || requested.current) return;

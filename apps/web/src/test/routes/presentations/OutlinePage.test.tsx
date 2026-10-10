@@ -201,6 +201,21 @@ describe("OutlinePage", () => {
 		expect(probe).toHaveTextContent('"url":"https://example.com/storage"');
 	});
 
+	it("reuses the outline a failed attempt approved without planning again", async () => {
+		const calls = serve(() => new Promise<Response>(() => {}));
+		const view = renderOutline({ plan: outline.plan, retryPresentationId: "pres_failed" });
+
+		expect(await view.findByDisplayValue("Costs fell by half")).toBeInTheDocument();
+		fireEvent.click(view.getByRole("button", { name: "Write 3 cards" }));
+
+		await waitFor(() =>
+			expect(calls.some((call) => call.url.includes("/presentation-jobs"))).toBe(true),
+		);
+		expect(calls.some((call) => call.url.includes("/presentation-outlines"))).toBe(false);
+		const job = calls.find((call) => call.url.includes("/presentation-jobs"));
+		expect(job?.body["plan"]).toEqual(outline.plan);
+	});
+
 	it("opens the presentation once the job is accepted", async () => {
 		serve((url) =>
 			url.endsWith("/presentation-jobs")
