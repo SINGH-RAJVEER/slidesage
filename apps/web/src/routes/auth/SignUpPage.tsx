@@ -65,7 +65,7 @@ export default function SignUpPage() {
 		event.preventDefault();
 		setError(null);
 
-		if (password !== confirmPassword) {
+		if (password && password !== confirmPassword) {
 			setError("Passwords do not match.");
 			return;
 		}
@@ -78,7 +78,7 @@ export default function SignUpPage() {
 				await auth.signUpEmail({
 					name,
 					email: normalizedEmail,
-					password,
+					...(password ? { password } : {}),
 				});
 			} catch (err) {
 				if (getErrorCode(err) !== "EMAIL_NOT_VERIFIED") {
@@ -164,28 +164,32 @@ export default function SignUpPage() {
 								value={password}
 								onChange={(event) => setPassword(event.target.value)}
 								className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
-								placeholder="Create a password"
+								placeholder="Create a password (optional)"
 								minLength={8}
-								required
 							/>
+							<p className="text-xs text-white/50">
+								Optional. Without a password, you sign in with a code sent to your email.
+							</p>
 						</div>
 
-						<div className="space-y-2">
-							<label htmlFor="confirmPassword" className="text-sm font-medium text-white/80">
-								Confirm password
-							</label>
-							<input
-								id="confirmPassword"
-								type="password"
-								autoComplete="new-password"
-								value={confirmPassword}
-								onChange={(event) => setConfirmPassword(event.target.value)}
-								className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
-								placeholder="Re-enter your password"
-								minLength={8}
-								required
-							/>
-						</div>
+						{password ? (
+							<div className="space-y-2">
+								<label htmlFor="confirmPassword" className="text-sm font-medium text-white/80">
+									Confirm password
+								</label>
+								<input
+									id="confirmPassword"
+									type="password"
+									autoComplete="new-password"
+									value={confirmPassword}
+									onChange={(event) => setConfirmPassword(event.target.value)}
+									className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+									placeholder="Re-enter your password"
+									minLength={8}
+									required
+								/>
+							</div>
+						) : null}
 
 						<button
 							type="submit"

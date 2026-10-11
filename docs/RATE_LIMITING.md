@@ -1,3 +1,4 @@
+| `POST /feedback` | Authenticated user | 10 | 1 hour |
 # Rate limiting
 
 - Fixed-window counters live in PostgreSQL `api_rate_limits`, shared across API instances.

@@ -93,7 +93,9 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - `/presentation-outlines` accepts generation fields plus a client `outline_id`, returning `plan`, photo availability, charged points, and remaining points.
 - Planning has its own `outline` reservation/settlement; repeated IDs return `409`.
 - Users can edit, reorder, add, or remove entries and change layouts or photo searches.
+- The browser keeps the latest unfinished outline and its request settings per account. Returning or refreshing restores edits and photo availability without another planning charge. Starting a new outline replaces this draft; an accepted generation clears it.
 - Submit the approved `plan` to `/presentation-jobs` with `slide_count` matching its length. Submission and worker validate it; drafting follows its order.
+- A deck that fails after an approved outline saves it as `failure.retry.plan`. Retrying opens that outline instead of planning, and charging for, a new one while the prompt and slide count are unchanged and, with research, while the reviewed sources are exactly the saved ones, since the plan cites them by position. Changing any of these plans afresh. A restored outline offers photo layouts only if it already used one.
 
 ## Photos
 
@@ -140,7 +142,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Conflicts stop autosave and offer reload. Navigation saves pending edits first; dropping unsavable edits requires confirmation. Closing an unsaved tab requests browser confirmation.
 - Edit activates the centered slide and header controls for title, theme, undo, and redo. The toolbar offers compatible layouts, widget insertion, AI revision, photos, movement, duplication, and insertion.
 - Widget controls edit chart data/kind, meter values, table cells, tone, size, and removal where valid. Chart data passes schema checks before saving.
-- Deleting the displayed slide requires confirmation.
+- Deleting the displayed slide takes one click and autosaves the deck without it. An Undo action on the floating notice puts the card back at its position for a few seconds.
 
 ## Sharing
 
@@ -176,10 +178,13 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 ## Browser
 
 - `DeckViewer.tsx` at `/presentations/:presentationId` shows a carousel and synchronized thumbnails.
-- During generation, drafted cards appear beside planned placeholders. Completion loads and validates the saved document.
-- Failed decks open `/presentation-error`. Initial load failures return to the library with a notice; later reload failures keep the current deck visible.
+- During generation, drafted cards appear beside planned placeholders, and the viewer moves to each card as it arrives until the user picks a slide. Completion loads and validates the saved document.
+- Failed decks open `/presentation-error`, which loads the deck and shows its saved `failure.message`. Initial load failures return to the library with a notice; later reload failures keep the current deck visible.
 - Changing decks resets loading and editor state. Late responses from the previous deck are ignored.
 - Cards stay 16:9 and scale in container units. `CardView` refits text and spacing down to half size on edits and resize; `data-text-scale` records shrinking.
 - Content exceeding the minimum fit clips at the bottom. `CardSlide` letterboxes other viewport ratios.
 - Present supports full screen and timed playback. Left/right or J/L move cards, up/down jump first/last, and N shows notes. Exiting full screen stops presenting.
 - Generate and research pass through `/generate/outline`; accepted jobs open their deck. The library and generation indicator open the same viewer.
+- Generate keeps the prompt, template selection, slide count, detail level, tone, research toggle, and result count in browser storage per account. Leaving for another section or refreshing restores the setup. A new retry starts with that presentation's settings; its edited setup retains the retry ID and AI selection until generation is accepted.
+- Presentation edits also have a browser recovery draft, including incomplete text and uncertain saves. Returning restores the draft and retries the same operation ID when a save response was lost. A newer server revision blocks autosaving until the user reloads the latest version. Reloading explicitly discards the recovery draft; successful saves clear it.
+- Drafts use versioned local storage keys and stay on the same browser. Invalid stored data falls back to the page defaults. If browser storage is unavailable or full, the form remains usable but recovery is unavailable.

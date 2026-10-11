@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -113,7 +114,8 @@ func (h *handler) submit(writer http.ResponseWriter, request *http.Request) {
 				writeError(writer, previewErr.Status, previewErr.Message)
 				return
 			}
-			writeError(writer, http.StatusInternalServerError, "Unable to start generation")
+			slog.ErrorContext(request.Context(), "research preview", "error", err)
+			writeError(writer, http.StatusInternalServerError, "Unable to run research")
 			return
 		}
 		writeJSON(writer, http.StatusOK, map[string]any{"sources": result.Sources, "estimated_tokens": result.EstimatedTokens, "slide_tokens_remaining": result.RemainingPoints})

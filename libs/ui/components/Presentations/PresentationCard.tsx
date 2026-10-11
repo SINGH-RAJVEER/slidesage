@@ -1,29 +1,35 @@
-import type { PresentationSummary } from "@slidesage/types";
+import type { PresentationStatus, PresentationSummary } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@slidesage/ui/components/card";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { Calendar, RotateCcw, Trash2 } from "lucide-react";
 import type React from "react";
+import { usePrefetchIntent } from "../../hooks/usePrefetchIntent";
 
 interface PresentationCardProps {
 	presentation: PresentationSummary;
-	isDeleting: boolean;
 	isOpening: boolean;
 	onCardClick: (id: string) => void;
+	/** Called once the user looks about to open the card. */
+	onPrefetch?: (id: string, status: PresentationStatus) => void;
 	onDelete: (e: React.MouseEvent, id: string) => void;
 	formatDate: (date: string) => string;
 }
 
 export const PresentationCard: React.FC<PresentationCardProps> = ({
 	presentation,
-	isDeleting,
 	isOpening,
 	onCardClick,
+	onPrefetch,
 	onDelete,
 	formatDate,
 }) => {
+	const intent = usePrefetchIntent(
+		onPrefetch ? () => onPrefetch(presentation.id, presentation.status) : undefined,
+	);
 	return (
 		<Card
+			{...intent}
 			className={`group flex h-full cursor-pointer flex-col border bg-black/20 transition-colors hover:bg-white/5 ${
 				presentation.status === "failed" ? "border-red-300/20" : "border-white/10"
 			}`}
@@ -46,9 +52,8 @@ export const PresentationCard: React.FC<PresentationCardProps> = ({
 						className="h-8 w-8 text-white/40 hover:text-red-400 hover:bg-red-500/10 flex-shrink-0 ml-2 -mt-0.5"
 						aria-label="Delete presentation"
 						onClick={(e) => onDelete(e, presentation.id)}
-						disabled={isDeleting}
 					>
-						{isDeleting ? <ThinkingOrb size={20} /> : <Trash2 className="h-4 w-4" />}
+						<Trash2 className="h-4 w-4" />
 					</Button>
 				</CardTitle>
 			</CardHeader>

@@ -18,6 +18,7 @@ import (
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/auth"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/cache"
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/feedback"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/generation"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/billing"
@@ -99,6 +100,7 @@ func main() {
 		return identity(request)
 	}, researchService, database)
 	ai.RegisterRoutes(mux, ai.ConnectionService{DB: database}, identity)
+	feedback.RegisterRoutes(mux, feedback.Repository{DB: database}, identity)
 	razorpay, err := billing.NewRazorpayClientFromEnv()
 	if err != nil {
 		fatal(logger, err)

@@ -30,6 +30,7 @@ const { default: _defaultMatchers, ...matchers } = await import(
 );
 expect.extend(matchers);
 const { cleanup } = await import("@testing-library/react");
+const { clearPrefetched } = await import("@slidesage/ui/lib/prefetch");
 
 if (typeof document === "undefined") {
 	throw new Error("document is not defined after GlobalRegistrator.register()");
@@ -37,6 +38,8 @@ if (typeof document === "undefined") {
 
 afterEach(() => {
 	cleanup();
+	// A prefetched answer left by one test would be handed to the next.
+	clearPrefetched();
 	// Clear everything rather than the two known keys: a test that leaves any
 	// stored state behind changes what the next one sees, and the streaming
 	// context resumes an active generation from storage on mount.

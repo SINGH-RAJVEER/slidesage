@@ -27,6 +27,18 @@ describe("presentation retry destination", () => {
 		expect(destination?.state).toMatchObject({ retryPresentationId: "abc" });
 	});
 
+	it("takes the approved outline to the research page with its sources", () => {
+		const plan = {
+			title: "Quantum computing",
+			cards: [
+				{ position: 1, takeaway: "Qubits", role: "opening", layout: "title", sourceIds: ["s1"] },
+			],
+		};
+		const destination = getPresentationRetryDestination(failed({ plan }), "abc");
+
+		expect(destination?.state).toMatchObject({ plan });
+	});
+
 	it("prefills the generate form when no sources were saved", () => {
 		const destination = getPresentationRetryDestination(
 			failed({ research_enabled: false, research_payload: undefined }),

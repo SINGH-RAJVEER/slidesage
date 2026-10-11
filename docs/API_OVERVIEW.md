@@ -71,7 +71,7 @@ Owner authentication is required except for `/shared` routes:
 - Documents use versioned cards in PostgreSQL JSONB. Stored images require `PRESENTATION_GCS_BUCKET`; text-only documents do not.
 - Editing, outlines, photos, shares, and export contracts are in [Card documents](CARD_DOCUMENTS.md).
 - List pagination uses `limit` from 1 to 100, default 20, and non-negative `offset`, default 0, bounded by JavaScript's maximum safe integer. Responses include `presentations`, `total`, `limit`, `offset`, and `has_more`.
-- Summaries expose `generating`, `ready`, or `failed` status and `has_research`. Failed decks retain `failure.retry` settings for recovery.
+- Summaries expose `generating`, `ready`, or `failed` status and `has_research`. Failed decks retain `failure.retry` settings for recovery, including the approved outline as `plan` when the job had one.
 
 ### Input limits
 
@@ -136,6 +136,14 @@ Owner authentication is required except for `/shared` routes:
 - Webhooks verify the exact raw body and require complete `payment.captured` entities.
 - Claiming payment and crediting points are one transaction. Repeated payment is idempotent; conflicting details return `409`.
 - Another user's order returns `403`. A webhook arriving before the local order returns `503` for retry.
+
+## Feedback
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `/feedback` | User | Store a 1 to 4,000 character `message` |
+
+- Validation, limits, and storage are in [Feedback and bug reports](FEEDBACK.md).
 
 ## CORS
 

@@ -142,11 +142,15 @@ interface ResearchPreviewRequest {
 	slideCount: number;
 	detailLevel: string;
 	tonality: string;
+	/** Left out, the API retrieves its default of five sources. */
+	maxResults?: number;
 }
 
 interface ResearchPreviewState extends ResearchPreviewRequest {
 	status: ResearchPreviewStatus;
 	sources: Source[];
+	/** URLs of fetched sources the user removed; they are left out of the reviewed payload. */
+	removedSourceUrls: string[];
 	estimatedTokens: number | null;
 	error?: string;
 	requestKey?: string;
@@ -162,6 +166,8 @@ interface StreamingContextValue {
 		savedResearch?: ResearchPayload,
 		forceRefresh?: boolean,
 	) => Promise<boolean>;
+	removeResearchSource: (url: string) => void;
+	restoreResearchSources: () => void;
 	stopStreaming: () => void;
 	resetStreaming: () => void;
 	getPresentation: () => PresentationData | null;
@@ -185,15 +191,20 @@ const initialResearchPreviewState: ResearchPreviewState = {
 	detailLevel: "balanced",
 	tonality: "professional",
 	sources: [],
+	removedSourceUrls: [],
 	estimatedTokens: null,
 };
 
 export const StreamingContext = createContext<StreamingContextValue | null>(null);
 
 function getResearchPreviewKey(request: ResearchPreviewRequest) {
-	return [request.prompt.trim(), request.slideCount, request.detailLevel, request.tonality].join(
-		"\u001f",
-	);
+	return [
+		request.prompt.trim(),
+		request.slideCount,
+		request.detailLevel,
+		request.tonality,
+		request.maxResults ?? "",
+	].join("\u001f");
 }
 
 async function fetchPersistedPresentation(
@@ -758,6 +769,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 					...request,
 					status: "ready",
 					sources: savedResearch.sources,
+					removedSourceUrls: [],
 					estimatedTokens:
 						typeof savedResearch.estimated_tokens === "number"
 							? savedResearch.estimated_tokens
@@ -771,6 +783,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				...request,
 				status: "loading",
 				sources: [],
+				removedSourceUrls: [],
 				estimatedTokens: null,
 				error: undefined,
 				requestKey,
@@ -788,7 +801,10 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 						slide_count: request.slideCount,
 						detail_level: request.detailLevel,
 						tonality: request.tonality,
-						research: { enabled: true },
+						research: {
+							enabled: true,
+							...(request.maxResults ? { maxResults: request.maxResults } : {}),
+						},
 					}),
 					signal: controller.signal,
 				});
@@ -826,6 +842,7 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 					...request,
 					status: "ready",
 					sources: Array.isArray(data?.sources) ? data.sources : [],
+					removedSourceUrls: [],
 					estimatedTokens:
 						typeof data?.estimated_tokens === "number" ? data.estimated_tokens : null,
 					requestKey,
@@ -845,6 +862,25 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 		},
 		[updateResearchPreviewState],
 	);
+
+	// Removal only hides a source from the reviewed payload, so it can be undone
+	// without paying for another search.
+	const removeResearchSource = useCallback(
+		(url: string) => {
+			updateResearchPreviewState((previous) =>
+				previous.status !== "ready" || previous.removedSourceUrls.includes(url)
+					? previous
+					: { ...previous, removedSourceUrls: [...previous.removedSourceUrls, url] },
+			);
+		},
+		[updateResearchPreviewState],
+	);
+
+	const restoreResearchSources = useCallback(() => {
+		updateResearchPreviewState((previous) =>
+			previous.removedSourceUrls.length === 0 ? previous : { ...previous, removedSourceUrls: [] },
+		);
+	}, [updateResearchPreviewState]);
 
 	const getPresentation = useCallback((): PresentationData | null => {
 		const completed = streamingState.completedDocument;
@@ -902,6 +938,8 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				generate,
 				cancelGeneration,
 				previewResearch,
+				removeResearchSource,
+				restoreResearchSources,
 				stopStreaming,
 				resetStreaming,
 				getPresentation,

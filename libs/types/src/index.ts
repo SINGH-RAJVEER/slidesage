@@ -80,6 +80,8 @@ export interface PresentationRetryOptions {
 	ai?: AIModelSelection;
 	/** The theme the deck was to be styled with; absent means the default. */
 	theme?: string;
+	/** The outline the user approved, so a retry need not plan and charge again. */
+	plan?: Outline;
 }
 
 export interface PresentationFailure {
@@ -159,6 +161,8 @@ export interface UserProfile {
 
 export interface ProfileResponse {
 	user: UserProfile;
+	/** Present on GET /profile; false for passwordless and OAuth-only accounts. */
+	hasPassword?: boolean;
 }
 
 export interface UpdateProfileRequest {
@@ -175,6 +179,17 @@ export interface UpdateAvatarRequest {
 
 export interface ProfileAvatarResponse {
 	user: Pick<UserProfile, "id" | "image">;
+}
+
+/** Longest feedback message the API accepts, in characters. */
+export const FEEDBACK_MAX_LENGTH = 4000;
+
+export interface FeedbackRequest {
+	message: string;
+}
+
+export interface FeedbackResponse {
+	feedback: { id: string; created_at: string };
 }
 
 export type BillingPackName = "starter" | "pro" | "premium" | "custom";

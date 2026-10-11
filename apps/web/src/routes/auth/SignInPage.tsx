@@ -1,4 +1,5 @@
 import { useAuth } from "@slidesage/ui";
+import { Button } from "@slidesage/ui/components/button";
 import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { LoadingScreen } from "@slidesage/ui/components/loading-screen";
 import { auth } from "@slidesage/ui/lib/auth-client";
@@ -20,13 +21,24 @@ function getErrorCode(value: unknown): string | undefined {
 	return typeof code === "string" ? code : undefined;
 }
 
+type SignInStep = "email" | "method" | "password";
+
+const inputClassName =
+	"w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20";
+const primaryButtonClassName =
+	"h-auto w-full rounded-lg bg-white px-4 py-3 text-base font-semibold text-black shadow-sm transition-[transform,background-color,box-shadow,opacity] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-white/90 active:scale-[0.97] active:bg-white/80 disabled:opacity-60 motion-reduce:active:scale-100";
+const secondaryButtonClassName =
+	"h-auto w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-base font-semibold text-white shadow-sm transition-[transform,background-color,box-shadow,opacity] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-white/10 active:scale-[0.97] active:bg-white/15 disabled:opacity-60 motion-reduce:active:scale-100";
+
 export default function SignInPage() {
 	const [searchParams] = useSearchParams();
 	const redirectTo = sanitizeRedirectPath(searchParams.get("redirect_url"));
 	const navigate = useNavigate();
 	const { isSignedIn, refreshSession } = useAuth();
 	useHorizonPageReady(!isSignedIn);
+	const [step, setStep] = useState<SignInStep>("email");
 	const [email, setEmail] = useState("");
+	const [hasPassword, setHasPassword] = useState(false);
 	const [password, setPassword] = useState("");
 	const [rememberMe, setRememberMe] = useState(true);
 	const [submitting, setSubmitting] = useState(false);
@@ -34,6 +46,8 @@ export default function SignInPage() {
 	const [error, setError] = useState<string | null>(null);
 	const signUpTo =
 		redirectTo === "/" ? "/sign-up" : `/sign-up?redirect_url=${encodeURIComponent(redirectTo)}`;
+	const normalizedEmail = email.trim().toLowerCase();
+	const emailQuery = `email=${encodeURIComponent(normalizedEmail)}&redirect_url=${encodeURIComponent(redirectTo)}`;
 
 	// Redirect to dashboard if already signed in
 	useEffect(() => {
@@ -60,12 +74,60 @@ export default function SignInPage() {
 		}
 	};
 
-	const handleEmailSignIn = async (event: FormEvent<HTMLFormElement>) => {
+	const changeEmail = () => {
+		setStep("email");
+		setPassword("");
+		setError(null);
+	};
+
+	const handleContinue = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setError(null);
 		setSubmitting(true);
 
-		const normalizedEmail = email.trim().toLowerCase();
+		try {
+			const options = await auth.signInOptions({ email: normalizedEmail });
+			setHasPassword(options.hasPassword);
+			setStep("method");
+		} catch (err) {
+			if (getErrorCode(err) === "ACCOUNT_NOT_FOUND") {
+				setError("No account exists for this email. Sign up to continue.");
+				return;
+			}
+			setError(err instanceof Error ? err.message : "Sign in failed.");
+		} finally {
+			setSubmitting(false);
+		}
+	};
+
+	const handleCodeSignIn = async () => {
+		setError(null);
+		setSubmitting(true);
+
+		try {
+			await auth.sendSignInOtp({ email: normalizedEmail });
+			navigate(`/sign-in/verify?mode=sign-in&${emailQuery}`, { state: { rememberMe } });
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to send sign-in code.");
+		} finally {
+			setSubmitting(false);
+		}
+	};
+
+	const handlePasswordChoice = () => {
+		setError(null);
+		if (hasPassword) {
+			setStep("password");
+			return;
+		}
+		// Without a password yet, the user creates one and confirms it with an emailed code.
+		navigate(`/sign-in/create-password?${emailQuery}`, { state: { rememberMe } });
+	};
+
+	const handlePasswordSignIn = async (event: FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		setError(null);
+		setSubmitting(true);
 
 		try {
 			await auth.signInEmail({
@@ -88,15 +150,12 @@ export default function SignInPage() {
 					deliveryError =
 						deliveryErr instanceof Error ? deliveryErr.message : "Failed to send verification code";
 				}
-				navigate(
-					`/sign-up/verify-email?email=${encodeURIComponent(normalizedEmail)}&redirect_url=${encodeURIComponent(redirectTo)}`,
-					{
-						replace: true,
-						state: {
-							deliveryError,
-						},
+				navigate(`/sign-up/verify-email?${emailQuery}`, {
+					replace: true,
+					state: {
+						deliveryError,
 					},
-				);
+				});
 				return;
 			}
 			if (getErrorCode(err) === "INVALID_EMAIL_OR_PASSWORD") {
@@ -109,6 +168,20 @@ export default function SignInPage() {
 		}
 	};
 
+	const signedInAs =
+		step === "email" ? null : (
+			<p className="text-center text-sm text-white/60">
+				Signing in as <span className="font-semibold text-white">{normalizedEmail}</span>.{" "}
+				<button
+					type="button"
+					onClick={changeEmail}
+					className="font-medium text-white/80 hover:text-white hover:underline"
+				>
+					Change
+				</button>
+			</p>
+		);
+
 	return (
 		<div className="min-h-screen bg-transparent flex flex-col">
 			{switching ? <LoadingScreen label="Loading sign up" /> : null}
@@ -116,78 +189,118 @@ export default function SignInPage() {
 			<FloatingNotice error={error} onDismiss={() => setError(null)} />
 			<div className="flex flex-1 items-center justify-center px-4 py-8 md:px-8">
 				<div className="max-w-md w-full">
-					<form className="space-y-4" onSubmit={handleEmailSignIn}>
-						<div className="space-y-2">
-							<label htmlFor="email" className="text-sm font-medium text-white/80">
-								Email
-							</label>
-							<input
-								id="email"
-								type="email"
-								autoComplete="email"
-								value={email}
-								onChange={(event) => setEmail(event.target.value)}
-								className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
-								placeholder="you@example.com"
-								required
-							/>
-						</div>
-
-						<div className="space-y-2">
-							<div className="flex items-center justify-between gap-3">
-								<label htmlFor="password" className="text-sm font-medium text-white/80">
-									Password
+					{step === "email" ? (
+						<form className="space-y-4" onSubmit={handleContinue}>
+							<div className="space-y-2">
+								<label htmlFor="email" className="text-sm font-medium text-white/80">
+									Email
 								</label>
-								<a
-									href="/forgot-password"
-									className="text-sm font-medium text-white/60 hover:text-white hover:underline"
-								>
-									Forgot password?
-								</a>
+								<input
+									id="email"
+									type="email"
+									autoComplete="email"
+									value={email}
+									onChange={(event) => setEmail(event.target.value)}
+									className={inputClassName}
+									placeholder="you@example.com"
+									required
+								/>
 							</div>
-							<input
-								id="password"
-								type="password"
-								autoComplete="current-password"
-								value={password}
-								onChange={(event) => setPassword(event.target.value)}
-								className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
-								placeholder="Enter your password"
-								minLength={8}
-								required
-							/>
+
+							<label
+								htmlFor="remember-me"
+								className="flex w-fit cursor-pointer items-center gap-2 text-sm text-white/70"
+							>
+								<input
+									id="remember-me"
+									type="checkbox"
+									checked={rememberMe}
+									onChange={(event) => setRememberMe(event.target.checked)}
+									className="h-4 w-4 cursor-pointer rounded border-white/25 bg-white/10 accent-white"
+								/>
+								Remember me
+							</label>
+
+							<Button type="submit" className={primaryButtonClassName} disabled={submitting}>
+								{submitting ? "Checking..." : "Continue"}
+							</Button>
+						</form>
+					) : null}
+
+					{step === "method" ? (
+						<div className="space-y-4">
+							{signedInAs}
+							<Button
+								type="button"
+								onClick={handleCodeSignIn}
+								className={primaryButtonClassName}
+								disabled={submitting}
+							>
+								{submitting ? "Sending code..." : "Sign in with a code"}
+							</Button>
+							<Button
+								type="button"
+								onClick={handlePasswordChoice}
+								className={secondaryButtonClassName}
+								disabled={submitting}
+							>
+								Sign in with password
+							</Button>
 						</div>
+					) : null}
 
-						<label
-							htmlFor="remember-me"
-							className="flex w-fit cursor-pointer items-center gap-2 text-sm text-white/70"
-						>
-							<input
-								id="remember-me"
-								type="checkbox"
-								checked={rememberMe}
-								onChange={(event) => setRememberMe(event.target.checked)}
-								className="h-4 w-4 cursor-pointer rounded border-white/25 bg-white/10 accent-white"
-							/>
-							Remember me
-						</label>
+					{step === "password" ? (
+						<form className="space-y-4" onSubmit={handlePasswordSignIn}>
+							{signedInAs}
+							<div className="space-y-2">
+								<div className="flex items-center justify-between gap-3">
+									<label htmlFor="password" className="text-sm font-medium text-white/80">
+										Password
+									</label>
+									<a
+										href={`/forgot-password?email=${encodeURIComponent(normalizedEmail)}`}
+										className="text-sm font-medium text-white/60 hover:text-white hover:underline"
+									>
+										Forgot password?
+									</a>
+								</div>
+								<input
+									id="password"
+									type="password"
+									autoComplete="current-password"
+									value={password}
+									onChange={(event) => setPassword(event.target.value)}
+									className={inputClassName}
+									placeholder="Enter your password"
+									minLength={8}
+									required
+								/>
+							</div>
 
-						<button
-							type="submit"
-							className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black shadow-sm transition-[transform,background-color,box-shadow,opacity] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-white/90 active:scale-[0.97] active:bg-white/80 active:shadow-inner disabled:opacity-60 motion-reduce:active:scale-100"
-							disabled={submitting}
-						>
-							{submitting ? "Signing in..." : "Sign In"}
-						</button>
-					</form>
+							<Button type="submit" className={primaryButtonClassName} disabled={submitting}>
+								{submitting ? "Signing in..." : "Sign In"}
+							</Button>
+							<Button
+								type="button"
+								onClick={() => {
+									setStep("method");
+									setPassword("");
+									setError(null);
+								}}
+								className={secondaryButtonClassName}
+							>
+								Use a code instead
+							</Button>
+						</form>
+					) : null}
 
-					<div className="my-6 flex items-center gap-3">
+					<div className={step === "email" ? "my-6 flex items-center gap-3" : "hidden"}>
 						<div className="h-px flex-1 bg-white/10" />
 						<span className="text-xs text-white/50 uppercase tracking-[0.2em]">or</span>
 						<div className="h-px flex-1 bg-white/10" />
 					</div>
 
-					<div className="space-y-3">
+					<div className={step === "email" ? "space-y-3" : "hidden"}>
 						<button
 							type="button"
 							onClick={handleGoogleSignIn}

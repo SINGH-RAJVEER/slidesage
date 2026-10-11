@@ -39,5 +39,8 @@ func TestVerifyPasswordRefusesRemovedFormats(t *testing.T) {
 		if verifyPassword(hash, "password") {
 			t.Fatalf("%q verified", hash)
 		}
+		if isPasswordHash(hash) {
+			t.Fatalf("%q counted as a usable password", hash)
+		}
 	}
 }

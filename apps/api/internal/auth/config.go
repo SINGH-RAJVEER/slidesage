@@ -42,7 +42,7 @@ func (sender ResendEmailSender) SendOTP(ctx context.Context, email, code, purpos
 	}
 	subject := "Verify your Slide Sage email"
 	if purpose == "forget-password" {
-		subject = "Reset your Slide Sage password"
+		subject = "Set or reset your Slide Sage password"
 	} else if purpose == "sign-in" {
 		subject = "Your Slide Sage sign-in code"
 	}

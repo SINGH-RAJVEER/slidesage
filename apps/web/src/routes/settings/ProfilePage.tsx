@@ -12,14 +12,38 @@ import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { LoadingScreen } from "@slidesage/ui/components/loading-screen";
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { API_URL, readJsonResponse } from "@slidesage/ui/lib/api";
+import { auth } from "@slidesage/ui/lib/auth-client";
 import { FolderOpen } from "lucide-react";
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
+import { isRecord, usePageDraft } from "../../hooks/usePageDraft";
+import { takeProfile } from "./settings-data";
 
 const AVATAR_URL_DEBOUNCE_MS = 800;
 const MAX_AVATAR_UPLOAD_BYTES = 800 * 1024;
+
+interface ProfileDraft {
+	editingName: boolean;
+	newName: string | null;
+	editingEmail: boolean;
+	newEmail: string | null;
+	editingPassword: boolean;
+	imageUrl: string | null;
+}
+
+function isProfileDraft(value: unknown): value is ProfileDraft {
+	return (
+		isRecord(value) &&
+		typeof value["editingName"] === "boolean" &&
+		typeof value["editingEmail"] === "boolean" &&
+		typeof value["editingPassword"] === "boolean" &&
+		[value["newName"], value["newEmail"], value["imageUrl"]].every(
+			(field) => field === null || typeof field === "string",
+		)
+	);
+}
 
 function isValidAvatarUrl(value: string): boolean {
 	try {
@@ -37,20 +61,40 @@ export default function ProfilePage() {
 	const [error, setError] = useState<string | null>(null);
 	const [success, setSuccess] = useState<string | null>(null);
 
-	// Form states
-	const [editingName, setEditingName] = useState(false);
-	const [newName, setNewName] = useState("");
-
-	const [editingEmail, setEditingEmail] = useState(false);
-	const [newEmail, setNewEmail] = useState("");
+	const [draft, setDraft] = usePageDraft<ProfileDraft>(
+		"profile",
+		{
+			editingName: false,
+			newName: null,
+			editingEmail: false,
+			newEmail: null,
+			editingPassword: false,
+			imageUrl: null,
+		},
+		isProfileDraft,
+	);
+	const { editingName, editingEmail, editingPassword } = draft;
+	const newName = draft.newName ?? profile?.name ?? "";
+	const newEmail = draft.newEmail ?? profile?.email ?? "";
+	const imageUrl = draft.imageUrl ?? profile?.image ?? "";
+	const change = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) =>
+		setDraft((current) => ({ ...current, [key]: value }));
+	const setEditingName = (value: boolean) => change("editingName", value);
+	const setNewName = (value: string) => change("newName", value);
+	const setEditingEmail = (value: boolean) => change("editingEmail", value);
+	const setNewEmail = (value: string) => change("newEmail", value);
+	const setEditingPassword = (value: boolean) => change("editingPassword", value);
+	const setImageUrl = (value: string | null) => change("imageUrl", value);
+	// Credentials stay in the mounted form and are never written to draft storage.
 	const [emailCurrentPassword, setEmailCurrentPassword] = useState("");
-
-	const [editingPassword, setEditingPassword] = useState(false);
+	// Passwordless and OAuth-only accounts set a first password with an emailed code.
+	const [hasPassword, setHasPassword] = useState(true);
+	const [passwordCodeSent, setPasswordCodeSent] = useState(false);
+	const [passwordCode, setPasswordCode] = useState("");
 	const [currentPassword, setCurrentPassword] = useState("");
 	const [newPassword, setNewPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
 
-	const [imageUrl, setImageUrl] = useState("");
 	const [uploadingImage, setUploadingImage] = useState(false);
 	const avatarUrlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const avatarRequest = useRef<AbortController | null>(null);
@@ -64,19 +108,9 @@ export default function ProfilePage() {
 	const fetchProfile = useCallback(async () => {
 		try {
 			setLoading(true);
-			const res = await fetch(`${API_URL}/profile`, {
-				credentials: "include",
-			});
-
-			if (!res.ok) {
-				throw new Error("Failed to load profile");
-			}
-
-			const data = (await res.json()) as ProfileResponse;
+			const data = await takeProfile();
 			setProfile(data.user);
-			setNewName(data.user.name || "");
-			setNewEmail(data.user.email);
-			setImageUrl(data.user.image || "");
+			setHasPassword(data.hasPassword ?? true);
 			savedImage.current = data.user.image || "";
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load profile");
@@ -133,6 +167,7 @@ export default function ProfilePage() {
 			setProfile(data.user);
 			await refreshSession({ force: true });
 			setEditingName(false);
+			change("newName", null);
 			setSuccess("Name updated successfully");
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to update name");
@@ -169,6 +204,7 @@ export default function ProfilePage() {
 			};
 			setProfile(data.user);
 			setEditingEmail(false);
+			change("newEmail", null);
 			setEmailCurrentPassword("");
 			if (data.verification_required && data.pending_email) {
 				navigate(
@@ -233,6 +269,57 @@ export default function ProfilePage() {
 		}
 	};
 
+	let passwordSubmitLabel = savingProfile ? "Updating..." : "Update Password";
+	if (!hasPassword) {
+		passwordSubmitLabel = passwordCodeSent ? "Set Password" : "Email me a code";
+		if (savingProfile) passwordSubmitLabel = passwordCodeSent ? "Setting..." : "Sending code...";
+	}
+
+	const resetPasswordForm = () => {
+		setEditingPassword(false);
+		setPasswordCodeSent(false);
+		setPasswordCode("");
+		setCurrentPassword("");
+		setNewPassword("");
+		setConfirmPassword("");
+	};
+
+	const handleSetPassword = async (event: FormEvent) => {
+		event.preventDefault();
+		if (!profile) return;
+		setError(null);
+		setSuccess(null);
+
+		if (newPassword !== confirmPassword) {
+			setError("Passwords do not match");
+			return;
+		}
+
+		if (newPassword.length < 8) {
+			setError("Password must be at least 8 characters");
+			return;
+		}
+
+		setSavingProfile(true);
+
+		try {
+			if (!passwordCodeSent) {
+				await auth.requestPasswordReset({ email: profile.email });
+				setPasswordCodeSent(true);
+				setSuccess(`We sent a 6-digit code to ${profile.email}`);
+				return;
+			}
+			await auth.resetPassword({ email: profile.email, otp: passwordCode, password: newPassword });
+			setHasPassword(true);
+			resetPasswordForm();
+			setSuccess("Password set. You can now sign in with it.");
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Failed to set password");
+		} finally {
+			setSavingProfile(false);
+		}
+	};
+
 	const cancelAvatarUpdate = () => {
 		if (avatarUrlTimer.current) {
 			clearTimeout(avatarUrlTimer.current);
@@ -267,7 +354,7 @@ export default function ProfilePage() {
 			if (!data?.user || revision !== avatarRevision.current) return;
 
 			savedImage.current = data.user.image || "";
-			setImageUrl(data.user.image || "");
+			setImageUrl(null);
 			setProfile((currentProfile) =>
 				currentProfile ? { ...currentProfile, ...data.user } : currentProfile,
 			);
@@ -466,7 +553,7 @@ export default function ProfilePage() {
 										type="button"
 										onClick={() => {
 											setEditingName(false);
-											setNewName(profile.name || "");
+											change("newName", null);
 										}}
 										className="flex-1 bg-white/10 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 hover:bg-white/20"
 									>
@@ -528,7 +615,7 @@ export default function ProfilePage() {
 										type="button"
 										onClick={() => {
 											setEditingEmail(false);
-											setNewEmail(profile.email);
+											change("newEmail", null);
 											setEmailCurrentPassword("");
 										}}
 										className="flex-1 bg-white/10 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 hover:bg-white/20"
@@ -563,27 +650,32 @@ export default function ProfilePage() {
 									onClick={() => setEditingPassword(true)}
 									className="text-sm text-white/60 hover:text-white transition"
 								>
-									Change
+									{hasPassword ? "Change" : "Set password"}
 								</button>
 							) : null}
 						</div>
 
 						{editingPassword ? (
-							<form className="space-y-4" onSubmit={handleUpdatePassword}>
-								<div className="space-y-2">
-									<label htmlFor="current-password" className="text-sm font-medium text-white/80">
-										Current Password
-									</label>
-									<input
-										id="current-password"
-										type="password"
-										value={currentPassword}
-										onChange={(e) => setCurrentPassword(e.target.value)}
-										className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
-										placeholder="Enter current password"
-										required
-									/>
-								</div>
+							<form
+								className="space-y-4"
+								onSubmit={hasPassword ? handleUpdatePassword : handleSetPassword}
+							>
+								{hasPassword ? (
+									<div className="space-y-2">
+										<label htmlFor="current-password" className="text-sm font-medium text-white/80">
+											Current Password
+										</label>
+										<input
+											id="current-password"
+											type="password"
+											value={currentPassword}
+											onChange={(e) => setCurrentPassword(e.target.value)}
+											className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+											placeholder="Enter current password"
+											required
+										/>
+									</div>
+								) : null}
 
 								<div className="space-y-2">
 									<label htmlFor="new-password" className="text-sm font-medium text-white/80">
@@ -620,30 +712,48 @@ export default function ProfilePage() {
 									/>
 								</div>
 
+								{!hasPassword && passwordCodeSent ? (
+									<div className="space-y-2">
+										<label htmlFor="password-code" className="text-sm font-medium text-white/80">
+											Verification Code
+										</label>
+										<input
+											id="password-code"
+											type="text"
+											inputMode="numeric"
+											autoComplete="one-time-code"
+											maxLength={6}
+											value={passwordCode}
+											onChange={(e) => setPasswordCode(e.target.value.replace(/\D/g, ""))}
+											className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+											placeholder="6-digit code from your email"
+											minLength={6}
+											required
+										/>
+									</div>
+								) : null}
+
 								<div className="flex gap-2">
 									<button
 										type="submit"
 										disabled={savingProfile}
 										className="flex-1 bg-white text-black font-semibold py-2 px-4 rounded-lg transition duration-200 disabled:opacity-60"
 									>
-										{savingProfile ? "Updating..." : "Update Password"}
+										{passwordSubmitLabel}
 									</button>
 									<button
 										type="button"
-										onClick={() => {
-											setEditingPassword(false);
-											setCurrentPassword("");
-											setNewPassword("");
-											setConfirmPassword("");
-										}}
+										onClick={resetPasswordForm}
 										className="flex-1 bg-white/10 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 hover:bg-white/20"
 									>
 										Cancel
 									</button>
 								</div>
 							</form>
-						) : (
+						) : hasPassword ? (
 							<p className="text-white/80">••••••••</p>
+						) : (
+							<p className="text-white/60">Not set. You sign in with a code sent to your email.</p>
 						)}
 					</div>
 

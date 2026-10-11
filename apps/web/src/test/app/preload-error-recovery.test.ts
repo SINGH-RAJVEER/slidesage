@@ -72,4 +72,25 @@ describe("preload error recovery", () => {
 		expect(reload).not.toHaveBeenCalled();
 		uninstall();
 	});
+
+	it("leaves an ignored failure for the navigation that needs the chunk", () => {
+		const storage = createStorage();
+		const reload = mock(() => {});
+		let prefetching = true;
+		const uninstall = installPreloadErrorRecovery({
+			storage,
+			reload,
+			ignore: () => prefetching,
+		});
+		const chunkUrl = "https://slidesage.app/assets/PresentationPage-old.js";
+
+		const prefetchErrorWasHandled = !window.dispatchEvent(createPreloadError(chunkUrl));
+		prefetching = false;
+		const navigationErrorWasHandled = !window.dispatchEvent(createPreloadError(chunkUrl));
+
+		expect(prefetchErrorWasHandled).toBe(false);
+		expect(navigationErrorWasHandled).toBe(true);
+		expect(reload).toHaveBeenCalledTimes(1);
+		uninstall();
+	});
 });

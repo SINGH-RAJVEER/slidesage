@@ -12,11 +12,13 @@
 | `warning` | `string \| null \| undefined` | Shown when no error exists |
 | `success` | `string \| null \| undefined` | Shown when no error or warning exists |
 | `onDismiss` | `() => void` | Clear the state that produced the message |
+| `action` | `{ label: string; onClick: () => void } \| null \| undefined` | Button shown beside the message, such as Undo |
 
 - Errors use `role="alert"`, a warning icon, and red styling.
 - Warnings use `role="status"`, a warning icon, and amber styling.
 - Success uses `role="status"`, a check icon, and emerald styling.
 - All notices use `aria-live="polite"`. Empty messages render nothing.
+- `NOTICE_TTL_MS` is exported so a page can time an action window to the notice.
 
 ## Usage
 
@@ -39,11 +41,21 @@ Mount once per page after `<Header />`:
 - If upstream state cannot be cleared, copy the message into local state and clear that copy on dismissal.
 - Implementation: `libs/ui/components/FloatingNotice.tsx`.
 
+## Undoing a deletion
+
+Deletes take one click and offer Undo on the notice instead of a confirmation dialog:
+
+- Slides in `DeckWorkspace` are removed and autosaved at once. Undo re-inserts the card at its old position.
+- Presentations in `PresentationsGridPage` leave the grid at once, but the `DELETE` request waits `NOTICE_TTL_MS`. Undo cancels it. A second deletion, leaving the page, or closing the tab sends the pending request. A failed request restores the presentation and shows an error.
+- Pass a `key` that changes per deletion so back-to-back deletions restart the notice timer.
+- A new deletion clears any error on the notice so Undo is visible. Hide the action if a later error takes over the notice.
+
 ## What stays inline
 
 Keep states that replace a page or panel and provide recovery controls inline:
 
-- `PresentationErrorPage`; retry failures use a notice.
-- The research failure block on `GenerateResearchPage`, with Retry research.
+- `PresentationErrorPage`, including the saved reason the generation failed; retry failures use a notice.
+- A failed research search on `GenerateResearchPage`: the reason stays in place of the sources, and Retry research replaces Proceed to Generate.
+- A failed outline request on `OutlinePage`: the reason stays in place of the outline. Its back button keeps the chosen settings, returning reviewed sources to the research page without another search. A refused draft submission keeps the outline and uses a notice.
 - The load failure in `AISettings`; action confirmations use a notice.
 - The terminal Email verified state on `VerifyEmailPage`.

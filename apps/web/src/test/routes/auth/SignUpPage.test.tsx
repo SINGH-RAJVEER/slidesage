@@ -75,6 +75,29 @@ it("requests a verification OTP after creating an email account", async () => {
 	});
 });
 
+it("creates an account without a password when the field is left blank", async () => {
+	signUp.mockClear();
+	const { default: SignUpPage } = await import("../../../routes/auth/SignUpPage");
+	const view = render(
+		<MemoryRouter initialEntries={["/sign-up"]}>
+			<Routes>
+				<Route path="/sign-up" element={<SignUpPage />} />
+				<Route path="/sign-up/verify-email" element={<VerificationProbe />} />
+			</Routes>
+		</MemoryRouter>,
+	);
+
+	fireEvent.change(view.getByLabelText("Name"), { target: { value: "Test User" } });
+	fireEvent.change(view.getByLabelText("Email"), { target: { value: "User@Example.com" } });
+	expect(view.queryByLabelText("Confirm password")).toBeNull();
+	fireEvent.click(view.getByRole("button", { name: "Sign Up" }));
+
+	await waitFor(() => {
+		expect(view.getByText("user@example.com|")).toBeInTheDocument();
+	});
+	expect(signUp).toHaveBeenCalledWith({ name: "Test User", email: "user@example.com" });
+});
+
 it("resends verification when the email belongs to an unverified account", async () => {
 	signUp.mockClear();
 	sendVerificationOtp.mockClear();

@@ -1,5 +1,6 @@
-import { LogOut, Settings, UserRound } from "lucide-react";
+import { Bug, LogOut, MessageSquare, Settings, UserRound } from "lucide-react";
 import { type ComponentType, type ReactNode, useState } from "react";
+import { usePrefetchIntent } from "../hooks/usePrefetchIntent";
 import { cn } from "../lib/utils";
 import {
 	DropdownMenu,
@@ -26,8 +27,11 @@ export interface HeaderRoutes {
 	purchase: string;
 	profile: string;
 	settings: string;
+	feedback: string;
 	auth: string[];
 }
+
+const BUG_REPORT_URL = "https://github.com/SINGH-RAJVEER/slidesage/issues";
 
 export interface HeaderLinkProps {
 	to: string;
@@ -43,6 +47,8 @@ interface HeaderProps {
 	user?: HeaderUser | null;
 	sticky?: boolean;
 	onNavigate: (path: string) => void;
+	/** Called once the user looks about to open a page the header reaches without a link. */
+	onPrefetch?: (path: string) => void;
 	onSignOut: () => Promise<void>;
 }
 
@@ -53,9 +59,13 @@ export function Header({
 	user,
 	sticky = false,
 	onNavigate,
+	onPrefetch,
 	onSignOut,
 }: HeaderProps) {
 	const [signingOut, setSigningOut] = useState(false);
+	const purchaseIntent = usePrefetchIntent(
+		onPrefetch ? () => onPrefetch(routes.purchase) : undefined,
+	);
 
 	const handleSignOut = async () => {
 		if (signingOut) return;
@@ -139,6 +149,7 @@ export function Header({
 						<>
 							<button
 								type="button"
+								{...purchaseIntent}
 								onClick={() => onNavigate(routes.purchase)}
 								className="hidden rounded-full border border-white/10 px-5 py-2 text-base font-medium text-white/90 transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20 lg:block"
 								title="Click to purchase more points"
@@ -172,6 +183,7 @@ export function Header({
 									{[
 										{ path: routes.profile, label: "Profile", Icon: UserRound },
 										{ path: routes.settings, label: "Settings", Icon: Settings },
+										{ path: routes.feedback, label: "Feedback", Icon: MessageSquare },
 									].map(({ path, label, Icon }) => (
 										<DropdownMenuItem
 											key={path}
@@ -187,6 +199,20 @@ export function Header({
 											</LinkComponent>
 										</DropdownMenuItem>
 									))}
+									<DropdownMenuItem
+										asChild
+										className="rounded-lg px-0 py-0 text-white/80 focus:bg-white/10 focus:text-white"
+									>
+										<a
+											href={BUG_REPORT_URL}
+											target="_blank"
+											rel="noopener noreferrer"
+											className="flex items-center gap-2 px-3 py-2 text-sm whitespace-nowrap outline-none transition-colors"
+										>
+											<Bug aria-hidden="true" className="size-4" />
+											Report a bug
+										</a>
+									</DropdownMenuItem>
 									<DropdownMenuItem
 										disabled={signingOut}
 										onSelect={() => void handleSignOut()}

@@ -26,6 +26,18 @@ function AwayPage() {
 
 describe("GenerateResearchPage", () => {
 	it("shows saved retry sources without repeating the research request", async () => {
+		const plan = {
+			title: "Saved research topic",
+			cards: [
+				{
+					position: 1,
+					takeaway: "The saved point",
+					role: "opening",
+					layout: "title",
+					sourceIds: ["s1"],
+				},
+			],
+		};
 		const originalFetch = globalThis.fetch;
 		const fetchMock = mock(async () => new Response(null, { status: 500 }));
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -51,6 +63,53 @@ describe("GenerateResearchPage", () => {
 									],
 									estimated_tokens: 8.4,
 								},
+								plan,
+							},
+						},
+					]}
+				>
+					<StreamingProvider>
+						<Routes>
+							<Route path="/generate/research" element={<GenerateResearchPage />} />
+							<Route path="/generate/outline" element={<OutlineStateProbe />} />
+						</Routes>
+					</StreamingProvider>
+				</MemoryRouter>,
+			);
+
+			await waitFor(() => expect(view.getByText("Saved source")).toBeInTheDocument());
+			expect(view.getAllByText("Stored with the failed presentation.")).not.toHaveLength(0);
+			expect(view.getByText("Proceed to Generate").closest("button")).not.toBeDisabled();
+			expect(fetchMock).not.toHaveBeenCalled();
+
+			// The sources the outline cites are unchanged, so it goes along.
+			fireEvent.click(view.getByText("Proceed to Generate"));
+			const state = JSON.parse((await view.findByTestId("outline-state")).textContent ?? "{}");
+			expect(state.plan).toEqual(plan);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	it("asks the search for the chosen number of results", async () => {
+		const originalFetch = globalThis.fetch;
+		const fetchMock = mock(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+			Response.json({ sources: [] }),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		try {
+			const view = render(
+				<MemoryRouter
+					initialEntries={[
+						{
+							pathname: "/generate/research",
+							state: {
+								prompt: "Tidal energy",
+								slideCount: 6,
+								detailLevel: "balanced",
+								tonality: "professional",
+								maxResults: 3,
 							},
 						},
 					]}
@@ -63,16 +122,82 @@ describe("GenerateResearchPage", () => {
 				</MemoryRouter>,
 			);
 
-			await waitFor(() => expect(view.getByText("Saved source")).toBeInTheDocument());
-			expect(view.getAllByText("Stored with the failed presentation.")).not.toHaveLength(0);
-			expect(view.getByText("Proceed to Generate").closest("button")).not.toBeDisabled();
-			expect(fetchMock).not.toHaveBeenCalled();
+			await waitFor(() => expect(view.getByText(/No sources found/)).toBeInTheDocument());
+			const init = fetchMock.mock.calls[0]?.[1];
+			expect(JSON.parse(String(init?.body)).research).toEqual({ enabled: true, maxResults: 3 });
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
 	});
 
-	it("keeps generation disabled while the research request is loading", async () => {
+	it("leaves removed sources out of the reviewed payload until they are restored", async () => {
+		const view = render(
+			<MemoryRouter
+				initialEntries={[
+					{
+						pathname: "/generate/research",
+						state: {
+							prompt: "Coastal erosion",
+							slideCount: 5,
+							detailLevel: "balanced",
+							tonality: "professional",
+							researchPayload: {
+								sources: [
+									{ url: "https://example.com/first", title: "First source" },
+									{ url: "https://example.com/second", title: "Second source" },
+									{ url: "https://example.com/third", title: "Third source" },
+								],
+							},
+							plan: {
+								title: "Coastal erosion",
+								cards: [
+									{
+										position: 1,
+										takeaway: "Coasts are retreating",
+										role: "opening",
+										layout: "title",
+										sourceIds: ["s1"],
+									},
+								],
+							},
+						},
+					},
+				]}
+			>
+				<StreamingProvider>
+					<Routes>
+						<Route path="/generate/research" element={<GenerateResearchPage />} />
+						<Route path="/generate/outline" element={<OutlineStateProbe />} />
+					</Routes>
+				</StreamingProvider>
+			</MemoryRouter>,
+		);
+
+		await waitFor(() => expect(view.getByText("Second source")).toBeInTheDocument());
+
+		fireEvent.click(view.getByRole("button", { name: "Remove source: Second source" }));
+		expect(view.queryByText("Second source")).not.toBeInTheDocument();
+		expect(view.getByRole("button", { name: "Remove source: Third source" })).toHaveFocus();
+
+		fireEvent.click(view.getByRole("button", { name: "Remove source: First source" }));
+		fireEvent.click(view.getByRole("button", { name: "Restore 2 removed" }));
+		expect(view.getByText("First source")).toBeInTheDocument();
+		expect(view.getByText("Second source")).toBeInTheDocument();
+		expect(view.getByRole("button", { name: "Remove source: First source" })).toHaveFocus();
+
+		fireEvent.click(view.getByRole("button", { name: "Remove source: First source" }));
+		fireEvent.click(view.getByText("Proceed to Generate"));
+
+		const state = JSON.parse((await view.findByTestId("outline-state")).textContent ?? "{}");
+		expect(state.researchPayload.sources.map((source: { url: string }) => source.url)).toEqual([
+			"https://example.com/second",
+			"https://example.com/third",
+		]);
+		// The saved outline cited the removed source by position, so it is not reused.
+		expect(state.plan).toBeUndefined();
+	});
+
+	it("shows the sources table and Proceed only once research succeeds", async () => {
 		const originalFetch = globalThis.fetch;
 		let requestCount = 0;
 		let resolveResearch: ((response: Response) => void) | undefined;
@@ -110,8 +235,10 @@ describe("GenerateResearchPage", () => {
 			);
 
 			await waitFor(() => expect(requestCount).toBe(1));
-			expect(view.getByText("Proceed to Generate").closest("button")).toBeDisabled();
-			expect(view.getByText("Sources")).toBeInTheDocument();
+			expect(view.getByText("Searching the web for sources...")).toBeInTheDocument();
+			expect(view.queryByText("Proceed to Generate")).not.toBeInTheDocument();
+			expect(view.queryByText("Sources")).not.toBeInTheDocument();
+			expect(view.queryByRole("columnheader", { name: "Research note" })).not.toBeInTheDocument();
 
 			resolveResearch?.(
 				new Response(
@@ -136,6 +263,7 @@ describe("GenerateResearchPage", () => {
 				expect(view.getByText("Battery storage outlook")).toBeInTheDocument();
 			});
 			expect(view.getByRole("table", { name: "Research sources" })).toBeInTheDocument();
+			expect(view.getByRole("columnheader", { name: "Research note" })).toBeInTheDocument();
 			expect(view.getAllByText("A complete source preview.")).not.toHaveLength(0);
 			const sourceLink = view.getByRole("link", {
 				name: "Open source: Battery storage outlook",
@@ -162,6 +290,53 @@ describe("GenerateResearchPage", () => {
 				],
 				estimated_tokens: 5.8,
 			});
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	it("keeps a failed search's reason on the page with a retry in place of Proceed", async () => {
+		const originalFetch = globalThis.fetch;
+		const fetchMock = mock(
+			async () =>
+				new Response(JSON.stringify({ error: "Unable to run research" }), {
+					status: 500,
+					headers: { "Content-Type": "application/json" },
+				}),
+		);
+		globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+		try {
+			const view = render(
+				<MemoryRouter
+					initialEntries={[
+						{
+							pathname: "/generate/research",
+							state: {
+								prompt: "Desalination costs",
+								slideCount: 5,
+								detailLevel: "balanced",
+								tonality: "professional",
+							},
+						},
+					]}
+				>
+					<StreamingProvider>
+						<Routes>
+							<Route path="/generate/research" element={<GenerateResearchPage />} />
+						</Routes>
+					</StreamingProvider>
+				</MemoryRouter>,
+			);
+
+			const reason = await view.findByRole("alert");
+			expect(reason).toHaveTextContent("Unable to run research");
+			expect(reason.closest(".fixed")).toBeNull();
+			expect(view.queryByText("Proceed to Generate")).not.toBeInTheDocument();
+			expect(view.queryByRole("table", { name: "Research sources" })).not.toBeInTheDocument();
+
+			fireEvent.click(view.getByRole("button", { name: "Retry research" }));
+			await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
 		} finally {
 			globalThis.fetch = originalFetch;
 		}

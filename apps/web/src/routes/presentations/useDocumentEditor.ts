@@ -1,6 +1,9 @@
 import { type CardDocument, validateCardDocument } from "@slidesage/cards";
+import { useAuth } from "@slidesage/ui";
 import { API_URL } from "@slidesage/ui/lib/api";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { pageDraftKey, readPageDraft, writePageDraft } from "../../hooks/usePageDraft";
+import { type DraftOperation, isDocumentDraft, sameDocument } from "./document-draft";
 
 export type SaveStatus =
 	| { state: "saved" }
@@ -17,11 +20,7 @@ interface History {
 }
 
 /** One save request. A retry sends the same ID, so the server applies it once. */
-interface Operation {
-	document: CardDocument;
-	validated: CardDocument;
-	id: string;
-}
+type Operation = DraftOperation;
 
 /** Edits closer together than this undo as one step, so typing is not undone a letter at a time. */
 const COALESCE_MS = 800;
@@ -43,6 +42,10 @@ export interface DocumentEditor {
 	savedRevision: () => number;
 	/** True when every edit is saved and saving is not blocked by a conflict. */
 	isSaved: () => boolean;
+	/** Explicitly discards the local recovery draft before reloading the server version. */
+	discardDraft: () => void;
+	/** Whether the current edits were successfully stored in this browser. */
+	hasLocalDraft: () => boolean;
 }
 
 /**
@@ -59,24 +62,91 @@ export function useDocumentEditor(options: {
 	onSaved?: (document: CardDocument, revision: number) => void;
 }): DocumentEditor {
 	const { presentationId, assetIds, onSaved } = options;
+	const { user } = useAuth();
+	const draftKey = pageDraftKey(user?.id, `document:${presentationId}`);
+	const ownerKey = `${draftKey}:owner`;
+	const [recovery] = useState(() => {
+		const draft = readPageDraft(draftKey, isDocumentDraft);
+		if (!draft) return null;
+		// A lost response may have reached the server. Reconcile that save first
+		// instead of replaying it against a revision it already produced.
+		if (draft.pendingOperation && sameDocument(draft.pendingOperation.document, options.initial)) {
+			return {
+				...draft,
+				savedDocument: options.initial,
+				baseRevision: options.revision,
+				pendingOperation: null,
+				conflict: false,
+			};
+		}
+		return { ...draft, conflict: draft.baseRevision !== options.revision };
+	});
+	const [owner] = useState(() => crypto.randomUUID());
+	const discarded = useRef(false);
+	const recoveredDocument =
+		recovery && !sameDocument(recovery.document, options.initial)
+			? recovery.document
+			: options.initial;
 	const [history, setHistory] = useState<History>({
-		past: [],
-		present: options.initial,
+		past: recovery && recoveredDocument !== options.initial ? [options.initial] : [],
+		present: recoveredDocument,
 		future: [],
 	});
-	const [status, setStatus] = useState<SaveStatus>({ state: "saved" });
-	const base = useRef(options.revision);
+	const [status, setStatus] = useState<SaveStatus>(
+		recovery?.conflict
+			? {
+					state: "conflict",
+					message: "This presentation was changed elsewhere. Reload it before editing.",
+				}
+			: { state: recoveredDocument === options.initial ? "saved" : "pending" },
+	);
+	const base = useRef(recovery?.baseRevision ?? options.revision);
 	const saved = useRef<CardDocument>(options.initial);
 	const lastEdit = useRef(0);
 	const saving = useRef<Promise<void> | null>(null);
-	const blocked = useRef(false);
+	const blocked = useRef(recovery?.conflict ?? false);
 	// The last save that did not succeed, kept while it may still have landed.
-	const pendingOperation = useRef<Operation | null>(null);
+	const pendingOperation = useRef<Operation | null>(
+		recovery?.pendingOperation
+			? {
+					...recovery.pendingOperation,
+					document: sameDocument(recovery.pendingOperation.document, recoveredDocument)
+						? recoveredDocument
+						: recovery.pendingOperation.document,
+				}
+			: null,
+	);
 	const present = useRef(history.present);
 	present.current = history.present;
 	// A save that may have landed without an answer is unsaved until it is
 	// confirmed, even when the edits it carried were undone.
 	const unsaved = () => present.current !== saved.current || pendingOperation.current !== null;
+	const persist = useCallback(() => {
+		if (discarded.current) return;
+		// An older editor's in-flight save must not erase a newer editor's draft.
+		if (readPageDraft(ownerKey, (value): value is string => typeof value === "string") !== owner)
+			return;
+		writePageDraft(
+			draftKey,
+			present.current !== saved.current || pendingOperation.current
+				? {
+						owner,
+						document: present.current,
+						savedDocument: saved.current,
+						baseRevision: base.current,
+						pendingOperation: pendingOperation.current,
+					}
+				: undefined,
+		);
+	}, [draftKey, owner, ownerKey]);
+	useEffect(() => {
+		// Take ownership once, before autosaving or processing new edits.
+		writePageDraft(ownerKey, owner);
+		if (recovery) writePageDraft(draftKey, { ...recovery, owner });
+	}, [draftKey, owner, ownerKey, recovery]);
+	useEffect(() => {
+		persist();
+	}, [history.present, persist]);
 
 	const edit = useCallback((update: (document: CardDocument) => CardDocument) => {
 		setHistory((current) => {
@@ -140,6 +210,7 @@ export function useDocumentEditor(options: {
 				if (response.status === 409) {
 					blocked.current = true;
 					pendingOperation.current = null;
+					persist();
 					setStatus({
 						state: "conflict",
 						message: body?.error?.message ?? "This presentation was changed elsewhere.",
@@ -150,12 +221,14 @@ export function useDocumentEditor(options: {
 					// A refusal means nothing was stored. A server error may have
 					// come after the revision was, so that save stays pending.
 					if (response.status < 500) pendingOperation.current = null;
+					persist();
 					setStatus({ state: "error", message: body?.error?.message ?? "Unable to save changes." });
 					return false;
 				}
 				base.current = body.revision.revision;
 				saved.current = operation.document;
 				pendingOperation.current = null;
+				persist();
 				onSaved?.(operation.document, body.revision.revision);
 				return true;
 			} catch {
@@ -163,7 +236,7 @@ export function useDocumentEditor(options: {
 				return false;
 			}
 		},
-		[onSaved, presentationId],
+		[onSaved, persist, presentationId],
 	);
 
 	const save = useCallback(async () => {
@@ -191,9 +264,10 @@ export function useDocumentEditor(options: {
 		if (pendingOperation.current?.document !== document) {
 			pendingOperation.current = { document, validated: checked.value, id: crypto.randomUUID() };
 		}
+		persist();
 		if (!(await send(pendingOperation.current))) return;
 		setStatus(present.current === document ? { state: "saved" } : { state: "pending" });
-	}, [assetIds, send]);
+	}, [assetIds, persist, send]);
 
 	const flush = useCallback(async () => {
 		while (saving.current) await saving.current;
@@ -247,6 +321,14 @@ export function useDocumentEditor(options: {
 		flush,
 		savedRevision: () => base.current,
 		isSaved: () => !unsaved() && !blocked.current,
+		discardDraft: () => {
+			discarded.current = true;
+			writePageDraft(draftKey, undefined);
+		},
+		hasLocalDraft: () => {
+			const draft = readPageDraft(draftKey, isDocumentDraft);
+			return !!draft && sameDocument(draft.document, present.current);
+		},
 	};
 }
 

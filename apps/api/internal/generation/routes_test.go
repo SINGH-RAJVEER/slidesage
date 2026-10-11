@@ -472,3 +472,18 @@ func TestGenerationFailureDocumentCarriesSubmittedSettingsIntoRetryState(t *test
 		t.Fatalf("retry detail level, tonality, and theme = %#v", retry)
 	}
 }
+
+func TestGenerationFailureDocumentKeepsTheApprovedOutline(t *testing.T) {
+	plan := &cardPlan{Title: "Grid storage", Cards: []cardPlanEntry{{Position: 1, Takeaway: "Storage is scaling fast", Role: "opening", Layout: "title"}}}
+	failed := generationFailureDocument(streamJob{kind: "generation", prompt: "Grid storage", slideCount: 1, plan: plan}, "provider was unreachable")
+
+	retry := failed["failure"].(map[string]any)["retry"].(map[string]any)
+	if retry["plan"] != plan {
+		t.Fatalf("retry plan = %#v", retry["plan"])
+	}
+
+	planned := generationFailureDocument(streamJob{kind: "generation", prompt: "Grid storage", slideCount: 1}, "provider was unreachable")
+	if _, found := planned["failure"].(map[string]any)["retry"].(map[string]any)["plan"]; found {
+		t.Fatal("a deck planned during generation has no approved outline to keep")
+	}
+}

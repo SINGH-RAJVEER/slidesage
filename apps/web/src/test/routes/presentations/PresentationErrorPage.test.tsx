@@ -163,6 +163,53 @@ describe("PresentationErrorPage", () => {
 		}
 	});
 
+	it("shows why the saved presentation failed", async () => {
+		const { default: PresentationErrorPage } = await import(
+			"../../../routes/presentations/PresentationErrorPage"
+		);
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = mock(async () =>
+			Response.json({
+				presentation: {
+					id: "presentation_42",
+					title: "Generation failed",
+					slides_data: {
+						title: "Generation failed",
+						slides: [],
+						status: "failed",
+						failure: {
+							message:
+								"Your AI provider account does not have enough credit for this presentation.",
+							retry: {
+								prompt: "Retry this deck",
+								slide_count: 7,
+								detail_level: "detailed",
+								tonality: "professional",
+								research_enabled: false,
+							},
+						},
+					},
+				},
+			}),
+		) as unknown as typeof fetch;
+
+		try {
+			const view = render(
+				<MemoryRouter initialEntries={["/presentation-error?id=presentation_42"]}>
+					<Routes>
+						<Route path="/presentation-error" element={<PresentationErrorPage />} />
+					</Routes>
+				</MemoryRouter>,
+			);
+
+			expect(await view.findByRole("alert")).toHaveTextContent(
+				"Your AI provider account does not have enough credit for this presentation.",
+			);
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
 	it("handles an HTML deployment error without exposing a JSON parser failure", async () => {
 		const { default: PresentationErrorPage } = await import(
 			"../../../routes/presentations/PresentationErrorPage"
@@ -225,7 +272,10 @@ describe("PresentationErrorPage", () => {
 			});
 			return new Response(null, { status: 204 });
 		});
-		globalThis.fetch = deleteRequest as unknown as typeof fetch;
+		// Opening the page loads the saved failure; only the delete is under test.
+		globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) =>
+			init?.method === "DELETE" ? deleteRequest(input, init) : new Promise<Response>(() => {}),
+		) as unknown as typeof fetch;
 
 		try {
 			const view = render(

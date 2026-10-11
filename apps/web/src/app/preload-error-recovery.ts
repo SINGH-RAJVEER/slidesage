@@ -6,6 +6,8 @@ type RecoveryStorage = Pick<Storage, "getItem" | "setItem">;
 type PreloadErrorRecoveryOptions = {
 	storage?: RecoveryStorage;
 	reload?: () => void;
+	/** Leaves a failure alone, as one nobody is waiting on yet. */
+	ignore?: () => boolean;
 };
 
 function getSessionStorage(): RecoveryStorage | undefined {
@@ -41,8 +43,10 @@ function claimRecovery(storage: RecoveryStorage | undefined, fingerprint: string
 export function installPreloadErrorRecovery({
 	storage = getSessionStorage(),
 	reload = () => window.location.reload(),
+	ignore = () => false,
 }: PreloadErrorRecoveryOptions = {}) {
 	const handlePreloadError = (event: VitePreloadErrorEvent) => {
+		if (ignore()) return;
 		const fingerprint = event.payload.message.trim();
 		if (!fingerprint || !claimRecovery(storage, fingerprint)) return;
 

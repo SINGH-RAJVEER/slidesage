@@ -1,5 +1,8 @@
 import type { CardTemplate } from "@slidesage/cards";
+import { usePrefetchIntent } from "@slidesage/ui/hooks/usePrefetchIntent";
 import { Plus, Trash2 } from "lucide-react";
+import { prefetchModule } from "../../app/prefetch";
+import { routeModules } from "../../app/router/route-modules";
 import { TemplatePreview } from "./TemplatePreview";
 
 interface MarketplaceCardProps {
@@ -17,10 +20,13 @@ export default function MarketplaceCard({
 	onInstall,
 	onRemove,
 }: MarketplaceCardProps) {
+	// The template is already in memory; only the preview page's code is fetched.
+	const intent = usePrefetchIntent(() => prefetchModule(routeModules.marketplacePreview));
 	return (
 		<article className="group min-w-0 break-inside-avoid">
 			<button
 				type="button"
+				{...intent}
 				onClick={() => onOpen(template.id)}
 				aria-label={`Preview ${template.name} template`}
 				className="relative block aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black/30 text-left shadow-[0_18px_50px_rgba(0,0,0,0.16)] transition duration-300 group-hover:-translate-y-1 group-hover:border-white/20 group-hover:shadow-[0_24px_65px_rgba(0,0,0,0.28)] focus:outline-none focus:ring-2 focus:ring-amber-100/35"
@@ -36,6 +42,7 @@ export default function MarketplaceCard({
 			<div className="flex items-start gap-3 px-1 pb-2 pt-4">
 				<button
 					type="button"
+					{...intent}
 					onClick={() => onOpen(template.id)}
 					className="min-w-0 flex-1 text-left focus:outline-none"
 				>
