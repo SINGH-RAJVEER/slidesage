@@ -20,6 +20,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/auth"
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/generation"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/integrations/ai"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/middleware"
@@ -360,6 +361,29 @@ func runCleanup(ctx context.Context, database *sql.DB, authService *auth.Service
 		slog.Warn("rate-limit cleanup failed", slog.Any("error", err))
 	} else if deleted > 0 {
 		slog.Info("deleted expired rate-limit counters", slog.Int64("count", deleted))
+	}
+	runImageCleanup(ctx, database)
+}
+
+func runImageCleanup(ctx context.Context, database *sql.DB) {
+	bucket := strings.TrimSpace(os.Getenv("PRESENTATION_GCS_BUCKET"))
+	if bucket == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	store, err := carddocument.NewGCSBlobStore(ctx, bucket)
+	if err != nil {
+		slog.Warn("image cleanup storage unavailable", slog.Any("error", err))
+		return
+	}
+	defer store.Close()
+	deleted, err := carddocument.CleanupDeletedAssets(ctx, database, store, 100)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		slog.Warn("image cleanup failed; pending images will be retried", slog.Any("error", err))
+	}
+	if deleted > 0 {
+		slog.Info("deleted images for removed presentations", slog.Int("count", deleted))
 	}
 }
 
