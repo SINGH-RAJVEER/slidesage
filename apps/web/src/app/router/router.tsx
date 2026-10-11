@@ -1,6 +1,7 @@
 import { LoadingScreen } from "@slidesage/ui/components/loading-screen";
 import type { ComponentType } from "react";
 import { createBrowserRouter } from "react-router-dom";
+import CreatePasswordPage from "../../routes/auth/CreatePasswordPage";
 import ForgotPasswordPage from "../../routes/auth/ForgotPasswordPage";
 import ResetPasswordPage from "../../routes/auth/ResetPasswordPage";
 import SignInPage from "../../routes/auth/SignInPage";
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
 			{ path: "landing", lazy: lazyRoute(() => import("../../routes/landing/LandingPage")) },
 			{ path: "sign-in/*", element: <SignInPage /> },
 			{ path: "sign-in/verify", element: <VerifyEmailPage /> },
+			{ path: "sign-in/create-password", element: <CreatePasswordPage /> },
 			{ path: "sign-up/*", element: <SignUpPage /> },
 			{ path: "sign-up/verify-email", element: <VerifyEmailPage /> },
 			{ path: "forgot-password", element: <ForgotPasswordPage /> },

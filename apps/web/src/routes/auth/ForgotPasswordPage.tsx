@@ -2,7 +2,7 @@ import { useAuth } from "@slidesage/ui";
 import { FloatingNotice } from "@slidesage/ui/components/FloatingNotice";
 import { auth } from "@slidesage/ui/lib/auth-client";
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Header from "../../app/Header";
 
 function getErrorCode(value: unknown): string | undefined {
@@ -14,7 +14,8 @@ function getErrorCode(value: unknown): string | undefined {
 export default function ForgotPasswordPage() {
 	const navigate = useNavigate();
 	const { isSignedIn } = useAuth();
-	const [email, setEmail] = useState("");
+	const [searchParams] = useSearchParams();
+	const [email, setEmail] = useState(searchParams.get("email") ?? "");
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [missingAccount, setMissingAccount] = useState(false);
