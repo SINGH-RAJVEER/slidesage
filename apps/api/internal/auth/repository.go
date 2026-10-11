@@ -31,10 +31,18 @@ func (repository *Repository) CreateUserWithCredential(ctx context.Context, user
 	if _, err = transaction.ExecContext(ctx, `INSERT INTO point_ledger (id, user_id, entry_type, delta_millis, balance_after_millis) VALUES (md5(random()::text || clock_timestamp()::text), $1, 'signup_credit', $2, $2)`, user.ID, balanceMillis); err != nil {
 		return err
 	}
-	if _, err = transaction.ExecContext(ctx, `INSERT INTO accounts (id, account_id, provider_id, user_id, password, created_at, updated_at) VALUES ($1, $2, 'credential', $2, $3, NOW(), NOW())`, accountID, user.ID, password); err != nil {
-		return err
+	// A passwordless user has no credential account until a password reset sets one.
+	if password != "" {
+		if err = insertCredential(ctx, transaction, accountID, user.ID, password); err != nil {
+			return err
+		}
 	}
 	return transaction.Commit()
+}
+
+func insertCredential(ctx context.Context, transaction *sql.Tx, accountID, userID, password string) error {
+	_, err := transaction.ExecContext(ctx, `INSERT INTO accounts (id, account_id, provider_id, user_id, password, created_at, updated_at) VALUES ($1, $2, 'credential', $2, $3, NOW(), NOW())`, accountID, userID, password)
+	return err
 }
 
 func (repository *Repository) UserByID(ctx context.Context, id string) (User, error) {
@@ -54,7 +62,7 @@ func (repository *Repository) DeleteExpiredUnverifiedUsers(ctx context.Context, 
 			AND u.created_at <= $1
 			AND NOT EXISTS (
 				SELECT 1 FROM verifications AS v
-				WHERE v.identifier = 'email-verification-otp-' || u.email
+				WHERE v.identifier IN ('email-verification-otp-' || u.email, 'sign-in-otp-' || u.email)
 					AND v.expires_at > $2
 			)
 			AND NOT EXISTS (
@@ -69,6 +77,7 @@ func (repository *Repository) DeleteExpiredUnverifiedUsers(ctx context.Context, 
 			USING expired_users AS expired
 			WHERE v.identifier IN (
 				'email-verification-otp-' || expired.email,
+				'sign-in-otp-' || expired.email,
 				'forget-password-otp-' || expired.email
 			)
 		)
@@ -259,7 +268,9 @@ func scanUser(row rowScanner) (User, error) {
 	return user, err
 }
 
-func (repository *Repository) ResetPassword(ctx context.Context, userID, accountID, verificationID, identifier, password string, now time.Time) error {
+// ResetPassword replaces the password on credentialID, or creates a credential
+// account with newAccountID when the user has none (passwordless and OAuth users).
+func (repository *Repository) ResetPassword(ctx context.Context, userID, credentialID, newAccountID, verificationID, identifier, password string, now time.Time) error {
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -273,7 +284,11 @@ func (repository *Repository) ResetPassword(ctx context.Context, userID, account
 	if err != nil || affected != 1 {
 		return ErrNotFound
 	}
-	if _, err = transaction.ExecContext(ctx, `UPDATE accounts SET password = $2, updated_at = NOW() WHERE id = $1 AND user_id = $3`, accountID, password, userID); err != nil {
+	if credentialID == "" {
+		if err = insertCredential(ctx, transaction, newAccountID, userID, password); err != nil {
+			return err
+		}
+	} else if _, err = transaction.ExecContext(ctx, `UPDATE accounts SET password = $2, updated_at = NOW() WHERE id = $1 AND user_id = $3`, credentialID, password, userID); err != nil {
 		return err
 	}
 	return transaction.Commit()

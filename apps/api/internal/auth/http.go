@@ -12,6 +12,7 @@ import (
 func RegisterAuthRoutes(mux *http.ServeMux, service *Service) {
 	mux.HandleFunc("POST /auth/sign-up/email", service.signUpHandler)
 	mux.HandleFunc("POST /auth/sign-in/email", service.signInHandler)
+	mux.HandleFunc("POST /auth/sign-in/email-otp", service.signInWithOTPHandler)
 	mux.HandleFunc("POST /auth/sign-out", service.signOutHandler)
 	mux.HandleFunc("GET /auth/get-session", service.getSessionHandler)
 	mux.HandleFunc("POST /auth/email-otp/send-verification-otp", service.sendVerificationOTPHandler)
@@ -30,11 +31,17 @@ func (service *Service) sendVerificationOTPHandler(writer http.ResponseWriter, r
 	if !decodeJSON(writer, request, &body) {
 		return
 	}
-	if body.Type != "" && body.Type != "email-verification" {
+	var err error
+	switch body.Type {
+	case "", "email-verification":
+		err = service.SendVerificationOTP(request.Context(), body.Email)
+	case "sign-in":
+		err = service.SendSignInOTP(request.Context(), body.Email)
+	default:
 		writeError(writer, http.StatusBadRequest, "Unsupported verification type")
 		return
 	}
-	if err := service.SendVerificationOTP(request.Context(), body.Email); err != nil {
+	if err != nil {
 		writeServiceError(writer, err)
 		return
 	}
@@ -152,6 +159,25 @@ func (service *Service) signInHandler(writer http.ResponseWriter, request *http.
 	persistent := body.RememberMe == nil || *body.RememberMe
 	service.setJWTCookieWithPersistence(writer, session, persistent)
 	writeJSON(writer, http.StatusOK, map[string]any{"redirect": false, "token": session.Token, "url": nil, "user": user})
+}
+
+func (service *Service) signInWithOTPHandler(writer http.ResponseWriter, request *http.Request) {
+	var body struct {
+		Email      string `json:"email"`
+		OTP        string `json:"otp"`
+		RememberMe *bool  `json:"rememberMe"`
+	}
+	if !decodeJSON(writer, request, &body) {
+		return
+	}
+	session, user, err := service.SignInWithOTP(request.Context(), body.Email, body.OTP)
+	if err != nil {
+		writeServiceError(writer, err)
+		return
+	}
+	persistent := body.RememberMe == nil || *body.RememberMe
+	service.setJWTCookieWithPersistence(writer, session, persistent)
+	writeJSON(writer, http.StatusOK, map[string]any{"token": session.Token, "user": user})
 }
 
 func (service *Service) signOutHandler(writer http.ResponseWriter, request *http.Request) {
