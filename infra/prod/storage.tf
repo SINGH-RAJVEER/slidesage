@@ -31,7 +31,7 @@ resource "google_storage_bucket_iam_member" "runtime_revision_viewer" {
 
 # The migration job deletes what the retired pipelines left: PPTX revisions,
 # their preview renders, and card bodies stored before PostgreSQL. The runtime
-# account may delete only under those prefixes, so images stay create-and-read.
+# account may delete only under those prefixes through this grant.
 resource "google_storage_bucket_iam_member" "runtime_legacy_object_cleaner" {
   bucket = google_storage_bucket.presentation_revisions.name
   role   = "roles/storage.objectUser"
@@ -50,6 +50,23 @@ resource "google_storage_bucket_iam_member" "runtime_legacy_object_cleaner" {
         resource.name.extract('/objects/presentations/{id}/') == resource.name.extract('/objects/presentations/{id}/revisions/') ||
         resource.name.extract('/objects/presentations/{id}/') == resource.name.extract('/objects/presentations/{id}/cards/')
       )
+    EOT
+  }
+}
+
+# Maintenance consumes committed image deletion requests from PostgreSQL.
+resource "google_storage_bucket_iam_member" "runtime_asset_cleaner" {
+  bucket = google_storage_bucket.presentation_revisions.name
+  role   = "roles/storage.objectUser"
+  member = "serviceAccount:${google_service_account.runtime.email}"
+
+  condition {
+    title       = "presentation-image-cleanup"
+    description = "Stored presentation images queued after account or presentation deletion"
+    expression  = <<-EOT
+      resource.name.startsWith('projects/_/buckets/${google_storage_bucket.presentation_revisions.name}/objects/presentations/') &&
+      resource.name.extract('/objects/presentations/{id}/') != '' &&
+      resource.name.extract('/objects/presentations/{id}/') == resource.name.extract('/objects/presentations/{id}/assets/')
     EOT
   }
 }

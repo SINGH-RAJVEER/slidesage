@@ -29,7 +29,7 @@
 - Cloud SQL automatic disk growth, automated backups, and PITR are disabled in this configuration. Releases take verified on-demand backups.
 - Preserve bucket name and address `google_storage_bucket.presentation_revisions`, plus its IAM addresses. Renaming can replace stored images.
 - `PRESENTATION_GCS_BUCKET` overrides the default `<project-id>-presentation-revisions` in both workflows.
-- Runtime bucket permissions allow creation/reading of assets and deletion only under legacy `objects/`, `revisions/`, and `cards/` prefixes.
+- Runtime bucket permissions allow creation/reading of assets and deletion under legacy `objects/`, `revisions/`, and `cards/` prefixes plus `assets/` for queued image cleanup. The maintenance job receives `PRESENTATION_GCS_BUCKET` and deletes images only after their database deletion commits.
 - Conditional deletion uses IAM `startsWith()` and `extract()`, not unsupported `matches()`. Validate changes with `gcloud alpha iam policies lint-condition`; Terraform validation does not compile these expressions.
 - Optional Memorystore for Valkey and its VPC resources are disabled by default; GitHub `CACHE_ENABLED` controls provisioning. See [Database cache](DATABASE_CACHE.md#production).
 - API memory limit is 512 MiB with `GOMEMLIMIT=400MiB`; image decoding uses a separate bounded budget.
