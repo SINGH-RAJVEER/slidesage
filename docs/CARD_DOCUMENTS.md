@@ -126,7 +126,8 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Writes use expected-revision compare-and-swap; repeated operation IDs return the first result. All referenced assets must belong to the presentation at commit.
 - Document reads return revision metadata, body, and referenced assets together, with no GCS fallback.
 - Digest and size describe submitted compact JSON or verified imported GCS bytes. Never compare them with JSONB's reserialized bytes.
-- Deleting a user removes presentations and revisions; image bytes remain in GCS.
+- Deleting a user or presentation queues its stored images in `card_asset_deletions` within the deletion transaction. The maintenance job removes up to 100 queued images per sweep, normally every 15 minutes. Failed deletions remain queued for retry; rolled-back deletions queue nothing, and hotlinked photos need no bucket cleanup. Images registered again before cleanup are preserved. GCS soft-delete retention may retain recoverable copies after deletion.
+- This applies to deletions after migration 39. Previously orphaned images need a separate bucket reconciliation because their database references are already gone.
 - Migration 33 imported bodies into JSONB. Migration 35 deletes decks without complete card bodies, removes legacy object keys and pgvector tables, and cannot downgrade. Unlinked point operations remain as billing history.
 - After migrations, `cmd/migrate` deletes legacy `presentations/<id>/objects/`, `revisions/`, and `cards/` keys, keeping `assets/`. Sweep failure is logged without failing migrations; reruns remove remaining objects.
 - Verify GCS soft-delete retention with `gcloud storage buckets describe` before sweeping. Database deletions require the pre-migration backup for recovery.

@@ -68,7 +68,8 @@
 ## Recovery and cleanup
 
 - `slidesage-maintenance` runs `cmd/worker --maintenance` every 15 minutes through Cloud Scheduler.
-- It recovers terminated generation jobs and expired reservations, removes expired rate-limit rows and unverified accounts, and re-wakes due queue work.
+- It recovers terminated generation jobs and expired reservations, removes expired rate-limit rows and unverified accounts, deletes queued images for removed users/presentations, and re-wakes due queue work.
+- Image cleanup requires `PRESENTATION_GCS_BUCKET` and permission to delete stored image objects. Each sweep processes up to 100 queued images within two minutes; failures are deferred for 15 minutes so they do not block other queued images. Missing objects count as already removed.
 - Future scheduled/retryable rows do not wake the worker before `scheduled_at`.
 - Each sweep handles at most 100 terminated jobs and 100 affected users, with two concurrent recovery transactions and bounded cleanup batches.
 - `maintenance_mode` pauses the scheduler during migrations.
