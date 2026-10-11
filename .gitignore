@@ -1,5 +1,6 @@
 node_modules/
 .env
+.wrangler/tmp
 .jj
 .git
 .devenv/
@@ -8,11 +9,17 @@ node_modules/
 .claude/
 .agents/
 
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+
 # web
 apps/web/node_modules
 apps/web/out
 apps/web/dist
 apps/web/*.tgz
+apps/web/.wrangler
 apps/web/.vercel
 apps/web/logs
 apps/web/_.log
@@ -41,10 +48,3 @@ apps/api/migrate
 
 # Python environments are recreated from uv.lock.
 .venv/
-
-# VPS deployment state that lives only on the server
-infra/certs/
-infra/secrets/
-infra/backups/
-infra/.deploy.lock
-infra/.deploy-incomplete
