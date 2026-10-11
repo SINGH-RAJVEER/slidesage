@@ -10,8 +10,8 @@ Required production values:
 ```dotenv
 AUTH_SECRET=replace-with-at-least-32-random-characters
 BASE_URL=https://api.slidesage.app
-BETTER_AUTH_TRUSTED_ORIGINS=https://slidesage.app,https://www.slidesage.app
-CORS_ORIGINS=https://slidesage.app,https://www.slidesage.app
+BETTER_AUTH_TRUSTED_ORIGINS=https://slidesage.app,https://www.slidesage.app,https://slidesage.pages.dev
+CORS_ORIGINS=https://slidesage.app,https://www.slidesage.app,https://slidesage.pages.dev
 RESEND_API_KEY=re_...
 RESEND_FROM_EMAIL=auth@example.com
 ```

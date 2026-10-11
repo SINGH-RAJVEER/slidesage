@@ -30,17 +30,8 @@ func TestDisabledAndConfiguration(t *testing.T) {
 	if _, err := FromEnv(); err == nil {
 		t.Fatal("production accepted plaintext unauthenticated cache")
 	}
-	t.Setenv("CACHE_VALKEY_AUTH", "password")
-	t.Setenv("CACHE_VALKEY_PASSWORD", "")
-	if _, err := FromEnv(); err == nil {
-		t.Fatal("password auth accepted an empty password")
-	}
-	t.Setenv("CACHE_VALKEY_PASSWORD", "secret")
-	if client, err := FromEnv(); err != nil || client.valkey.Options().Password != "secret" {
-		t.Fatalf("production password cache = %v, %v", client, err)
-	}
 	t.Setenv("NODE_ENV", "test")
-	t.Setenv("CACHE_VALKEY_AUTH", "acl")
+	t.Setenv("CACHE_VALKEY_AUTH", "password")
 	if _, err := FromEnv(); err == nil {
 		t.Fatal("unknown auth mode accepted")
 	}
