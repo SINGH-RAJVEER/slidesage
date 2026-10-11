@@ -9,6 +9,7 @@
         pkgs.goose
         pkgs.just
         pkgs.terraform
+		pkgs.google-cloud-sdk
         pkgs.fake-gcs-server
         pkgs.valkey
 		pkgs.uv
@@ -198,5 +199,9 @@
 		# Image bucket; cmd/migrate also deletes retired document objects from it.
 		PRESENTATION_GCS_BUCKET = "slidesage-dev-revisions";
 		CARD_CONVERTER_URL = "http://127.0.0.1:8090";
+
+		# Default gcloud to the production project and region in infra/prod.
+		CLOUDSDK_CORE_PROJECT = "slidesage-504414";
+		CLOUDSDK_RUN_REGION = "asia-south1";
     };
 }
