@@ -147,75 +147,71 @@ export default function VerifyEmailPage() {
 			<FloatingNotice error={error} onDismiss={() => setError(null)} />
 			<div className="flex-1 flex items-center justify-center px-4 py-8 md:px-8">
 				<div className="max-w-md w-full">
-					<div className="rounded-xl border border-white/10 bg-black/20 p-6">
-						<h1 className="mb-1 text-2xl font-semibold text-white">
-							{isSignIn ? "Check your email" : "Verify email"}
-						</h1>
-						<p className="mb-6 text-white/65">
-							We sent a 6-digit code to <span className="text-white font-semibold">{email}</span>
-						</p>
+					<h1 className="mb-1 text-2xl font-semibold text-white">
+						{isSignIn ? "Check your email" : "Verify email"}
+					</h1>
+					<p className="mb-6 text-white/65">
+						We sent a 6-digit code to <span className="text-white font-semibold">{email}</span>
+					</p>
 
-						{success ? (
-							<div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-100 mb-6">
-								{isSignIn ? "✓ Signed in! Redirecting..." : "✓ Email verified! Redirecting..."}
+					{success ? (
+						<div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-100 mb-6">
+							{isSignIn ? "✓ Signed in! Redirecting..." : "✓ Email verified! Redirecting..."}
+						</div>
+					) : (
+						<form className="space-y-4" onSubmit={handleVerify}>
+							<div className="space-y-2">
+								<label htmlFor="code" className="text-sm font-medium text-white/80">
+									Verification Code
+								</label>
+								<input
+									id="code"
+									type="text"
+									inputMode="numeric"
+									maxLength={6}
+									value={code}
+									onChange={(event) => {
+										const value = event.target.value.replace(/\D/g, "");
+										setCode(value);
+									}}
+									placeholder="000000"
+									className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 text-center text-2xl tracking-widest font-mono"
+									required
+								/>
+								<p className="text-xs text-white/50 text-center mt-2">Code expires in 15 minutes</p>
 							</div>
-						) : (
-							<form className="space-y-4" onSubmit={handleVerify}>
-								<div className="space-y-2">
-									<label htmlFor="code" className="text-sm font-medium text-white/80">
-										Verification Code
-									</label>
-									<input
-										id="code"
-										type="text"
-										inputMode="numeric"
-										maxLength={6}
-										value={code}
-										onChange={(event) => {
-											const value = event.target.value.replace(/\D/g, "");
-											setCode(value);
-										}}
-										placeholder="000000"
-										className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 text-center text-2xl tracking-widest font-mono"
-										required
-									/>
-									<p className="text-xs text-white/50 text-center mt-2">
-										Code expires in 15 minutes
-									</p>
-								</div>
 
+							<button
+								type="submit"
+								className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition duration-200 disabled:opacity-60"
+								disabled={submitting || code.length !== 6}
+							>
+								{submitting ? "Verifying..." : isSignIn ? "Sign In" : "Verify Email"}
+							</button>
+
+							{!isEmailChange ? (
 								<button
-									type="submit"
-									className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition duration-200 disabled:opacity-60"
-									disabled={submitting || code.length !== 6}
+									type="button"
+									onClick={handleResend}
+									className="w-full text-white/60 hover:text-white font-medium py-2 px-4 rounded-lg transition duration-200 disabled:opacity-60"
+									disabled={resendDisabled}
 								>
-									{submitting ? "Verifying..." : isSignIn ? "Sign In" : "Verify Email"}
+									{resending
+										? "Sending..."
+										: resendCooldownSeconds > 0
+											? `Resend Code in ${resendCooldownSeconds}s`
+											: "Resend Code"}
 								</button>
+							) : null}
+						</form>
+					)}
 
-								{!isEmailChange ? (
-									<button
-										type="button"
-										onClick={handleResend}
-										className="w-full text-white/60 hover:text-white font-medium py-2 px-4 rounded-lg transition duration-200 disabled:opacity-60"
-										disabled={resendDisabled}
-									>
-										{resending
-											? "Sending..."
-											: resendCooldownSeconds > 0
-												? `Resend Code in ${resendCooldownSeconds}s`
-												: "Resend Code"}
-									</button>
-								) : null}
-							</form>
-						)}
-
-						<p className="mt-6 text-center text-sm text-white/55">
-							Wrong email?{" "}
-							<a href={wrongEmailLink.href} className="text-white hover:underline font-semibold">
-								{wrongEmailLink.label}
-							</a>
-						</p>
-					</div>
+					<p className="mt-6 text-center text-sm text-white/55">
+						Wrong email?{" "}
+						<a href={wrongEmailLink.href} className="text-white hover:underline font-semibold">
+							{wrongEmailLink.label}
+						</a>
+					</p>
 				</div>
 			</div>
 		</div>
