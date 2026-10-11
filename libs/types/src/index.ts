@@ -159,6 +159,8 @@ export interface UserProfile {
 
 export interface ProfileResponse {
 	user: UserProfile;
+	/** Present on GET /profile; false for passwordless and OAuth-only accounts. */
+	hasPassword?: boolean;
 }
 
 export interface UpdateProfileRequest {

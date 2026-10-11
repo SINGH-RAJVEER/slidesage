@@ -25,6 +25,10 @@ export interface EmailSignInResult {
 	user: AuthUser;
 }
 
+export interface SignInOptionsResult {
+	hasPassword: boolean;
+}
+
 export interface EmailOtpSignInResult {
 	token: string;
 	user: AuthUser;
@@ -139,9 +143,14 @@ export const auth = {
 		});
 	},
 
+	signInOptions(input: { email: string }): Promise<SignInOptionsResult> {
+		return post<SignInOptionsResult>("/auth/sign-in/options", input);
+	},
+
 	signInEmailOtp(input: {
 		email: string;
 		otp: string;
+		password?: string;
 		rememberMe: boolean;
 	}): Promise<EmailOtpSignInResult> {
 		return post<EmailOtpSignInResult>("/auth/sign-in/email-otp", input);
