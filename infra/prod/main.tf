@@ -680,6 +680,11 @@ resource "google_cloud_run_v2_job" "maintenance" {
           }
         }
 
+        env {
+          name  = "PRESENTATION_GCS_BUCKET"
+          value = local.presentation_gcs_bucket
+        }
+
         # The sweep re-wakes the worker when it finds queue rows nothing is
         # polling for, such as a River retry that came due while the service was
         # scaled away.
@@ -714,7 +719,10 @@ resource "google_cloud_run_v2_job" "maintenance" {
     ignore_changes = [client, client_version]
   }
 
-  depends_on = [google_secret_manager_secret_iam_member.runtime_accessor]
+  depends_on = [
+    google_secret_manager_secret_iam_member.runtime_accessor,
+    google_storage_bucket_iam_member.runtime_asset_cleaner,
+  ]
 }
 
 resource "google_cloud_run_v2_job_iam_member" "maintenance_invoker" {
