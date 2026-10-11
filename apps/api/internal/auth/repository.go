@@ -200,7 +200,9 @@ func (repository *Repository) DeleteVerification(ctx context.Context, id string)
 	return err
 }
 
-func (repository *Repository) VerifyUserEmail(ctx context.Context, userID, verificationID, identifier string, now time.Time) (User, error) {
+// VerifyUserEmail consumes a code and marks the email verified. A non-empty
+// password is set in the same transaction, creating newAccountID if needed.
+func (repository *Repository) VerifyUserEmail(ctx context.Context, userID, verificationID, identifier, newAccountID, password string, now time.Time) (User, error) {
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
 		return User{}, err
@@ -217,6 +219,12 @@ func (repository *Repository) VerifyUserEmail(ctx context.Context, userID, verif
 	user, err := scanUser(transaction.QueryRowContext(ctx, `UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1 RETURNING id, name, email, email_verified, image, balance_millis::double precision / 1000, landing_page, created_at, updated_at`, userID))
 	if err != nil {
 		return User{}, err
+	}
+	// A sign-in code may carry a new password, saved only if the code is consumed.
+	if password != "" {
+		if err = setCredentialPassword(ctx, transaction, userID, newAccountID, password); err != nil {
+			return User{}, err
+		}
 	}
 	return user, transaction.Commit()
 }
@@ -268,9 +276,7 @@ func scanUser(row rowScanner) (User, error) {
 	return user, err
 }
 
-// ResetPassword replaces the password on credentialID, or creates a credential
-// account with newAccountID when the user has none (passwordless and OAuth users).
-func (repository *Repository) ResetPassword(ctx context.Context, userID, credentialID, newAccountID, verificationID, identifier, password string, now time.Time) error {
+func (repository *Repository) ResetPassword(ctx context.Context, userID, newAccountID, verificationID, identifier, password string, now time.Time) error {
 	transaction, err := repository.database.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -284,14 +290,23 @@ func (repository *Repository) ResetPassword(ctx context.Context, userID, credent
 	if err != nil || affected != 1 {
 		return ErrNotFound
 	}
-	if credentialID == "" {
-		if err = insertCredential(ctx, transaction, newAccountID, userID, password); err != nil {
-			return err
-		}
-	} else if _, err = transaction.ExecContext(ctx, `UPDATE accounts SET password = $2, updated_at = NOW() WHERE id = $1 AND user_id = $3`, credentialID, password, userID); err != nil {
+	if err = setCredentialPassword(ctx, transaction, userID, newAccountID, password); err != nil {
 		return err
 	}
 	return transaction.Commit()
+}
+
+// setCredentialPassword replaces the user's password, creating a credential
+// account with newAccountID when the user has none (passwordless and OAuth users).
+func setCredentialPassword(ctx context.Context, transaction *sql.Tx, userID, newAccountID, password string) error {
+	result, err := transaction.ExecContext(ctx, `UPDATE accounts SET password = $2, updated_at = NOW() WHERE user_id = $1 AND provider_id = 'credential'`, userID, password)
+	if err != nil {
+		return err
+	}
+	if updated, err := result.RowsAffected(); err != nil || updated > 0 {
+		return err
+	}
+	return insertCredential(ctx, transaction, newAccountID, userID, password)
 }
 
 func (repository *Repository) UpsertOAuthUser(ctx context.Context, provider, providerAccountID, name, email, image, accessToken, refreshToken string, now time.Time) (User, error) {

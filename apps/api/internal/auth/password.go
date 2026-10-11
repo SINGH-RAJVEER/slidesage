@@ -23,14 +23,21 @@ func hashPassword(password string) (string, error) {
 	return saltText + ":" + hex.EncodeToString(derived), nil
 }
 
+// isPasswordHash reports whether a stored value has the salted scrypt shape, so
+// accounts holding a removed-format marker count as having no password.
+func isPasswordHash(hash string) bool {
+	parts := strings.Split(hash, ":")
+	return len(parts) == 2 && len(parts[0]) == 32 && len(parts[1]) == 128
+}
+
 // verifyPassword checks a password against the salted scrypt hash every
 // credential stores. Any other value, including the marker left where an older
 // format was removed, never verifies.
 func verifyPassword(hash, password string) bool {
-	parts := strings.Split(hash, ":")
-	if len(parts) != 2 || len(parts[0]) != 32 || len(parts[1]) != 128 {
+	if !isPasswordHash(hash) {
 		return false
 	}
+	parts := strings.Split(hash, ":")
 	expected, err := hex.DecodeString(parts[1])
 	if err != nil {
 		return false
