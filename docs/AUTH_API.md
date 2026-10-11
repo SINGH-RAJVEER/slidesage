@@ -31,7 +31,8 @@ RESEND_FROM_EMAIL=auth@example.com
 | `POST` | `/auth/email-otp/send-verification-otp` | Send or replace a verification OTP, or a sign-in OTP with `type: "sign-in"` |
 | `POST` | `/auth/email-otp/verify-email` | Verify email and issue a JWT |
 | `POST` | `/auth/sign-in/email` | Sign in with a password |
-| `POST` | `/auth/sign-in/email-otp` | Sign in with an emailed OTP and issue a JWT |
+| `POST` | `/auth/sign-in/email-otp` | Sign in with an emailed OTP, optionally setting a password, and issue a JWT |
+| `POST` | `/auth/sign-in/options` | Report whether an account can sign in with a password |
 | `POST` | `/auth/sign-in/social` | Start OAuth |
 | `POST` | `/auth/email-otp/request-password-reset` | Send or replace a reset OTP |
 | `POST` | `/auth/email-otp/reset-password` | Reset or set a password using an OTP |
@@ -54,7 +55,9 @@ RESEND_FROM_EMAIL=auth@example.com
 
 - `PUT /profile` requires a JWT and current-password verification for security changes.
 - Password changes require `currentPassword` and `newPassword`, write a salted scrypt hash, and cannot include name or email changes.
-- Accounts without a password cannot change password or email here until they set one through the reset OTP flow.
+- `GET /profile` returns `hasPassword` next to `user`. It is false for passwordless accounts, OAuth-only accounts, and migration-36 markers.
+- Without a password, the profile page offers "Set password". It requests a reset OTP for the account email, then submits the code and new password to `/auth/email-otp/reset-password`, which leaves the current session untouched.
+- Accounts without a password cannot change their email until they set one.
 - Email changes require `currentPassword`. The API sends a user-bound six-digit OTP to the normalized new address and returns `pending_email` and `verification_required`; the existing email stays unchanged.
 - `/profile/email/verify` accepts `email` and `otp`, atomically consumes the code, updates the verified email, and invalidates relevant OTPs for both addresses.
 - Users who forgot their password must complete the reset OTP flow before changing email.
@@ -76,8 +79,10 @@ RESEND_FROM_EMAIL=auth@example.com
 - A password is optional at sign-up. Without one, the API creates no `credential` account and the user signs in with emailed codes.
 - New email users must verify their email. Successful verification signs them in.
 - Sign-in OTPs use the identifier `sign-in-otp-<email>`. Requests for unknown addresses return `404 ACCOUNT_NOT_FOUND` and send nothing; sign-in codes never create accounts.
-- `/auth/sign-in/email-otp` accepts `email`, `otp`, and optional `rememberMe`. It consumes the code, marks the email verified, and sets the JWT cookie. The `/auth/sign-in/` email and IP rate limits bound guessing.
-- The web sign-in page emails a code by default. "Sign in with a password instead" reveals the password form. Code entry lives at `/sign-in/verify?mode=sign-in`.
+- `/auth/sign-in/email-otp` accepts `email`, `otp`, and optional `password` and `rememberMe`. It consumes the code, marks the email verified, and sets the JWT cookie. A `password` of at least 8 characters is validated before the code is checked and saved in the same transaction that consumes it. The `/auth/sign-in/` email and IP rate limits bound guessing.
+- `/auth/sign-in/options` accepts `email` and returns `{ "hasPassword": bool }`, or `404 ACCOUNT_NOT_FOUND`. A password counts only when the credential holds a salted scrypt hash. The response reveals whether an account has a password, not only whether it exists; the `/auth/sign-in/` limits bound probing.
+- The web sign-in page asks for the email first. Continue calls `/auth/sign-in/options` and shows two buttons: "Sign in with a code" emails a code and opens `/sign-in/verify?mode=sign-in`; "Sign in with password" opens the password form, or `/sign-in/create-password` when the account has no password.
+- `/sign-in/create-password` takes a password and confirmation, emails a sign-in code, and submits the code with the password to `/auth/sign-in/email-otp`, which saves the password and signs the user in. The password stays in component state only.
 - Password resets create a `credential` account for users without one, so the reset flow also sets a first password.
 - Correct-password sign-in and repeated sign-up for an unverified address send a fresh OTP and open verification. Sign-up for a verified address returns `Email already in use`.
 - Reset requests for unknown addresses return `404 ACCOUNT_NOT_FOUND` and send nothing. This exposes account existence; email and IP limits bound probing.
