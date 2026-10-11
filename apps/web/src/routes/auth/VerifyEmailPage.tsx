@@ -38,7 +38,10 @@ export default function VerifyEmailPage() {
 	const wrongEmailLink = isEmailChange
 		? { href: ROUTES.profile, label: "Return to profile" }
 		: isSignIn
-			? { href: ROUTES.signIn, label: "Use a different email" }
+			? {
+					href: `${ROUTES.signIn}?redirect_url=${encodeURIComponent(redirectTo)}`,
+					label: "Use a different email",
+				}
 			: { href: "/sign-up", label: "Sign up again" };
 
 	useEffect(() => {
