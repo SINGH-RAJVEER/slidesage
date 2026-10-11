@@ -25,6 +25,11 @@ export interface EmailSignInResult {
 	user: AuthUser;
 }
 
+export interface EmailOtpSignInResult {
+	token: string;
+	user: AuthUser;
+}
+
 export interface EmailSignUpResult {
 	user: AuthUser;
 }
@@ -110,7 +115,7 @@ export const auth = {
 	signUpEmail(input: {
 		name: string;
 		email: string;
-		password: string;
+		password?: string;
 	}): Promise<EmailSignUpResult> {
 		return post<EmailSignUpResult>("/auth/sign-up/email", input);
 	},
@@ -125,6 +130,21 @@ export const auth = {
 
 	sendVerificationOtp(input: { email: string; type?: string }): Promise<SuccessResult> {
 		return post<SuccessResult>("/auth/email-otp/send-verification-otp", input);
+	},
+
+	sendSignInOtp(input: { email: string }): Promise<SuccessResult> {
+		return post<SuccessResult>("/auth/email-otp/send-verification-otp", {
+			email: input.email,
+			type: "sign-in",
+		});
+	},
+
+	signInEmailOtp(input: {
+		email: string;
+		otp: string;
+		rememberMe: boolean;
+	}): Promise<EmailOtpSignInResult> {
+		return post<EmailOtpSignInResult>("/auth/sign-in/email-otp", input);
 	},
 
 	verifyEmail(input: { email: string; otp: string }): Promise<VerifyEmailResult> {
