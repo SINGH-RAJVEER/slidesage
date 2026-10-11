@@ -32,6 +32,7 @@ export const router = createBrowserRouter([
 			   reach it even when it is not their default page */
 			{ path: "landing", lazy: lazyRoute(() => import("../../routes/landing/LandingPage")) },
 			{ path: "sign-in/*", element: <SignInPage /> },
+			{ path: "sign-in/verify", element: <VerifyEmailPage /> },
 			{ path: "sign-up/*", element: <SignUpPage /> },
 			{ path: "sign-up/verify-email", element: <VerifyEmailPage /> },
 			{ path: "forgot-password", element: <ForgotPasswordPage /> },

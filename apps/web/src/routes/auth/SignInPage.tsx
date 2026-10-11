@@ -27,6 +27,7 @@ export default function SignInPage() {
 	const { isSignedIn, refreshSession } = useAuth();
 	useHorizonPageReady(!isSignedIn);
 	const [email, setEmail] = useState("");
+	const [usePassword, setUsePassword] = useState(false);
 	const [password, setPassword] = useState("");
 	const [rememberMe, setRememberMe] = useState(true);
 	const [submitting, setSubmitting] = useState(false);
@@ -34,6 +35,13 @@ export default function SignInPage() {
 	const [error, setError] = useState<string | null>(null);
 	const signUpTo =
 		redirectTo === "/" ? "/sign-up" : `/sign-up?redirect_url=${encodeURIComponent(redirectTo)}`;
+	const submitLabel = usePassword
+		? submitting
+			? "Signing in..."
+			: "Sign In"
+		: submitting
+			? "Sending code..."
+			: "Email me a sign-in code";
 
 	// Redirect to dashboard if already signed in
 	useEffect(() => {
@@ -60,12 +68,35 @@ export default function SignInPage() {
 		}
 	};
 
+	const handleCodeSignIn = async (normalizedEmail: string) => {
+		try {
+			await auth.sendSignInOtp({ email: normalizedEmail });
+			navigate(
+				`/sign-in/verify?mode=sign-in&email=${encodeURIComponent(normalizedEmail)}&redirect_url=${encodeURIComponent(redirectTo)}`,
+				{ state: { rememberMe } },
+			);
+		} catch (err) {
+			if (getErrorCode(err) === "ACCOUNT_NOT_FOUND") {
+				setError("No account exists for this email. Sign up to continue.");
+				return;
+			}
+			setError(err instanceof Error ? err.message : "Failed to send sign-in code.");
+		} finally {
+			setSubmitting(false);
+		}
+	};
+
 	const handleEmailSignIn = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setError(null);
 		setSubmitting(true);
 
 		const normalizedEmail = email.trim().toLowerCase();
+
+		if (!usePassword) {
+			await handleCodeSignIn(normalizedEmail);
+			return;
+		}
 
 		try {
 			await auth.signInEmail({
@@ -133,30 +164,32 @@ export default function SignInPage() {
 							/>
 						</div>
 
-						<div className="space-y-2">
-							<div className="flex items-center justify-between gap-3">
-								<label htmlFor="password" className="text-sm font-medium text-white/80">
-									Password
-								</label>
-								<a
-									href="/forgot-password"
-									className="text-sm font-medium text-white/60 hover:text-white hover:underline"
-								>
-									Forgot password?
-								</a>
+						{usePassword ? (
+							<div className="space-y-2">
+								<div className="flex items-center justify-between gap-3">
+									<label htmlFor="password" className="text-sm font-medium text-white/80">
+										Password
+									</label>
+									<a
+										href="/forgot-password"
+										className="text-sm font-medium text-white/60 hover:text-white hover:underline"
+									>
+										Forgot password?
+									</a>
+								</div>
+								<input
+									id="password"
+									type="password"
+									autoComplete="current-password"
+									value={password}
+									onChange={(event) => setPassword(event.target.value)}
+									className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
+									placeholder="Enter your password"
+									minLength={8}
+									required
+								/>
 							</div>
-							<input
-								id="password"
-								type="password"
-								autoComplete="current-password"
-								value={password}
-								onChange={(event) => setPassword(event.target.value)}
-								className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
-								placeholder="Enter your password"
-								minLength={8}
-								required
-							/>
-						</div>
+						) : null}
 
 						<label
 							htmlFor="remember-me"
@@ -177,7 +210,19 @@ export default function SignInPage() {
 							className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black shadow-sm transition-[transform,background-color,box-shadow,opacity] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-white/90 active:scale-[0.97] active:bg-white/80 active:shadow-inner disabled:opacity-60 motion-reduce:active:scale-100"
 							disabled={submitting}
 						>
-							{submitting ? "Signing in..." : "Sign In"}
+							{submitLabel}
+						</button>
+
+						<button
+							type="button"
+							onClick={() => {
+								setUsePassword((current) => !current);
+								setPassword("");
+								setError(null);
+							}}
+							className="w-full py-1 text-sm font-medium text-white/60 hover:text-white hover:underline"
+						>
+							{usePassword ? "Email me a code instead" : "Sign in with a password instead"}
 						</button>
 					</form>
 

@@ -20,6 +20,7 @@ const signIn = mock(async () => {
 	throw new MockAuthError("email address is not verified", 401, "EMAIL_NOT_VERIFIED");
 });
 const sendVerificationOtp = mock(async () => ({ success: true }));
+const sendSignInOtp = mock(async () => ({ success: true }));
 
 mock.module("@slidesage/ui/context/AuthContext", () => ({
 	useAuth: () => ({
@@ -34,6 +35,7 @@ mock.module("@slidesage/ui/lib/auth-client", () => ({
 		signInEmail: signIn,
 		startSocialSignIn: mock(),
 		sendVerificationOtp,
+		sendSignInOtp,
 	},
 }));
 
@@ -57,6 +59,7 @@ it("resends verification when an unverified user signs in", async () => {
 	);
 
 	fireEvent.change(view.getByLabelText("Email"), { target: { value: "User@Example.com" } });
+	fireEvent.click(view.getByRole("button", { name: "Sign in with a password instead" }));
 	fireEvent.change(view.getByLabelText("Password"), { target: { value: "correct-password" } });
 	fireEvent.click(view.getByRole("button", { name: "Sign In" }));
 
@@ -67,6 +70,28 @@ it("resends verification when an unverified user signs in", async () => {
 		email: "user@example.com",
 		type: "email-verification",
 	});
+});
+
+it("emails a sign-in code by default and opens code entry", async () => {
+	sendSignInOtp.mockClear();
+	const { default: SignInPage } = await import("../../../routes/auth/SignInPage");
+	const view = render(
+		<MemoryRouter initialEntries={["/sign-in"]}>
+			<Routes>
+				<Route path="/sign-in" element={<SignInPage />} />
+				<Route path="/sign-in/verify" element={<VerificationProbe />} />
+			</Routes>
+		</MemoryRouter>,
+	);
+
+	expect(view.queryByLabelText("Password")).toBeNull();
+	fireEvent.change(view.getByLabelText("Email"), { target: { value: "User@Example.com" } });
+	fireEvent.click(view.getByRole("button", { name: "Email me a sign-in code" }));
+
+	await waitFor(() => {
+		expect(view.getByText("user@example.com")).toBeInTheDocument();
+	});
+	expect(sendSignInOtp).toHaveBeenCalledWith({ email: "user@example.com" });
 });
 
 it("shows the orb loader when switching to sign up", async () => {

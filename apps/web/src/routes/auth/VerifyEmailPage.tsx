@@ -19,19 +19,27 @@ export default function VerifyEmailPage() {
 	const email = searchParams.get("email");
 	const redirectTo = sanitizeRedirectPath(searchParams.get("redirect_url"));
 	const isEmailChange = searchParams.get("mode") === "email-change";
+	const isSignIn = searchParams.get("mode") === "sign-in";
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { isSignedIn, user, refreshSession } = useAuth();
 	const [code, setCode] = useState("");
 	const [submitting, setSubmitting] = useState(false);
-	const [error, setError] = useState<string | null>(
-		(location.state as { deliveryError?: string | null } | null)?.deliveryError ?? null,
-	);
+	const navigationState = location.state as {
+		deliveryError?: string | null;
+		rememberMe?: boolean;
+	} | null;
+	const [error, setError] = useState<string | null>(navigationState?.deliveryError ?? null);
 	const [success, setSuccess] = useState(false);
 	const [resending, setResending] = useState(false);
 	const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0);
 
 	const resendDisabled = resending || resendCooldownSeconds > 0;
+	const wrongEmailLink = isEmailChange
+		? { href: ROUTES.profile, label: "Return to profile" }
+		: isSignIn
+			? { href: ROUTES.signIn, label: "Use a different email" }
+			: { href: "/sign-up", label: "Sign up again" };
 
 	useEffect(() => {
 		if (!isEmailChange && isSignedIn && user?.emailVerified) {
@@ -41,8 +49,8 @@ export default function VerifyEmailPage() {
 
 	// Redirect if no email is provided
 	useEffect(() => {
-		if (!email) navigate("/sign-up");
-	}, [email, navigate]);
+		if (!email) navigate(isSignIn ? "/sign-in" : "/sign-up");
+	}, [email, isSignIn, navigate]);
 
 	useEffect(() => {
 		if (resendCooldownSeconds <= 0) return;
@@ -81,6 +89,12 @@ export default function VerifyEmailPage() {
 					} | null;
 					throw new Error(data?.error?.message || "Verification failed");
 				}
+			} else if (isSignIn) {
+				await auth.signInEmailOtp({
+					email,
+					otp: code,
+					rememberMe: navigationState?.rememberMe ?? true,
+				});
 			} else {
 				await auth.verifyEmail({
 					email,
@@ -107,10 +121,14 @@ export default function VerifyEmailPage() {
 		setError(null);
 
 		try {
-			await auth.sendVerificationOtp({
-				email,
-				type: "email-verification",
-			});
+			if (isSignIn) {
+				await auth.sendSignInOtp({ email });
+			} else {
+				await auth.sendVerificationOtp({
+					email,
+					type: "email-verification",
+				});
+			}
 
 			setResendCooldownSeconds(30);
 		} catch (err) {
@@ -127,14 +145,16 @@ export default function VerifyEmailPage() {
 			<div className="flex-1 flex items-center justify-center px-4 py-8 md:px-8">
 				<div className="max-w-md w-full">
 					<div className="rounded-xl border border-white/10 bg-black/20 p-6">
-						<h1 className="mb-1 text-2xl font-semibold text-white">Verify email</h1>
+						<h1 className="mb-1 text-2xl font-semibold text-white">
+							{isSignIn ? "Check your email" : "Verify email"}
+						</h1>
 						<p className="mb-6 text-white/65">
 							We sent a 6-digit code to <span className="text-white font-semibold">{email}</span>
 						</p>
 
 						{success ? (
 							<div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-100 mb-6">
-								✓ Email verified! Redirecting...
+								{isSignIn ? "✓ Signed in! Redirecting..." : "✓ Email verified! Redirecting..."}
 							</div>
 						) : (
 							<form className="space-y-4" onSubmit={handleVerify}>
@@ -166,7 +186,7 @@ export default function VerifyEmailPage() {
 									className="w-full rounded-lg bg-white px-4 py-3 font-semibold text-black transition duration-200 disabled:opacity-60"
 									disabled={submitting || code.length !== 6}
 								>
-									{submitting ? "Verifying..." : "Verify Email"}
+									{submitting ? "Verifying..." : isSignIn ? "Sign In" : "Verify Email"}
 								</button>
 
 								{!isEmailChange ? (
@@ -188,11 +208,8 @@ export default function VerifyEmailPage() {
 
 						<p className="mt-6 text-center text-sm text-white/55">
 							Wrong email?{" "}
-							<a
-								href={isEmailChange ? ROUTES.profile : "/sign-up"}
-								className="text-white hover:underline font-semibold"
-							>
-								{isEmailChange ? "Return to profile" : "Sign up again"}
+							<a href={wrongEmailLink.href} className="text-white hover:underline font-semibold">
+								{wrongEmailLink.label}
 							</a>
 						</p>
 					</div>
