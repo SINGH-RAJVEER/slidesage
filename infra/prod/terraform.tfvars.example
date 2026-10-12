@@ -23,3 +23,12 @@ unsplash_enabled = false
 cache_enabled       = false
 cache_node_type     = "SHARED_CORE_NANO"
 cache_replica_count = 0
+
+# Leave empty to build the web app without ads. Ads show to readers below 250 points.
+adsense_client_id = ""
+adsense_slots = {
+  generate      = ""
+  presentations = ""
+  marketplace   = ""
+  anchor        = ""
+}

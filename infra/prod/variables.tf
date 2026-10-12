@@ -160,3 +160,30 @@ variable "maintenance_schedule" {
   type        = string
   default     = "*/15 * * * *"
 }
+
+variable "adsense_client_id" {
+  description = "AdSense publisher ID (ca-pub-...) for the web build. Leave empty to build without ads."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.adsense_client_id == "" || can(regex("^ca-pub-[0-9]{10,20}$", var.adsense_client_id))
+    error_message = "adsense_client_id must be empty or look like ca-pub-1234567890123456."
+  }
+}
+
+variable "adsense_slots" {
+  description = "AdSense ad unit IDs for each web placement. An empty ID leaves that placement without an ad."
+  type = object({
+    generate      = optional(string, "")
+    presentations = optional(string, "")
+    marketplace   = optional(string, "")
+    anchor        = optional(string, "")
+  })
+  default = {}
+
+  validation {
+    condition     = alltrue([for slot in values(var.adsense_slots) : slot == "" || can(regex("^[0-9]{1,20}$", slot))])
+    error_message = "Each adsense_slots entry must be empty or a numeric ad unit ID."
+  }
+}

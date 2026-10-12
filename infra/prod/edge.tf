@@ -119,6 +119,17 @@ locals {
   # Kept in step with the packageManager field in package.json and the version
   # oven-sh/setup-bun pins in the checks workflow.
   bun_version = "1.3.13"
+
+  # Only set ad variables are passed to the web build, so an empty one stays unset.
+  web_adsense_environment = {
+    for name, value in {
+      VITE_ADSENSE_CLIENT_ID          = var.adsense_client_id
+      VITE_ADSENSE_SLOT_GENERATE      = var.adsense_slots.generate
+      VITE_ADSENSE_SLOT_PRESENTATIONS = var.adsense_slots.presentations
+      VITE_ADSENSE_SLOT_MARKETPLACE   = var.adsense_slots.marketplace
+      VITE_ADSENSE_SLOT_ANCHOR        = var.adsense_slots.anchor
+    } : name => value if var.adsense_client_id != "" && value != ""
+  }
 }
 
 resource "cloudflare_pages_project" "web" {
@@ -138,12 +149,12 @@ resource "cloudflare_pages_project" "web" {
       fail_open   = true
       usage_model = "standard"
 
-      environment_variables = {
+      environment_variables = merge({
         VITE_API_URL = "https://api.${var.domain_name}"
         # Pages still defaults to an older Bun than CI and the lockfile use.
         # Pin it so a deployment builds on the same toolchain the checks ran on.
         BUN_VERSION = local.bun_version
-      }
+      }, local.web_adsense_environment)
     }
   }
 
