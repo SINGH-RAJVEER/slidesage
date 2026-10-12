@@ -679,6 +679,33 @@ func (d *drafting) reportCards(converted []json.RawMessage, entries []cardPlanEn
 	d.report("cards", map[string]any{"cards": cards, "assets": assets, "completed": completed, "total": len(converted)})
 }
 
+// repairedCard reads the card from a repair response. Weaker models drop the
+// {"card": ...} wrapper, wrap the card in a one-element cards array, or encode
+// it as a JSON string; each is accepted so the converter checks the card the
+// model wrote rather than a null.
+func repairedCard(response map[string]any) map[string]any {
+	switch card := response["card"].(type) {
+	case map[string]any:
+		return card
+	case string:
+		decoder := json.NewDecoder(strings.NewReader(card))
+		decoder.UseNumber()
+		var decoded map[string]any
+		if decoder.Decode(&decoded) == nil {
+			return decoded
+		}
+		return nil
+	}
+	if cards, ok := response["cards"].([]any); ok && len(cards) == 1 {
+		card, _ := cards[0].(map[string]any)
+		return card
+	}
+	if _, wrapped := response["card"]; !wrapped && response["nodes"] != nil {
+		return response
+	}
+	return nil
+}
+
 // draftsByPosition indexes a drafting response. A card the model left out has
 // no entry, and the converter reports it for repair like any other issue.
 func draftsByPosition(response map[string]any) map[int]json.RawMessage {
@@ -732,7 +759,7 @@ func (d *drafting) repair(ctx context.Context, background string, input carddocu
 		if err != nil {
 			return nil, err
 		}
-		card, _ := response["card"].(map[string]any)
+		card := repairedCard(response)
 		delete(card, "position")
 		input.Draft, _ = json.Marshal(card)
 		input.Draft = d.withImage(input.Position, input.Draft)

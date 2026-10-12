@@ -12,7 +12,7 @@
 | `cmd/worker` | Provider calls, card conversion, document persistence, settlement/refunds |
 | `generation_jobs` | Public identity, payload, ownership, lifecycle, cancellation, errors |
 | `generation_job_events` | Ordered replayable events |
-| `cmd/migrate` | Goose and River migrations, retired-object sweep |
+| `cmd/migrate` | Goose and River migrations |
 
 - Migration 15 creates application jobs and events. River owns separate queue tables.
 - Public IDs are application job IDs; River IDs are internal.
@@ -49,6 +49,7 @@
 - Reasoning-capable models receive a 1,024-token allowance above the answer bound. Google uses `thinkingBudget`, Anthropic uses `thinking`, OpenAI reasoning models use `max_completion_tokens`, and OpenRouter uses `reasoning.max_tokens`.
 - Inline `<think>` blocks are removed before parsing. Empty answers return a specific provider error.
 - Planning precedes batches of four cards. Conversion reports valid cards as they arrive and repairs invalid cards after the batch. See [Card generation](CARD_DOCUMENTS.md#generation).
+- Repair responses accept a `card` object, a JSON string in `card`, a one-element `cards` array, or a bare card with `nodes`. Each extracted card still passes through the converter's schema checks.
 - Reservations cover planning, card output bounds, repeated prompt context, and repair headroom.
 - Persist events before delivery. `saved` and `error` terminate streams.
 - Cancellation locks the application job, cancels River work, releases its reservation, and records terminal state in one transaction. Late provider results cannot settle a cancelled job.

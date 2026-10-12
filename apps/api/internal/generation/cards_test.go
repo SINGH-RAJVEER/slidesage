@@ -322,3 +322,28 @@ func TestCardDrafterShowsEachCardWhileItsBatchStreams(t *testing.T) {
 		t.Fatalf("the card missing from the stream was not shown: %+v", shown[2])
 	}
 }
+
+func TestRepairedCardAcceptsUnwrappedAnswers(t *testing.T) {
+	want := `{"layout":"statement","nodes":[{"text":"Hi","type":"heading"}]}`
+	card := map[string]any{"layout": "statement", "nodes": []any{map[string]any{"type": "heading", "text": "Hi"}}}
+	for name, response := range map[string]map[string]any{
+		"wrapped":     {"card": card},
+		"string":      {"card": want},
+		"cards array": {"cards": []any{card}},
+		"bare":        card,
+	} {
+		got, _ := json.Marshal(repairedCard(response))
+		if string(got) != want {
+			t.Errorf("%s: repaired card = %s", name, got)
+		}
+	}
+	for name, response := range map[string]map[string]any{
+		"empty":      {},
+		"bad string": {"card": "not json"},
+		"two cards":  {"cards": []any{card, card}},
+	} {
+		if got := repairedCard(response); got != nil {
+			t.Errorf("%s: repaired card = %v, want nil", name, got)
+		}
+	}
+}
