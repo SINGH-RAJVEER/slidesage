@@ -2,7 +2,7 @@
 
 - One x86-64 VPS runs the React frontend, Nginx, Go API, continuous generation worker, card converter, PostgreSQL 18 with pgvector, and Valkey through `infra/compose.json`.
 - Nginx serves the frontend baked into the `web` image and proxies `api.slidesage.app` to the private API port. Cloudflare provides DNS and edge TLS. The frontend has no Cloudflare Pages deployment.
-- Terraform configuration and its CI jobs have been removed. Provision the VPS, DNS records, origin certificate, and existing GCS bucket access manually.
+- Terraform configuration and its CI jobs have been removed. Provision the VPS, DNS records, and origin certificate manually.
 - GitHub Actions publishes five commit-tagged images to GHCR and deploys over SSH. All application components use the same release tag.
 
 | Resource | Configuration |
@@ -16,7 +16,7 @@
 | Migrate | Runs to completion before API and worker start |
 | Maintenance | Systemd timer every 15 minutes, shares the release lock |
 | Backups | Verified custom-format database dumps before releases and daily |
-| Card images | Existing private GCS bucket through a service-account key |
+| Card images | Local files in the `objects` Docker volume |
 
 - Database dumps on the VPS need an off-server copy. Keep the existing image bucket and encryption keys when moving production data.
 - Setup, DNS cutover, migration, and recovery are in [VPS deployment](VPS_DEPLOYMENT.md). Release configuration is in [CI/CD](CI_CD.md).

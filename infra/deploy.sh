@@ -16,7 +16,7 @@ if [[ ! $tag =~ ^[A-Za-z0-9._-]+$ ]]; then
 	echo "invalid image tag: $tag" >&2
 	exit 1
 fi
-for required in .env certs/origin.pem certs/origin.key secrets/gcs-key.json; do
+for required in .env certs/origin.pem certs/origin.key; do
 	if [ ! -f "$required" ]; then
 		echo "missing $required; see docs/VPS_DEPLOYMENT.md" >&2
 		exit 1

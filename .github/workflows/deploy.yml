@@ -148,7 +148,7 @@
 				},
 				{
 					"name": "Check server prerequisites",
-					"run": "set -euo pipefail\n# Expand only the generated release path on the runner.\n# shellcheck disable=SC2087\nssh slidesage-vps \"bash -se\" <<EOF\nset -euo pipefail\ncommand -v rsync >/dev/null\ncommand -v flock >/dev/null\ndocker compose version >/dev/null\ndocker info >/dev/null\ncd /opt/slidesage\ntest -w .\nfor required in .env certs/origin.pem certs/origin.key secrets/gcs-key.json; do\n\ttest -f \"\\$required\"\ndone\nmkdir -p '$RELEASE_DIRECTORY'\nEOF\n"
+					"run": "set -euo pipefail\n# Expand only the generated release path on the runner.\n# shellcheck disable=SC2087\nssh slidesage-vps \"bash -se\" <<EOF\nset -euo pipefail\ncommand -v rsync >/dev/null\ncommand -v flock >/dev/null\ndocker compose version >/dev/null\ndocker info >/dev/null\ncd /opt/slidesage\ntest -w .\nfor required in .env certs/origin.pem certs/origin.key; do\n\tif [[ ! -f \"\\$required\" ]]; then\n\t\techo \"Missing server file: \\$required\" >&2\n\t\texit 1\n\tfi\ndone\nmkdir -p '$RELEASE_DIRECTORY'\nEOF\n"
 				},
 				{
 					"name": "Upload isolated release files",

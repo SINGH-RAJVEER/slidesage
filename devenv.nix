@@ -1,89 +1,63 @@
-{ pkgs, lib, ... }:
+{ pkgs, lib, config, ... }:
 {
-    dotenv.enable = true;
+	dotenv.enable = true;
 
-    packages = [
-        pkgs.bun
-        pkgs.go
+	packages = [
+		pkgs.bun
+		pkgs.go
 		pkgs.watchexec
-        pkgs.goose
-        pkgs.just
-        pkgs.fake-gcs-server
-        pkgs.valkey
+		pkgs.goose
+		pkgs.just
+		pkgs.valkey
 		pkgs.uv
-    ];
+	];
 
-    services.postgres = {
-        enable = true;
-        package = pkgs.postgresql_18;
-        extensions = extensions: [ extensions.pgvector ];
-        createDatabase = false;
-        listen_addresses = "127.0.0.1";
-        port = 5432;
-        initdbArgs = [
-            "--username=postgres"
-            "--encoding=UTF8"
-            "--locale=C"
-        ];
-        hbaConf = ''
-            local all all trust
-            host all all 127.0.0.1/32 trust
-            host all all ::1/128 trust
-        '';
-    };
+	services.postgres = {
+		enable = true;
+		package = pkgs.postgresql_18;
+		extensions = extensions: [ extensions.pgvector ];
+		createDatabase = false;
+		listen_addresses = "127.0.0.1";
+		port = 5432;
+		initdbArgs = [
+			"--username=postgres"
+			"--encoding=UTF8"
+			"--locale=C"
+		];
+		hbaConf = ''
+			local all all trust
+			host all all 127.0.0.1/32 trust
+			host all all ::1/128 trust
+		'';
+	};
 
-    tasks = {
-        "db:setup" = {
-            after = [ "devenv:processes:postgres@ready" ];
-            exec = ''
-                if ! psql -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'slidesage'" | grep -q 1; then
-                    psql -d postgres -c "CREATE USER slidesage WITH PASSWORD 'slidesage'"
-                fi
+	tasks = {
+		"db:setup" = {
+			after = [ "devenv:processes:postgres@ready" ];
+			exec = ''
+				if ! psql -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'slidesage'" | grep -q 1; then
+					psql -d postgres -c "CREATE USER slidesage WITH PASSWORD 'slidesage'"
+				fi
 
-                if ! psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'slidesage'" | grep -q 1; then
-                    psql -d postgres -c "CREATE DATABASE slidesage OWNER slidesage"
-                fi
+				if ! psql -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'slidesage'" | grep -q 1; then
+					psql -d postgres -c "CREATE DATABASE slidesage OWNER slidesage"
+				fi
 
-                psql -d slidesage -c "CREATE EXTENSION IF NOT EXISTS vector"
-                psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE slidesage TO slidesage"
-            '';
-        };
+				psql -d slidesage -c "CREATE EXTENSION IF NOT EXISTS vector"
+				psql -d postgres -c "GRANT ALL PRIVILEGES ON DATABASE slidesage TO slidesage"
+			'';
+		};
 
 		"db:migrate" = {
-			after = [ "db:setup" "devenv:processes:storage@ready" ];
+			after = [ "db:setup" ];
 			exec = ''
 				DATABASE_URL="postgresql://slidesage:slidesage@127.0.0.1:$PGPORT/slidesage" \
 					go -C "$DEVENV_ROOT/apps/api" run ./cmd/migrate
 			'';
 		};
-    };
+	};
 
 	processes = {
-		storage = {
-			exec = ''
-				mkdir -p "$DEVENV_STATE/gcs/$PRESENTATION_GCS_BUCKET"
-				exec fake-gcs-server \
-					-scheme http \
-					-host 127.0.0.1 \
-					-port 4443 \
-					-backend filesystem \
-					-filesystem-root "$DEVENV_STATE/gcs" \
-					-public-host 127.0.0.1:4443
-			'';
-			cwd = ".";
-			ready = {
-				http.get = {
-					host = "127.0.0.1";
-					port = 4443;
-					path = "/_internal/healthcheck";
-				};
-				initial_delay = 1;
-				period = 1;
-				probe_timeout = 3;
-				success_threshold = 1;
-				failure_threshold = 30;
-			};
-		};
 		cache = {
 			exec = ''
 				mkdir -p "$DEVENV_STATE/valkey"
@@ -161,41 +135,40 @@
 				failure_threshold = 30;
 			};
 		};
-        web = {
-            exec = "bun run dev:web";
-            cwd = ".";
+		web = {
+			exec = "bun run dev:web";
+			cwd = ".";
 			after = [ "devenv:processes:api" "devenv:processes:worker" ];
-            ready = {
-                http.get = {
-                    host = "localhost";
-                    port = 5173;
-                    path = "/";
-                };
-                initial_delay = 1;
-                period = 1;
-                probe_timeout = 3;
-                success_threshold = 1;
-                failure_threshold = 30;
-            };
-        };
-    };
+			ready = {
+				http.get = {
+					host = "localhost";
+					port = 5173;
+					path = "/";
+				};
+				initial_delay = 1;
+				period = 1;
+				probe_timeout = 3;
+				success_threshold = 1;
+				failure_threshold = 30;
+			};
+		};
+	};
 
-    env = {
-        PGUSER = "postgres";
-        POSTGRES_USER = "slidesage";
-        POSTGRES_PASSWORD = "slidesage";
-        POSTGRES_DB = "slidesage";
-        POSTGRES_PORT = toString 5432;
-        DATABASE_URL = "postgresql://slidesage:slidesage@127.0.0.1:${toString 5432}/slidesage";
-        NODE_ENV = "development";
-        LOG_LEVEL = "debug";
-        CGO_ENABLED = "0";
+	env = {
+		PGUSER = "postgres";
+		POSTGRES_USER = "slidesage";
+		POSTGRES_PASSWORD = "slidesage";
+		POSTGRES_DB = "slidesage";
+		POSTGRES_PORT = toString 5432;
+		DATABASE_URL = "postgresql://slidesage:slidesage@127.0.0.1:${toString 5432}/slidesage";
+		NODE_ENV = "development";
+		LOG_LEVEL = "debug";
+		CGO_ENABLED = "0";
 		WORKER_CONCURRENCY = "2";
 		WORKER_DATABASE_POOL_MAX = "5";
 
-		STORAGE_EMULATOR_HOST = "http://127.0.0.1:4443";
-		# Image bucket; cmd/migrate also deletes retired document objects from it.
-		PRESENTATION_GCS_BUCKET = "slidesage-dev-revisions";
+		# Card image files; created on first use.
+		PRESENTATION_STORAGE_DIR = "${config.devenv.state}/objects";
 		CARD_CONVERTER_URL = "http://127.0.0.1:8090";
-    };
+	};
 }

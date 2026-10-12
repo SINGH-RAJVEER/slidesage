@@ -45,9 +45,9 @@
 				"CACHE_VALKEY_PASSWORD": "${VALKEY_PASSWORD:?set VALKEY_PASSWORD in .env}",
 				"CARD_CONVERTER_URL": "http://converter:8090",
 				"WORKER_WAKE_URL": "",
-				"GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/gcs-key"
+				"PRESENTATION_STORAGE_DIR": "/data/objects"
 			},
-			"secrets": ["gcs-key"],
+			"volumes": ["objects:/data/objects"],
 			"depends_on": {
 				"migrate": { "condition": "service_completed_successfully" },
 				"valkey": { "condition": "service_healthy" },
@@ -73,9 +73,9 @@
 				"WORKER_DRAIN_TIMEOUT": "20",
 				"WORKER_HEALTH_PORT": "8080",
 				"CARD_CONVERTER_URL": "http://converter:8090",
-				"GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/gcs-key"
+				"PRESENTATION_STORAGE_DIR": "/data/objects"
 			},
-			"secrets": ["gcs-key"],
+			"volumes": ["objects:/data/objects"],
 			"depends_on": {
 				"migrate": { "condition": "service_completed_successfully" },
 				"converter": { "condition": "service_healthy" }
@@ -91,11 +91,8 @@
 			"image": "${IMAGE_REGISTRY}/migrate:${IMAGE_TAG}",
 			"restart": "no",
 			"environment": {
-				"DATABASE_URL": "postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-slidesage}?sslmode=disable",
-				"PRESENTATION_GCS_BUCKET": "${PRESENTATION_GCS_BUCKET:-}",
-				"GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/gcs-key"
+				"DATABASE_URL": "postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-slidesage}?sslmode=disable"
 			},
-			"secrets": ["gcs-key"],
 			"depends_on": {
 				"postgres": { "condition": "service_healthy" }
 			},
@@ -115,9 +112,9 @@
 				"OTEL_SERVICE_VERSION": "${IMAGE_TAG}",
 				"DATABASE_URL": "postgresql://${POSTGRES_USER:-slidesage}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-slidesage}?sslmode=disable",
 				"WORKER_WAKE_URL": "",
-				"GOOGLE_APPLICATION_CREDENTIALS": "/run/secrets/gcs-key"
+				"PRESENTATION_STORAGE_DIR": "/data/objects"
 			},
-			"secrets": ["gcs-key"],
+			"volumes": ["objects:/data/objects"],
 			"networks": ["public", "private"],
 			"cap_drop": ["ALL"],
 			"security_opt": ["no-new-privileges:true"],
@@ -193,9 +190,7 @@
 		"private": { "internal": true }
 	},
 	"volumes": {
-		"postgres-data": {}
-	},
-	"secrets": {
-		"gcs-key": { "file": "./secrets/gcs-key.json" }
+		"postgres-data": {},
+		"objects": {}
 	}
 }

@@ -2,18 +2,17 @@ set dotenv-path := ".env"
 set shell := ["bash", "-cu"]
 
 default:
-    @just --list
+	@just --list
 
 # Start all services and apps
 dev:
-    devenv up
+	devenv up
 
 # Open a psql shell to the local dev database
 db-shell:
-    psql -h 127.0.0.1 -p "${PGPORT:-${POSTGRES_PORT:-5432}}" -U "${POSTGRES_USER:-slidesage}" -d "${POSTGRES_DB:-slidesage}"
+	psql -h 127.0.0.1 -p "${PGPORT:-${POSTGRES_PORT:-5432}}" -U "${POSTGRES_USER:-slidesage}" -d "${POSTGRES_DB:-slidesage}"
 
-# Apply Goose and River migrations, then delete retired objects from the image
-# bucket when PRESENTATION_GCS_BUCKET is set.
+# Apply Goose and River migrations
 migrate:
 	CGO_ENABLED=0 go -C apps/api run ./cmd/migrate
 
@@ -24,36 +23,36 @@ seed *args:
 
 # Create a new Goose SQL migration
 db-generate name:
-    goose -dir apps/api/migrations create "{{name}}" sql
+	goose -dir apps/api/migrations create "{{name}}" sql
 
 # Run the API server only
 api:
-    bun run dev:api
+	bun run dev:api
 
 # Run the Web server only
 web:
-    bun --cwd apps/web dev
+	bun --cwd apps/web dev
 
 test:
-    bun run test
+	bun run test
 
 test-api:
-    bun run test:api
+	bun run test:api
 
 test-web:
-    bun run test:web
+	bun run test:web
 
 test-ui:
-    bun run test:ui
+	bun run test:ui
 
 lint:
-    bun run lint
+	bun run lint
 
 lint-fix:
-    bunx biome check --write .
+	bunx biome check --write .
 
 format:
-    bun run format
+	bun run format
 
 # Compile the release binaries the container images copy in
 binaries:

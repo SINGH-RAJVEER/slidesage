@@ -55,7 +55,7 @@
 - Provenance records provider, model, prompt version `cards-v2`, plan version, and source IDs.
 - Converter network errors and `5xx` are temporary; `4xx` fail the job.
 - Submission requires `CARD_CONVERTER_URL`, otherwise `503` occurs before reserving points.
-- Text-only generation and document reads need no GCS bucket; stored image bytes do.
+- Text-only generation and document reads need no image storage directory; stored image bytes do.
 
 ## Widgets
 
@@ -105,7 +105,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Browser and share views load the remote URL; asset routes redirect. PPTX downloads the photo into the file without retaining a copy.
 - Upload limits are 15 MB, 50 megapixels, and 12000px per side; costly formats may be rejected below those limits.
 - Decoding has a 192 MB per-process budget, with at most four uploads read concurrently. Images exceeding the decode budget are rejected.
-- Stored images normalize to at most 2400px width, then JPEG or transparent PNG. GCS keys are `presentations/{id}/assets/{sha256}`; metadata includes MIME, dimensions, size, and source.
+- Stored images normalize to at most 2400px width, then JPEG or transparent PNG. Object keys are `presentations/{id}/assets/{sha256}`, stored as files under `PRESENTATION_STORAGE_DIR`; metadata includes MIME, dimensions, size, and source.
 - Remote downloads allow only approved hosts and redirects. Historical Pexels assets and credits remain readable.
 - `STOCK_LIBRARIES` shares attribution metadata between browser and converter.
 
@@ -124,12 +124,11 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 
 - `card_revisions` stores required immutable JSONB bodies, digest, size, count, schema version, author, operation/base IDs, and provenance. A trigger rejects updates.
 - Writes use expected-revision compare-and-swap; repeated operation IDs return the first result. All referenced assets must belong to the presentation at commit.
-- Document reads return revision metadata, body, and referenced assets together, with no GCS fallback.
-- Digest and size describe submitted compact JSON or verified imported GCS bytes. Never compare them with JSONB's reserialized bytes.
-- Deleting a user removes presentations and revisions; image bytes remain in GCS.
+- Document reads return revision metadata, body, and referenced assets together, with no object-store fallback.
+- Digest and size describe submitted compact JSON or verified imported object bytes. Never compare them with JSONB's reserialized bytes.
+- Deleting a user removes presentations and revisions; image files remain on disk.
 - Migration 33 imported bodies into JSONB. Migration 35 deletes decks without complete card bodies, removes legacy object keys and pgvector tables, and cannot downgrade. Unlinked point operations remain as billing history.
-- After migrations, `cmd/migrate` deletes legacy `presentations/<id>/objects/`, `revisions/`, and `cards/` keys, keeping `assets/`. Sweep failure is logged without failing migrations; reruns remove remaining objects.
-- Verify GCS soft-delete retention with `gcloud storage buckets describe` before sweeping. Database deletions require the pre-migration backup for recovery.
+- Database deletions require the pre-migration backup for recovery.
 
 ## Editing
 

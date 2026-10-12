@@ -126,8 +126,7 @@
 
 | Variable | Required | Secret | Purpose |
 | --- | --- | --- | --- |
-| `PRESENTATION_GCS_BUCKET` | Stored images | No | Private image bucket and migration sweep target; text-only documents need no bucket |
-| `STORAGE_EMULATOR_HOST` | Local image storage | No | GCS emulator URL. Devenv and `.env.example` use `http://127.0.0.1:4443`. Leave unset in production so clients use real GCS |
+| `PRESENTATION_STORAGE_DIR` | Stored images | No | Directory holding card image files, created on first use; text-only documents need none. Devenv uses `.devenv/state/objects`; compose sets `/data/objects` on the `objects` volume |
 | `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
 | `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
 | `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |

@@ -223,9 +223,9 @@ func TestCardDrafterPlansDraftsRepairsWithoutImageStorage(t *testing.T) {
 	}
 }
 
-func TestConfigureCardDrafterWithoutImageBucket(t *testing.T) {
+func TestConfigureCardDrafterWithoutImageStorage(t *testing.T) {
 	t.Setenv("CARD_CONVERTER_URL", "http://converter.test")
-	t.Setenv("PRESENTATION_GCS_BUCKET", "")
+	t.Setenv("PRESENTATION_STORAGE_DIR", "")
 	drafter, err := configureCardDrafter(&handler{})
 	if err != nil {
 		t.Fatal(err)

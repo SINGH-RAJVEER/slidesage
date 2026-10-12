@@ -12,8 +12,7 @@ fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT
 cp infra/compose.json "$fixture/"
 cp -r infra/nginx infra/templates "$fixture/"
-mkdir -p "$fixture/certs" "$fixture/secrets"
-printf '{}\n' > "$fixture/secrets/gcs-key.json"
+mkdir -p "$fixture/certs"
 sed -e 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci-placeholder/' \
 	-e 's/^VALKEY_PASSWORD=.*/VALKEY_PASSWORD=ci-placeholder/' \
 	"infra/env.example" > "$fixture/.env"
