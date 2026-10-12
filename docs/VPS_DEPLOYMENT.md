@@ -98,7 +98,7 @@ sudo systemctl enable --now slidesage-maintenance.timer slidesage-backup.timer
 
 ## Releases and proxy behavior
 
-- Pushes to `main` run all application and infrastructure checks, publish all five images, and deploy when `VPS_DEPLOY_ENABLED=true`. CI uploads files to an isolated directory, then holds the release lock while copying configuration and deploying. Server secrets, certificates, and backups are excluded from sync. Manual builds are in [CI/CD](CI_CD.md#manual-build).
+- Pull requests must pass all application and infrastructure checks before merging into protected `main`. Pushes to `main` build and publish all five release images, then deploy when `VPS_DEPLOY_ENABLED=true`. CI uploads files to an isolated directory, then holds the release lock while copying configuration and deploying. Server secrets, certificates, and backups are excluded from sync. Manual builds are in [CI/CD](CI_CD.md#manual-build).
 - `activate-release.sh` refuses registry or domain values that differ from the build. Keep `WEB_DOMAIN`, `API_DOMAIN`, and `IMAGE_REGISTRY` consistent with [CI/CD settings](CI_CD.md#repository-setup). The VPS still needs a persistent GHCR login if the image packages are private.
 - `./deploy.sh <commit-sha>` takes the shared lock, pulls images, and validates the rendered Nginx configuration before downtime. It starts dependencies, backs up the database, stops API and worker, and runs a fresh migration container to completion.
 - Only after migration succeeds does it recreate Nginx, API, and worker. It waits for frontend health, API health, and worker readiness. A migration failure leaves API and worker stopped. A `.deploy-incomplete` marker keeps maintenance disabled after any failed cutover until a release succeeds or recovery completes.
