@@ -31,23 +31,15 @@
 
 ## Production
 
-- Terraform `cache_enabled` defaults to false. GitHub `CACHE_ENABLED=true` enables it in plan/deploy; local plans can use `-var=cache_enabled=true`.
-- Deploy through the migration-first workflow so version tracking exists before enabling cache.
-- Deploy provisions the instance, its networking, and runtime IAM through a targeted apply before pausing runtimes. A slow or failed create stops the release while the previous version still serves.
-- `CACHE_ENABLED=false` removes cache resources on the next release and restores direct database reads.
-- Enabled defaults are Memorystore for Valkey 9.0 with cluster mode disabled, one `SHARED_CORE_NANO` node, no replicas, and a dedicated VPC.
-- Private Service Connect automation is the only connection method. A `gcp-memorystore` service connection policy reserves the primary and reader endpoints in a `/28` subnet; the API uses only the primary, because the reader rejects writes.
-- API uses Direct VPC egress from a separate `/26` subnet with `PRIVATE_RANGES_ONLY`. Worker needs no cache access or VPC attachment; database triggers invalidate its writes.
-- TLS and IAM authentication are enabled. Memorystore for Valkey has no generated AUTH password, so nothing is stored in Secret Manager or Terraform state. Terraform supplies the instance CA chain through `CACHE_VALKEY_CA_PEM`, sets `CACHE_VALKEY_AUTH=iam`, and grants the runtime account `roles/memorystore.dbConnectionUser`.
-- With IAM auth, each new connection sends a runtime service account access token through Valkey AUTH. Authenticated connections outlive token expiry. A token refresh slower than the operation budget fails that operation and starts the five-second bypass.
-- Production rejects a configured cache without both the CA and IAM auth.
-- `cache_node_type` accepts `SHARED_CORE_NANO`, `STANDARD_SMALL`, `HIGHMEM_MEDIUM`, or `HIGHMEM_XLARGE`. `cache_replica_count` accepts 0 to 5; one or more adds automatic failover.
-- Zero replicas permit cold restarts and flushes. Every node is billed while idle, and PostgreSQL fallback is required either way. See [Memorystore for Valkey pricing](https://cloud.google.com/memorystore/valkey/pricing).
+- Compose runs password-protected Valkey on the private container network, with no published host port.
+- The API uses `CACHE_VALKEY_ADDR=valkey:6379`, `CACHE_VALKEY_AUTH=password`, and the server's `VALKEY_PASSWORD`. Empty `CACHE_VALKEY_ADDR` disables caching outside Compose.
+- Valkey uses `allkeys-lru` and no disk persistence. Restarts produce cache misses; PostgreSQL remains authoritative.
+- Apply migrations before enabling the read cache. The worker invalidates reads through database triggers and needs no direct Valkey access.
 
 ## Local development and checks
 
 - devenv starts Valkey on `127.0.0.1:6379` as the `cache` process, without persistence, and points the API at it. Apply migrations before relying on it; devenv orders them first.
-- Non-production Valkey may omit IAM auth and CA. Variables are listed in [Environment variables](ENVIRONMENT_VARIABLES.md#database-read-cache).
+- Local Valkey may omit password authentication and TLS. Variables are listed in [Environment variables](ENVIRONMENT_VARIABLES.md#database-read-cache).
 - Outside devenv, run a disposable server:
 
 ```bash

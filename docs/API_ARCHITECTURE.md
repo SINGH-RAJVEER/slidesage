@@ -61,6 +61,6 @@
 ## Deployment
 
 - Build API, worker, migration, and converter images from the same commit.
-- Cloud Run runs a converter sidecar beside each Go service.
+- Compose runs a shared card converter on the VPS private network.
 - Authenticated Cloud Tasks requests own production River clients so active work has an HTTP lease while the worker scales from zero.
 - Run migrations before updating runtimes. See [CI/CD](CI_CD.md) for the release sequence.
