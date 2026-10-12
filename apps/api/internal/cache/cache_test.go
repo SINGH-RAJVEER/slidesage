@@ -6,8 +6,6 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"golang.org/x/oauth2"
 )
 
 func TestDisabledAndConfiguration(t *testing.T) {
@@ -31,10 +29,23 @@ func TestDisabledAndConfiguration(t *testing.T) {
 		t.Fatal("production accepted plaintext unauthenticated cache")
 	}
 	t.Setenv("NODE_ENV", "test")
-	t.Setenv("CACHE_VALKEY_AUTH", "password")
+	t.Setenv("CACHE_VALKEY_AUTH", "iam")
 	if _, err := FromEnv(); err == nil {
 		t.Fatal("unknown auth mode accepted")
 	}
+	t.Setenv("CACHE_VALKEY_AUTH", "password")
+	t.Setenv("CACHE_VALKEY_PASSWORD", "")
+	if _, err := FromEnv(); err == nil {
+		t.Fatal("password authentication accepted an empty password")
+	}
+	t.Setenv("CACHE_VALKEY_PASSWORD", "test-password")
+	t.Setenv("NODE_ENV", "production")
+	client, err = FromEnv()
+	if err != nil || client == nil {
+		t.Fatalf("private-network production cache = %v, %v", client, err)
+	}
+	defer client.Close()
+	t.Setenv("NODE_ENV", "test")
 	t.Setenv("CACHE_VALKEY_AUTH", "")
 	t.Setenv("CACHE_VALKEY_CA_PEM", "invalid")
 	if _, err := FromEnv(); err == nil {
@@ -44,27 +55,6 @@ func TestDisabledAndConfiguration(t *testing.T) {
 	t.Setenv("CACHE_TIMEOUT_MS", "0")
 	if _, err := FromEnv(); err == nil {
 		t.Fatal("invalid timeout accepted")
-	}
-}
-
-type blockingTokens struct{ release chan struct{} }
-
-func (source blockingTokens) Token() (*oauth2.Token, error) {
-	<-source.release
-	return &oauth2.Token{AccessToken: "late"}, nil
-}
-
-func TestIAMCredentialsUseTokenAsPassword(t *testing.T) {
-	username, password, err := iamCredentials(oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "token"}))(context.Background())
-	if err != nil || username != "" || password != "token" {
-		t.Fatalf("credentials = %q, %q, %v", username, password, err)
-	}
-	source := blockingTokens{release: make(chan struct{})}
-	defer close(source.release)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel()
-	if _, _, err := iamCredentials(source)(ctx); err == nil {
-		t.Fatal("stalled token fetch outlived the operation budget")
 	}
 }
 

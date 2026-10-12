@@ -5,10 +5,12 @@
 # than the incremental compile saved. Build the binaries first with
 # `just binaries`, then `just image`.
 
-# certificates
+# certificates and the image storage directory
 from docker.io/library/alpine:3.24 as certs
 
-run apk add --no-cache ca-certificates
+run apk add --no-cache ca-certificates \
+	&& mkdir -p /data/objects \
+	&& chown -R 65532:65532 /data
 
 
 from scratch as base
@@ -18,6 +20,10 @@ workdir /app
 copy --from=certs \
 	/etc/ssl/certs/ca-certificates.crt \
 	/etc/ssl/certs/ca-certificates.crt
+
+# Image storage mount point. A new named volume copies this ownership, so the
+# non-root runtime user can write card images to it.
+copy --from=certs --chown=65532:65532 /data /data
 
 user 65532:65532
 

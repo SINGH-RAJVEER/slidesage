@@ -223,9 +223,9 @@ func TestCardDrafterPlansDraftsRepairsWithoutImageStorage(t *testing.T) {
 	}
 }
 
-func TestConfigureCardDrafterWithoutImageBucket(t *testing.T) {
+func TestConfigureCardDrafterWithoutImageStorage(t *testing.T) {
 	t.Setenv("CARD_CONVERTER_URL", "http://converter.test")
-	t.Setenv("PRESENTATION_GCS_BUCKET", "")
+	t.Setenv("PRESENTATION_STORAGE_DIR", "")
 	drafter, err := configureCardDrafter(&handler{})
 	if err != nil {
 		t.Fatal(err)
@@ -320,5 +320,30 @@ func TestCardDrafterShowsEachCardWhileItsBatchStreams(t *testing.T) {
 	}
 	if _, ok := shown[2]["cards"].(map[string]any)["3"]; !ok {
 		t.Fatalf("the card missing from the stream was not shown: %+v", shown[2])
+	}
+}
+
+func TestRepairedCardAcceptsUnwrappedAnswers(t *testing.T) {
+	want := `{"layout":"statement","nodes":[{"text":"Hi","type":"heading"}]}`
+	card := map[string]any{"layout": "statement", "nodes": []any{map[string]any{"type": "heading", "text": "Hi"}}}
+	for name, response := range map[string]map[string]any{
+		"wrapped":     {"card": card},
+		"string":      {"card": want},
+		"cards array": {"cards": []any{card}},
+		"bare":        card,
+	} {
+		got, _ := json.Marshal(repairedCard(response))
+		if string(got) != want {
+			t.Errorf("%s: repaired card = %s", name, got)
+		}
+	}
+	for name, response := range map[string]map[string]any{
+		"empty":      {},
+		"bad string": {"card": "not json"},
+		"two cards":  {"cards": []any{card, card}},
+	} {
+		if got := repairedCard(response); got != nil {
+			t.Errorf("%s: repaired card = %v, want nil", name, got)
+		}
 	}
 }

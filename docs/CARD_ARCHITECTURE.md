@@ -8,7 +8,7 @@
 
 ### Implemented so far
 
-- Version 3 schema, private Bun converter, immutable JSONB revisions, and GCS image storage.
+- Version 3 schema, private Bun converter, immutable JSONB revisions, and local file image storage.
 - Approved outlines, bounded drafting batches, targeted repairs, and live previews.
 - Direct editing, selected-card AI revisions, stock and uploaded photos, presenting, and read-only sharing.
 - Charts, meters, tables, and callouts with shared browser/export geometry.
@@ -34,9 +34,9 @@ Remaining work:
 - Versioned documents contain a theme, ordered card IDs, content nodes, and source references. Cards and nodes have stable IDs.
 - Layouts and themes are separate from content. Model output cannot inject styling or scripts.
 - `internal/carddocument` owns validation, immutable revisions, idempotent operations, expected-revision checks, and asset ownership.
-- Callers use the document interface rather than manipulating JSONB bodies, ZIP entries, or GCS keys.
+- Callers use the document interface rather than manipulating JSONB bodies, ZIP entries, or object keys.
 - The browser and exporter share layout definitions; their rendering implementations can change independently.
-- Commit document bodies, revision metadata, and the current-revision pointer in one transaction. Keep image bytes under immutable GCS identifiers.
+- Commit document bodies, revision metadata, and the current-revision pointer in one transaction. Keep image bytes under immutable object keys.
 - Planned export records must identify the card revision, exporter version, dimensions, and digest, with repeat downloads returning identical bytes.
 
 ## Generation and editing flow

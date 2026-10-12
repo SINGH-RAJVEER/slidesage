@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"os"
-	"strings"
 
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 )
@@ -42,11 +40,11 @@ func configureCardDrafter(h *handler) (documentDrafter, error) {
 		return nil, nil
 	}
 	var store carddocument.ObjectStore
-	if bucket := strings.TrimSpace(os.Getenv("PRESENTATION_GCS_BUCKET")); bucket != "" {
-		configured, err := carddocument.NewGCSBlobStore(context.Background(), bucket)
-		if err != nil {
-			return nil, err
-		}
+	configured, err := carddocument.StoreFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	if configured != nil {
 		store = configured
 	}
 	var images imageSource

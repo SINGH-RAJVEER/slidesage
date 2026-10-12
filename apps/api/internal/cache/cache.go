@@ -20,8 +20,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 )
 
 const MaxValueBytes = 4 << 20
@@ -47,12 +45,17 @@ func FromEnv() (*Client, error) {
 		return nil, nil
 	}
 	authMode := os.Getenv("CACHE_VALKEY_AUTH")
-	if authMode != "" && authMode != "iam" {
-		return nil, errors.New("CACHE_VALKEY_AUTH must be empty or iam")
+	if authMode != "" && authMode != "password" {
+		return nil, errors.New("CACHE_VALKEY_AUTH must be empty or password")
 	}
-	if os.Getenv("NODE_ENV") == "production" && (os.Getenv("CACHE_VALKEY_CA_PEM") == "" || authMode != "iam") {
-		return nil, errors.New("production cache requires TLS CA and IAM authentication")
+	password := os.Getenv("CACHE_VALKEY_PASSWORD")
+	if authMode == "password" && password == "" {
+		return nil, errors.New("CACHE_VALKEY_AUTH=password requires CACHE_VALKEY_PASSWORD")
 	}
+	if os.Getenv("NODE_ENV") == "production" && authMode != "password" {
+		return nil, errors.New("production cache requires password authentication")
+	}
+
 	timeout := 100 * time.Millisecond
 	if raw := os.Getenv("CACHE_TIMEOUT_MS"); raw != "" {
 		millis, err := strconv.Atoi(raw)
@@ -68,12 +71,8 @@ func FromEnv() (*Client, error) {
 		PoolTimeout: timeout, ContextTimeoutEnabled: true, MaxRetries: -1,
 		ConnMaxIdleTime: time.Minute,
 	}
-	if authMode == "iam" {
-		source, err := google.DefaultTokenSource(context.Background(), "https://www.googleapis.com/auth/cloud-platform")
-		if err != nil {
-			return nil, fmt.Errorf("cache IAM credentials: %w", err)
-		}
-		options.CredentialsProviderContext = iamCredentials(source)
+	if authMode == "password" {
+		options.Password = password
 	}
 	if pem := os.Getenv("CACHE_VALKEY_CA_PEM"); pem != "" {
 		roots := x509.NewCertPool()
@@ -92,33 +91,6 @@ func FromEnv() (*Client, error) {
 		return nil, err
 	}
 	return &Client{valkey: redis.NewClient(options), timeout: timeout, requests: requests, latency: latency}, nil
-}
-
-// iamCredentials authenticates each new connection with a fresh access token.
-// Memorystore keeps authenticated connections open after the token expires.
-// The token source caches tokens but ignores contexts, so a slow metadata
-// server is bounded by the operation budget instead.
-func iamCredentials(source oauth2.TokenSource) func(context.Context) (string, string, error) {
-	return func(ctx context.Context) (string, string, error) {
-		type result struct {
-			token *oauth2.Token
-			err   error
-		}
-		done := make(chan result, 1)
-		go func() {
-			token, err := source.Token()
-			done <- result{token, err}
-		}()
-		select {
-		case fetched := <-done:
-			if fetched.err != nil {
-				return "", "", fetched.err
-			}
-			return "", fetched.token.AccessToken, nil
-		case <-ctx.Done():
-			return "", "", ctx.Err()
-		}
-	}
 }
 
 // Key hashes length-delimited identities so user content never enters cache keys.

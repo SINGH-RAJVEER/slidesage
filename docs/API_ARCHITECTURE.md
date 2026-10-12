@@ -40,7 +40,7 @@
 
 ## Presentation documents
 
-- `internal/carddocument` stores immutable card revisions in PostgreSQL JSONB and image bytes in GCS.
+- `internal/carddocument` stores immutable card revisions in PostgreSQL JSONB and image bytes as files under `PRESENTATION_STORAGE_DIR`.
 - The browser renders the saved card revision; the converter derives an editable PPTX from it.
 - See [Card documents](CARD_DOCUMENTS.md) for the schema, editing, sharing, and export limits.
 

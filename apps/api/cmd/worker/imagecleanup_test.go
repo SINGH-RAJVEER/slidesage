@@ -14,10 +14,11 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 )
 
-func TestMaintenanceDeletesAccountImagesFromGCS(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" || os.Getenv("STORAGE_EMULATOR_HOST") == "" {
-		t.Skip("PostgreSQL and GCS emulator are required")
+func TestMaintenanceDeletesAccountImagesFromDisk(t *testing.T) {
+	if os.Getenv("DATABASE_URL") == "" {
+		t.Skip("PostgreSQL is required")
 	}
+	t.Setenv("PRESENTATION_STORAGE_DIR", t.TempDir())
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
 	database, err := sql.Open("pgx", os.Getenv("DATABASE_URL"))
@@ -25,11 +26,10 @@ func TestMaintenanceDeletesAccountImagesFromGCS(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
-	store, err := carddocument.NewGCSBlobStore(ctx, os.Getenv("PRESENTATION_GCS_BUCKET"))
+	store, err := carddocument.StoreFromEnv()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = store.Close() })
 	body := []byte("image cleanup fixture")
 	sum := sha256.Sum256(body)
 	digest := hex.EncodeToString(sum[:])

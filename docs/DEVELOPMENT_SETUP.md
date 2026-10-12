@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Install Nix and [devenv](https://devenv.sh/getting-started/). The shell provides Go, Watchexec, Bun, PostgreSQL, Goose, `just`, Terraform, the Google Cloud CLI (`gcloud`, defaulting to the production project and `asia-south1`), and `fake-gcs-server`.
+- Install Nix and [devenv](https://devenv.sh/getting-started/). The shell provides Go, Watchexec, Bun, PostgreSQL, Goose, and `just`.
 - `apps/api` targets Go 1.27.1. The pinned shell ships Go 1.26; `GOTOOLCHAIN=auto` downloads and caches the required toolchain on first use. That build needs network access.
 
 ```bash
@@ -21,11 +21,10 @@ just dev
 `just dev` starts services in dependency order:
 
 1. PostgreSQL with pgvector for the early migrations, plus the local role and database.
-2. GCS emulator on `4443`, using bucket `slidesage-dev-revisions` and disk state in `.devenv/state/gcs`.
-3. Goose and River migrations, followed by the retired-object sweep.
-4. Card converter on `8090`.
-5. API on `8000` and generation worker on `8080`, after converter health checks.
-6. Vite on `5173`, after API and worker readiness.
+2. Goose and River migrations.
+3. Card converter on `8090`.
+4. API on `8000` and generation worker on `8080`, after converter health checks. Card images go to `.devenv/state/objects`.
+5. Vite on `5173`, after API and worker readiness.
 
 - Stop with `Ctrl+C`; devenv shuts down managed services.
 - Document bodies live in PostgreSQL JSONB; the emulator stores image bytes.
@@ -80,7 +79,7 @@ just migrate
 
 - `apps/api/migrations` is the embedded Goose history. River manages its queue migrations separately.
 - `just migrate` runs `go -C apps/api run ./cmd/migrate`, applying Goose then River. Only upward migration is supported.
-- It does not start services. Start the emulator first, or unset `PRESENTATION_GCS_BUCKET` to skip the object sweep.
+- It does not start services.
 - Migration 35 deletes decks without card documents and refuses downgrade. See [Card storage](CARD_DOCUMENTS.md#storage).
 - Migration 36 invalidates legacy password hashes. See [Password and email changes](AUTH_API.md#password-and-email-changes).
 - Apply migrations before API and worker startup. Production uses the separate `migrate` image target.

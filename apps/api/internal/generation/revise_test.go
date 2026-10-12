@@ -126,7 +126,7 @@ func TestCardDrafterRevisesOnlyTheRequestedCardsInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(store.objects) != 1 {
-		t.Fatalf("expected only the image in GCS, got %d objects", len(store.objects))
+		t.Fatalf("expected only the image in the object store, got %d objects", len(store.objects))
 	}
 	if strings.Join(revised.CardOrder, ",") != strings.Join(deck.document.CardOrder, ",") {
 		t.Fatalf("card order changed: %v", revised.CardOrder)
