@@ -1,0 +1,11 @@
+[Unit]
+Description=SlideSage recovery and cleanup sweep
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=slidesage
+WorkingDirectory=/opt/slidesage
+# The script skips running and failed deployments under the shared lock.
+ExecStart=/opt/slidesage/maintenance.sh

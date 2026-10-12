@@ -49,31 +49,13 @@ OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>
 - Filter Datadog on `env:development` for local runs.
 - Local telemetry is billed. Leave the endpoint empty when unused or reduce `OTEL_TRACES_SAMPLING_RATIO`.
 
-## Datadog on Cloud Run
+## Datadog on the VPS
 
-- Production uses direct intake at `https://otlp.us5.datadoghq.com`. Other sites use their own [serverless OTLP endpoints](https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest/serverless/).
-- Metrics export delta temporality.
-- Keep service names unset to retain separate API and worker defaults. GCP detection adds project, region, service, revision, and instance attributes.
-- Store the complete header value in Secret Manager:
-
-```bash
-gcloud secrets create DATADOG_OTLP_HEADERS --replication-policy=automatic
-printf '%s' 'dd-api-key=<api-key>,dd-otlp-source=serverless,compute_stats=true' \
-	| gcloud secrets versions add DATADOG_OTLP_HEADERS --data-file=-
-```
-
-Configure `infra/prod`:
-
-```hcl
-otel_exporter_otlp_endpoint = "https://otlp.us5.datadoghq.com"
-otel_service_version        = "<git-sha>"
-otel_logs_exporter          = "otlp"
-```
-
-- Terraform injects the secret and grants runtime access.
-- Set `otel_logs_exporter="none"` when Datadog's GCP integration already ingests stdout, avoiding duplicate logs.
-- In GitHub, set `DATADOG_OTLP_ENDPOINT` and optional `OTEL_LOGS_EXPORTER`; deploy forwards them to Terraform and sets service version to the commit SHA.
-- Unsetting `DATADOG_OTLP_ENDPOINT` disables export on the next deployment.
+- API and worker export directly to the OTLP endpoint configured in `/opt/slidesage/.env`. Metrics use delta temporality.
+- Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, and `OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>,compute_stats=true` on the server. Keep credentials out of GitHub and the repository.
+- Service names default to `slidesage-api` and `slidesage-worker`. Compose sets `OTEL_SERVICE_VERSION` to the release SHA and the environment to `production`.
+- Recreate API and worker after changing telemetry credentials so they load the new environment. Keep `OTEL_LOGS_EXPORTER=otlp` for direct log intake, or `none` when logs are collected separately.
+- An empty endpoint disables export.
 
 ### Check ingestion
 

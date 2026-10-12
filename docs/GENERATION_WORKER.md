@@ -12,7 +12,7 @@
 | `cmd/worker` | Provider calls, card conversion, document persistence, settlement/refunds |
 | `generation_jobs` | Public identity, payload, ownership, lifecycle, cancellation, errors |
 | `generation_job_events` | Ordered replayable events |
-| `cmd/migrate` | Goose and River migrations, retired-object sweep |
+| `cmd/migrate` | Goose and River migrations |
 
 - Migration 15 creates application jobs and events. River owns separate queue tables.
 - Public IDs are application job IDs; River IDs are internal.
@@ -49,28 +49,17 @@
 - Reasoning-capable models receive a 1,024-token allowance above the answer bound. Google uses `thinkingBudget`, Anthropic uses `thinking`, OpenAI reasoning models use `max_completion_tokens`, and OpenRouter uses `reasoning.max_tokens`.
 - Inline `<think>` blocks are removed before parsing. Empty answers return a specific provider error.
 - Planning precedes batches of four cards. Conversion reports valid cards as they arrive and repairs invalid cards after the batch. See [Card generation](CARD_DOCUMENTS.md#generation).
+- Repair responses accept a `card` object, a JSON string in `card`, a one-element `cards` array, or a bare card with `nodes`. Each extracted card still passes through the converter's schema checks.
 - Reservations cover planning, card output bounds, repeated prompt context, and repair headroom.
 - Persist events before delivery. `saved` and `error` terminate streams.
 - Cancellation locks the application job, cancels River work, releases its reservation, and records terminal state in one transaction. Late provider results cannot settle a cancelled job.
-- Local shutdown uses a six-second River soft stop. Production leases allow up to eight minutes for claimed work before handoff.
-
-## Waking a scaled-to-zero worker
-
-- After submission commits, the API creates an authenticated Cloud Task to call worker `POST /drain`. Idempotent resubmission sends another wake signal.
-- Tasks carry no generation payload; the worker claims durable PostgreSQL jobs.
-- The inbound request keeps the instance active. With request leasing, River starts only inside `/drain`, so the protected instance claims the work.
-- Each drain stops claiming after 20 minutes and allows eight more minutes for its active attempt.
-- Pending work, including delayed retries, returns `500` before the 30-minute task deadline so Cloud Tasks retries. An empty queue returns `204` after its settle window and client shutdown.
-- Unexpected request cancellation hard-stops local work for River recovery.
-- Each submission creates a task. Production uses one River execution slot per request-owned instance.
-- Worker ingress is internal, with invocation granted only to the runtime service account. Same-project tasks call its default `run.app` URL.
+- River uses a six-second soft-stop window; the process shutdown deadline is controlled by `WORKER_DRAIN_TIMEOUT`. The continuous VPS worker stops gracefully before its container exits.
 
 ## Recovery and cleanup
 
 - `slidesage-maintenance` runs `cmd/worker --maintenance` every 15 minutes through Cloud Scheduler.
-- It recovers terminated generation jobs and expired reservations, removes expired rate-limit rows and unverified accounts, deletes queued images for removed users/presentations, and re-wakes due queue work.
-- Image cleanup requires `PRESENTATION_GCS_BUCKET` and permission to delete stored image objects. Each sweep processes up to 100 queued images within two minutes; failures are deferred for 15 minutes so they do not block other queued images. Missing objects count as already removed.
-- Future scheduled/retryable rows do not wake the worker before `scheduled_at`.
+- It recovers terminated generation jobs and expired reservations, removes expired rate-limit rows and unverified accounts, deletes queued images for removed users/presentations.
+- Image cleanup uses `PRESENTATION_STORAGE_DIR` and the shared objects volume. Each sweep processes up to 100 queued images within two minutes; failures are deferred for 15 minutes so they do not block other queued images. Missing objects count as already removed.
 - Each sweep handles at most 100 terminated jobs and 100 affected users, with two concurrent recovery transactions and bounded cleanup batches.
 - `maintenance_mode` pauses the scheduler during migrations.
 
@@ -104,13 +93,12 @@ All endpoints require the job owner:
 ## Process configuration
 
 - API and worker need matching database, provider, and BYOK encryption settings.
-- Worker concurrency, pools, lease timing, and wake variables are listed in [Environment variables](ENVIRONMENT_VARIABLES.md#generation-worker).
 - `/live` returns `204` while the health server runs. `/ready` returns `204` while accepting work with PostgreSQL reachable, and `503` during shutdown.
 - Size the instance limit, River slots, database pools, task dispatch concurrency, and provider limits together.
 
 ## Deployment
 
-- API and worker are Cloud Run services; converter sidecars share their network namespace.
+- API, worker, and converter run as separate Compose services on the VPS private network.
 - Worker uses instance-based billing with `cpu_idle=false`, no minimum instance, and request-owned River clients.
 - Cloud Tasks request count drives scaling; PostgreSQL queue depth does not.
 - Run the migration image before updating runtimes. API and worker startup never applies migrations.
@@ -119,5 +107,4 @@ All endpoints require the job owner:
 ## Local development
 
 - Devenv starts dependencies, migrations, converter, API, worker, and web in order.
-- Local worker runs continuously; leave `WORKER_WAKE_URL` unset.
 - Commands and readiness checks are in [Development setup](DEVELOPMENT_SETUP.md).

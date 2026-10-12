@@ -109,18 +109,6 @@ func newInsertClient(database *sql.DB) (*queueClient, error) {
 // NewWorkerClient constructs the continuously running River client used by the
 // worker process. API processes use an insert-only client instead.
 func NewWorkerClient(database *sql.DB, connections ai.ConnectionService, maxWorkers int) (*queueClient, error) {
-	return newWorkerClient(database, connections, maxWorkers, 6*time.Second)
-}
-
-// NewLeasedWorkerClient constructs a River client whose graceful-stop window
-// is long enough for one generation attempt to finish before an HTTP lease is
-// handed to a successor. The caller still owns the final deadline and may use
-// StopAndCancel when the request disappears unexpectedly.
-func NewLeasedWorkerClient(database *sql.DB, connections ai.ConnectionService, maxWorkers int) (*queueClient, error) {
-	return newWorkerClient(database, connections, maxWorkers, 8*time.Minute)
-}
-
-func newWorkerClient(database *sql.DB, connections ai.ConnectionService, maxWorkers int, softStopTimeout time.Duration) (*queueClient, error) {
 	if maxWorkers < 1 {
 		maxWorkers = 1
 	}
@@ -136,7 +124,7 @@ func newWorkerClient(database *sql.DB, connections ai.ConnectionService, maxWork
 		FetchPollInterval:    time.Second,
 		JobTimeout:           7 * time.Minute,
 		RescueStuckJobsAfter: 8 * time.Minute,
-		SoftStopTimeout:      softStopTimeout,
+		SoftStopTimeout:      6 * time.Second,
 		Queues: map[string]river.QueueConfig{
 			generationQueue: {MaxWorkers: maxWorkers},
 		},
@@ -815,32 +803,3 @@ type providerRequestError struct {
 }
 
 func (err *providerRequestError) Error() string { return err.Message }
-
-// OutstandingGenerationJobs counts queue rows that still need a worker. A
-// woken worker uses it to decide whether it may let its drain request finish:
-// returning while work remains would hand the instance back to Cloud Run,
-// which cannot see that the generation is still running.
-//
-// Scheduled rows count because River holds a retry in the queue until its
-// backoff elapses, and nothing polls for it once the instance is gone.
-func OutstandingGenerationJobs(ctx context.Context, database *sql.DB) (int, error) {
-	var count int
-	err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM river_job WHERE queue = $1 AND state IN ('available', 'running', 'retryable', 'scheduled')`, generationQueue).Scan(&count)
-	if err != nil {
-		return 0, err
-	}
-	return count, nil
-}
-
-// RunnableGenerationJobs excludes retries scheduled for the future. It is used
-// by the periodic backstop so a sweep does not wake an instance before River
-// can claim anything. An active drain uses OutstandingGenerationJobs instead
-// and stays attached across River's short retry delays.
-func RunnableGenerationJobs(ctx context.Context, database *sql.DB) (int, error) {
-	var count int
-	err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM river_job WHERE queue = $1 AND (state IN ('available', 'running') OR (state IN ('retryable', 'scheduled') AND scheduled_at <= NOW()))`, generationQueue).Scan(&count)
-	if err != nil {
-		return 0, err
-	}
-	return count, nil
-}
