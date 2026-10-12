@@ -1,182 +1,200 @@
-name: Pull request checks
-
-on:
-  pull_request:
-    branches: [main, dev]
-  push:
-    branches: [dev]
-  workflow_dispatch:
-  workflow_call:
-
-permissions:
-  contents: read
-  pull-requests: read
-
-concurrency:
-  group: checks-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.workflow == 'Pull request checks' }}
-
-jobs:
-  test-and-build:
-    runs-on: ubuntu-latest
-    env:
-      CGO_ENABLED: "0"
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: ${{ github.event_name == 'push' && 50 || 1 }}
-
-      - name: Resolve the comparison base for a push
-        if: github.event_name == 'push'
-        id: base
-        shell: bash
-        run: |
-          set -euo pipefail
-          before='${{ github.event.before }}'
-          if [ -n "$before" ] \
-            && [ "$before" != "0000000000000000000000000000000000000000" ] \
-            && git cat-file -e "$before^{commit}" 2>/dev/null; then
-            echo "ref=$before" >> "$GITHUB_OUTPUT"
-          fi
-
-      - id: changes
-        if: github.event_name == 'pull_request' || steps.base.outputs.ref != ''
-        continue-on-error: true
-        uses: dorny/paths-filter@v4
-        with:
-          base: ${{ steps.base.outputs.ref }}
-          filters: |
-            api:
-              - 'apps/api/**'
-              - 'apps/converter/**'
-              - 'libs/cards/**'
-              - 'libs/types/**'
-              - '.github/workflows/checks.yml'
-              - '.github/workflows/deploy.yml'
-              - 'docker-bake.hcl'
-            web:
-              - 'apps/web/**'
-              - 'apps/converter/**'
-              - 'libs/**'
-              - 'package.json'
-              - 'bun.lock'
-              - 'tsconfig.json'
-              - 'biome.json'
-              - '.github/workflows/checks.yml'
-              - '.github/workflows/deploy.yml'
-              - 'docker-bake.hcl'
-
-      - id: scope
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ '${{ steps.changes.outcome }}' = 'success' ]; then
-            echo 'api=${{ steps.changes.outputs.api }}' >> "$GITHUB_OUTPUT"
-            echo 'web=${{ steps.changes.outputs.web }}' >> "$GITHUB_OUTPUT"
-          else
-            echo 'api=true' >> "$GITHUB_OUTPUT"
-            echo 'web=true' >> "$GITHUB_OUTPUT"
-          fi
-
-      - if: steps.scope.outputs.api == 'true'
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: apps/api/go.mod
-          cache: false
-
-      - name: Stamp the Go cache key
-        if: steps.scope.outputs.api == 'true'
-        run: echo "GO_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
-
-      - name: Restore the Go module and build caches
-        if: steps.scope.outputs.api == 'true'
-        id: go-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-
-            ${{ runner.os }}-go-
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.13
-
-      - run: bun install --frozen-lockfile
-
-      - if: steps.scope.outputs.web == 'true'
-        run: bun run type-check
-
-      - if: steps.scope.outputs.web == 'true'
-        run: bun run test:cards
-
-      - if: steps.scope.outputs.web == 'true'
-        run: bun run test:converter
-
-      - if: steps.scope.outputs.web == 'true'
-        run: bun run test:ui
-
-      - if: steps.scope.outputs.web == 'true'
-        run: bun run test:web
-
-      - name: Start API integration dependencies
-        if: steps.scope.outputs.api == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run -d --name slidesage-test-postgres \
-            -e POSTGRES_USER=slidesage -e POSTGRES_PASSWORD=slidesage -e POSTGRES_DB=slidesage \
-            -p 127.0.0.1:55439:5432 docker.io/pgvector/pgvector:pg17
-          docker run -d --name slidesage-test-valkey \
-            -p 127.0.0.1:56389:6379 docker.io/valkey/valkey:9.0-alpine \
-            valkey-server --save '' --appendonly no
-          ready=false
-          for attempt in {1..30}; do
-            if docker exec slidesage-test-postgres pg_isready -h 127.0.0.1 -U slidesage -d slidesage \
-              && docker exec slidesage-test-valkey valkey-cli ping; then
-              ready=true
-              break
-            fi
-            sleep 1
-          done
-          test "$ready" = true
-
-      - name: Migrate the disposable integration database
-        if: steps.scope.outputs.api == 'true'
-        env:
-          DATABASE_URL: postgresql://slidesage:slidesage@127.0.0.1:55439/slidesage
-        run: go run ./cmd/migrate
-        working-directory: apps/api
-
-      - if: steps.scope.outputs.api == 'true'
-        env:
-          DATABASE_URL: postgresql://slidesage:slidesage@127.0.0.1:55439/slidesage
-          TEST_VALKEY_ADDR: 127.0.0.1:56389
-        run: go test ./...
-        working-directory: apps/api
-
-      - if: steps.scope.outputs.api == 'true'
-        run: go vet ./...
-        working-directory: apps/api
-
-      - if: steps.scope.outputs.web == 'true'
-        run: bun run build
-
-      - if: steps.scope.outputs.api == 'true'
-        run: bun run build:api
-
-      - name: Save the Go module and build caches
-        if: >-
-          github.event_name != 'pull_request'
-          && steps.scope.outputs.api == 'true'
-          && steps.go-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}
-
+{
+	"name": "Pull request checks",
+	"on": {
+		"pull_request": {
+			"branches": [
+				"main",
+				"dev",
+				"vps"
+			]
+		},
+		"push": {
+			"branches": [
+				"dev"
+			]
+		},
+		"workflow_dispatch": null,
+		"workflow_call": {
+			"inputs": {
+				"full-check": {
+					"type": "boolean",
+					"default": false,
+					"description": "Run every application suite before publishing release images"
+				}
+			}
+		}
+	},
+	"permissions": {
+		"contents": "read",
+		"pull-requests": "read"
+	},
+	"concurrency": {
+		"group": "checks-${{ github.workflow }}-${{ github.ref }}",
+		"cancel-in-progress": "${{ github.workflow == 'Pull request checks' }}"
+	},
+	"jobs": {
+		"test-and-build": {
+			"runs-on": "ubuntu-latest",
+			"env": {
+				"CGO_ENABLED": "0"
+			},
+			"steps": [
+				{
+					"uses": "actions/checkout@v4",
+					"with": {
+						"fetch-depth": "${{ github.event_name == 'push' && 50 || 1 }}"
+					}
+				},
+				{
+					"name": "Resolve the comparison base for a push",
+					"if": "github.event_name == 'push'",
+					"id": "base",
+					"shell": "bash",
+					"run": "set -euo pipefail\nbefore='${{ github.event.before }}'\nif [ -n \"$before\" ] \\\n\t&& [ \"$before\" != \"0000000000000000000000000000000000000000\" ] \\\n\t&& git cat-file -e \"$before^{commit}\" 2>/dev/null; then\n\techo \"ref=$before\" >> \"$GITHUB_OUTPUT\"\nfi\n"
+				},
+				{
+					"id": "changes",
+					"if": "!inputs.full-check && (github.event_name == 'pull_request' || steps.base.outputs.ref != '')",
+					"continue-on-error": true,
+					"uses": "dorny/paths-filter@v4",
+					"with": {
+						"base": "${{ steps.base.outputs.ref }}",
+						"filters": "api:\n  - 'apps/api/**'\n  - 'apps/converter/**'\n  - 'libs/cards/**'\n  - 'libs/types/**'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\nweb:\n  - 'apps/web/**'\n  - 'apps/converter/**'\n  - 'libs/**'\n  - 'package.json'\n  - 'bun.lock'\n  - 'tsconfig.json'\n  - 'biome.json'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\n"
+					}
+				},
+				{
+					"id": "scope",
+					"shell": "bash",
+					"run": "set -euo pipefail\nif [ '${{ steps.changes.outcome }}' = 'success' ]; then\n\techo 'api=${{ steps.changes.outputs.api }}' >> \"$GITHUB_OUTPUT\"\n\techo 'web=${{ steps.changes.outputs.web }}' >> \"$GITHUB_OUTPUT\"\nelse\n\techo 'api=true' >> \"$GITHUB_OUTPUT\"\n\techo 'web=true' >> \"$GITHUB_OUTPUT\"\nfi\n"
+				},
+				{
+					"if": "steps.scope.outputs.api == 'true'",
+					"uses": "actions/setup-go@v5",
+					"with": {
+						"go-version-file": "apps/api/go.mod",
+						"cache": "false"
+					}
+				},
+				{
+					"name": "Stamp the Go cache key",
+					"if": "steps.scope.outputs.api == 'true'",
+					"run": "echo \"GO_CACHE_DATE=$(date -u +%Y-%m-%d)\" >> \"$GITHUB_ENV\"\n"
+				},
+				{
+					"name": "Restore the Go module and build caches",
+					"if": "steps.scope.outputs.api == 'true'",
+					"id": "go-cache",
+					"uses": "actions/cache/restore@v4",
+					"with": {
+						"path": "~/.cache/go-build\n~/go/pkg/mod\n",
+						"key": "${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}",
+						"restore-keys": "${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-\n${{ runner.os }}-go-\n"
+					}
+				},
+				{
+					"uses": "oven-sh/setup-bun@v2",
+					"with": {
+						"bun-version": "1.3.13"
+					}
+				},
+				{
+					"run": "bun install --frozen-lockfile\n"
+				},
+				{
+					"if": "steps.scope.outputs.web == 'true'",
+					"run": "bun run type-check\n"
+				},
+				{
+					"if": "steps.scope.outputs.web == 'true'",
+					"run": "bun run test:cards\n"
+				},
+				{
+					"if": "steps.scope.outputs.web == 'true'",
+					"run": "bun run test:converter\n"
+				},
+				{
+					"if": "steps.scope.outputs.web == 'true'",
+					"run": "bun run test:ui\n"
+				},
+				{
+					"if": "steps.scope.outputs.web == 'true'",
+					"run": "bun run test:web\n"
+				},
+				{
+					"name": "Start API integration dependencies",
+					"if": "steps.scope.outputs.api == 'true'",
+					"shell": "bash",
+					"run": "set -euo pipefail\ndocker run -d --name slidesage-test-postgres \\\n\t-e POSTGRES_USER=slidesage -e POSTGRES_PASSWORD=slidesage -e POSTGRES_DB=slidesage \\\n\t-p 127.0.0.1:55439:5432 docker.io/pgvector/pgvector:pg17\ndocker run -d --name slidesage-test-valkey \\\n\t-p 127.0.0.1:56389:6379 docker.io/valkey/valkey:9.0-alpine \\\n\tvalkey-server --save '' --appendonly no\nready=false\nfor _ in {1..30}; do\n\tif docker exec slidesage-test-postgres pg_isready -h 127.0.0.1 -U slidesage -d slidesage \\\n\t\t&& docker exec slidesage-test-valkey valkey-cli ping; then\n\t\tready=true\n\t\tbreak\n\tfi\n\tsleep 1\ndone\ntest \"$ready\" = true\n"
+				},
+				{
+					"name": "Migrate the disposable integration database",
+					"if": "steps.scope.outputs.api == 'true'",
+					"env": {
+						"DATABASE_URL": "postgresql://slidesage:slidesage@127.0.0.1:55439/slidesage"
+					},
+					"run": "go run ./cmd/migrate\n",
+					"working-directory": "apps/api"
+				},
+				{
+					"if": "steps.scope.outputs.api == 'true'",
+					"env": {
+						"DATABASE_URL": "postgresql://slidesage:slidesage@127.0.0.1:55439/slidesage",
+						"TEST_VALKEY_ADDR": "127.0.0.1:56389"
+					},
+					"run": "go test ./...\n",
+					"working-directory": "apps/api"
+				},
+				{
+					"if": "steps.scope.outputs.api == 'true'",
+					"run": "go vet ./...\n",
+					"working-directory": "apps/api"
+				},
+				{
+					"if": "steps.scope.outputs.web == 'true'",
+					"run": "bun run build\n"
+				},
+				{
+					"if": "steps.scope.outputs.api == 'true'",
+					"run": "bun run build:api\n"
+				},
+				{
+					"name": "Save the Go module and build caches",
+					"if": "github.event_name != 'pull_request' && steps.scope.outputs.api == 'true' && steps.go-cache.outputs.cache-hit != 'true'",
+					"uses": "actions/cache/save@v4",
+					"with": {
+						"path": "~/.cache/go-build\n~/go/pkg/mod\n",
+						"key": "${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}"
+					}
+				}
+			],
+			"timeout-minutes": 30
+		},
+		"infrastructure": {
+			"runs-on": "ubuntu-latest",
+			"timeout-minutes": 10,
+			"steps": [
+				{
+					"uses": "actions/checkout@v4"
+				},
+				{
+					"uses": "actions/setup-go@v5",
+					"with": {
+						"go-version-file": "apps/api/go.mod",
+						"cache": false
+					}
+				},
+				{
+					"uses": "docker/setup-buildx-action@v3"
+				},
+				{
+					"name": "Validate Actions workflows",
+					"run": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color .github/workflows/*.yml\n"
+				},
+				{
+					"name": "Validate Compose, Bake, shell scripts, and Nginx",
+					"run": "./infra/check.sh\n"
+				}
+			]
+		}
+	}
+}
