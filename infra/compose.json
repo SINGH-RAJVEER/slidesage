@@ -186,7 +186,10 @@
 		}
 	},
 	"networks": {
-		"public": {},
+		"public": {
+			"enable_ipv6": true,
+			"ipam": { "config": [{ "subnet": "fd5a:5a5a:5a5a::/64" }] }
+		},
 		"private": { "internal": true }
 	},
 	"volumes": {

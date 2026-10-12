@@ -26,16 +26,19 @@ gzip_types text/css application/javascript application/json image/svg+xml text/p
 # Refuse TLS for any other name before a certificate is presented.
 server {
 	listen 443 ssl default_server;
+	listen [::]:443 ssl default_server;
 	ssl_reject_handshake on;
 }
 
 server {
 	listen 80 default_server;
+	listen [::]:80 default_server;
 	return 444;
 }
 
 server {
 	listen 80;
+	listen [::]:80;
 	server_name ${WEB_DOMAIN} www.${WEB_DOMAIN} ${API_DOMAIN};
 
 	if ($from_cloudflare = 0) {
@@ -47,6 +50,7 @@ server {
 
 server {
 	listen 443 ssl;
+	listen [::]:443 ssl;
 	http2 on;
 	server_name www.${WEB_DOMAIN};
 
@@ -74,6 +78,7 @@ server {
 # The frontend, baked into this image at /usr/share/nginx/html.
 server {
 	listen 443 ssl;
+	listen [::]:443 ssl;
 	http2 on;
 	server_name ${WEB_DOMAIN};
 	root /usr/share/nginx/html;
@@ -103,6 +108,7 @@ server {
 
 server {
 	listen 443 ssl;
+	listen [::]:443 ssl;
 	http2 on;
 	server_name ${API_DOMAIN};
 	gzip off;

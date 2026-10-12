@@ -14,7 +14,7 @@
 | PostgreSQL 18 with pgvector | `postgres:5432` | Internal network, persistent volume |
 | Valkey | `valkey:6379` | Internal network, password auth, no persistence |
 | Migrate and maintenance | One-off containers | No host ports |
-| Card images | Existing private GCS bucket | Outbound requests with a service-account key |
+| Card images | `/data/objects` on `slidesage_objects` | Persistent Docker volume shared by API, worker, and maintenance |
 
 - Only Nginx publishes ports. PostgreSQL, Valkey, and converter join the `internal` private network. API, worker, and jobs also join the public network for outbound provider and storage calls.
 - `WORKER_REQUEST_LEASED=false` and empty `WORKER_WAKE_URL` make the worker run continuously without Cloud Tasks.
@@ -41,7 +41,7 @@
 
 ## Server setup
 
-1. Allow SSH, 80, and 443 in the provider firewall. Restrict HTTP/HTTPS to [Cloudflare edge ranges](https://www.cloudflare.com/ips/) when possible. Docker publishes ports around the host firewall; Nginx also rejects non-Cloudflare sources. Use IPv4 origin records, with no origin `AAAA` record.
+1. Allow SSH, 80, and 443 in the provider firewall. Restrict HTTP/HTTPS to [Cloudflare edge ranges](https://www.cloudflare.com/ips/) when possible. Docker publishes ports around the host firewall; Nginx also rejects non-Cloudflare sources. Nginx listens on IPv4 and IPv6; preserve the existing Docker public network's IPv6 configuration.
 2. Create the deploy user and stack directory. Docker group membership and the SSH key must work in a fresh login. The included timers use `slidesage`; edit their `User` if choosing another user.
 
 ```bash
@@ -65,7 +65,7 @@ docker login ghcr.io
 ```
 
 4. Fill in `.env`. Generate database/cache passwords, `AUTH_SECRET`, and `RATE_LIMIT_HASH_SECRET` with `openssl rand -hex 32`. Generate `BYOK_ENCRYPTION_KEY` with `openssl rand -base64 32`. All three Razorpay values are required. Keep database passwords URL-safe.
-5. When moving an existing deployment, preserve auth secrets, rate-limit secrets, all BYOK key versions, and the image bucket name. See [Environment variables](ENVIRONMENT_VARIABLES.md).
+5. When moving an existing deployment, preserve auth secrets, rate-limit secrets, all BYOK key versions, and the `slidesage_objects` volume. See [Environment variables](ENVIRONMENT_VARIABLES.md).
 6. Configure DNS, certificates, and storage below. Build or select a published release SHA, then run:
 
 ```bash
@@ -77,13 +77,13 @@ sudo systemctl enable --now slidesage-maintenance.timer slidesage-backup.timer
 ```
 
 - Configure [GitHub deployment settings](CI_CD.md#repository-setup) and enable `VPS_DEPLOY_ENABLED` after the first successful deployment.
-- Arrange an off-server copy of `backups/` with your backup tool. Local dumps alone do not survive VPS disk loss.
+- Arrange an off-server copy of `backups/` and the `slidesage_objects` volume with your backup tool. Database dumps do not contain image bytes, and local copies do not survive VPS disk loss.
 
 ### DNS and TLS
 
 - Create a Cloudflare Origin CA certificate covering `slidesage.app`, `www.slidesage.app`, and `api.slidesage.app`, or the apex and wildcard. Save the certificate as `certs/origin.pem` and key as `certs/origin.key`; use mode `600` for the key.
 - Set Full (strict) TLS mode and Always Use HTTPS. Origin CA certificates require Cloudflare proxying and are not trusted directly by browsers. See [Cloudflare Origin CA](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/).
-- Point proxied `A` records for `@`, `www`, and `api` to the VPS IPv4 address. Remove conflicting Pages CNAMEs for the frontend, detach its Pages custom domains, and disable the Pages Git build integration after the VPS frontend is verified. Preserve email and other unrelated DNS records.
+- Point proxied `A` and, where configured, `AAAA` records for `@`, `www`, and `api` to the VPS. Remove conflicting Pages CNAMEs for the frontend, detach its Pages custom domains, and disable the Pages Git build integration after the VPS frontend is verified. Preserve email and other unrelated DNS records.
 - Match `.env` domains and `WEB_ORIGINS` to these records. Set OAuth callbacks to `https://api.slidesage.app/auth/callback/google` and `/github`.
 - Nginx rejects unknown hosts and TLS names. Its local frontend health endpoint binds only to loopback inside the container and has no host port.
 - To update Cloudflare ranges, run `./refresh-cloudflare-ips.sh`, then `docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload`.
@@ -91,10 +91,10 @@ sudo systemctl enable --now slidesage-maintenance.timer slidesage-backup.timer
 
 ### Card image storage
 
-- Keep the existing `PRESENTATION_GCS_BUCKET`. Image references in the restored database still point to that bucket.
-- Create a VPS service account with bucket-scoped object viewer and object creator permissions, plus conditional object delete permission restricted to legacy `objects/`, `revisions/`, and `cards/` prefixes for the migration sweep. No Terraform is required.
-- Save its JSON key to `secrets/gcs-key.json`. Go containers run as UID 65532; set `sudo chown 65532:65532 secrets/gcs-key.json && sudo chmod 400 secrets/gcs-key.json`. Keep the parent directory traversable by that UID.
-- Compose mounts the key into API, worker, migrate, and maintenance and sets `GOOGLE_APPLICATION_CREDENTIALS`. Leave `STORAGE_EMULATOR_HOST` unset in production.
+- `PRESENTATION_STORAGE_DIR=/data/objects` selects disk storage. API, worker, and maintenance mount the `objects` Compose volume, whose existing server name is `slidesage_objects`.
+- The runtime image creates `/data/objects` with UID/GID 65532 ownership. Docker preserves the existing volume on image updates; do not run `docker compose down --volumes` during releases.
+- Objects use the existing content-addressed keys. Writes check their size and SHA-256 digest, then link a complete temporary file into place without replacing an existing object. GCS credentials are unnecessary.
+- Back up the volume together with PostgreSQL. For a consistent copy, pause API, worker, and maintenance under the deployment lock before copying image files and taking the database dump.
 
 ## Releases and proxy behavior
 
@@ -123,7 +123,7 @@ docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTG
 ./deploy.sh <commit-sha>
 ```
 
-3. Verify frontend routes, auth, generation, image access, and export before changing all DNS records. Existing encryption keys and GCS objects must remain available.
+3. Verify frontend routes, auth, generation, image access, and export before changing all DNS records. Existing encryption keys and image files must remain available. A migration from a GCS deployment also requires copying image objects into the local volume using their original keys.
 4. Disable the previous release workflow and Pages integration before allowing routine VPS releases. Archive the old Terraform state separately if needed for the migration record; repository removal does not destroy remote resources.
 
 ## Operations
