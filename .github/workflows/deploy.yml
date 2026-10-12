@@ -1,272 +1,192 @@
-name: Build and Deploy to Cloud Run
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-concurrency:
-  group: slidesage-production
-  cancel-in-progress: false
-
-env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGISTRY_LOCATION: asia-south1
-  REGISTRY_REPOSITORY: slidesage
-  RUN_REGION: asia-south1
-  IMAGE_VERSION: ${{ github.sha }}
-
-jobs:
-  checks:
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      pull-requests: read
-    uses: ./.github/workflows/checks.yml
-
-  build:
-    needs: checks
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: apps/api/go.mod
-          cache: false
-
-      - name: Stamp the Go cache key
-        run: echo "GO_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
-
-      - name: Restore the Go module and build caches
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-
-            ${{ runner.os }}-go-
-
-      - name: Build the release binaries
-        working-directory: apps/api
-        env:
-          CGO_ENABLED: "0"
-          GOOS: linux
-          GOARCH: amd64
-        run: |
-          set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/dist"
-          for component in api worker migrate; do
-            go build -mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" \
-              -o "$GITHUB_WORKSPACE/dist/$component" "./cmd/$component"
-            test -x "$GITHUB_WORKSPACE/dist/$component"
-          done
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.13
-
-      - name: Bundle the card converter
-        run: |
-          bun install --frozen-lockfile
-          bun build apps/converter/src/main.ts --target bun --outfile dist/converter.js
-          test -s dist/converter.js
-
-      - id: auth
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker "$REGISTRY_LOCATION-docker.pkg.dev" --quiet
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build and push the runtime images
-        uses: docker/bake-action@v7
-        with:
-          source: .
-          files: docker-bake.hcl
-          push: true
-        env:
-          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          REGISTRY: ${{ env.REGISTRY_LOCATION }}-docker.pkg.dev
-          REPOSITORY: ${{ env.REGISTRY_REPOSITORY }}
-          IMAGE_VERSION: ${{ env.IMAGE_VERSION }}
-
-  deploy:
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      TF_IN_AUTOMATION: "true"
-      TF_INPUT: "false"
-      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
-      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
-      TF_VAR_gcp_region: asia-south1
-      # Keep the image bucket name; the migration job also deletes retired document objects from it.
-      TF_VAR_presentation_gcs_bucket: ${{ vars.PRESENTATION_GCS_BUCKET || format('{0}-presentation-revisions', secrets.GCP_PROJECT_ID) }}
-      TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      TF_VAR_otel_exporter_otlp_endpoint: ${{ vars.DATADOG_OTLP_ENDPOINT }}
-      TF_VAR_otel_logs_exporter: ${{ vars.OTEL_LOGS_EXPORTER || 'otlp' }}
-      TF_VAR_otel_service_version: ${{ github.sha }}
-      TF_VAR_unsplash_enabled: ${{ vars.UNSPLASH_ENABLED || 'false' }}
-      TF_VAR_cache_enabled: ${{ vars.CACHE_ENABLED || 'false' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - id: auth
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - uses: google-github-actions/setup-gcloud@v2
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.16.0
-          terraform_wrapper: false
-
-      - name: Start the pre-migration database backup
-        shell: bash
-        run: |
-          set -euo pipefail
-          operation=$(gcloud sql backups create --instance=slidesage-postgres \
-            --project="$PROJECT_ID" --description="Before release $IMAGE_VERSION" \
-            --async --format='value(name)')
-          test -n "$operation"
-          echo "BACKUP_OPERATION=$operation" >> "$GITHUB_ENV"
-
-      - name: Configure Terraform inputs
-        shell: bash
-        run: |
-          set -euo pipefail
-          : "${TF_STATE_BUCKET:?Set TF_STATE_BUCKET after provisioning the state bucket}"
-          : "${TF_VAR_gcp_project_id:?Set GCP_PROJECT_ID}"
-          : "${TF_VAR_cloudflare_account_id:?Set CLOUDFLARE_ACCOUNT_ID}"
-          : "${TF_VAR_cloudflare_api_token:?Set CLOUDFLARE_API_TOKEN}"
-          for component in api worker migrate converter; do
-            echo "TF_VAR_${component}_image=$REGISTRY_LOCATION-docker.pkg.dev/$PROJECT_ID/$REGISTRY_REPOSITORY/$component:$IMAGE_VERSION" >> "$GITHUB_ENV"
-          done
-
-      - name: Initialize Terraform
-        working-directory: infra/prod
-        run: |
-          terraform init -input=false -lockfile=readonly \
-            -backend-config="bucket=$TF_STATE_BUCKET" \
-            -backend-config="prefix=prod"
-          terraform validate -no-color
-
-      - name: Plan the release
-        working-directory: infra/prod
-        run: terraform plan -input=false -lock-timeout=5m -no-color
-
-      # Verify the recovery point before any apply. Cloud SQL settings stay
-      # unchanged in this cutover; PITR enablement needs a separate rollout.
-      - name: Wait for the pre-migration database backup
-        shell: bash
-        run: |
-          set -euo pipefail
-          : "${BACKUP_OPERATION:?The backup was never started}"
-          gcloud sql operations wait "$BACKUP_OPERATION" \
-            --project="$PROJECT_ID" --timeout=1800 || true
-          operation=$(gcloud sql operations describe "$BACKUP_OPERATION" \
-            --project="$PROJECT_ID" --format=json)
-          status=$(jq -r '.status // empty' <<<"$operation")
-          error=$(jq -r '.error // empty' <<<"$operation")
-          if [ "$status" != "DONE" ] || [ -n "$error" ]; then
-            echo "The pre-migration backup did not complete cleanly:" >&2
-            jq . <<<"$operation" >&2
-            exit 1
-          fi
-
-      # Creating Memorystore takes minutes. Provision it while the old release
-      # still serves, so a slow or failed create never extends the pause.
-      - name: Provision the read cache
-        if: vars.CACHE_ENABLED == 'true'
-        working-directory: infra/prod
-        run: |
-          terraform plan -input=false -lock-timeout=5m -no-color \
-            -target=google_memorystore_instance.cache \
-            -target=google_compute_subnetwork.cache \
-            -target=google_project_iam_member.runtime_cache_connect \
-            -out=cache.tfplan
-          terraform apply -input=false -lock-timeout=5m -no-color cache.tfplan
-
-      - name: Update the migration job
-        working-directory: infra/prod
-        run: |
-          terraform plan -input=false -lock-timeout=5m -no-color \
-            -target=google_cloud_run_v2_job.migrate -out=migrate.tfplan
-          terraform apply -input=false -lock-timeout=5m -no-color migrate.tfplan
-
-      - name: Pause services for database migration
-        working-directory: infra/prod
-        shell: bash
-        run: |
-          set -euo pipefail
-          args=(-var=maintenance_mode=true)
-          for component in api worker; do
-            service="$component"
-            resource="$component"
-            image=$(gcloud run services describe "$service" \
-              --project="$PROJECT_ID" --region="$RUN_REGION" \
-              --format='value(spec.template.spec.containers[0].image)')
-            test -n "$image"
-            args+=("-var=${component}_image=$image")
-            args+=("-target=google_cloud_run_v2_service.$resource")
-          done
-          # The sweep runs on its own schedule now, so pausing the services is
-          # not enough to keep a worker away from a half-migrated schema.
-          args+=(-target=google_cloud_scheduler_job.maintenance)
-          terraform plan -input=false -lock-timeout=5m -no-color \
-            "${args[@]}" -out=maintenance.tfplan
-          terraform apply -input=false -lock-timeout=5m -no-color maintenance.tfplan
-
-      - name: Run migrations and purge retired objects
-        run: |
-          gcloud run jobs execute slidesage-migrate \
-            --project="$PROJECT_ID" --region="$RUN_REGION" --wait
-
-      - name: Apply the release
-        working-directory: infra/prod
-        run: |
-          terraform plan -input=false -lock-timeout=5m -no-color -out=release.tfplan
-          terraform apply -input=false -lock-timeout=5m -no-color release.tfplan
-
-      - name: Verify Cloud Run exposure
-        run: |
-          API_INGRESS=$(gcloud run services describe api \
-            --project="$PROJECT_ID" \
-            --region="$RUN_REGION" \
-            --format="value(metadata.annotations.'run.googleapis.com/ingress')")
-          WORKER_INGRESS=$(gcloud run services describe worker \
-            --project="$PROJECT_ID" \
-            --region="$RUN_REGION" \
-            --format="value(metadata.annotations.'run.googleapis.com/ingress')")
-          WORKER_PUBLIC_BINDING=$(gcloud run services get-iam-policy worker \
-            --project="$PROJECT_ID" \
-            --region="$RUN_REGION" \
-            --flatten='bindings[].members' \
-            --filter='bindings.role=roles/run.invoker AND bindings.members=allUsers' \
-            --format='value(bindings.members)')
-
-          test "$API_INGRESS" = internal-and-cloud-load-balancing
-          # Same-project Cloud Tasks can reach the default run.app URL through
-          # internal ingress. IAM remains a second independent restriction.
-          test "$WORKER_INGRESS" = internal
-          test -z "$WORKER_PUBLIC_BINDING"
+{
+	"name": "Build and deploy to the VPS",
+	"on": {
+		"push": {
+			"branches": [
+				"main"
+			]
+		},
+		"workflow_dispatch": null
+	},
+	"concurrency": {
+		"group": "slidesage-vps-production",
+		"cancel-in-progress": false
+	},
+	"env": {
+		"IMAGE_VERSION": "${{ github.sha }}",
+		"WEB_DOMAIN": "${{ vars.WEB_DOMAIN || 'slidesage.app' }}",
+		"API_DOMAIN": "${{ vars.API_DOMAIN || 'api.slidesage.app' }}"
+	},
+	"jobs": {
+		"checks": {
+			"if": "github.ref == 'refs/heads/main'",
+			"permissions": {
+				"contents": "read",
+				"pull-requests": "read"
+			},
+			"uses": "./.github/workflows/checks.yml",
+			"with": {
+				"full-check": true
+			}
+		},
+		"build": {
+			"needs": "checks",
+			"if": "github.ref == 'refs/heads/main'",
+			"runs-on": "ubuntu-latest",
+			"permissions": {
+				"contents": "read",
+				"packages": "write"
+			},
+			"steps": [
+				{
+					"uses": "actions/checkout@v4"
+				},
+				{
+					"uses": "actions/setup-go@v5",
+					"with": {
+						"go-version-file": "apps/api/go.mod",
+						"cache": "false"
+					}
+				},
+				{
+					"name": "Stamp the Go cache key",
+					"run": "echo \"GO_CACHE_DATE=$(date -u +%Y-%m-%d)\" >> \"$GITHUB_ENV\"\n"
+				},
+				{
+					"name": "Restore the Go module and build caches",
+					"uses": "actions/cache/restore@v4",
+					"with": {
+						"path": "~/.cache/go-build\n~/go/pkg/mod\n",
+						"key": "${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}",
+						"restore-keys": "${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-\n${{ runner.os }}-go-\n"
+					}
+				},
+				{
+					"name": "Build the release binaries",
+					"working-directory": "apps/api",
+					"env": {
+						"CGO_ENABLED": "0",
+						"GOOS": "linux",
+						"GOARCH": "amd64"
+					},
+					"run": "set -euo pipefail\nmkdir -p \"$GITHUB_WORKSPACE/dist\"\nfor component in api worker migrate; do\n\tgo build -mod=readonly -trimpath -buildvcs=false -ldflags=\"-s -w\" \\\n\t\t-o \"$GITHUB_WORKSPACE/dist/$component\" \"./cmd/$component\"\n\ttest -x \"$GITHUB_WORKSPACE/dist/$component\"\ndone\n"
+				},
+				{
+					"uses": "oven-sh/setup-bun@v2",
+					"with": {
+						"bun-version": "1.3.13"
+					}
+				},
+				{
+					"name": "Bundle the card converter and the frontend",
+					"env": {
+						"VITE_ADSENSE_CLIENT_ID": "${{ vars.VITE_ADSENSE_CLIENT_ID }}",
+						"VITE_ADSENSE_SLOT_GENERATE": "${{ vars.VITE_ADSENSE_SLOT_GENERATE }}",
+						"VITE_ADSENSE_SLOT_PRESENTATIONS": "${{ vars.VITE_ADSENSE_SLOT_PRESENTATIONS }}",
+						"VITE_ADSENSE_SLOT_MARKETPLACE": "${{ vars.VITE_ADSENSE_SLOT_MARKETPLACE }}",
+						"VITE_ADSENSE_SLOT_ANCHOR": "${{ vars.VITE_ADSENSE_SLOT_ANCHOR }}"
+					},
+					"run": "set -euo pipefail\nbun install --frozen-lockfile\nbun build apps/converter/src/main.ts --target bun --outfile dist/converter.js\ntest -s dist/converter.js\nVITE_API_URL=\"https://$API_DOMAIN\" bun run --cwd apps/web build\ncp -r apps/web/dist dist/web\ngrep -rqF \"https://$API_DOMAIN\" dist/web/assets\n"
+				},
+				{
+					"name": "Resolve the image registry path",
+					"run": "registry=\"ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/slidesage\"\necho \"REGISTRY=$registry\" >> \"$GITHUB_ENV\"\necho \"registry=$registry\" >> \"$GITHUB_OUTPUT\"\n",
+					"id": "registry"
+				},
+				{
+					"uses": "docker/login-action@v3",
+					"with": {
+						"registry": "ghcr.io",
+						"username": "${{ github.actor }}",
+						"password": "${{ secrets.GITHUB_TOKEN }}"
+					}
+				},
+				{
+					"uses": "docker/setup-buildx-action@v3"
+				},
+				{
+					"name": "Build and push the runtime images",
+					"uses": "docker/bake-action@v7",
+					"with": {
+						"source": ".",
+						"files": "docker-bake.hcl",
+						"push": "true",
+						"set": "api.cache-from=type=gha,scope=vps-api\napi.cache-to=type=gha,scope=vps-api,mode=max\nworker.cache-from=type=gha,scope=vps-worker\nworker.cache-to=type=gha,scope=vps-worker,mode=max\nmigrate.cache-from=type=gha,scope=vps-migrate\nmigrate.cache-to=type=gha,scope=vps-migrate,mode=max\nconverter.cache-from=type=gha,scope=vps-converter\nconverter.cache-to=type=gha,scope=vps-converter,mode=max\nweb.cache-from=type=gha,scope=vps-web\nweb.cache-to=type=gha,scope=vps-web,mode=max"
+					}
+				},
+				{
+					"name": "Record published images",
+					"run": "printf 'Published five images under %s/*:%s.\\n' \"$REGISTRY\" \"$IMAGE_VERSION\" >> \"$GITHUB_STEP_SUMMARY\"\nif [[ \"$VPS_DEPLOY_ENABLED\" != true ]]; then\n\tprintf 'VPS deployment is disabled. Configure the server and set VPS_DEPLOY_ENABLED=true.\\n' >> \"$GITHUB_STEP_SUMMARY\"\nfi\n",
+					"env": {
+						"VPS_DEPLOY_ENABLED": "${{ vars.VPS_DEPLOY_ENABLED }}"
+					}
+				}
+			],
+			"timeout-minutes": 30,
+			"outputs": {
+				"registry": "${{ steps.registry.outputs.registry }}"
+			}
+		},
+		"deploy": {
+			"needs": "build",
+			"if": "github.ref == 'refs/heads/main' && vars.VPS_DEPLOY_ENABLED == 'true'",
+			"runs-on": "ubuntu-latest",
+			"permissions": {
+				"contents": "read"
+			},
+			"env": {
+				"VPS_HOST": "${{ secrets.VPS_HOST }}",
+				"VPS_USER": "${{ vars.VPS_USER || 'slidesage' }}",
+				"VPS_PORT": "${{ vars.VPS_PORT || '22' }}",
+				"REGISTRY": "${{ needs.build.outputs.registry }}",
+				"RELEASE_DIRECTORY": "/opt/slidesage/.releases/${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}"
+			},
+			"steps": [
+				{
+					"uses": "actions/checkout@v4"
+				},
+				{
+					"name": "Configure pinned SSH connection",
+					"env": {
+						"VPS_SSH_KEY": "${{ secrets.VPS_SSH_KEY }}",
+						"VPS_KNOWN_HOSTS": "${{ secrets.VPS_KNOWN_HOSTS }}"
+					},
+					"run": "set -euo pipefail\nfor setting in VPS_HOST VPS_USER VPS_PORT VPS_SSH_KEY VPS_KNOWN_HOSTS; do\n\tif [[ -z ${!setting} ]]; then\n\t\techo \"::error::Missing $setting. See docs/CI_CD.md.\"\n\t\texit 1\n\tfi\ndone\n[[ $VPS_HOST =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]\n[[ $VPS_USER =~ ^[a-z_][a-z0-9_-]*$ ]]\n[[ $VPS_PORT =~ ^[0-9]{1,5}$ ]] && (( 10#$VPS_PORT > 0 && 10#$VPS_PORT <= 65535 ))\nfor domain in \"$WEB_DOMAIN\" \"$API_DOMAIN\"; do\n\t[[ $domain =~ ^[a-z0-9][a-z0-9.-]*[a-z0-9]$ ]]\ndone\ninstall -m 700 -d ~/.ssh\nprintf '%s\\n' \"$VPS_SSH_KEY\" > ~/.ssh/slidesage_vps\nchmod 600 ~/.ssh/slidesage_vps\nssh-keygen -y -f ~/.ssh/slidesage_vps >/dev/null\nprintf '%s\\n' \"$VPS_KNOWN_HOSTS\" > ~/.ssh/slidesage_known_hosts\ncat > ~/.ssh/config <<EOF\nHost slidesage-vps\n\tHostName $VPS_HOST\n\tUser $VPS_USER\n\tPort $VPS_PORT\n\tIdentityFile ~/.ssh/slidesage_vps\n\tIdentitiesOnly yes\n\tBatchMode yes\n\tStrictHostKeyChecking yes\n\tUserKnownHostsFile ~/.ssh/slidesage_known_hosts\n\tConnectTimeout 15\n\tServerAliveInterval 15\n\tServerAliveCountMax 4\nEOF\nchmod 600 ~/.ssh/config\n"
+				},
+				{
+					"name": "Check server prerequisites",
+					"run": "set -euo pipefail\n# Expand only the generated release path on the runner.\n# shellcheck disable=SC2087\nssh slidesage-vps \"bash -se\" <<EOF\nset -euo pipefail\ncommand -v rsync >/dev/null\ncommand -v flock >/dev/null\ndocker compose version >/dev/null\ndocker info >/dev/null\ncd /opt/slidesage\ntest -w .\nfor required in .env certs/origin.pem certs/origin.key; do\n\tif [[ ! -f \"\\$required\" ]]; then\n\t\techo \"Missing server file: \\$required\" >&2\n\t\texit 1\n\tfi\ndone\nmkdir -p '$RELEASE_DIRECTORY'\nEOF\n"
+				},
+				{
+					"name": "Upload isolated release files",
+					"run": "set -euo pipefail\nrsync -a --exclude='.env' --exclude='certs/' --exclude='secrets/' \\\n\t--exclude='backups/' --exclude='.deploy*' infra/ \"slidesage-vps:$RELEASE_DIRECTORY/\"\n"
+				},
+				{
+					"name": "Install, back up, migrate, and deploy under one lock",
+					"run": "set -euo pipefail\n# These values are a SHA, a derived registry, and validated domain names.\n# shellcheck disable=SC2029\nssh slidesage-vps \"'$RELEASE_DIRECTORY/activate-release.sh' '$IMAGE_VERSION' '$REGISTRY' '$WEB_DOMAIN' '$API_DOMAIN'\"\n"
+				},
+				{
+					"name": "Verify public endpoints",
+					"run": "set -euo pipefail\nfor endpoint in \"https://$API_DOMAIN/health\" \"https://$WEB_DOMAIN/\" \"https://$WEB_DOMAIN/sign-in\"; do\n\tcurl --fail --silent --show-error --connect-timeout 10 --max-time 30 \\\n\t\t--retry 5 --retry-delay 3 --retry-all-errors \"$endpoint\" -o /tmp/slidesage-response\n\tif [[ $endpoint != \"https://$API_DOMAIN/health\" ]]; then\n\t\tgrep -q 'id=\"root\"' /tmp/slidesage-response\n\tfi\ndone\n"
+				},
+				{
+					"name": "Record deployed release and remove upload",
+					"run": "set -euo pipefail\n# shellcheck disable=SC2029\nssh slidesage-vps \"test \\\"\\$(cat /opt/slidesage/.deployed-release)\\\" = '$IMAGE_VERSION' && rm -rf -- '$RELEASE_DIRECTORY'\"\nprintf 'Deployed %s to https://%s\\n' \"$IMAGE_VERSION\" \"$WEB_DOMAIN\" >> \"$GITHUB_STEP_SUMMARY\"\n"
+				}
+			],
+			"timeout-minutes": 30,
+			"environment": {
+				"name": "vps-production",
+				"url": "https://${{ vars.WEB_DOMAIN || 'slidesage.app' }}"
+			}
+		}
+	},
+	"permissions": {
+		"contents": "read"
+	},
+	"defaults": {
+		"run": {
+			"shell": "bash"
+		}
+	}
+}

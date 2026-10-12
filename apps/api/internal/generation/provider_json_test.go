@@ -14,7 +14,7 @@ import (
 
 func TestModelUsesConfiguredOpenRouterDefault(t *testing.T) {
 	t.Setenv("OPEN_ROUTER_MODEL", "")
-	if got := model(); got != "qwen/qwen3.8-27b:free" {
+	if got := model(); got != "nvidia/nemotron-3-super-120b-a12b:free" {
 		t.Fatalf("default model = %q", got)
 	}
 }

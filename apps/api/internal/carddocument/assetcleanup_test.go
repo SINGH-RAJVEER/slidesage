@@ -1,10 +1,39 @@
 package carddocument
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
+
+func TestFileBlobStoreDeletesOnlyImageObjects(t *testing.T) {
+	store, err := NewFileBlobStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	body := []byte("image")
+	key := "presentations/p/assets/" + sha256Hex(body) + ".jpg"
+	if err := store.PutImmutable(ctx, key, bytes.NewReader(body), int64(len(body)), "image/jpeg", sha256Hex(body)); err != nil {
+		t.Fatal(err)
+	}
+	for _, invalid := range []string{"../escape", "other/" + strings.Repeat("a", 64) + ".jpg"} {
+		if err := store.DeleteObject(ctx, invalid); err == nil {
+			t.Fatalf("deletion accepted %q", invalid)
+		}
+	}
+	if err := store.DeleteObject(ctx, key); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.OpenObject(ctx, key); !errors.Is(err, ErrObjectNotFound) {
+		t.Fatalf("deleted image remained: %v", err)
+	}
+	if err := store.DeleteObject(ctx, key); err != nil {
+		t.Fatalf("missing image deletion: %v", err)
+	}
+}
 
 type cleanupTestStore struct {
 	memoryStore

@@ -16,7 +16,7 @@
 		"dev:web": "bun --cwd apps/web dev",
 		"dev:converter": "bun --cwd apps/converter dev",
 		"test": "bun run test:api && bun run test:cards && bun run test:converter && bun run test:ui && bun run test:web",
-		"test:api": "CGO_ENABLED=0 go -C apps/api test ./...",
+		"test:api": "CGO_ENABLED=0 go -C apps/api test -p 1 ./...",
 		"test:web": "bun --cwd apps/web test",
 		"test:ui": "bun --cwd libs/ui test",
 		"test:cards": "bun --cwd libs/cards test",

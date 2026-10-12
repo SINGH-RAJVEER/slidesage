@@ -328,37 +328,6 @@ func insertFixture(t *testing.T, database *sql.DB) (string, string) {
 	return userID, presentationID
 }
 
-func TestPutImmutableTreatsALostRaceAsTheSameObject(t *testing.T) {
-	if os.Getenv("STORAGE_EMULATOR_HOST") == "" {
-		t.Skip("STORAGE_EMULATOR_HOST is not set")
-	}
-	store, err := NewGCSBlobStore(context.Background(), os.Getenv("PRESENTATION_GCS_BUCKET"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	body := make([]byte, 4096)
-	if _, err := rand.Read(body); err != nil {
-		t.Fatal(err)
-	}
-	digest := sha256Hex(body)
-	var wg sync.WaitGroup
-	errs := make(chan error, 4)
-	for range 4 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			errs <- store.PutImmutable(context.Background(), "race/"+digest, bytes.NewReader(body), int64(len(body)), "application/octet-stream", digest)
-		}()
-	}
-	wg.Wait()
-	close(errs)
-	for err := range errs {
-		if err != nil {
-			t.Fatalf("concurrent identical write failed: %v", err)
-		}
-	}
-}
-
 func sha256Hex(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])

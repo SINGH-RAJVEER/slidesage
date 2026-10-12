@@ -1,5 +1,5 @@
 // Package carddocument owns immutable JSONB document revisions and their current
-// pointer in PostgreSQL, images in GCS, and the card schema converter.
+// pointer in PostgreSQL, images on local disk, and the card schema converter.
 //
 // Callers never build object keys or edit document JSON directly. The
 // converter is the schema authority, shared with the browser editor.

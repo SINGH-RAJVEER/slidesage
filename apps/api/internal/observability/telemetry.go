@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
-	"go.opentelemetry.io/contrib/detectors/gcp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
@@ -176,9 +175,6 @@ func (t *Telemetry) resource(ctx context.Context) (*resource.Resource, error) {
 	options := []resource.Option{
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
-	}
-	if os.Getenv("K_SERVICE") != "" {
-		options = append(options, resource.WithDetectors(gcp.NewDetector()))
 	}
 	options = append(options, resource.WithAttributes(attributes...))
 	detected, err := resource.New(ctx, options...)

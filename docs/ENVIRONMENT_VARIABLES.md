@@ -1,7 +1,7 @@
 # Environment variables
 
 - Copy `.env.example` to `.env`; devenv loads it for API, worker, and Bun processes.
-- Keep `.env` out of version control. Store production secrets in Secret Manager.
+- Keep `.env` out of version control. Store VPS production secrets in `/opt/slidesage/.env`, copied from `infra/env.example`, with mode `600`. Compose supplies the internal database, cache, converter, and public API addresses.
 
 ## Core
 
@@ -17,9 +17,9 @@
 | `DATABASE_POOL_MAX` | No | `5` | Maximum open and idle connections in the Go API pool |
 | `RATE_LIMIT_HASH_SECRET` | Production | `AUTH_SECRET` | Independent secret mixed into hashed rate-limit identities |
 | `TRUST_PROXY_HEADERS` | No | `false` | Allows Go to use proxy-supplied client-IP headers; enable only behind a proxy that replaces them |
-| `CORS_ORIGINS` | No | Local frontend origins, `https://slidesage.pages.dev`, `https://slidesage.app`, and `https://www.slidesage.app` | Comma-separated allowed web origins; trailing slashes are normalized |
+| `CORS_ORIGINS` | No | Local frontend origins, `https://slidesage.app`, and `https://www.slidesage.app` | Comma-separated allowed web origins; trailing slashes are normalized |
 | `CORS_ORIGIN` | No | Default CORS origins | Single-origin fallback; trailing slashes are normalized |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | No | Local frontend, `https://slidesage.pages.dev`, `https://slidesage.app`, and `https://www.slidesage.app` | Comma-separated auth callback origins; trailing slashes are normalized |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | No | `CORS_ORIGINS`, else the local frontend origins | Comma-separated auth callback origins; trailing slashes are normalized |
 | `VITE_API_URL` | No | `http://localhost:8000` | Browser API origin without a path suffix; set production to `https://api.slidesage.app` |
 | `NODE_ENV` | No | `development` in devenv | Controls production auth and email-delivery safeguards; OTP values are never logged |
 
@@ -45,18 +45,19 @@
 | `VITE_ADSENSE_SLOT_MARKETPLACE` | No | Unset | Ad unit ID for `/marketplace` |
 | `VITE_ADSENSE_SLOT_ANCHOR` | No | Unset | Ad unit ID for the mobile anchored banner |
 
-- Production sets these through the `adsense_client_id` and `adsense_slots` Terraform inputs. See [Ads](ADS.md).
+- Production sets these as GitHub repository variables for the VPS frontend build. See [Ads](ADS.md).
 
 ## Database read cache
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
 | `CACHE_VALKEY_ADDR` | No | Empty | Valkey host:port; empty disables caching |
-| `CACHE_VALKEY_AUTH` | Production cache | Empty | `iam` sends IAM access tokens through Valkey AUTH; empty skips AUTH |
-| `CACHE_VALKEY_CA_PEM` | Production cache | Empty | Trusted TLS CA certificates |
+| `CACHE_VALKEY_AUTH` | Production cache | Empty | `password` sends `CACHE_VALKEY_PASSWORD`; empty skips AUTH in local development |
+| `CACHE_VALKEY_PASSWORD` | With `password` auth | Empty | Valkey `requirepass` value for a self-hosted server |
+| `CACHE_VALKEY_CA_PEM` | With TLS | Empty | Trusted TLS CA certificates |
 | `CACHE_TIMEOUT_MS` | No | `100` | Operation timeout, 1 to 1,000 milliseconds |
 
-- GitHub `CACHE_ENABLED` controls Terraform provisioning and defaults to `false`.
+- The VPS stack always runs Valkey and sets the address and password auth itself.
 - See [Database cache](DATABASE_CACHE.md) for read paths, invalidation, fallback, and production setup.
 
 ## Generation worker
@@ -66,37 +67,18 @@
 | `WORKER_CONCURRENCY` | No | `2` | Maximum concurrent River generation jobs in one worker process |
 | `WORKER_DATABASE_POOL_MAX` | No | `WORKER_CONCURRENCY + 3` | Maximum open and idle connections in the worker database pool |
 | `WORKER_DRAIN_TIMEOUT` | No | `8` | Graceful shutdown timeout in seconds after `SIGINT` or `SIGTERM` |
-| `WORKER_HEALTH_PORT` | No | `8080` | Worker `/live`, `/ready`, and `/drain` health server port |
-| `WORKER_DRAIN_POLL_SECONDS` | No | `2` | Interval at which `POST /drain` recounts outstanding queue rows |
-| `WORKER_DRAIN_IDLE_SECONDS` | No | `30` | How long the queue must stay empty before `POST /drain` returns |
-| `WORKER_DRAIN_ACCEPT_SECONDS` | No | `1200` | How long a request-owned River client may claim new jobs |
-| `WORKER_DRAIN_HANDOFF_SECONDS` | No | `480` | Time reserved for active work to finish before lease renewal |
-| `WORKER_REQUEST_LEASED` | No | `false` | Start River only inside `/drain`; production sets this to `true` |
+| `WORKER_HEALTH_PORT` | No | `8080` | Worker `/live`, `/ready`, health server port |
 
 - Worker needs the same database, provider, and BYOK encryption settings as API.
-- Health probes, lease behavior, and shutdown are in [Worker operation](GENERATION_WORKER.md#process-configuration).
+- Health probes and shutdown are in [Worker operation](GENERATION_WORKER.md#process-configuration).
 
-## Worker wake signal
-
-- Set wake variables for production scale-to-zero operation. Leave `WORKER_WAKE_URL` unset locally.
-
-| Variable | Required | Default | Purpose |
-| --- | --- | --- | --- |
-| `WORKER_WAKE_URL` | No | unset | Worker `/drain` URL. Unset disables waking entirely |
-| `WORKER_WAKE_QUEUE` | With URL | none | Cloud Tasks queue path that carries the signal |
-| `WORKER_WAKE_SERVICE_ACCOUNT` | No | unset | Service account minted into the task's OIDC token |
-| `WORKER_WAKE_DEADLINE_SECONDS` | No | `1800` | How long Cloud Tasks holds the drain request open |
-
-- Scheduled maintenance uses the same wake settings to re-wake due work.
-- Size worker slots, instance limits, database pools, and provider capacity together. Production requires instance-based billing with CPU throttling disabled.
-- See [Generation worker](GENERATION_WORKER.md) for lease and scaling behavior.
 
 ## AI and research
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
 | `OPEN_ROUTER_API_KEY` | Yes for default generation | None | Server OpenRouter authentication; BYOK replaces only generation calls |
-| `OPEN_ROUTER_MODEL` | No | `qwen/qwen3.8-27b:free` | Server-owned OpenRouter generation model |
+| `OPEN_ROUTER_MODEL` | No | `nvidia/nemotron-3-super-120b-a12b:free` | Server-owned OpenRouter generation model |
 | `OPEN_ROUTER_API_BASE` | No | OpenRouter chat completions endpoint | Chat endpoint override |
 | `PROVIDER_VALIDATION_TIMEOUT_MS` | No | `15000` | Total timeout for listing models from a user-connected BYOK provider |
 | `EXA_API_KEY` | For web research | None | Exa search authentication |
@@ -119,7 +101,7 @@
 
 - Development without a Resend key skips delivery and never logs OTPs. Production delivery failures return `503`.
 - OAuth callbacks use `${BASE_URL}/auth/callback/google` and `${BASE_URL}/auth/callback/github`.
-- Without explicit `BASE_URL`, auth can use `CF_PAGES_URL` or `VERCEL_URL`.
+- The VPS sets `BASE_URL=https://${API_DOMAIN}` explicitly.
 - See [Authentication](AUTH_API.md) for cookie and email behavior.
 
 ## Billing
@@ -137,16 +119,14 @@
 
 | Variable | Required | Secret | Purpose |
 | --- | --- | --- | --- |
-| `PRESENTATION_GCS_BUCKET` | Stored images | No | Private image bucket, migration sweep target, and maintenance image cleanup; text-only documents need no bucket |
-| `STORAGE_EMULATOR_HOST` | Local image storage | No | GCS emulator URL. Devenv and `.env.example` use `http://127.0.0.1:4443`. Leave unset in production so clients use real GCS |
+| `PRESENTATION_STORAGE_DIR` | Stored images | No | Directory holding card image files, created on first use; text-only documents need none. Devenv uses `.devenv/state/objects`; compose sets `/data/objects` on the `objects` volume |
 | `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
 | `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
 | `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |
 | `UNSPLASH_ACCESS_KEY` | Stock photos | Yes | Unsplash key; without it stock routes return `503` and generation uses text layouts. Uploads remain available |
 | `UNSPLASH_API_BASE` | No | No | Unsplash API base URL; defaults to `https://api.unsplash.com`. Only for tests and local stubs |
 
-- `UNSPLASH_ENABLED` is a GitHub repository variable, passed to Terraform as `TF_VAR_unsplash_enabled`, default `false`.
-- Enable photos by provisioning an enabled `UNSPLASH_ACCESS_KEY:latest`, setting `UNSPLASH_ENABLED=true`, and deploying. Disabled deployments skip the secret lookup and injection.
+- Production enables photos when `UNSPLASH_ACCESS_KEY` is set in the server `.env`, and disables them when it is empty.
 
 ## Observability
 

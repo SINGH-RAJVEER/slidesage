@@ -5,21 +5,30 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"regexp"
 )
 
 var storedAssetKey = regexp.MustCompile(`^presentations/[^/]+/assets/[0-9a-f]{64}\.(jpg|png)$`)
 
 // DeleteObject removes only stored image objects. Missing objects are success.
-func (store *GCSBlobStore) DeleteObject(ctx context.Context, key string) error {
+func (store *FileBlobStore) DeleteObject(ctx context.Context, key string) error {
 	if !storedAssetKey.MatchString(key) || validateObjectKey(key) != nil {
 		return errors.New("invalid image object key")
 	}
-	return store.backend.Delete(ctx, key)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	err := os.Remove(store.path(key))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
 }
 
 // CleanupDeletedAssets processes a bounded batch of committed deletion requests.
-// Failures remain queued. A crash after GCS deletion is safe to retry, and row
+// Failures remain queued. A crash after file deletion is safe to retry, and row
 // locks prevent concurrent maintenance jobs from processing the same request.
 func CleanupDeletedAssets(ctx context.Context, database *sql.DB, store interface {
 	DeleteObject(context.Context, string) error

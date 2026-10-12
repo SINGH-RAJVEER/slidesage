@@ -1,211 +1,80 @@
 # CI/CD
 
-- `.github/workflows/deploy.yml` builds and deploys API, worker, migration, and converter images.
-- Releases run on pushes or manual dispatches to `main`. Other refs are rejected; production runs share one concurrency group.
-- Cloudflare Pages builds the frontend independently from GitHub.
+- `.github/workflows/checks.yml` checks pull requests into `main` and `dev`, plus pushes to `dev`. Path filtering selects application suites for pull requests; unresolved comparisons run both. Every run also validates Actions, shell scripts, Compose, Docker Bake, and Nginx with disposable credentials and a temporary certificate.
+- `.github/workflows/deploy.yml` runs on pushes to `main` and manual dispatches with `main` selected. It runs all application checks before publishing, compiles three Linux amd64 Go binaries, bundles the converter, and builds the frontend with `VITE_API_URL=https://${API_DOMAIN}`. Other branches cannot deploy through this workflow.
+- Docker Bake publishes `api`, `worker`, `migrate`, `converter`, and `web` to `ghcr.io/<lowercase-owner>/slidesage/<component>:<commit-sha>`. Deployments use SHA tags; `latest` is only a convenience tag.
+- The frontend build reads optional `VITE_ADSENSE_*` repository variables for the publisher and ad placements. Unset values keep ads disabled. See [Ads](ADS.md) for the variable names.
+- The `web` image contains Nginx and the built React app. GitHub builds and publishes the frontend together with the backend.
+- Each image has its own GitHub Actions build cache. The deployment job records releases in the `vps-production` GitHub environment and writes the verified SHA to `/opt/slidesage/.deployed-release`.
+- Go module and build caches are restored in checks and builds. Only non-PR checks write daily cache entries.
+- Workflows use JSON syntax in `.yml` files, which is valid YAML and supports the repository's tab indentation rule.
 
-## Flow
+- Go integration suites share one disposable database. CI and `bun run test:api` run packages sequentially with `-p 1` so a maintenance sweep cannot consume another package's deletion fixtures.
 
-1. Run checks, compile three Go binaries, and bundle the Bun converter.
-2. Build four targets through `docker-bake.hcl` and push full-commit-SHA and `latest` tags.
-3. Start an on-demand database backup while planning the complete Terraform configuration.
-4. Verify backup completion. With `CACHE_ENABLED=true`, provision the read cache through a targeted apply while the old release still serves. Then update the migration job through a targeted apply.
-5. Pause API, worker, and maintenance scheduler; run migrations and the retired-object sweep.
-6. Create a fresh full plan and apply the release images, restoring automatic scaling.
-7. Verify ingress and worker invocation restrictions.
+## Repository setup
 
-- Terraform owns services, jobs, load balancing, and IAM. `gcloud` executes the migration job and reads deployment status.
-- Deploy forwards `TF_VAR_api_image`, `TF_VAR_worker_image`, `TF_VAR_migrate_image`, and `TF_VAR_converter_image`.
-- Bootstrap secrets, backend, credentials, and imports must exist before planning. See [Production infrastructure](PRODUCTION_INFRASTRUCTURE.md).
-
-## Build caching
-
-| Cache | Writer | Reader | Key |
-| --- | --- | --- | --- |
-| Go module/build | `checks.yml`, non-PR runs | Checks and deploy build | OS, `go.sum` hash, UTC date, with fallback prefixes |
-| Pages build | Cloudflare Pages | Pages builds | Platform-managed |
-
-- Disable `actions/setup-go` caching; explicit restore prefixes retain useful entries after dependency changes.
-- Only checks writes Go entries. Daily keys limit churn; branch scope controls which entries are readable.
-- PRs restore base-branch caches without saving merge-ref-only entries.
-- Docker images copy prebuilt artifacts. `.dockerignore` limits context to `dist/`.
-- Docker layers, BuildKit mounts, and Terraform providers are not cached in this workflow.
-- Pages pins `BUN_VERSION` and enables `build_caching` in `infra/prod/edge.tf`.
-
-### Path filtering
-
-- API changes run Go checks; web changes run TypeScript checks. Converter, cards, shared contracts, and release-pipeline changes can trigger both.
-- Documentation-only changes skip both application suites.
-- PR comparison uses the base branch; push comparison uses the previous commit, with checkout depth 50.
-- Unresolvable bases or filter failures run the complete suite.
-- Filtering stays inside `test-and-build`, preserving the branch-protection check name.
-
-## Artifact Registry layout
-
-```text
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/<target>:<commit-sha>
-asia-south1-docker.pkg.dev/<PROJECT_ID>/slidesage/<target>:latest
-```
-
-- Targets are `api`, `worker`, `migrate`, and `converter`. Terraform deploys SHA tags.
-- Registry and Cloud Run use `asia-south1`; change `REGISTRY_LOCATION` and `RUN_REGION` in deploy configuration to move regions.
-- Public API is `https://api.slidesage.app` through the HTTPS load balancer. Keep its DNS-only A record pointed at the reserved address.
-- Pages builds with `bun install --frozen-lockfile && bun run build` from `apps/web`, producing `dist`.
-- `public/_headers` sets `Cache-Control: no-cache`. Extra Browser TTL or Cache Everything rules can leave stale HTML referencing missing chunks.
-- `vite:preloadError` triggers one reload for a removed chunk, then leaves repeated failure to the route error page.
-
-## One-time GCP bootstrap
-
-Set project and repository values before provisioning the CI identity:
-
-```bash
-PROJECT_ID=slidesage-504414
-PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
-REPO_URL=SINGH-RAJVEER/slidesage
-
-gcloud config set project "$PROJECT_ID"
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
-
-gcloud artifacts repositories create slidesage \
-	--repository-format=docker \
-	--location=asia-south1 \
-	--project="$PROJECT_ID"
-
-gcloud iam service-accounts create slidesage-deploy \
-	--display-name="SlideSage CI deploy" \
-	--project="$PROJECT_ID"
-
-gcloud iam workload-identity-pools create slidesage \
-	--location=global \
-	--display-name="SlideSage CI pool" \
-	--project="$PROJECT_ID"
-
-gcloud iam workload-identity-pools providers create-oidc github \
-	--location=global \
-	--workload-identity-pool=slidesage \
-	--issuer-uri=https://token.actions.githubusercontent.com \
-	--attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.actor=assertion.actor" \
-	--attribute-condition="attribute.repository == '$REPO_URL'" \
-	--project="$PROJECT_ID"
-
-gcloud iam service-accounts add-iam-policy-binding \
-	"slidesage-deploy@$PROJECT_ID.iam.gserviceaccount.com" \
-	--role=roles/iam.workloadIdentityUser \
-	--member="principalSet://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/slidesage/attribute.repository/$REPO_URL"
-```
-
-- CI uses short-lived GitHub OIDC credentials, without service-account keys.
-- Authorize the deploy identity for Terraform-managed Cloud Run, Cloud Tasks, Cloud Scheduler, Cloud SQL, Artifact Registry, Compute, service accounts, project services/IAM, Secret Manager IAM, and storage resources.
-- With `CACHE_ENABLED=true`, also grant `roles/compute.networkAdmin` for the cache VPC, subnets, and service connection policy, and `roles/memorystore.admin` for the Valkey instance. Load balancer roles do not include network creation.
-- Include runtime-account `actAs` and state-bucket object access. Image building requires `roles/artifactregistry.writer`.
-- These commands create the identity; they do not grant the complete deployment permissions.
-- Keep runtime and deployment accounts separate. Use [Bootstrap](PRODUCTION_INFRASTRUCTURE.md#bootstrap) for backend and resource adoption.
-
-## GitHub repository setup
-
-| Secret | Value |
-| --- | --- |
-| `GCP_PROJECT_ID` | `slidesage-504414` |
-| `GCP_WIF_PROVIDER` | `projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/slidesage/providers/github` |
-| `GCP_SERVICE_ACCOUNT` | `slidesage-deploy@slidesage-504414.iam.gserviceaccount.com` |
-| `TF_STATE_BUCKET` | `slidesage-504414-tfstate` |
-| `CLOUDFLARE_ACCOUNT_ID` | Account containing Pages and the zone |
-| `CLOUDFLARE_API_TOKEN` | Zone Read, DNS Read/Edit, Pages Read/Edit |
-
-- `PRESENTATION_GCS_BUCKET` optionally overrides the existing image bucket name. Preserve that name.
-- `UNSPLASH_ENABLED` defaults to `false`. [Production bootstrap](PRODUCTION_INFRASTRUCTURE.md#bootstrap) describes enabling stock photos.
-- Datadog variables are documented in [Observability](OBSERVABILITY.md#datadog-on-cloud-run).
-
-## Secret Manager
-
-- Provision required secret values before planning. `infra/prod/main.tf` lists the names; [Environment variables](ENVIRONMENT_VARIABLES.md) explains their use.
-- Required API secrets include database, auth, rate-limit hash, OAuth, Exa, OpenRouter, Resend, and all three Razorpay credentials.
-- Missing Razorpay secrets fail planning and API startup.
-- Use enabled `latest` versions. BYOK deployments also need encryption keys for API and worker.
-- Unsplash and Datadog secrets are conditional on their deployment settings.
-- Set provider OAuth callbacks to `https://api.slidesage.app/auth/callback/google` and `/github`.
-- Change runtime configuration in Terraform. Direct service deployment can replace sidecars and will drift from the next plan.
-
-## Cloud Run service settings
-
-| Service | Port | Instances | HTTP concurrency | Runtime |
-| --- | --- | --- | --- | --- |
-| `api` | 8000 | 0 to 10 | 80 | API and private converter |
-| `worker` | 8080 | 0 to 10 | 1 | Request-owned River client and private converter |
-
-- Converters listen on localhost `8090` with no public port.
-- Worker keeps `cpu_idle=false`; Cloud Tasks holds `/drain` while River owns claims.
-- Monitor dispatch, queue latency, provider capacity, and database connections together.
-
-### Ingress and invocation
-
-| Resource | Ingress | Invocation |
+| Setting | Type | Purpose |
 | --- | --- | --- |
-| `api` | `internal-and-cloud-load-balancing` | Public IAM access; application auth protects private routes |
-| `worker` | `internal` | Runtime service account only, no `allUsers` binding |
-| `slidesage-migrate` | Job, no service ingress | CI execution |
+| `VPS_DEPLOY_ENABLED` | Variable | Set to `true` after server setup; otherwise CI builds images without deploying |
+| `VPS_HOST` | Secret | VPS IPv4 address or SSH hostname |
+| `VPS_USER` | Variable | SSH and timer user, defaults to `slidesage` |
+| `VPS_PORT` | Variable | SSH port, defaults to `22` |
+| `VPS_SSH_KEY` | Secret | Private key authorized for the deploy user |
+| `VPS_KNOWN_HOSTS` | Secret | Pinned SSH host key verified through the VPS console or another trusted channel |
+| `WEB_DOMAIN` | Variable | Frontend hostname, defaults to `slidesage.app` |
+| `API_DOMAIN` | Variable | API hostname, defaults to `api.slidesage.app` |
 
-- API internet traffic passes through the load balancer; direct internet `run.app` traffic is blocked.
-- Same-project Cloud Tasks invokes the private worker's default URL.
-- Release checks assert ingress and absence of public worker invocation.
+- Actions uses `GITHUB_TOKEN` with `packages: write` to publish images. The VPS needs its own GHCR login with `read:packages` if packages are private.
+- Match the workflow domains to the server `.env`. Changing `API_DOMAIN` requires a frontend rebuild because Vite embeds the URL.
+- Production secrets remain in `/opt/slidesage/.env`. Image bytes remain in the existing `slidesage_objects` Docker volume mounted at `/data/objects`. CI copies neither secrets nor stored objects.
+- A release uploads `infra/` into `/opt/slidesage/.releases/<sha>-<run>-<attempt>/`, excluding server state. `activate-release.sh` takes the shared deployment lock, checks the server registry and domains against the build, copies release files, and invokes `deploy.sh` under the same lock. Timers and manual releases cannot use files midway through sync. Failed uploads remain for inspection; successful uploads are removed after public checks.
+- Missing SSH settings, unreadable credentials, unavailable Docker, or domain/registry mismatches fail the deployment. `VPS_DEPLOY_ENABLED` controls deployment only; checks and image publishing still run when it is unset or `false`.
+- Releases share one concurrency group with cancellation disabled, so a newer push cannot cancel a migration. The `vps-production` environment is restricted to the `main` branch. GitHub supports [environment restrictions and deployment concurrency](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/control-deployments). Protect `main` with the `test-and-build` and `infrastructure` required checks if changes must go through pull requests. Do not configure required reviewers if releases should deploy automatically.
+- After deployment CI checks public API health, frontend HTML, and a frontend client route.
 
-## Rollback
-
-- Select earlier Cloud Run revisions only when their binaries support the current schema.
-- GCS-only writers are incompatible after migration 33; writers using `object_key` are incompatible after migration 35.
-- Migrations 33 and 35 refuse downgrade. Recovery requires a database restore with runtimes paused.
-- Restore compatible API, worker, and converter versions together, then reconcile Terraform.
-
-```bash
-gcloud run services update-traffic api \
-	--region=asia-south1 \
-	--to-revisions="<compatible-api-revision>=100"
-
-gcloud run services update-traffic worker \
-	--region=asia-south1 \
-	--to-revisions="<compatible-worker-revision>=100"
-```
-
-## Manual equivalents
-
-Build and push images:
+Configure settings with an authenticated GitHub CLI. Keep the private key in a local file; do not paste it into repository files or shell arguments:
 
 ```bash
-gcloud auth configure-docker asia-south1-docker.pkg.dev
-just binaries
-bun install --frozen-lockfile
-just converter-bundle
-PROJECT_ID=slidesage-504414 IMAGE_VERSION=dev docker buildx bake -f docker-bake.hcl --push
+gh secret set VPS_HOST --repo SINGH-RAJVEER/slidesage --env vps-production
+gh secret set VPS_SSH_KEY --repo SINGH-RAJVEER/slidesage --env vps-production < /path/to/deploy-key
+gh secret set VPS_KNOWN_HOSTS --repo SINGH-RAJVEER/slidesage --env vps-production < /path/to/verified-known-hosts
+gh variable set VPS_USER --repo SINGH-RAJVEER/slidesage --body slidesage
+gh variable set VPS_PORT --repo SINGH-RAJVEER/slidesage --body 22
+# Enable only after completing server setup and the first successful release.
+gh variable set VPS_DEPLOY_ENABLED --repo SINGH-RAJVEER/slidesage --body true
 ```
 
-- These commands build images only. Use the release workflow for backup, pause, migrations, and runtime updates.
-
-## Troubleshooting
-
-- Registry `403`: configure Docker auth and verify Artifact Registry writer permission.
-- `iam.serviceAccounts.actAs` denied: verify deploy identity can use the runtime account.
-- WIF failure: verify provider/account paths and repository casing in the binding.
-- Missing secret or DNS access: provision the secret or correct Cloudflare token permissions before applying.
-- Missing dynamic chunk: remove custom Browser TTL/Cache Everything rules, verify `_headers`, and purge stale zone cache once.
+- Verify the host key through the provider console before saving `VPS_KNOWN_HOSTS`. For a nondefault SSH port, its entry uses `[hostname]:port`. CI enforces `StrictHostKeyChecking=yes` and fails on an unknown or changed key.
+- Store SSH secrets in the `vps-production` environment. Configure the deployment toggle, SSH user/port, and domains as repository variables so job conditions and builds can read them. Server application secrets, certificates, backups, and GHCR read credentials stay on the VPS.
+- To rerun a failed release, use GitHub's rerun action. To manually build and deploy the current branch tip, select `main` under Actions or run `gh workflow run deploy.yml --repo SINGH-RAJVEER/slidesage --ref main`. The workflow must exist on the default branch for manual dispatch to be available. Pushes to `main` work independently.
 
 ## Migration cutover
 
-- Every release starts an on-demand Cloud SQL backup and verifies its completion/error fields before the first apply.
-- Update the migration job, then set API and worker to manual scaling with zero instances and pause the maintenance scheduler.
-- Preserve old runtime images while paused. API is unavailable during cutover.
-- Run migrations with a 20-minute attempt limit and three retries. The object sweep retains image assets; failures log without failing the release.
-- After success, re-plan the full release and restore automatic scaling with new images.
-- If migration or release apply fails, leave services paused while investigating. Old binaries may be incompatible with the changed schema.
-- Database changes that restart Cloud SQL need a separate rollout with a verified backup and independent runtime/scheduler pause before the database apply.
+1. Take the shared deployment lock. Pull the requested images and validate Nginx with the mounted certificate and templates before stopping application services.
+2. Start database, cache, and converter dependencies and take a verified database backup.
+3. Record the image tag, stop API and worker, and recreate the migration container. Wait for its exit code.
+4. After migration succeeds, recreate Nginx, API, and worker. Check frontend container health, API health, and worker readiness.
 
-| Migration | Destructive effect |
-| --- | --- |
-| 14 | Resets pre-launch user/accounting data |
-| 25 | Deletes decks without committed PPTX revisions |
-| 26 | Drops retired semantic memory and outline caches |
-| 34 | Drops legacy PPTX revision rows; downgrade restores schema only |
-| 35 | Deletes decks without card bodies and drops remaining pgvector tables; no downgrade |
-| 36 | Replaces legacy password hashes; affected users must reset passwords |
+- Maintenance and daily backup timers skip runs while the release lock is held.
+- Migration failures leave API and worker stopped. `.deploy-incomplete` also blocks scheduled maintenance until a release or recovery succeeds. Inspect logs locally before attempting recovery.
+- Migrations 35 and 36 remove data recoverable only from backups. Older binaries may not support the migrated schema.
+- Roll back by deploying a compatible earlier tag across all five images. For incompatible schemas, stop runtimes and restore a pre-release dump first. [VPS recovery](VPS_DEPLOYMENT.md#recovery) includes the commands.
 
-- Recover deleted database data from the pre-release backup. GCS recovery depends on bucket retention.
-- Storage details are in [Card storage](CARD_DOCUMENTS.md#storage).
+## Manual build
+
+Run in the development shell from the release checkout:
+
+```bash
+bun install --frozen-lockfile
+docker login ghcr.io
+just binaries converter-bundle
+just web-bundle https://api.slidesage.app
+IMAGE_VERSION=<commit-sha> docker buildx bake -f docker-bake.hcl --push
+ssh slidesage@<vps> 'mkdir -p /opt/slidesage/.releases/<commit-sha>'
+rsync -a --exclude='.env' --exclude='certs/' --exclude='secrets/' --exclude='backups/' --exclude='.deploy*' infra/ slidesage@<vps>:/opt/slidesage/.releases/<commit-sha>/
+ssh slidesage@<vps> '/opt/slidesage/.releases/<commit-sha>/activate-release.sh <commit-sha> ghcr.io/singh-rajveer/slidesage slidesage.app api.slidesage.app'
+```
+
+- Set `REGISTRY` when publishing outside the default owner and match `IMAGE_REGISTRY` in the server `.env`.
+- Building and pushing images does not deploy them. The server release script performs backup and migration.
+- Run `infra/check.sh` locally with Docker, Buildx, Compose, ShellCheck, and OpenSSL available. `infra/check.sh --config-only` validates without starting Nginx when Docker containers cannot run locally.
