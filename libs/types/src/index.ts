@@ -194,6 +194,9 @@ export interface FeedbackResponse {
 
 export type BillingPackName = "starter" | "pro" | "premium" | "custom";
 
+/** A balance of at least this many points hides ads. */
+export const AD_FREE_POINTS = 250;
+
 export interface BillingBalanceResponse {
 	slide_tokens: number;
 }
