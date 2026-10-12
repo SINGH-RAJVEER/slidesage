@@ -35,6 +35,18 @@
 
 - Use an independent production `RATE_LIMIT_HASH_SECRET` so auth-secret rotation does not reset identity hashes. See [Rate limiting](RATE_LIMITING.md).
 
+## Ads
+
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `VITE_ADSENSE_CLIENT_ID` | No | Unset, no ads | AdSense publisher ID (`ca-pub-...`) for the web build |
+| `VITE_ADSENSE_SLOT_GENERATE` | No | Unset | Ad unit ID for `/generate` |
+| `VITE_ADSENSE_SLOT_PRESENTATIONS` | No | Unset | Ad unit ID for `/presentations` |
+| `VITE_ADSENSE_SLOT_MARKETPLACE` | No | Unset | Ad unit ID for `/marketplace` |
+| `VITE_ADSENSE_SLOT_ANCHOR` | No | Unset | Ad unit ID for the mobile anchored banner |
+
+- Production sets these through the `adsense_client_id` and `adsense_slots` Terraform inputs. See [Ads](ADS.md).
+
 ## Database read cache
 
 | Variable | Required | Default | Purpose |
