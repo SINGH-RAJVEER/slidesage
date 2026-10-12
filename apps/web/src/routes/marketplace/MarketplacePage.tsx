@@ -1,7 +1,9 @@
 import { CARD_TEMPLATES, CARD_THEME_DEFINITIONS, type CardTemplate } from "@slidesage/cards";
 import { SearchBar } from "@slidesage/ui/components/SearchBar";
-import { useState } from "react";
+import { useMediaQuery } from "@slidesage/ui/hooks/useMediaQuery";
+import { Fragment, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AnchoredAd, InlineAd } from "../../app/Ads";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
@@ -26,6 +28,9 @@ export default function MarketplacePage() {
 	const navigate = useNavigate();
 	const library = useTemplateLibrary();
 	const [query, setQuery] = useState("");
+	// The ad takes a row of its own after the first row of templates. Inline ads
+	// only show from the md breakpoint, where the grid has two or three columns.
+	const firstRowLength = useMediaQuery("(min-width: 1024px)") ? 3 : 2;
 	/* Always by name. A catalog the reader cannot reorder is one they can learn
 	   the shape of, and alphabetical is the order a name is looked up in. */
 	const visibleTemplates = CARD_TEMPLATES.filter((template) => matchesSearch(template, query)).sort(
@@ -60,15 +65,19 @@ export default function MarketplacePage() {
 
 						{visibleTemplates.length > 0 ? (
 							<div className="mt-8 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-								{visibleTemplates.map((template) => (
-									<MarketplaceCard
-										key={template.id}
-										template={template}
-										installed={library.ids.includes(template.id)}
-										onOpen={(id) => navigate(ROUTES.marketplacePreview(id))}
-										onInstall={(id) => setInstalled(id, true)}
-										onRemove={(id) => setInstalled(id, false)}
-									/>
+								{visibleTemplates.map((template, index) => (
+									<Fragment key={template.id}>
+										{index === firstRowLength ? (
+											<InlineAd placement="marketplace" maxWidth={970} className="col-span-full" />
+										) : null}
+										<MarketplaceCard
+											template={template}
+											installed={library.ids.includes(template.id)}
+											onOpen={(id) => navigate(ROUTES.marketplacePreview(id))}
+											onInstall={(id) => setInstalled(id, true)}
+											onRemove={(id) => setInstalled(id, false)}
+										/>
+									</Fragment>
 								))}
 							</div>
 						) : (
@@ -87,6 +96,7 @@ export default function MarketplacePage() {
 						)}
 					</div>
 				</section>
+				<AnchoredAd />
 			</main>
 		</div>
 	);
