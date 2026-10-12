@@ -28,7 +28,8 @@ if ! grep -q '^IMAGE_TAG=' .env; then
 fi
 
 # Called by the EXIT trap below.
-# shellcheck disable=SC2329
+# ShellCheck versions on hosted runners may not recognize the EXIT trap call.
+# shellcheck disable=SC2317,SC2329
 diagnostics() {
 	status=$?
 	if (( status != 0 )); then
