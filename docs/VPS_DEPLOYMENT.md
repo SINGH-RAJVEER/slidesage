@@ -30,12 +30,14 @@
 | `infra/nginx/cloudflare.conf` | Trusted Cloudflare ranges and source gate |
 | `infra/refresh-cloudflare-ips.sh` | Updates those ranges from Cloudflare |
 | `infra/deploy.sh` | Validate, back up, migrate, and start a release |
+| `infra/activate-release.sh` | Install uploaded files and deploy under one lock |
+| `infra/check.sh` | CI validation with disposable configuration and certificates |
 | `infra/backup.sh` | Custom-format database dump, read-back check, retention |
 | `infra/maintenance.sh` | Runs maintenance under the release lock; skips failed cutovers |
 | `infra/slidesage-*.service`, `infra/slidesage-*.timer` | Daily backup and maintenance every 15 minutes |
 
 - JSON preserves tab indentation. Scripts and systemd set `COMPOSE_FILE=compose.json`; `.env` also sets it for interactive commands.
-- `.env`, `certs/`, `secrets/`, `backups/`, and `.deploy.lock`, and `.deploy-incomplete` are server state ignored by version control.
+- `.env`, `certs/`, `secrets/`, `backups/`, `.deploy.lock`, `.deploy-incomplete`, and `.deployed-release` are server state ignored by version control.
 
 ## Server setup
 
@@ -96,7 +98,8 @@ sudo systemctl enable --now slidesage-maintenance.timer slidesage-backup.timer
 
 ## Releases and proxy behavior
 
-- CI publishes all five images and syncs `infra/` to `/opt/slidesage/` without `--delete`, preserving secrets, certificates, and backups. Manual builds are in [CI/CD](CI_CD.md#manual-build).
+- Pushes to `vps` run all application and infrastructure checks, publish all five images, and deploy when `VPS_DEPLOY_ENABLED=true`. CI uploads files to an isolated directory, then holds the release lock while copying configuration and deploying. Server secrets, certificates, and backups are excluded from sync. Manual builds are in [CI/CD](CI_CD.md#manual-build).
+- `activate-release.sh` refuses registry or domain values that differ from the build. Keep `WEB_DOMAIN`, `API_DOMAIN`, and `IMAGE_REGISTRY` consistent with [CI/CD settings](CI_CD.md#repository-setup). The VPS still needs a persistent GHCR login if the image packages are private.
 - `./deploy.sh <commit-sha>` takes the shared lock, pulls images, and validates the rendered Nginx configuration before downtime. It starts dependencies, backs up the database, stops API and worker, and runs a fresh migration container to completion.
 - Only after migration succeeds does it recreate Nginx, API, and worker. It waits for frontend health, API health, and worker readiness. A migration failure leaves API and worker stopped. A `.deploy-incomplete` marker keeps maintenance disabled after any failed cutover until a release succeeds or recovery completes.
 - Nginx serves client routes through `index.html` with `Cache-Control: no-cache`. Fingerprinted `/assets/` files cache for a year; missing chunks return `404` rather than HTML. The frontend preload-error handler can then reload after a release.

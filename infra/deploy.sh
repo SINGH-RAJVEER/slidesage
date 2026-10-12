@@ -41,7 +41,11 @@ trap 'diagnostics' EXIT
 # The maintenance and backup timers skip their run while this lock is held,
 # so no sweep runs the new worker against a half-migrated schema. Waiting here
 # lets a sweep that already started finish first.
-exec 9>.deploy.lock
+# activate-release.sh passes its open lock descriptor across the file sync.
+# Reuse it only when it points to this stack's lock file.
+if [[ ! /proc/self/fd/9 -ef .deploy.lock ]]; then
+	exec 9>.deploy.lock
+fi
 flock 9
 
 # Pull before recording the tag, so a mistyped tag leaves .env on the release
@@ -72,6 +76,7 @@ docker compose up --detach --no-deps --force-recreate --wait --wait-timeout 120 
 for _ in $(seq 30); do
 	if docker compose exec -T nginx wget -q -T 3 -O /dev/null http://api:8000/health \
 		&& docker compose exec -T nginx wget -q -T 3 -O /dev/null http://worker:8080/ready; then
+		printf '%s\n' "$tag" > .deployed-release
 		rm -f .deploy-incomplete
 		echo "deployed $tag"
 		exit 0

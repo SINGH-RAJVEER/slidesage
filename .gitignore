@@ -48,3 +48,4 @@ infra/secrets/
 infra/backups/
 infra/.deploy.lock
 infra/.deploy-incomplete
+infra/.deployed-release
