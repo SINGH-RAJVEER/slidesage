@@ -140,7 +140,7 @@
 						"DATABASE_URL": "postgresql://slidesage:slidesage@127.0.0.1:55439/slidesage",
 						"TEST_VALKEY_ADDR": "127.0.0.1:56389"
 					},
-					"run": "go test ./...\n",
+					"run": "go test -p 1 ./...\n",
 					"working-directory": "apps/api"
 				},
 				{

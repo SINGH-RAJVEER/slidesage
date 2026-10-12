@@ -8,6 +8,8 @@
 - Go module and build caches are restored in checks and builds. Only non-PR checks write daily cache entries.
 - Workflows use JSON syntax in `.yml` files, which is valid YAML and supports the repository's tab indentation rule.
 
+- Go integration suites share one disposable database. CI and `bun run test:api` run packages sequentially with `-p 1` so a maintenance sweep cannot consume another package's deletion fixtures.
+
 ## Repository setup
 
 | Setting | Type | Purpose |
