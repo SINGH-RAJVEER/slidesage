@@ -119,7 +119,7 @@ export function RemoveItem({
 			type="button"
 			aria-label={label}
 			onClick={onRemove}
-			className="ml-auto shrink-0 self-start rounded-full p-[calc(0.3cqw*var(--fit,1))] opacity-0 transition-opacity group-hover/item:opacity-60 hover:!opacity-100 focus-visible:opacity-100"
+			className="ml-auto shrink-0 self-start rounded-full p-[calc(0.3cqw*var(--fit,1))] opacity-0 transition-opacity group-focus-within/item:opacity-60 group-hover/item:opacity-60 hover:!opacity-100 focus-visible:opacity-100"
 		>
 			<X className="size-[calc(1.6cqw*var(--fit,1))]" />
 		</button>

@@ -119,7 +119,7 @@ export function WidgetControls({ node }: { node: WidgetNode }) {
 		<div
 			role="toolbar"
 			aria-label={`${WIDGET_NAMES[node.type]} controls`}
-			className="absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded-md border border-white/10 bg-neutral-950/90 p-0.5 opacity-0 shadow-lg transition-opacity focus-within:opacity-100 group-hover/widget:opacity-100"
+			className="absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded-md border border-white/10 bg-neutral-950/90 p-0.5 opacity-0 shadow-lg transition-opacity group-focus-within/widget:opacity-100 group-hover/widget:opacity-100 [@media(hover:none)]:group-not-focus-within/widget:pointer-events-none"
 		>
 			{node.type === "chart" && (
 				<>
