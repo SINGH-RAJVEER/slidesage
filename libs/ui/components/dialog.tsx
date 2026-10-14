@@ -36,12 +36,14 @@ const DialogContent = React.forwardRef<
 			ref={ref}
 			className={cn(
 				"fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+				// A phone gets a sheet rising from the bottom edge, within reach of a thumb.
+				"mobile:inset-x-0 mobile:top-auto mobile:bottom-0 mobile:mx-auto mobile:max-h-[90dvh] mobile:translate-x-0 mobile:translate-y-0 mobile:overflow-y-auto mobile:rounded-t-2xl mobile:rounded-b-none mobile:pb-[max(1.5rem,env(safe-area-inset-bottom))] mobile:data-[state=closed]:animate-[ss-sheet-out-bottom_200ms_ease-in] mobile:data-[state=open]:animate-[ss-sheet-in-bottom_260ms_cubic-bezier(0.2,0.9,0.2,1)]",
 				className,
 			)}
 			{...props}
 		>
 			{children}
-			<DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+			<DialogPrimitive.Close className="absolute right-4 top-4 mobile:right-2 mobile:top-2 mobile:flex mobile:size-11 mobile:items-center mobile:justify-center rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
 				<X className="h-4 w-4" />
 				<span className="sr-only">Close</span>
 			</DialogPrimitive.Close>
