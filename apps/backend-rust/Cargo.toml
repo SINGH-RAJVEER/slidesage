@@ -1,0 +1,41 @@
+[package]
+name = "slidesage-backend"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+default-run = "api"
+
+[dependencies]
+axum = "0.8.9"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+hex = "0.4"
+http-body-util = "0.1"
+jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto"] }
+percent-encoding = "2"
+rand = "0.9"
+scrypt = { version = "0.11", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+sha2 = "0.10"
+sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "chrono", "macros"] }
+subtle = "2.6"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
+unicode-normalization = "0.1"
+uuid = { version = "1", features = ["v4"] }
+
+[features]
+postgres-tests = []
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+
+[profile.dev.package.scrypt]
+opt-level = 2
+
+[profile.dev.package.salsa20]
+opt-level = 2
+
+[profile.dev.package.pbkdf2]
+opt-level = 2

@@ -10,6 +10,10 @@
 		pkgs.just
 		pkgs.valkey
 		pkgs.uv
+		pkgs.cargo
+		pkgs.rustc
+		pkgs.rustfmt
+		pkgs.clippy
 	];
 
 	services.postgres = {
