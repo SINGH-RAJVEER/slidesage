@@ -121,7 +121,7 @@ export default function CreatePasswordPage() {
 		<div className="min-h-screen bg-transparent flex flex-col">
 			<Header />
 			<FloatingNotice error={error} onDismiss={() => setError(null)} />
-			<div className="flex flex-1 items-center justify-center px-4 py-8 md:px-8">
+			<div className="flex flex-1 items-center justify-center px-4 py-8 desktop:px-8">
 				<div className="max-w-md w-full">
 					<h1 className="mb-1 text-2xl font-semibold text-white">Create a password</h1>
 					<p className="mb-6 text-white/65">

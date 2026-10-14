@@ -208,7 +208,7 @@ export const TopicInput: React.FC<TopicInputProps> = ({
 						className={
 							expanded
 								? "h-full min-h-0 w-full resize-none overflow-y-auto rounded-lg border border-white/15 bg-black/20 p-5 pb-20 pr-14 text-left text-base leading-7 text-white outline-none transition-colors placeholder:text-white/35 focus:border-white/30 disabled:cursor-not-allowed disabled:opacity-60 sm:p-7 sm:pb-20 sm:pr-16 sm:text-lg"
-								: "field-sizing-content min-h-[60px] max-h-48 w-full resize-none overflow-y-auto rounded-lg border border-white/10 bg-black/20 px-4 py-4 text-center text-lg leading-7 text-white outline-none transition-colors placeholder:text-white/35 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-60 md:text-xl"
+								: "field-sizing-content min-h-[60px] max-h-48 w-full resize-none overflow-y-auto rounded-lg border border-white/10 bg-black/20 px-4 py-4 text-center text-lg leading-7 text-white outline-none transition-colors placeholder:text-white/35 focus:border-white/25 disabled:cursor-not-allowed disabled:opacity-60 desktop:text-xl"
 						}
 						disabled={disabled}
 					/>
@@ -221,7 +221,7 @@ export const TopicInput: React.FC<TopicInputProps> = ({
 							onKeyDown={handleExpandedControlKeyDown}
 							disabled={disabled || morphing}
 							aria-label={expanded ? "Shrink prompt editor" : "Expand prompt editor"}
-							className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-md text-white/45 transition-[color,background-color,transform] duration-200 hover:bg-white/10 hover:text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:pointer-events-none md:size-9"
+							className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-md text-white/45 transition-[color,background-color,transform] duration-200 hover:bg-white/10 hover:text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:pointer-events-none desktop:size-9"
 						>
 							{expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
 						</button>

@@ -340,7 +340,7 @@ function OutlineVisit() {
 		<div className="flex min-h-dvh w-full flex-col bg-transparent">
 			<Header />
 			<FloatingNotice error={error} onDismiss={() => setError(null)} />
-			<main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10 md:px-8">
+			<main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10 desktop:px-8">
 				{!outline && !loadError && (
 					<section
 						className="flex flex-1 flex-col items-center justify-center gap-4"

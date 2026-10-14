@@ -56,7 +56,7 @@ export default function ForgotPasswordPage() {
 		<div className="min-h-screen bg-transparent flex flex-col">
 			<Header />
 			<FloatingNotice error={error} onDismiss={() => setError(null)} />
-			<div className="flex-1 flex items-center justify-center px-4 py-8 md:px-8">
+			<div className="flex-1 flex items-center justify-center px-4 py-8 desktop:px-8">
 				<div className="max-w-md w-full">
 					<div className="rounded-xl border border-white/10 bg-black/20 p-6">
 						<h1 className="text-2xl font-semibold text-white mb-1">Forgot password</h1>

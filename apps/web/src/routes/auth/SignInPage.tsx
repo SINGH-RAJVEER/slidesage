@@ -187,7 +187,7 @@ export default function SignInPage() {
 			{switching ? <LoadingScreen label="Loading sign up" /> : null}
 			<Header />
 			<FloatingNotice error={error} onDismiss={() => setError(null)} />
-			<div className="flex flex-1 items-center justify-center px-4 py-8 md:px-8">
+			<div className="flex flex-1 items-center justify-center px-4 py-8 desktop:px-8">
 				<div className="max-w-md w-full">
 					{step === "email" ? (
 						<form className="space-y-4" onSubmit={handleContinue}>

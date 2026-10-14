@@ -5,6 +5,20 @@
 @source "../lib";
 @source "../context";
 
+/* Phones upright are narrow and phones sideways are short; both get the mobile
+   layout. `desktop` is the exact complement. Keep in step with lib/mobile.ts. */
+@custom-variant mobile {
+	@media (max-width: 767px), (max-height: 499px) {
+		@slot;
+	}
+}
+
+@custom-variant desktop {
+	@media (min-width: 768px) and (min-height: 500px) {
+		@slot;
+	}
+}
+
 /* Register the shadcn tokens as Tailwind 4 color utilities. */
 @theme inline {
 	--color-background: var(--background);
@@ -38,6 +52,15 @@ body {
 	background-color: hsl(222 27% 12%);
 	background-image: radial-gradient(circle at top, hsl(220 20% 18%), hsl(222 27% 12%) 60%);
 	position: relative;
+}
+
+/* iOS zooms into any field set smaller than 16px when it takes focus. */
+@media (max-width: 767px), (max-height: 499px) {
+	input,
+	textarea,
+	select {
+		font-size: 16px;
+	}
 }
 
 :root {

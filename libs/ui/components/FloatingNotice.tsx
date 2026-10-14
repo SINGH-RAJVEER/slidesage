@@ -54,7 +54,7 @@ export function FloatingNotice({
 		<div
 			role={tone === "error" ? "alert" : "status"}
 			aria-live="polite"
-			className={`fixed top-[4.5rem] right-4 z-50 flex h-12 max-w-[calc(100vw-2rem)] items-center gap-2.5 overflow-hidden rounded-full border bg-[hsl(222,27%,12%)]/95 px-5 text-sm font-medium shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md md:right-6 ${TONE_CLASSES[tone]}`}
+			className={`fixed top-[4.5rem] right-4 z-50 flex h-12 max-w-[calc(100vw-2rem)] items-center gap-2.5 overflow-hidden rounded-full border bg-[hsl(222,27%,12%)]/95 px-5 text-sm font-medium shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md desktop:right-6 ${TONE_CLASSES[tone]}`}
 		>
 			{tone === "success" ? (
 				<Check className="size-4 shrink-0" aria-hidden="true" />
