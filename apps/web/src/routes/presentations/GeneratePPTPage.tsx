@@ -219,7 +219,7 @@ export default function GeneratePPTPage() {
 			<div
 				data-horizon-reveal
 				data-generation-selectors
-				className="relative flex w-full flex-col items-center px-4 pt-6 desktop:pt-8"
+				className="relative flex w-full flex-col items-center px-4 pt-6 desktop:pt-8 mobile:order-2 mobile:pt-0 mobile:pb-6"
 			>
 				<GenerateOptionsBar
 					detailLevel={detailLevel}
@@ -246,10 +246,10 @@ export default function GeneratePPTPage() {
 
 			<main
 				data-horizon-reveal
-				className="flex w-full flex-1 items-center justify-center overflow-y-auto px-4 py-12 desktop:px-8"
+				className="flex w-full flex-1 items-center justify-center overflow-y-auto px-4 py-12 desktop:px-8 mobile:order-1 mobile:flex-none mobile:pt-6 mobile:pb-4"
 			>
 				<div className="w-full max-w-5xl">
-					<div className="relative -top-4 mx-auto flex w-full max-w-4xl flex-col items-center justify-center desktop:-top-6">
+					<div className="relative -top-4 mx-auto flex w-full max-w-4xl flex-col items-center justify-center desktop:-top-6 mobile:top-0">
 						<GenerateForm
 							prompt={prompt}
 							loading={loading || streamingState.isStreaming}

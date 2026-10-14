@@ -232,7 +232,7 @@ export const TopicInput: React.FC<TopicInputProps> = ({
 					className={
 						expanded
 							? "pointer-events-none absolute inset-x-3 bottom-3 z-10 flex items-end justify-between gap-3"
-							: "flex flex-col items-center gap-4"
+							: "flex flex-col items-center gap-4 mobile:w-full mobile:items-stretch"
 					}
 				>
 					<Button
@@ -242,7 +242,7 @@ export const TopicInput: React.FC<TopicInputProps> = ({
 						}}
 						onKeyDown={handleExpandedControlKeyDown}
 						disabled={disabled || !prompt.trim()}
-						className={`generation-prompt-action h-11 rounded-md border border-white/20 bg-white/10 px-6 text-white transition-[background-color,transform] duration-200 hover:bg-white/15 active:scale-[0.98] ${expanded ? "pointer-events-auto ml-auto shrink-0" : ""}`}
+						className={`generation-prompt-action h-11 rounded-md border border-white/20 bg-white/10 px-6 text-white transition-[background-color,transform] duration-200 hover:bg-white/15 active:scale-[0.98] ${expanded ? "pointer-events-auto ml-auto shrink-0" : "mobile:h-12 mobile:w-full"}`}
 					>
 						{loading ? (
 							<>
