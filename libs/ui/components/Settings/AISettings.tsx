@@ -305,7 +305,7 @@ export function AISettings({
 											}
 											disabled={!config.eligibility.eligible || busy === provider.id}
 											placeholder="Enter API key"
-											className="h-10 min-w-0 flex-1 rounded-md border border-white/10 bg-black/30 px-3 text-sm text-white outline-none transition-colors focus:border-white/25 disabled:opacity-50"
+											className="h-10 min-w-0 shrink-0 rounded-md border border-white/10 bg-black/30 px-3 text-sm sm:flex-1 text-white outline-none transition-colors focus:border-white/25 disabled:opacity-50"
 										/>
 										<Button
 											type="button"
