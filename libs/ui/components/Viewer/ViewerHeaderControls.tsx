@@ -69,9 +69,11 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 					aria-label="Present slideshow"
 					className="viewer-header__present-button border-white/5 bg-white/5 text-white hover:bg-white/10"
 				>
-					<Presentation className="mr-2 size-4" /> Present
+					<Presentation className="mr-2 size-4" />
+					<span className="viewer-header__label">Present</span>
 				</Button>
-				{tools}
+				{/* On a phone these take a row of their own below the title. */}
+				<div className="viewer-header__extra contents">{tools}</div>
 			</div>
 
 			<div className="viewer-header__actions flex items-center justify-end gap-2">
@@ -85,7 +87,7 @@ export const ViewerHeaderControls: React.FC<ViewerHeaderControlsProps> = ({
 						className="viewer-header__iterate bg-white/5 hover:bg-white/10 backdrop-blur-lg border border-white/5 text-white transition-all duration-300"
 					>
 						<Sparkles className="w-4 h-4 mr-2" />
-						Iterate
+						<span className="viewer-header__label">Iterate</span>
 					</Button>
 				)}
 			</div>
