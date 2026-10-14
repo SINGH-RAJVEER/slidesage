@@ -1,5 +1,17 @@
-import { Bug, LogOut, MessageSquare, Settings, UserRound } from "lucide-react";
+import {
+	Bug,
+	ChevronRight,
+	Coins,
+	LayoutGrid,
+	LogOut,
+	MessageSquare,
+	Settings,
+	Sparkles,
+	Store,
+	UserRound,
+} from "lucide-react";
 import { type ComponentType, type ReactNode, useState } from "react";
+import { useIsMobile } from "../hooks/useIsMobile";
 import { usePrefetchIntent } from "../hooks/usePrefetchIntent";
 import { cn } from "../lib/utils";
 import {
@@ -9,6 +21,7 @@ import {
 	DropdownMenuTrigger,
 } from "./dropdown-menu";
 import { SlideSageLogo } from "./SlideSageLogo";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./sheet";
 
 export interface HeaderUser {
 	name?: string | null;
@@ -37,7 +50,17 @@ export interface HeaderLinkProps {
 	to: string;
 	className?: string;
 	"aria-label"?: string;
+	"aria-current"?: "page";
+	onClick?: () => void;
 	children: ReactNode;
+}
+
+function accountLinks(routes: HeaderRoutes) {
+	return [
+		{ path: routes.profile, label: "Profile", Icon: UserRound },
+		{ path: routes.settings, label: "Settings", Icon: Settings },
+		{ path: routes.feedback, label: "Feedback", Icon: MessageSquare },
+	];
 }
 
 interface HeaderProps {
@@ -62,6 +85,7 @@ export function Header({
 	onPrefetch,
 	onSignOut,
 }: HeaderProps) {
+	const isMobile = useIsMobile();
 	const [signingOut, setSigningOut] = useState(false);
 	const purchaseIntent = usePrefetchIntent(
 		onPrefetch ? () => onPrefetch(routes.purchase) : undefined,
@@ -103,8 +127,31 @@ export function Header({
 		return currentPath.startsWith(path) && path !== routes.home;
 	};
 
+	const points = `${user?.slideTokens?.toFixed(1) ?? "0.0"} points`;
+	const avatar = user && <Avatar user={user} initials={getUserInitials()} className="text-base" />;
+
+	if (isMobile) {
+		return (
+			<MobileHeader
+				routes={routes}
+				LinkComponent={LinkComponent}
+				user={user}
+				sticky={sticky}
+				isAuthPage={isAuthPage}
+				isActive={isActive}
+				points={points}
+				initials={getUserInitials()}
+				signingOut={signingOut}
+				onNavigate={onNavigate}
+				purchaseIntent={purchaseIntent}
+				onSignOut={handleSignOut}
+			/>
+		);
+	}
+
 	return (
 		<header
+			data-app-header
 			className={cn(
 				"w-full border-b border-white/10 bg-[hsl(222,27%,12%)]/95 backdrop-blur-md",
 				sticky && "sticky top-0 z-50",
@@ -154,7 +201,7 @@ export function Header({
 								className="hidden rounded-full border border-white/10 px-5 py-2 text-base font-medium text-white/90 transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20 lg:block"
 								title="Click to purchase more points"
 							>
-								{`${user.slideTokens?.toFixed(1) ?? "0.0"} points`}
+								{points}
 							</button>
 
 							<DropdownMenu>
@@ -162,29 +209,13 @@ export function Header({
 									aria-label="Open account menu"
 									className="rounded-full ring-offset-black transition-all focus:outline-none focus:ring-2 focus:ring-white/20"
 								>
-									<div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 shadow-sm transition-colors hover:border-white/40">
-										{user.image ? (
-											<img
-												src={user.image}
-												alt={user.name ? `${user.name}'s profile` : "User profile"}
-												className="size-full object-cover"
-											/>
-										) : (
-											<span className="flex-shrink-0 text-base font-semibold uppercase text-white/90">
-												{getUserInitials()}
-											</span>
-										)}
-									</div>
+									{avatar}
 								</DropdownMenuTrigger>
 								<DropdownMenuContent
 									align="end"
 									className="w-max min-w-0 rounded-xl border border-white/10 bg-[hsl(222,27%,12%)] p-1 text-white shadow-2xl"
 								>
-									{[
-										{ path: routes.profile, label: "Profile", Icon: UserRound },
-										{ path: routes.settings, label: "Settings", Icon: Settings },
-										{ path: routes.feedback, label: "Feedback", Icon: MessageSquare },
-									].map(({ path, label, Icon }) => (
+									{accountLinks(routes).map(({ path, label, Icon }) => (
 										<DropdownMenuItem
 											key={path}
 											asChild
@@ -230,3 +261,227 @@ export function Header({
 		</header>
 	);
 }
+
+function Avatar({
+	user,
+	initials,
+	className,
+}: {
+	user: HeaderUser;
+	initials: string;
+	className?: string;
+}) {
+	return (
+		<div
+			className={cn(
+				"flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 shadow-sm transition-colors hover:border-white/40",
+				className,
+			)}
+		>
+			{user.image ? (
+				<img
+					src={user.image}
+					alt={user.name ? `${user.name}'s profile` : "User profile"}
+					className="size-full object-cover"
+				/>
+			) : (
+				<span className="flex-shrink-0 font-semibold uppercase text-white/90">{initials}</span>
+			)}
+		</div>
+	);
+}
+
+interface MobileHeaderProps {
+	routes: HeaderRoutes;
+	LinkComponent: ComponentType<HeaderLinkProps>;
+	user?: HeaderUser | null;
+	sticky: boolean;
+	isAuthPage: boolean;
+	isActive: (path: string) => boolean;
+	points: string;
+	initials: string;
+	signingOut: boolean;
+	onNavigate: (path: string) => void;
+	purchaseIntent: ReturnType<typeof usePrefetchIntent>;
+	onSignOut: () => Promise<void>;
+}
+
+/**
+ * The header on a phone: a slim bar with the logo and the points balance, and
+ * the main pages as tabs along the bottom, within reach of a thumb. The account
+ * menu opens as a sheet from the last tab.
+ */
+function MobileHeader({
+	routes,
+	LinkComponent,
+	user,
+	sticky,
+	isAuthPage,
+	isActive,
+	points,
+	initials,
+	signingOut,
+	onNavigate,
+	purchaseIntent,
+	onSignOut,
+}: MobileHeaderProps) {
+	const [accountOpen, setAccountOpen] = useState(false);
+	const showTabs = !isAuthPage;
+	const tabs = [
+		{ path: routes.generate, label: "Generate", Icon: Sparkles },
+		{ path: routes.presentations, label: "Presentations", Icon: LayoutGrid },
+		{ path: routes.marketplace, label: "Marketplace", Icon: Store },
+	];
+	const tabClassName = cn(
+		"flex min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
+		"short:flex-row short:gap-2 short:text-xs",
+	);
+	const go = (path: string) => {
+		setAccountOpen(false);
+		onNavigate(path);
+	};
+
+	return (
+		<>
+			<header
+				data-app-header
+				data-tab-bar={showTabs ? "" : undefined}
+				className={cn(
+					"w-full border-b border-white/10 bg-[hsl(222,27%,12%)]/95 pt-[env(safe-area-inset-top)] backdrop-blur-md",
+					sticky && "sticky top-0 z-50",
+				)}
+			>
+				<div
+					className={cn(
+						"flex h-14 items-center justify-between gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]",
+						"short:h-12",
+					)}
+				>
+					<LinkComponent to={routes.landing} aria-label="SlideSage — landing">
+						<SlideSageLogo className="h-7 w-auto" />
+					</LinkComponent>
+					{user && (
+						<button
+							type="button"
+							{...purchaseIntent}
+							onClick={() => onNavigate(routes.purchase)}
+							aria-label={`${points}. Buy more points`}
+							className="flex h-10 items-center gap-1.5 rounded-full border border-white/10 px-3.5 text-sm font-medium tabular-nums text-white/90 transition-colors active:bg-white/10"
+						>
+							<Coins aria-hidden="true" className="size-4 text-amber-300/90" />
+							{user.slideTokens?.toFixed(1) ?? "0.0"}
+						</button>
+					)}
+				</div>
+			</header>
+
+			{showTabs && (
+				<nav
+					aria-label="Main"
+					className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[hsl(222,27%,10%)]/95 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] backdrop-blur-md"
+				>
+					<div className={cn("mx-auto flex h-16 max-w-xl items-stretch", "short:h-12")}>
+						{tabs.map(({ path, label, Icon }) => {
+							const active = isActive(path);
+							return (
+								<LinkComponent
+									key={path}
+									to={path}
+									aria-current={active ? "page" : undefined}
+									className={cn(tabClassName, active ? "text-white" : "text-white/50")}
+								>
+									<Icon aria-hidden="true" className={cn("size-5", active && "text-sky-300")} />
+									<span className="max-w-full truncate">{label}</span>
+								</LinkComponent>
+							);
+						})}
+						{user && (
+							<button
+								type="button"
+								onClick={() => setAccountOpen(true)}
+								aria-label="Open account menu"
+								aria-haspopup="dialog"
+								className={cn(tabClassName, accountOpen ? "text-white" : "text-white/50")}
+							>
+								<Avatar
+									user={user}
+									initials={initials}
+									className="size-5 border-white/25 text-[9px]"
+								/>
+								<span>Account</span>
+							</button>
+						)}
+					</div>
+				</nav>
+			)}
+
+			{user && (
+				<Sheet open={accountOpen} onOpenChange={setAccountOpen}>
+					<SheetContent side="bottom" className="gap-5">
+						<SheetHeader className="flex-row items-center gap-3">
+							<Avatar user={user} initials={initials} className="size-12 shrink-0 text-lg" />
+							<div className="min-w-0">
+								<SheetTitle className="truncate">{user.name?.trim() || "Account"}</SheetTitle>
+								<SheetDescription className="truncate">{user.email}</SheetDescription>
+							</div>
+						</SheetHeader>
+
+						<button
+							type="button"
+							{...purchaseIntent}
+							onClick={() => go(routes.purchase)}
+							className="flex min-h-14 items-center gap-3 rounded-xl bg-white/5 px-4 text-left transition-colors active:bg-white/10"
+						>
+							<Coins aria-hidden="true" className="size-5 text-amber-300/90" />
+							<span className="flex-1">
+								<span className="block text-base font-medium tabular-nums text-white">
+									{points}
+								</span>
+								<span className="block text-xs text-white/50">Buy more points</span>
+							</span>
+							<ChevronRight aria-hidden="true" className="size-4 text-white/40" />
+						</button>
+
+						<nav aria-label="Account" className="-mx-2 flex flex-col">
+							{accountLinks(routes).map(({ path, label, Icon }) => (
+								<LinkComponent
+									key={path}
+									to={path}
+									onClick={() => setAccountOpen(false)}
+									className={accountRowClassName}
+								>
+									<Icon aria-hidden="true" className="size-5 text-white/60" />
+									<span className="flex-1">{label}</span>
+									<ChevronRight aria-hidden="true" className="size-4 text-white/30" />
+								</LinkComponent>
+							))}
+							<a
+								href={BUG_REPORT_URL}
+								target="_blank"
+								rel="noopener noreferrer"
+								className={accountRowClassName}
+							>
+								<Bug aria-hidden="true" className="size-5 text-white/60" />
+								<span className="flex-1">Report a bug</span>
+							</a>
+							<button
+								type="button"
+								disabled={signingOut}
+								onClick={() => void onSignOut()}
+								className={cn(accountRowClassName, "text-red-400 disabled:opacity-60")}
+							>
+								<LogOut aria-hidden="true" className="size-5" />
+								<span className="flex-1 text-left">
+									{signingOut ? "Signing out..." : "Sign Out"}
+								</span>
+							</button>
+						</nav>
+					</SheetContent>
+				</Sheet>
+			)}
+		</>
+	);
+}
+
+const accountRowClassName =
+	"flex min-h-12 items-center gap-3 rounded-lg px-2 text-base text-white/85 transition-colors active:bg-white/10";

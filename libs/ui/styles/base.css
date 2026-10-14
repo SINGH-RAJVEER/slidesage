@@ -19,6 +19,13 @@
 	}
 }
 
+/* A phone on its side, where height is the scarce dimension. */
+@custom-variant short {
+	@media (max-height: 499px) {
+		@slot;
+	}
+}
+
 /* Register the shadcn tokens as Tailwind 4 color utilities. */
 @theme inline {
 	--color-background: var(--background);
@@ -170,5 +177,62 @@ input.hide-number-spin[type="number"] {
 @media (prefers-reduced-motion: reduce) {
 	.ss-marquee-track {
 		animation: none;
+	}
+}
+
+/* Sheets and overlays enter and leave with these; Radix waits for the exit. */
+@keyframes ss-fade-in {
+	from {
+		opacity: 0;
+	}
+}
+
+@keyframes ss-fade-out {
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes ss-sheet-in-bottom {
+	from {
+		transform: translateY(100%);
+	}
+}
+
+@keyframes ss-sheet-out-bottom {
+	to {
+		transform: translateY(100%);
+	}
+}
+
+@keyframes ss-sheet-in-right {
+	from {
+		transform: translateX(100%);
+	}
+}
+
+@keyframes ss-sheet-out-right {
+	to {
+		transform: translateX(100%);
+	}
+}
+
+/* The mobile tab bar is fixed to the bottom of the screen, so the page it
+   sits over keeps its last content clear of it. */
+@media (max-width: 767px), (max-height: 499px) {
+	:has(> [data-app-header][data-tab-bar]) {
+		padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+	}
+}
+
+@media (max-height: 499px) {
+	:has(> [data-app-header][data-tab-bar]) {
+		padding-bottom: calc(3rem + env(safe-area-inset-bottom));
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-state] {
+		animation-duration: 0.01ms;
 	}
 }
