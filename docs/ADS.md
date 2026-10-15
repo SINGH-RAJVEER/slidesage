@@ -17,8 +17,9 @@
 - Each page shows one ad at a time: the inline unit on desktop widths, or the anchored banner on mobile widths. Slots that are hidden at the current width are not rendered, so AdSense never fills a zero-width unit.
 - The marketplace row follows the first two templates when the grid has two columns and the first three when it has three. A search that leaves no second row shows no ad.
 - The anchored banner is fixed to the bottom of the screen through a portal and leaves a spacer at the end of the page so the last item can scroll above it.
-- Every slot carries a "Sponsored" label and a Remove ads link to `/purchase`.
-- A blocked script or an unfilled unit (`data-ad-status="unfilled"`) removes the slot, so no empty space is left.
+- Every slot that shows an ad carries a "Sponsored" label and a Remove ads link to `/purchase`.
+- A slot stays invisible until AdSense marks it `data-ad-status="filled"`. While AdSense decides, the unit keeps its full size so AdSense requests the right ad, but it is transparent, out of the page layout, and inert. The anchored banner's bar and spacer also wait for the ad.
+- A blocked script, an unfilled unit (`data-ad-status="unfilled"`), or no answer within 15 seconds removes the slot. A page without an ad looks the same as an ad-free page, with no label, gap, or reserved space.
 - Shared decks (`/s/:token`), the deck viewer and editor, export, purchase, auth, landing, settings, and error pages never show ads.
 
 ## Code
