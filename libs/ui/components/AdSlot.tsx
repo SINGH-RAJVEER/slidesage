@@ -9,24 +9,35 @@ export interface AdLinkProps {
 	children: ReactNode;
 }
 
+/** How long a unit waits for AdSense to answer before it is dropped. */
+export const AD_ANSWER_TIMEOUT_MS = 15_000;
+
+type AdState = "pending" | "filled" | "unavailable";
+
 interface AdSlotProps {
 	placement: AdPlacement;
-	/** Height of the ad in CSS pixels, reserved while it loads. */
+	/** Height of the ad in CSS pixels. */
 	height: number;
 	/** The widest ad the slot takes; a narrower container gets a narrower ad. */
 	maxWidth: number;
 	purchaseHref: string;
 	LinkComponent: ComponentType<AdLinkProps>;
+	/** Applied once an ad is showing. */
 	className?: string;
-	/** Called once the ad is blocked or AdSense has nothing to show. */
+	/** Called once AdSense has delivered an ad. */
+	onFilled?: () => void;
+	/** Called once the ad is blocked, unfilled, or never answered. */
 	onUnavailable?: () => void;
+	answerTimeoutMs?: number;
 	config?: AdsConfig | null;
 }
 
 /**
  * One AdSense unit for a reader below the ad-free balance. It renders nothing
- * when ads are off, and removes itself when the ad is blocked or unfilled so
- * no empty space is left behind.
+ * when ads are off. While AdSense decides, the unit stays invisible, out of the
+ * layout, and hidden from assistive technology; it appears with its label only
+ * once an ad is delivered, and is removed when the ad is blocked, unfilled, or
+ * never answered, so a page without an ad looks like an ad-free page.
  */
 export function AdSlot({
 	placement,
@@ -35,14 +46,18 @@ export function AdSlot({
 	purchaseHref,
 	LinkComponent,
 	className,
+	onFilled,
 	onUnavailable,
+	answerTimeoutMs = AD_ANSWER_TIMEOUT_MS,
 	config = ADS_CONFIG,
 }: AdSlotProps) {
 	const unit = useAdUnit(placement, config);
-	const [unavailable, setUnavailable] = useState(false);
+	const [state, setState] = useState<AdState>("pending");
 	const insRef = useRef<HTMLModElement>(null);
 	// Each unit is filled once; Strict Mode runs the effect twice on one element.
 	const requested = useRef(false);
+	const callbacks = useRef({ onFilled, onUnavailable });
+	callbacks.current = { onFilled, onUnavailable };
 	const clientId = unit?.clientId;
 
 	useEffect(() => {
@@ -55,7 +70,7 @@ export function AdSlot({
 				requestAd();
 			},
 			() => {
-				if (!cancelled) setUnavailable(true);
+				if (!cancelled) setState("unavailable");
 			},
 		);
 		return () => {
@@ -63,28 +78,51 @@ export function AdSlot({
 		};
 	}, [clientId]);
 
-	// AdSense marks the unit filled or unfilled once it has answered.
+	// AdSense marks the unit filled or unfilled once it has answered. Ad blockers
+	// and failed requests can leave it unanswered, so the wait is bounded.
 	useEffect(() => {
 		const ins = insRef.current;
 		if (!clientId || !ins) return;
-		const observer = new MutationObserver(() => {
-			if (ins.getAttribute("data-ad-status") === "unfilled") setUnavailable(true);
-		});
+		const read = () => {
+			const status = ins.getAttribute("data-ad-status");
+			if (status === "filled") setState("filled");
+			else if (status === "unfilled") setState("unavailable");
+		};
+		read();
+		const observer = new MutationObserver(read);
 		observer.observe(ins, { attributes: true, attributeFilter: ["data-ad-status"] });
-		return () => observer.disconnect();
-	}, [clientId]);
+		const timer = setTimeout(
+			() => setState((current) => (current === "pending" ? "unavailable" : current)),
+			answerTimeoutMs,
+		);
+		return () => {
+			observer.disconnect();
+			clearTimeout(timer);
+		};
+	}, [clientId, answerTimeoutMs]);
 
 	useEffect(() => {
-		if (unavailable) onUnavailable?.();
-	}, [unavailable, onUnavailable]);
+		if (state === "filled") callbacks.current.onFilled?.();
+		if (state === "unavailable") callbacks.current.onUnavailable?.();
+	}, [state]);
 
-	if (!unit || unavailable) return null;
+	if (!unit || state === "unavailable") return null;
+	const filled = state === "filled";
 
 	return (
 		<aside
 			aria-label="Advertisement"
+			aria-hidden={filled ? undefined : true}
+			inert={!filled}
 			data-ad-placement={placement}
-			className={cn("mx-auto flex w-full flex-col gap-1.5", className)}
+			data-ad-state={state}
+			className={cn(
+				"mx-auto flex w-full flex-col gap-1.5",
+				// Out of the flow, so no margin, grid cell, or gap shows, and
+				// transparent, but at full size: AdSense sizes the ad it requests
+				// from the unit and skips units without a width.
+				filled ? className : "pointer-events-none absolute inset-x-0 bottom-0 opacity-0",
+			)}
 			style={{ maxWidth }}
 		>
 			<ins
