@@ -12,6 +12,7 @@ import {
 import { getPresentationRetryDestination } from "@slidesage/ui/lib/presentation-retry";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { AnchoredAd, InlineAd } from "../../app/Ads";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
@@ -398,6 +399,8 @@ export default function PresentationsGridPage() {
 						</div>
 					</div>
 
+					<InlineAd placement="presentations" maxWidth={970} className="mb-8" />
+
 					{loading ? (
 						<div
 							className="flex min-h-64 items-center justify-center"
@@ -472,6 +475,7 @@ export default function PresentationsGridPage() {
 						</>
 					)}
 				</div>
+				<AnchoredAd />
 			</div>
 		</div>
 	);

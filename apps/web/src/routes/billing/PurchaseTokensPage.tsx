@@ -1,11 +1,12 @@
-import type {
-	ApiErrorResponse,
-	BillingBalanceResponse,
-	BillingCheckoutRequest,
-	BillingCheckoutResponse,
-	BillingPackName,
-	BillingVerifyRequest,
-	BillingVerifyResponse,
+import {
+	AD_FREE_POINTS,
+	type ApiErrorResponse,
+	type BillingBalanceResponse,
+	type BillingCheckoutRequest,
+	type BillingCheckoutResponse,
+	type BillingPackName,
+	type BillingVerifyRequest,
+	type BillingVerifyResponse,
 } from "@slidesage/types";
 import { Button } from "@slidesage/ui/components/button";
 import {
@@ -298,7 +299,8 @@ export default function PurchaseTokensPage() {
 										<div className="text-sm text-white/80 flex items-start gap-2">
 											<span className="text-green-400 mt-0.5">✓</span>
 											<span>
-												<span className="font-semibold">Ad-Free Experience</span> (30+ points)
+												<span className="font-semibold">Ad-Free Experience</span> ({AD_FREE_POINTS}+
+												points)
 											</span>
 										</div>
 										<div className="text-sm text-white/70">
@@ -347,7 +349,8 @@ export default function PurchaseTokensPage() {
 											<div className="text-sm text-white/80 flex items-start gap-2">
 												<span className="text-green-400 mt-0.5">✓</span>
 												<span>
-													<span className="font-semibold">Ad-Free Experience</span> (30+ points)
+													<span className="font-semibold">Ad-Free Experience</span> (
+													{AD_FREE_POINTS}+ points)
 												</span>
 											</div>
 											<div className="text-sm text-white/80 flex items-start gap-2">

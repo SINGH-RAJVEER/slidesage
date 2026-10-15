@@ -10,6 +10,7 @@ import {
 import { useDebouncedCallback } from "@tanstack/react-pacer/debouncer";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { AnchoredAd, InlineAd } from "../../app/Ads";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
@@ -258,6 +259,8 @@ export default function GeneratePPTPage() {
 					</div>
 				</div>
 			</main>
+			<InlineAd placement="generate" maxWidth={728} className="mb-10" />
+			<AnchoredAd />
 		</div>
 	);
 }

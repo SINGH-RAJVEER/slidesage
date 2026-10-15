@@ -67,6 +67,13 @@
 				},
 				{
 					"name": "Bundle the card converter and the frontend",
+					"env": {
+						"VITE_ADSENSE_CLIENT_ID": "${{ vars.VITE_ADSENSE_CLIENT_ID }}",
+						"VITE_ADSENSE_SLOT_GENERATE": "${{ vars.VITE_ADSENSE_SLOT_GENERATE }}",
+						"VITE_ADSENSE_SLOT_PRESENTATIONS": "${{ vars.VITE_ADSENSE_SLOT_PRESENTATIONS }}",
+						"VITE_ADSENSE_SLOT_MARKETPLACE": "${{ vars.VITE_ADSENSE_SLOT_MARKETPLACE }}",
+						"VITE_ADSENSE_SLOT_ANCHOR": "${{ vars.VITE_ADSENSE_SLOT_ANCHOR }}"
+					},
 					"run": "set -euo pipefail\nbun install --frozen-lockfile\nbun build apps/converter/src/main.ts --target bun --outfile dist/converter.js\ntest -s dist/converter.js\nVITE_API_URL=\"https://$API_DOMAIN\" bun run --cwd apps/web build\ncp -r apps/web/dist dist/web\ngrep -rqF \"https://$API_DOMAIN\" dist/web/assets\n"
 				},
 				{
