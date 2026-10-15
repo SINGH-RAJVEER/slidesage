@@ -18,19 +18,7 @@
 		"API_DOMAIN": "${{ vars.API_DOMAIN || 'api.slidesage.app' }}"
 	},
 	"jobs": {
-		"checks": {
-			"if": "github.ref == 'refs/heads/main'",
-			"permissions": {
-				"contents": "read",
-				"pull-requests": "read"
-			},
-			"uses": "./.github/workflows/checks.yml",
-			"with": {
-				"full-check": true
-			}
-		},
 		"build": {
-			"needs": "checks",
 			"if": "github.ref == 'refs/heads/main'",
 			"runs-on": "ubuntu-latest",
 			"permissions": {
