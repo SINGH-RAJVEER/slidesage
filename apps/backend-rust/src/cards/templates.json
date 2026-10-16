@@ -1,0 +1,1484 @@
+{
+	"ocean-proposal": {
+		"document": {
+			"schemaVersion": 3,
+			"title": "A better place to work",
+			"theme": "ocean",
+			"cardOrder": [
+				"c_ng3a5j81wh",
+				"c_13m0oqtj8ws",
+				"c_1rjq7jw97le",
+				"c_1xd8a3zgr7x",
+				"c_1jjdmvan2c8"
+			],
+			"cards": {
+				"c_ng3a5j81wh": {
+					"id": "c_ng3a5j81wh",
+					"takeaway": "Make room for focused work",
+					"role": "opening",
+					"layout": "cover",
+					"nodes": [
+						{
+							"id": "n_1uz7afj94qa",
+							"type": "image",
+							"assetId": "c3545bb15dae08598f306bffe69c1ecd1997d52d7c53552ef91b1bf06a7fd4b8",
+							"alt": "Sunlit office with shared desks and plants",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						},
+						{
+							"id": "n_1wr4hxer17v",
+							"type": "heading",
+							"text": [
+								{
+									"text": "A better place to work"
+								}
+							]
+						},
+						{
+							"id": "n_cf8qk3vy85",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "A workspace proposal for the next chapter of our team."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_13m0oqtj8ws": {
+					"id": "c_13m0oqtj8ws",
+					"takeaway": "Design the office around how people work",
+					"role": "context",
+					"layout": "image-right",
+					"nodes": [
+						{
+							"id": "n_2abvefp9htv",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Focus needs a place"
+								}
+							]
+						},
+						{
+							"id": "n_1o4vddapby0",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Our next workspace should support quiet thinking as well as collaboration. Start with the work, then choose the rooms."
+								}
+							]
+						},
+						{
+							"id": "n_25ymc6s3gn8",
+							"type": "image",
+							"assetId": "c3545bb15dae08598f306bffe69c1ecd1997d52d7c53552ef91b1bf06a7fd4b8",
+							"alt": "Shared office with distinct work areas",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1rjq7jw97le": {
+					"id": "c_1rjq7jw97le",
+					"takeaway": "Balance dedicated space with flexibility",
+					"role": "comparison",
+					"layout": "comparison",
+					"nodes": [
+						{
+							"id": "n_uilf7ie5xu",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Two ways to make room"
+								}
+							]
+						},
+						{
+							"id": "n_ugmsfmcbw",
+							"type": "columns",
+							"columns": [
+								{
+									"id": "i_2dih4oec9vc",
+									"heading": "Fixed desks",
+									"items": [
+										{
+											"id": "i_v68kqrdo6t",
+											"text": [
+												{
+													"text": "A predictable home for each person"
+												}
+											]
+										},
+										{
+											"id": "i_139e7r48213",
+											"text": [
+												{
+													"text": "Less room for changing team sizes"
+												}
+											]
+										}
+									]
+								},
+								{
+									"id": "i_1yum2vo320e",
+									"heading": "Shared neighborhoods",
+									"items": [
+										{
+											"id": "i_1wjta30ypae",
+											"text": [
+												{
+													"text": "Space follows project needs"
+												}
+											]
+										},
+										{
+											"id": "i_k4k1lcv65b",
+											"text": [
+												{
+													"text": "Needs clear booking and storage rules"
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1xd8a3zgr7x": {
+					"id": "c_1xd8a3zgr7x",
+					"takeaway": "Test the plan before signing a lease",
+					"role": "process",
+					"layout": "process",
+					"nodes": [
+						{
+							"id": "n_1lpxuw8upcs",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Try it before we commit"
+								}
+							]
+						},
+						{
+							"id": "n_269xyvhjr2m",
+							"type": "steps",
+							"items": [
+								{
+									"id": "i_15ci3udh6yv",
+									"title": "Observe",
+									"detail": [
+										{
+											"text": "Map a week of actual work."
+										}
+									]
+								},
+								{
+									"id": "i_2ew4abby39s",
+									"title": "Pilot",
+									"detail": [
+										{
+											"text": "Test quiet zones and shared desks."
+										}
+									]
+								},
+								{
+									"id": "i_yoolyc4gin",
+									"title": "Decide",
+									"detail": [
+										{
+											"text": "Compare usage, cost and feedback."
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1jjdmvan2c8": {
+					"id": "c_1jjdmvan2c8",
+					"takeaway": "Approve a four-week workspace pilot",
+					"role": "closing",
+					"layout": "title",
+					"nodes": [
+						{
+							"id": "n_1k09gcd9i0o",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Start with a four-week pilot"
+								}
+							]
+						},
+						{
+							"id": "n_21ktezzfd18",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Agree on an owner, a budget and the measures that will guide the final decision."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				}
+			}
+		},
+		"assets": {
+			"c3545bb15dae08598f306bffe69c1ecd1997d52d7c53552ef91b1bf06a7fd4b8": {
+				"mimeType": "image/jpeg",
+				"byteSize": 0,
+				"width": 1600,
+				"height": 1000,
+				"url": "https://images.unsplash.com/photo-1497366811353-6870744d04b2?fm=jpg&fit=crop&w=1600&h=1000&q=85",
+				"source": {
+					"type": "stock",
+					"provider": "unsplash",
+					"providerId": "photo-1497366811353-6870744d04b2",
+					"photographer": "Nastuh Abootalebi",
+					"photographerUrl": "https://unsplash.com/@nastuh?utm_source=slidesage&utm_medium=referral",
+					"license": "https://unsplash.com/license"
+				}
+			}
+		}
+	},
+	"grove-lesson": {
+		"document": {
+			"schemaVersion": 3,
+			"title": "How a forest works",
+			"theme": "grove",
+			"cardOrder": [
+				"c_1g9pb4z9y1s",
+				"c_1751bwbagk2",
+				"c_1q484e79ts3",
+				"c_28zy8811gxf",
+				"c_24c2sbh6niy"
+			],
+			"cards": {
+				"c_1g9pb4z9y1s": {
+					"id": "c_1g9pb4z9y1s",
+					"takeaway": "A forest is a connected system",
+					"role": "opening",
+					"layout": "cover",
+					"nodes": [
+						{
+							"id": "n_293nb3jdes8",
+							"type": "image",
+							"assetId": "7d9f4da214f38d9f00185020ee84d3485e41291230f8db2b0be53a0eedb139cd",
+							"alt": "Sunlight filtering through a green forest",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						},
+						{
+							"id": "n_2d6fn7vwlbv",
+							"type": "heading",
+							"text": [
+								{
+									"text": "How a forest works"
+								}
+							]
+						},
+						{
+							"id": "n_193lv6xbnot",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Look beyond individual trees to the systems that support them."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1751bwbagk2": {
+					"id": "c_1751bwbagk2",
+					"takeaway": "Life occupies every layer of the forest",
+					"role": "context",
+					"layout": "image-left",
+					"nodes": [
+						{
+							"id": "n_2563io9d2yr",
+							"type": "image",
+							"assetId": "7d9f4da214f38d9f00185020ee84d3485e41291230f8db2b0be53a0eedb139cd",
+							"alt": "Tall trees and a shaded forest floor",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						},
+						{
+							"id": "n_27jj6drsg0q",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Life at every level"
+								}
+							]
+						},
+						{
+							"id": "n_1fbmh2bsu0a",
+							"type": "bullets",
+							"items": [
+								{
+									"id": "i_21lo35kfmqe",
+									"text": [
+										{
+											"text": "The canopy captures sunlight."
+										}
+									]
+								},
+								{
+									"id": "i_1bljvtxelsd",
+									"text": [
+										{
+											"text": "The understory shelters young plants."
+										}
+									]
+								},
+								{
+									"id": "i_ul7pvkhf6g",
+									"text": [
+										{
+											"text": "The forest floor recycles organic matter."
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1q484e79ts3": {
+					"id": "c_1q484e79ts3",
+					"takeaway": "Trace the connections between organisms",
+					"role": "insight",
+					"layout": "bullets",
+					"nodes": [
+						{
+							"id": "n_1ddxksa6mev",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Follow the connections"
+								}
+							]
+						},
+						{
+							"id": "n_1iaf1yvae6p",
+							"type": "bullets",
+							"items": [
+								{
+									"id": "i_jnzgg3qmf",
+									"text": [
+										{
+											"text": "Which organisms depend on the same food source?"
+										}
+									]
+								},
+								{
+									"id": "i_1o0wh2zw5m",
+									"text": [
+										{
+											"text": "Where does water collect after rain?"
+										}
+									]
+								},
+								{
+									"id": "i_z18wbv987l",
+									"text": [
+										{
+											"text": "What changes when one large tree falls?"
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_28zy8811gxf": {
+					"id": "c_28zy8811gxf",
+					"takeaway": "Observe, record and compare a small patch",
+					"role": "process",
+					"layout": "process",
+					"nodes": [
+						{
+							"id": "n_27nm5pw9a58",
+							"type": "heading",
+							"text": [
+								{
+									"text": "A field activity"
+								}
+							]
+						},
+						{
+							"id": "n_1f2rrvun0e3",
+							"type": "steps",
+							"items": [
+								{
+									"id": "i_lwryq75a8g",
+									"title": "Choose",
+									"detail": [
+										{
+											"text": "Pick a small patch of woodland."
+										}
+									]
+								},
+								{
+									"id": "i_2csyq8p2265",
+									"title": "Record",
+									"detail": [
+										{
+											"text": "Sketch its layers and signs of life."
+										}
+									]
+								},
+								{
+									"id": "i_1blq3ck6adz",
+									"title": "Compare",
+									"detail": [
+										{
+											"text": "Discuss what differs in another patch."
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_24c2sbh6niy": {
+					"id": "c_24c2sbh6niy",
+					"takeaway": "Explain one connection you observed",
+					"role": "closing",
+					"layout": "title",
+					"nodes": [
+						{
+							"id": "n_7g4e4c4z7n",
+							"type": "heading",
+							"text": [
+								{
+									"text": "What depends on what?"
+								}
+							]
+						},
+						{
+							"id": "n_1aztvh3r415",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Share one relationship you observed and explain what might happen if it changed."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				}
+			}
+		},
+		"assets": {
+			"7d9f4da214f38d9f00185020ee84d3485e41291230f8db2b0be53a0eedb139cd": {
+				"mimeType": "image/jpeg",
+				"byteSize": 0,
+				"width": 1600,
+				"height": 1000,
+				"url": "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?fm=jpg&fit=crop&w=1600&h=1000&q=85",
+				"source": {
+					"type": "stock",
+					"provider": "unsplash",
+					"providerId": "photo-1441974231531-c6227db76b6e",
+					"photographer": "Sebastian Unrau",
+					"photographerUrl": "https://unsplash.com/@sebastian_unrau?utm_source=slidesage&utm_medium=referral",
+					"license": "https://unsplash.com/license"
+				}
+			}
+		}
+	},
+	"orchid-portfolio": {
+		"document": {
+			"schemaVersion": 3,
+			"title": "From brief to brand",
+			"theme": "orchid",
+			"cardOrder": [
+				"c_fnlrbquld1",
+				"c_2bx2zomtpac",
+				"c_1u45rqfse14",
+				"c_1s5g3aq28mx",
+				"c_26uw56z2ruf"
+			],
+			"cards": {
+				"c_fnlrbquld1": {
+					"id": "c_fnlrbquld1",
+					"takeaway": "Turn a scattered identity into a usable brand",
+					"role": "opening",
+					"layout": "cover",
+					"nodes": [
+						{
+							"id": "n_ltr00p5iqd",
+							"type": "image",
+							"assetId": "a9f55fe74dddfa672920e9086eb332bfae9a230ffc1a71d541cd4ebac86d91a7",
+							"alt": "Design team working together around a table",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						},
+						{
+							"id": "n_wmy4xgnwkj",
+							"type": "heading",
+							"text": [
+								{
+									"text": "From brief to brand"
+								}
+							]
+						},
+						{
+							"id": "n_nqxqqvuwa2",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "A design case study for a small team with a growing audience."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_2bx2zomtpac": {
+					"id": "c_2bx2zomtpac",
+					"takeaway": "The team needs one recognizable visual language",
+					"role": "context",
+					"layout": "image-right",
+					"nodes": [
+						{
+							"id": "n_1l89gkjgeh5",
+							"type": "heading",
+							"text": [
+								{
+									"text": "The brief"
+								}
+							]
+						},
+						{
+							"id": "n_1nff3co8je",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Bring the website, launch materials and everyday documents into one visual language. Keep the system simple enough for a small team to maintain."
+								}
+							]
+						},
+						{
+							"id": "n_1s0xtat071d",
+							"type": "image",
+							"assetId": "a9f55fe74dddfa672920e9086eb332bfae9a230ffc1a71d541cd4ebac86d91a7",
+							"alt": "Collaborators reviewing work at a shared table",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1u45rqfse14": {
+					"id": "c_1u45rqfse14",
+					"takeaway": "Replace disconnected choices with a repeatable system",
+					"role": "comparison",
+					"layout": "comparison",
+					"nodes": [
+						{
+							"id": "n_179smpyndqo",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Before and after"
+								}
+							]
+						},
+						{
+							"id": "n_ewhs936nru",
+							"type": "columns",
+							"columns": [
+								{
+									"id": "i_ady35b4ts5",
+									"heading": "Before",
+									"items": [
+										{
+											"id": "i_q8sj1h414m",
+											"text": [
+												{
+													"text": "Different type choices on each channel"
+												}
+											]
+										},
+										{
+											"id": "i_zldxcwamaz",
+											"text": [
+												{
+													"text": "Layouts rebuilt for every launch"
+												}
+											]
+										}
+									]
+								},
+								{
+									"id": "i_ac1qvtp8db",
+									"heading": "After",
+									"items": [
+										{
+											"id": "i_3aw92n6rlm",
+											"text": [
+												{
+													"text": "A shared type scale and image treatment"
+												}
+											]
+										},
+										{
+											"id": "i_3k83ndc1ii",
+											"text": [
+												{
+													"text": "Reusable layouts with clear rules"
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1s5g3aq28mx": {
+					"id": "c_1s5g3aq28mx",
+					"takeaway": "Move from research to a usable toolkit",
+					"role": "process",
+					"layout": "process",
+					"nodes": [
+						{
+							"id": "n_jbzod6qcar",
+							"type": "heading",
+							"text": [
+								{
+									"text": "How we got there"
+								}
+							]
+						},
+						{
+							"id": "n_qqsvznpsvr",
+							"type": "steps",
+							"items": [
+								{
+									"id": "i_1cup0h6s1qq",
+									"title": "Listen",
+									"detail": [
+										{
+											"text": "Audit the work and interview the team."
+										}
+									]
+								},
+								{
+									"id": "i_n1x8szfijh",
+									"title": "Explore",
+									"detail": [
+										{
+											"text": "Test two directions with real content."
+										}
+									]
+								},
+								{
+									"id": "i_a4w666fp8m",
+									"title": "Deliver",
+									"detail": [
+										{
+											"text": "Package templates and usage examples."
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_26uw56z2ruf": {
+					"id": "c_26uw56z2ruf",
+					"takeaway": "A brand system should be easy to use",
+					"role": "closing",
+					"layout": "title",
+					"nodes": [
+						{
+							"id": "n_1rz3qp58y5v",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Make the next project easier"
+								}
+							]
+						},
+						{
+							"id": "n_s7gsizutjx",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Show the final work here, then explain how the team uses the toolkit without a designer in every meeting."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				}
+			}
+		},
+		"assets": {
+			"a9f55fe74dddfa672920e9086eb332bfae9a230ffc1a71d541cd4ebac86d91a7": {
+				"mimeType": "image/jpeg",
+				"byteSize": 0,
+				"width": 1600,
+				"height": 1000,
+				"url": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?fm=jpg&fit=crop&w=1600&h=1000&q=85",
+				"source": {
+					"type": "stock",
+					"provider": "unsplash",
+					"providerId": "photo-1519389950473-47ba0277781c",
+					"photographer": "Marvin Meyer",
+					"photographerUrl": "https://unsplash.com/@marvelous?utm_source=slidesage&utm_medium=referral",
+					"license": "https://unsplash.com/license"
+				}
+			}
+		}
+	},
+	"sand-workshop": {
+		"document": {
+			"schemaVersion": 3,
+			"title": "A workshop that leads to action",
+			"theme": "sand",
+			"cardOrder": [
+				"c_2by2j4ubut",
+				"c_1fd8j710gw7",
+				"c_17y746h3yxu",
+				"c_tg6ox2djlk",
+				"c_1ouwb8b4sac"
+			],
+			"cards": {
+				"c_2by2j4ubut": {
+					"id": "c_2by2j4ubut",
+					"takeaway": "Leave the workshop with a decision",
+					"role": "opening",
+					"layout": "cover",
+					"nodes": [
+						{
+							"id": "n_123qjpysv0s",
+							"type": "image",
+							"assetId": "c3545bb15dae08598f306bffe69c1ecd1997d52d7c53552ef91b1bf06a7fd4b8",
+							"alt": "Open workspace ready for a team session",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						},
+						{
+							"id": "n_ris7k1q6dn",
+							"type": "heading",
+							"text": [
+								{
+									"text": "A workshop that leads to action"
+								}
+							]
+						},
+						{
+							"id": "n_6lafoqjqz5",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "A practical session for choosing what the team should do next."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1fd8j710gw7": {
+					"id": "c_1fd8j710gw7",
+					"takeaway": "Set a shared goal before discussing solutions",
+					"role": "context",
+					"layout": "bullets",
+					"nodes": [
+						{
+							"id": "n_1h1b46ab5o8",
+							"type": "heading",
+							"text": [
+								{
+									"text": "What we need from today"
+								}
+							]
+						},
+						{
+							"id": "n_uecma9mnv7",
+							"type": "bullets",
+							"items": [
+								{
+									"id": "i_1j8wy9lihba",
+									"text": [
+										{
+											"text": "Agree on the problem we are solving."
+										}
+									]
+								},
+								{
+									"id": "i_29gbaj4h4ie",
+									"text": [
+										{
+											"text": "Choose one change we can test."
+										}
+									]
+								},
+								{
+									"id": "i_eykvr00uby",
+									"text": [
+										{
+											"text": "Name an owner and a review date."
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_17y746h3yxu": {
+					"id": "c_17y746h3yxu",
+					"takeaway": "Specific questions produce useful discussions",
+					"role": "insight",
+					"layout": "quote",
+					"nodes": [
+						{
+							"id": "n_23mr37t6g0f",
+							"type": "quote",
+							"text": [
+								{
+									"text": "What is one thing we could change this week that would make next week easier?"
+								}
+							],
+							"attribution": "Discussion prompt"
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_tg6ox2djlk": {
+					"id": "c_tg6ox2djlk",
+					"takeaway": "Give everyone time to think before deciding",
+					"role": "process",
+					"layout": "process",
+					"nodes": [
+						{
+							"id": "n_6p1g3rwo81",
+							"type": "heading",
+							"text": [
+								{
+									"text": "The session plan"
+								}
+							]
+						},
+						{
+							"id": "n_1d7swl4hh5x",
+							"type": "steps",
+							"items": [
+								{
+									"id": "i_4kn3u3mr38",
+									"title": "Think",
+									"detail": [
+										{
+											"text": "Write ideas silently for five minutes."
+										}
+									]
+								},
+								{
+									"id": "i_1og03ivr6az",
+									"title": "Discuss",
+									"detail": [
+										{
+											"text": "Group ideas and examine the tradeoffs."
+										}
+									]
+								},
+								{
+									"id": "i_vi8m17tzbg",
+									"title": "Choose",
+									"detail": [
+										{
+											"text": "Select one experiment and its owner."
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1ouwb8b4sac": {
+					"id": "c_1ouwb8b4sac",
+					"takeaway": "Record the action, owner and review date",
+					"role": "closing",
+					"layout": "title",
+					"nodes": [
+						{
+							"id": "n_l2cq8nvmz9",
+							"type": "heading",
+							"text": [
+								{
+									"text": "One action, one owner"
+								}
+							]
+						},
+						{
+							"id": "n_1viyrmzfbry",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Write the commitment here. Include when the team will review the result and what evidence it needs."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				}
+			}
+		},
+		"assets": {
+			"c3545bb15dae08598f306bffe69c1ecd1997d52d7c53552ef91b1bf06a7fd4b8": {
+				"mimeType": "image/jpeg",
+				"byteSize": 0,
+				"width": 1600,
+				"height": 1000,
+				"url": "https://images.unsplash.com/photo-1497366811353-6870744d04b2?fm=jpg&fit=crop&w=1600&h=1000&q=85",
+				"source": {
+					"type": "stock",
+					"provider": "unsplash",
+					"providerId": "photo-1497366811353-6870744d04b2",
+					"photographer": "Nastuh Abootalebi",
+					"photographerUrl": "https://unsplash.com/@nastuh?utm_source=slidesage&utm_medium=referral",
+					"license": "https://unsplash.com/license"
+				}
+			}
+		}
+	},
+	"cobalt-launch": {
+		"document": {
+			"schemaVersion": 3,
+			"title": "Meet the next release",
+			"theme": "cobalt",
+			"cardOrder": [
+				"c_156exg3ipe6",
+				"c_1mn22nme9zg",
+				"c_q3p2siyti7",
+				"c_jhh1mg5mog",
+				"c_2483fggqo23"
+			],
+			"cards": {
+				"c_156exg3ipe6": {
+					"id": "c_156exg3ipe6",
+					"takeaway": "Help teams move from requests to decisions",
+					"role": "opening",
+					"layout": "cover",
+					"nodes": [
+						{
+							"id": "n_29mq8ftq6z6",
+							"type": "image",
+							"assetId": "a9f55fe74dddfa672920e9086eb332bfae9a230ffc1a71d541cd4ebac86d91a7",
+							"alt": "Product team working on laptops",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						},
+						{
+							"id": "n_z0h4euxzyz",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Meet the next release"
+								}
+							]
+						},
+						{
+							"id": "n_2cshu66mjch",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Less chasing updates. More time to make the call."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1mn22nme9zg": {
+					"id": "c_1mn22nme9zg",
+					"takeaway": "Keep a request and its decision in one place",
+					"role": "context",
+					"layout": "image-left",
+					"nodes": [
+						{
+							"id": "n_2e8qqgjb3x3",
+							"type": "image",
+							"assetId": "a9f55fe74dddfa672920e9086eb332bfae9a230ffc1a71d541cd4ebac86d91a7",
+							"alt": "Team collaborating on a product launch",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						},
+						{
+							"id": "n_183icovom2w",
+							"type": "heading",
+							"text": [
+								{
+									"text": "A clearer path to a decision"
+								}
+							]
+						},
+						{
+							"id": "n_1smm58myq1w",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Give every request an owner, a visible status and the context needed to decide. The next release puts those details together."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_q3p2siyti7": {
+					"id": "c_q3p2siyti7",
+					"takeaway": "Measure the pilot against explicit targets",
+					"role": "evidence",
+					"layout": "stats",
+					"nodes": [
+						{
+							"id": "n_274qyrkh52e",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Pilot targets"
+								}
+							]
+						},
+						{
+							"id": "n_1lwjw4yyru0",
+							"type": "stat",
+							"value": "20%",
+							"label": "Target reduction in follow-up messages"
+						},
+						{
+							"id": "n_13m2pwwbt78",
+							"type": "stat",
+							"value": "2 weeks",
+							"label": "Planned pilot duration"
+						},
+						{
+							"id": "n_26g5dgj9w5g",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Illustrative targets, not measured results. Replace these with your own baseline and goals."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_jhh1mg5mog": {
+					"id": "c_jhh1mg5mog",
+					"takeaway": "Expand only after the pilot meets its goals",
+					"role": "process",
+					"layout": "process",
+					"nodes": [
+						{
+							"id": "n_77rbuo5e42",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Roll out with evidence"
+								}
+							]
+						},
+						{
+							"id": "n_15e2uirajd0",
+							"type": "steps",
+							"items": [
+								{
+									"id": "i_1o08md1oix5",
+									"title": "Invite",
+									"detail": [
+										{
+											"text": "Start with one team and a baseline."
+										}
+									]
+								},
+								{
+									"id": "i_276kbbkyl6w",
+									"title": "Learn",
+									"detail": [
+										{
+											"text": "Track friction and review usage."
+										}
+									]
+								},
+								{
+									"id": "i_2041n53ykpv",
+									"title": "Expand",
+									"detail": [
+										{
+											"text": "Roll out after the pilot review."
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_2483fggqo23": {
+					"id": "c_2483fggqo23",
+					"takeaway": "Choose a team for the pilot",
+					"role": "closing",
+					"layout": "title",
+					"nodes": [
+						{
+							"id": "n_i108x99d94",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Who should try it first?"
+								}
+							]
+						},
+						{
+							"id": "n_g5vjdqyzd0",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Name the pilot team and the person who will collect feedback. Set a date for the first review."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				}
+			}
+		},
+		"assets": {
+			"a9f55fe74dddfa672920e9086eb332bfae9a230ffc1a71d541cd4ebac86d91a7": {
+				"mimeType": "image/jpeg",
+				"byteSize": 0,
+				"width": 1600,
+				"height": 1000,
+				"url": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?fm=jpg&fit=crop&w=1600&h=1000&q=85",
+				"source": {
+					"type": "stock",
+					"provider": "unsplash",
+					"providerId": "photo-1519389950473-47ba0277781c",
+					"photographer": "Marvin Meyer",
+					"photographerUrl": "https://unsplash.com/@marvelous?utm_source=slidesage&utm_medium=referral",
+					"license": "https://unsplash.com/license"
+				}
+			}
+		}
+	},
+	"mono-briefing": {
+		"document": {
+			"schemaVersion": 3,
+			"title": "A system we can trust",
+			"theme": "mono",
+			"cardOrder": [
+				"c_2760qyvopkw",
+				"c_1cc8ug51nj7",
+				"c_8uz5vtclel",
+				"c_t4i06ocw7g",
+				"c_1b9b1fyozyg"
+			],
+			"cards": {
+				"c_2760qyvopkw": {
+					"id": "c_2760qyvopkw",
+					"takeaway": "Make reliability a property of the system",
+					"role": "opening",
+					"layout": "title",
+					"nodes": [
+						{
+							"id": "n_1nj5fvpqlvh",
+							"type": "heading",
+							"text": [
+								{
+									"text": "A system we can trust"
+								}
+							]
+						},
+						{
+							"id": "n_hjpaien087",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "A technical briefing on making background jobs observable and safe to retry."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1cc8ug51nj7": {
+					"id": "c_1cc8ug51nj7",
+					"takeaway": "A retry must not repeat a completed side effect",
+					"role": "context",
+					"layout": "image-right",
+					"nodes": [
+						{
+							"id": "n_26a7vdupn07",
+							"type": "heading",
+							"text": [
+								{
+									"text": "The failure we need to handle"
+								}
+							]
+						},
+						{
+							"id": "n_b1xwofbart",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "A worker can finish a job and lose its connection before acknowledging it. A retry should find the completed result rather than apply the same change again."
+								}
+							]
+						},
+						{
+							"id": "n_pp3nl6ate7",
+							"type": "image",
+							"assetId": "a9f55fe74dddfa672920e9086eb332bfae9a230ffc1a71d541cd4ebac86d91a7",
+							"alt": "Engineers reviewing work together",
+							"fit": "cover",
+							"focus": {
+								"x": 0.5,
+								"y": 0.5
+							}
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_8uz5vtclel": {
+					"id": "c_8uz5vtclel",
+					"takeaway": "Choose the consistency model deliberately",
+					"role": "comparison",
+					"layout": "comparison",
+					"nodes": [
+						{
+							"id": "n_1lo4m68gmvl",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Two approaches to retries"
+								}
+							]
+						},
+						{
+							"id": "n_1j8rp2667d0",
+							"type": "columns",
+							"columns": [
+								{
+									"id": "i_kfn95ngc9l",
+									"heading": "Best effort",
+									"items": [
+										{
+											"id": "i_1w0q9mcgzt8",
+											"text": [
+												{
+													"text": "Simple workers and low coordination"
+												}
+											]
+										},
+										{
+											"id": "i_22h2rmhxgwn",
+											"text": [
+												{
+													"text": "Duplicate effects require cleanup"
+												}
+											]
+										}
+									]
+								},
+								{
+									"id": "i_1f65255o137",
+									"heading": "Idempotent jobs",
+									"items": [
+										{
+											"id": "i_2b2ehu96tyw",
+											"text": [
+												{
+													"text": "Stable keys identify completed work"
+												}
+											]
+										},
+										{
+											"id": "i_w5pd9spwzo",
+											"text": [
+												{
+													"text": "State transitions need explicit rules"
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_t4i06ocw7g": {
+					"id": "c_t4i06ocw7g",
+					"takeaway": "Migrate in steps that can be measured",
+					"role": "process",
+					"layout": "process",
+					"nodes": [
+						{
+							"id": "n_tcictgwsws",
+							"type": "heading",
+							"text": [
+								{
+									"text": "A measured migration"
+								}
+							]
+						},
+						{
+							"id": "n_wl82x5n4wp",
+							"type": "steps",
+							"items": [
+								{
+									"id": "i_2c5i1xjzs4z",
+									"title": "Instrument",
+									"detail": [
+										{
+											"text": "Record attempts, results and latency."
+										}
+									]
+								},
+								{
+									"id": "i_1mktvnk604r",
+									"title": "Protect",
+									"detail": [
+										{
+											"text": "Add stable keys to side effects."
+										}
+									]
+								},
+								{
+									"id": "i_248ev9zu0de",
+									"title": "Verify",
+									"detail": [
+										{
+											"text": "Test recovery before wider rollout."
+										}
+									]
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				},
+				"c_1b9b1fyozyg": {
+					"id": "c_1b9b1fyozyg",
+					"takeaway": "Review the design with a real failure scenario",
+					"role": "closing",
+					"layout": "title",
+					"nodes": [
+						{
+							"id": "n_278n9efj9vh",
+							"type": "heading",
+							"text": [
+								{
+									"text": "Walk through the failure"
+								}
+							]
+						},
+						{
+							"id": "n_2dkvbb621qv",
+							"type": "paragraph",
+							"text": [
+								{
+									"text": "Pick one job. Show what happens if the worker stops before, during and after its side effect."
+								}
+							]
+						}
+					],
+					"sourceIds": [],
+					"notes": "Starter content is illustrative. Replace claims and figures with your own evidence before presenting."
+				}
+			}
+		},
+		"assets": {
+			"a9f55fe74dddfa672920e9086eb332bfae9a230ffc1a71d541cd4ebac86d91a7": {
+				"mimeType": "image/jpeg",
+				"byteSize": 0,
+				"width": 1600,
+				"height": 1000,
+				"url": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?fm=jpg&fit=crop&w=1600&h=1000&q=85",
+				"source": {
+					"type": "stock",
+					"provider": "unsplash",
+					"providerId": "photo-1519389950473-47ba0277781c",
+					"photographer": "Marvin Meyer",
+					"photographerUrl": "https://unsplash.com/@marvelous?utm_source=slidesage&utm_medium=referral",
+					"license": "https://unsplash.com/license"
+				}
+			}
+		}
+	}
+}

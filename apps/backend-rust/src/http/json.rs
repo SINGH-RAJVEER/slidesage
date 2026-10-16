@@ -65,7 +65,7 @@ fn go_utf8(mut input: &[u8]) -> std::borrow::Cow<'_, str> {
 	output.into()
 }
 
-fn replace_lone_surrogates(text: &str) -> String {
+pub(crate) fn replace_lone_surrogates(text: &str) -> String {
 	let bytes = text.as_bytes();
 	let mut output = Vec::with_capacity(bytes.len());
 	let mut inside = false;

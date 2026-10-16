@@ -1,5 +1,8 @@
 //! Static drafting metadata. Document validation and card conversion are pending.
 
+mod templates;
+pub use templates::template_deck;
+
 use serde_json::Value;
 use std::sync::LazyLock;
 
