@@ -6,12 +6,13 @@ use axum::{
 };
 use serde_json::json;
 
-pub const CARD_SCHEMA_VERSION: u8 = 3;
+pub use crate::cards::SCHEMA_VERSION as CARD_SCHEMA_VERSION;
 
-/// Only health is implemented. Conversion and PPTX writing are pending.
+/// Health and schema metadata are implemented. Conversion and PPTX writing are pending.
 pub fn router() -> Router {
 	Router::new()
 		.route("/health", any(health))
+		.route("/v1/schema", any(schema))
 		.fallback(not_found)
 }
 
@@ -23,6 +24,13 @@ async fn health(method: Method) -> Response {
 		StatusCode::OK,
 		json!({"status": "ok", "schemaVersion": CARD_SCHEMA_VERSION}),
 	)
+}
+
+async fn schema(method: Method) -> Response {
+	if method != Method::GET {
+		return not_found().await;
+	}
+	json_response(StatusCode::OK, crate::cards::drafting_schema())
 }
 
 async fn not_found() -> Response {

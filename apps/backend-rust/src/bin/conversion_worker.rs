@@ -5,7 +5,7 @@ async fn main() -> std::io::Result<()> {
 		.parse::<u16>()
 		.map_err(std::io::Error::other)?;
 	eprintln!(
-		"development port: converter health only; conversion/export are not implemented"
+		"development port: converter health and schema; conversion/export are not implemented"
 	);
 	slidesage_backend::serve(slidesage_backend::conversion::router(), &host, port).await
 }

@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod billing;
+pub mod cards;
 pub mod conversion;
 pub mod feedback;
 pub mod http;

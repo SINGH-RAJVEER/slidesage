@@ -1,6 +1,24 @@
 import { describe, expect, it } from "bun:test";
-import { CARD_TEMPLATES, THEMES } from "@slidesage/cards";
-import { handle, SCHEMA_VERSION_HEADER } from "./handler";
+import { CARD_TEMPLATES, draftingSchema, THEMES } from "@slidesage/cards";
+import { handle as referenceHandle, SCHEMA_VERSION_HEADER } from "./handler";
+
+// One transport switch for every case. Unported routes fail when targeting Rust.
+function handle(request: Request): Promise<Response> {
+	const target = process.env["CONVERTER_UNDER_TEST_URL"];
+	if (!target) return referenceHandle(request);
+	const base = new URL(target);
+	if (base.protocol !== "http:" && base.protocol !== "https:") {
+		throw new Error("CONVERTER_UNDER_TEST_URL must be an HTTP test worker");
+	}
+	const url = new URL(request.url);
+	return fetch(new URL(url.pathname + url.search, base), {
+		method: request.method,
+		headers: request.headers,
+		body: request.body,
+		redirect: "manual",
+		signal: AbortSignal.timeout(5000),
+	});
+}
 
 function post(path: string, body: unknown, version = "3") {
 	return handle(
@@ -55,14 +73,37 @@ describe("converter", () => {
 	});
 	it("reports health with its schema version", async () => {
 		const response = await handle(new Request("http://converter/health"));
+		expect(response.headers.get("Content-Type")).toBe("application/json;charset=utf-8");
 		expect(await response.json()).toEqual({ status: "ok", schemaVersion: 3 });
 	});
 
 	it("serves the drafting schema its caller builds prompts from", async () => {
 		const response = await handle(new Request("http://converter/v1/schema"));
 		const body = (await response.json()) as { schemaVersion: number; layouts: object };
+		expect(response.status).toBe(200);
+		expect(response.headers.get("Content-Type")).toBe("application/json;charset=utf-8");
 		expect(body.schemaVersion).toBe(3);
 		expect(Object.keys(body.layouts)).toContain("comparison");
+		expect(body).toEqual(draftingSchema());
+	});
+
+	it("preserves schema routing and version-header behavior", async () => {
+		for (const version of [undefined, "1", "3"]) {
+			const response = await handle(
+				new Request("http://converter/v1/schema?source=prompt", {
+					headers: version ? { [SCHEMA_VERSION_HEADER]: version } : {},
+				}),
+			);
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual(draftingSchema());
+		}
+		for (const method of ["HEAD", "POST", "PUT", "DELETE", "OPTIONS"]) {
+			const response = await handle(new Request("http://converter/v1/schema", { method }));
+			expect(response.status).toBe(404);
+			if (method !== "HEAD") expect(await response.json()).toEqual({ error: "not found" });
+		}
+		const response = await handle(new Request("http://converter/v1/schema/"));
+		expect(response.status).toBe(404);
 	});
 
 	it("refuses a caller built against another schema version", async () => {
