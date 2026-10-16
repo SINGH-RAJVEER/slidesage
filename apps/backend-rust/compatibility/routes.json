@@ -92,7 +92,13 @@
 			"method": "POST",
 			"path": "/auth/sign-in/email",
 			"source": "apps/api/internal/auth/http.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Go/Rust password credentials, NFKC normalization, unverified accounts and legacy/passwordless cases",
+				"Go-compatible JSON parsing, duplicates, nulls and body limits",
+				"JWT claims and remembered/session cookies under normal and secure-cookie configurations",
+				"Persisted IP/email rate counters, trusted proxy precedence and fixed-window limits"
+			]
 		},
 		{
 			"method": "POST",
@@ -306,11 +312,11 @@
 				"Original Go routes with existing cache fixture compared to live Rust on disposable PostgreSQL",
 				"Pagination bounds, URL query decoding, repeated/invalid query pairs, empty pages and stable ordering",
 				"Legacy summary partial/case-folded decoding, research flags and user isolation",
-				"Committed writes, rollback, ownership transfer and unchanged database cache triggers"
+				"Committed writes, rollback, ownership transfer and unchanged database cache triggers",
+				"Native Valkey hits skip presentation/count queries; Go and Rust exchange cached entries",
+				"30-second TTL, corrupt entries, late fills, account deletion, size limits and outage fallback"
 			],
-			"pending_cases": [
-				"Optional Valkey caching, query counts and late cache fills"
-			]
+			"pending_cases": ["Cache telemetry"]
 		},
 		{
 			"method": "GET",
@@ -408,7 +414,13 @@
 			"method": "POST",
 			"path": "/v1/templates",
 			"source": "apps/converter/src/handler.ts",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"All six curated documents and asset maps match the current TypeScript catalog in full",
+				"Template lookup, typing, whitespace, duplicate JSON fields and ignored client URLs",
+				"Schema negotiation precedes parsing; malformed JSON and UTF-16 body limits match Bun",
+				"Unsupported methods, route matching and exact JSON charset"
+			]
 		},
 		{
 			"method": "POST",

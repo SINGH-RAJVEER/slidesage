@@ -33,7 +33,17 @@ just dev
 
 ## Rust port development
 
-The work-in-progress package is `apps/backend-rust`. It provides API health/CORS, password/JWT helpers, converter health/schema and SQLx-backed session/profile reads, sign-out, feedback, billing balance and presentation list/detail/delete. Most application endpoints, generation and PPTX export remain pending. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
+The work-in-progress package is `apps/backend-rust`. It provides API health/CORS, password sign-in, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete with optional Valkey caching, and converter health/schema/templates. Most application endpoints, generation and PPTX export remain pending. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
+
+Run the implemented compatibility subset with one command:
+
+```bash
+bun apps/backend-rust/compatibility/run.ts
+```
+
+The runner requires Bun, Go, Cargo, SQLx CLI 0.9, PostgreSQL tools with pgvector, and `valkey-server`/`valkey-cli` on PATH. It creates private UTF-8 PostgreSQL and Valkey instances on temporary loopback ports, applies the unchanged Goose/River migrations, runs native Rust tests and Go comparisons against live Rust, then checks the Bun converter reference and implemented Rust handlers. Both normal and secure-cookie configurations run. It supplies synthetic credentials and its own database URL, independently of your application database. Owned services stop on success, failure or interruption; logs and `results.json` remain under the printed temporary directory.
+
+A passing subset keeps `release_ready: false`. Add `--converter-full` to include the required, still-unported converter handler cases and expose their failures. This runner does not yet cover the complete API, generation or PPTX export contract.
 
 Run from the repository root inside `devenv shell`:
 
@@ -42,7 +52,7 @@ cargo test --manifest-path apps/backend-rust/Cargo.toml --locked --all-targets
 cargo run --manifest-path apps/backend-rust/Cargo.toml --bin api
 ```
 
-The standalone API defaults to `127.0.0.1:8001`; `HOST` and `PORT` override it. In another terminal, run `cargo run --manifest-path apps/backend-rust/Cargo.toml --bin conversion_worker` for converter health and schema on `127.0.0.1:8091`. It accepts `CARD_CONVERTER_HOST` and `CARD_CONVERTER_PORT` overrides. Both stop on SIGINT/SIGTERM.
+The standalone API defaults to `127.0.0.1:8001`; `HOST` and `PORT` override it. In another terminal, run `cargo run --manifest-path apps/backend-rust/Cargo.toml --bin conversion_worker` for converter health, schema and template lookup on `127.0.0.1:8091`. It accepts `CARD_CONVERTER_HOST` and `CARD_CONVERTER_PORT` overrides. Both stop on SIGINT/SIGTERM.
 
 Set `DATABASE_URL` to a database migrated with the existing Go runner to enable the implemented application routes. Without it, the standalone server exposes health only. `AUTH_SECRET` signs/verifies tokens; `BASE_URL` selects the existing normal or HTTPS cookie name and sign-out policy, and `RATE_LIMIT_HASH_SECRET` defaults to `AUTH_SECRET`. HTTPS rejects short/placeholder auth secrets; production requires an explicit rate-limit hash secret. The current SQLx pool is limited to five connections.
 
@@ -63,17 +73,23 @@ The original Go feedback tests can target the Rust server using `API_UNDER_TEST_
 
 For billing balance, set `API_UNDER_TEST_URL`, `TEST_DATABASE_URL` and `TEST_AUTH_SECRET`, then run `go -C apps/api test -count=1 -tags rustcompat -run '^TestBillingBalanceMatchesRust$' ./internal/integrations/billing`. It creates/removes its own fixture users and applies identical requests and assertions to the original Go handler and Rust server. `TEST_COOKIE_NAME` defaults to `slidesage_token`; use `__Secure-slidesage_token` for a server configured with an HTTPS `BASE_URL`. The balance query uses the existing schema; it does not call Razorpay or modify balances.
 
-With the same environment, run `go -C apps/api test -count=1 -tags rustcompat -run '^TestPresentationRoutesMatchRust$' ./internal/presentation` for presentation list/detail/delete comparisons. The suite creates and removes its own users, presentations, operations, assets and share fixtures. It compares original Go routes with live Rust, including active-generation guards, failed-deletion rollback and cleanup/cache triggers. The original Go cache fixture is enabled on the reference server; Rust currently reads PostgreSQL on every list request. The explicit Rust error suite also checks authentication/validation before closed-database failures. Valkey cache query-count and late-fill behavior remain pending for Rust.
+With the same environment, run `go -C apps/api test -count=1 -tags rustcompat -run '^TestPresentationRoutesMatchRust$' ./internal/presentation` for presentation list/detail/delete comparisons. The suite creates and removes its own users, presentations, operations, assets and share fixtures. It compares original Go routes with live Rust, including active-generation guards, failed-deletion rollback and cleanup/cache triggers. The explicit Rust error suite also checks authentication/validation before closed-database failures.
 
-For session/profile reads and sign-out, keep `API_UNDER_TEST_URL`, `TEST_DATABASE_URL` and `TEST_AUTH_SECRET` set, then run `go -C apps/api test -count=1 -tags rustcompat -run '^TestAuthReadRoutesMatchRust$' ./internal/auth`. The suite creates/removes its own user/credential fixtures and compares 20 cases with the original Go routes. Run it again with `TEST_SECURE_COOKIES=true` against a test API configured with `BASE_URL=https://slidesage.app` to check `__Secure-slidesage_token`, Secure and SameSite=None. This tests HTTPS cookie configuration; the local test transport can still use HTTP. Only `session.expiresAt` is normalized, after verifying it falls within the request's lookup-time + seven-day window.
+Set `CACHE_VALKEY_ADDR` on the Rust API and `TEST_VALKEY_ADDR` on tests to the same disposable no-auth Valkey, then run `TestRustPresentationListSharesGoCache` in that Go package. It fills entries in both directions, blocks presentation-table reads to prove cache hits, checks corruption recovery and verifies the 30-second TTL. Native Rust tests also cover committed invalidation, rollback, ownership changes, account deletion, late fills, size limits, expiry and outages. PostgreSQL still supplies the current cache generation on every list request. See [cache details](DATABASE_CACHE.md#isolated-rust-port).
 
-The converter handler suite targets Bun by default. Set `CONVERTER_UNDER_TEST_URL` to send every request to a running Rust worker, preserving the existing assertions. The focused command below checks the implemented health/schema subset; ten other handler cases remain required and currently fail against Rust. Running without `-t` exposes those failures. PPTX writer tests still exercise Bun directly and need their own adapter.
+For session/profile reads and sign-out, keep `API_UNDER_TEST_URL`, `TEST_DATABASE_URL` and `TEST_AUTH_SECRET` set, then run `go -C apps/api test -count=1 -tags rustcompat -run '^TestAuthReadRoutesMatchRust$' ./internal/auth`. The suite creates/removes its own user/credential fixtures and compares 25 cases with the original Go routes. Run it again with `TEST_SECURE_COOKIES=true` against a test API configured with `BASE_URL=https://slidesage.app` to check `__Secure-slidesage_token`, Secure and SameSite=None. This tests HTTPS cookie configuration; the local test transport can still use HTTP. Only `session.expiresAt` is normalized, after verifying it falls within the request's lookup-time + seven-day window.
+
+For password sign-in, run `go -C apps/api test -count=1 -tags rustcompat -run '^TestPasswordSignInMatchesRust$' ./internal/auth` with the same database/auth variables. Set `TRUST_PROXY_HEADERS=true` on both the test process and test API for the synthetic proxy/rate-limit cases. Set `TEST_RATE_LIMIT_HASH_SECRET` if the server uses a separate rate secret. Cases compare credentials, JSON parsing, normalization, JWT claims, cookie policy and persisted IP/email counters. Repeat against the secure-cookie API as above. Password checks use a bounded blocking pool; no verification mail is sent by this endpoint in the reference implementation.
+
+The converter handler suite targets Bun by default. Set `CONVERTER_UNDER_TEST_URL` to send every request to a running Rust worker, preserving the existing assertions. The focused command below checks health/schema/templates; eight other handler cases remain required and currently fail against Rust. Running without `-t` exposes those failures. PPTX writer tests still exercise Bun directly and need their own adapter.
 
 ```bash
-CONVERTER_UNDER_TEST_URL=http://127.0.0.1:8091 bun test --isolate apps/converter/src/handler.test.ts -t 'reports health|serves the drafting schema|preserves schema routing'
+CONVERTER_UNDER_TEST_URL=http://127.0.0.1:8091 bun test --isolate apps/converter/src/handler.test.ts -t 'reports health|serves the drafting schema|preserves schema routing|schema version|template'
 ```
 
 The Rust drafting descriptor is embedded at `apps/backend-rust/src/cards/drafting-schema.json`. Keep it aligned with `libs/cards/src/draft-format.ts`, `layouts.ts` and `schema.ts`; the schema test compares the full response with the current TypeScript function, so stale metadata fails. This is drafting metadata, not a document validator.
+
+Curated template documents/assets are embedded in `apps/backend-rust/src/cards/templates.json`. Regenerate them with `bun apps/backend-rust/scripts/templates.ts` after changing the TypeScript catalog. Handler tests compare all six responses with the current catalog; the Rust worker needs no Bun process or runtime catalog files.
 
 The original Go CORS tests can target the running Rust API. Configure matching origins on that server, then run:
 
@@ -88,7 +104,7 @@ cargo build --manifest-path apps/backend-rust/Cargo.toml --locked --example auth
 RUST_AUTH_COMPAT_BIN="$PWD/apps/backend-rust/target/debug/examples/auth_compat" go -C apps/api test -count=1 -tags rustcompat -run '^TestRustPasswordAndJWTCompatibility$' ./internal/auth
 ```
 
-The build-tagged auth check fails if its example executable is unavailable; ordinary Go tests do not include it. Format with `cargo fmt --manifest-path apps/backend-rust/Cargo.toml`, and check with `cargo clippy --manifest-path apps/backend-rust/Cargo.toml --locked --all-targets -- -D warnings`. The [port plan](RUST_BACKEND_PORT.md) distinguishes implemented helpers from application endpoint compatibility.
+The build-tagged auth check fails if its example executable is unavailable; ordinary Go tests do not include it. Format with `cargo fmt --manifest-path apps/backend-rust/Cargo.toml`, and check with `cargo clippy --manifest-path apps/backend-rust/Cargo.toml --locked --all-targets --all-features -- -D warnings`. The [port plan](RUST_BACKEND_PORT.md) distinguishes implemented helpers from application endpoint compatibility.
 
 ## Go hot reload
 
