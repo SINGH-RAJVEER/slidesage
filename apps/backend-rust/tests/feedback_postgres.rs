@@ -32,6 +32,7 @@ async fn feedback_preserves_validation_authentication_and_postgres_effects() {
 	let app = router_with_database(
 		Security::new("https://slidesage.app"),
 		ApiState {
+			cache: None,
 			database: database.clone(),
 			auth: RequestAuth::new(secret, "slidesage_token"),
 			rate_limit_secret: String::from_utf8(secret.to_vec()).unwrap(),

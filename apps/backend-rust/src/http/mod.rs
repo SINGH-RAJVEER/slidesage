@@ -12,6 +12,7 @@ pub struct ApiState {
 	pub database: sqlx::PgPool,
 	pub auth: crate::auth::request::RequestAuth,
 	pub rate_limit_secret: String,
+	pub cache: Option<std::sync::Arc<dyn crate::cache::Store>>,
 }
 
 /// Development-only partial router. Other application routes have not been ported.

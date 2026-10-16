@@ -38,6 +38,7 @@ async fn main() -> std::io::Result<()> {
 				.map_err(std::io::Error::other)?;
 			let state = slidesage_backend::http::ApiState {
 				database,
+				cache: slidesage_backend::cache::from_env().map_err(std::io::Error::other)?,
 				rate_limit_secret: slidesage_backend::env_or("RATE_LIMIT_HASH_SECRET", &secret),
 				auth: slidesage_backend::auth::request::RequestAuth::new(
 					secret.as_bytes(),
@@ -50,7 +51,7 @@ async fn main() -> std::io::Result<()> {
 				.with_secure_cookies(secure),
 			};
 			eprintln!(
-				"development port: health/CORS, session/profile reads, sign-out, feedback, billing balance and presentation list/detail/delete; remaining endpoints are pending"
+				"development port: health/CORS, password sign-in, session/profile reads, sign-out, feedback, billing balance and presentation list/detail/delete with optional cache; remaining endpoints are pending"
 			);
 			slidesage_backend::http::router_with_database(security, state)
 		}

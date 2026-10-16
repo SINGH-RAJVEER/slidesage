@@ -8,7 +8,7 @@ use axum::{
 	routing::get,
 };
 use chrono::NaiveDateTime;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, value::RawValue};
 
 use crate::http::ApiState;
@@ -28,6 +28,37 @@ struct Presentation {
 	slides_data: String,
 	created_at: NaiveDateTime,
 	updated_at: NaiveDateTime,
+}
+
+#[derive(Deserialize, Serialize)]
+struct PresentationSummary {
+	id: String,
+	title: String,
+	prompt: String,
+	slide_count: i64,
+	status: String,
+	has_research: bool,
+	#[serde(deserialize_with = "cached_time")]
+	created_at: String,
+	#[serde(deserialize_with = "cached_time")]
+	updated_at: String,
+}
+
+fn cached_time<'de, D: serde::Deserializer<'de>>(decoder: D) -> Result<String, D::Error> {
+	let value = String::deserialize(decoder)?;
+	chrono::DateTime::parse_from_rfc3339(&value).map_err(serde::de::Error::custom)?;
+	Ok(value)
+}
+
+// Share the Go cache format and hashed keys, including during differential tests.
+#[derive(Deserialize, Serialize)]
+struct CachedList {
+	#[serde(rename = "Summaries")]
+	summaries: Option<Vec<PresentationSummary>>,
+	#[serde(rename = "Total")]
+	total: i64,
+	#[serde(rename = "HasMore")]
+	has_more: bool,
 }
 
 async fn list(
@@ -52,6 +83,25 @@ async fn list(
 		Ok(value) => value,
 		Err(message) => return error(StatusCode::BAD_REQUEST, &message),
 	};
+	// Read the committed generation before every cache lookup. A worker write or
+	// ownership change advances it transactionally; a late fill keeps its old key.
+	let cache_key = if state.cache.is_some() {
+		sqlx::query_scalar!(
+			"SELECT COALESCE((SELECT version FROM presentation_cache_versions WHERE user_id = $1), 0) AS \"version!\"",
+			user
+		).fetch_one(&state.database).await.ok().map(|version| {
+			crate::cache::key(&["presentation-list", &user, &version.to_string(), &limit.to_string(), &offset.to_string()])
+		})
+	} else {
+		None
+	};
+	if let (Some(cache), Some(key)) = (&state.cache, &cache_key)
+		&& let Some(value) = cache.get(key).await
+		&& let Ok(cached) = serde_json::from_slice::<CachedList>(&value)
+		&& let Some(summaries) = cached.summaries
+	{
+		return list_response(summaries, cached.total, cached.has_more, limit, offset);
+	}
 	let total = match sqlx::query_scalar!(
 		"SELECT count(*) AS \"count!\" FROM presentations WHERE user_id = $1",
 		user
@@ -75,15 +125,48 @@ async fn list(
 		.into_iter()
 		.map(|row| {
 			let summary = summary::read(&row.slides_data);
-			json!({
-				"id": row.id, "title": row.title, "prompt": row.prompt,
-				"slide_count": summary.slide_count, "status": summary.status,
-				"has_research": summary.has_research,
-				"created_at": crate::rfc3339_nano(row.created_at.and_utc()),
-				"updated_at": crate::rfc3339_nano(row.updated_at.and_utc())
-			})
+			PresentationSummary {
+				id: row.id,
+				title: row.title,
+				prompt: row.prompt,
+				slide_count: summary.slide_count,
+				status: summary.status,
+				has_research: summary.has_research,
+				created_at: crate::rfc3339_nano(row.created_at.and_utc()),
+				updated_at: crate::rfc3339_nano(row.updated_at.and_utc()),
+			}
 		})
 		.collect();
+	if let (Some(cache), Some(key)) = (&state.cache, &cache_key) {
+		#[derive(Serialize)]
+		struct CacheFill<'a> {
+			#[serde(rename = "Summaries")]
+			summaries: &'a [PresentationSummary],
+			#[serde(rename = "Total")]
+			total: i64,
+			#[serde(rename = "HasMore")]
+			has_more: bool,
+		}
+		if let Ok(value) = serde_json::to_vec(&CacheFill {
+			summaries: &presentations,
+			total,
+			has_more,
+		}) {
+			cache
+				.set(key, &value, std::time::Duration::from_secs(30))
+				.await;
+		}
+	}
+	list_response(presentations, total, has_more, limit, offset)
+}
+
+fn list_response(
+	presentations: Vec<PresentationSummary>,
+	total: i64,
+	has_more: bool,
+	limit: i64,
+	offset: i64,
+) -> Response {
 	response(
 		StatusCode::OK,
 		json!({

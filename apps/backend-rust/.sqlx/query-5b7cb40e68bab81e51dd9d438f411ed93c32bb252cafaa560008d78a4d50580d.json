@@ -1,0 +1,23 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT COALESCE((SELECT version FROM presentation_cache_versions WHERE user_id = $1), 0) AS \"version!\"",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "version!",
+				"type_info": "Int8",
+				"origin": "Expression"
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text"
+			]
+		},
+		"nullable": [
+			null
+		]
+	},
+	"hash": "5b7cb40e68bab81e51dd9d438f411ed93c32bb252cafaa560008d78a4d50580d"
+}

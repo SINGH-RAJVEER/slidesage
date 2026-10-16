@@ -33,6 +33,7 @@ async fn auth_reads_and_sign_out_preserve_closed_database_and_cookie_behavior() 
 		let app = router_with_database(
 			Security::new("https://slidesage.app"),
 			ApiState {
+				cache: None,
 				database: database.clone(),
 				auth: RequestAuth::new(secret, cookie_name).with_secure_cookies(secure),
 				rate_limit_secret: String::new(),

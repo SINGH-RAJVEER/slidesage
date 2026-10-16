@@ -14,6 +14,8 @@ http-body-util = "0.1"
 jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto"] }
 percent-encoding = "2"
 rand = "0.9"
+redis = { version = "1.7", default-features = false, features = ["tokio-rustls-comp", "tls-rustls-webpki-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 scrypt = { version = "0.11", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
@@ -21,7 +23,7 @@ sha2 = "0.10"
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "chrono", "macros"] }
 subtle = "2.6"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v4"] }
 

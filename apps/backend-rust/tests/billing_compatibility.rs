@@ -22,6 +22,7 @@ async fn balance_database_failure_keeps_authentication_and_billing_error_format(
 	let app = router_with_database(
 		Security::new("https://slidesage.app"),
 		ApiState {
+			cache: None,
 			database,
 			auth: RequestAuth::new(secret, "slidesage_token"),
 			rate_limit_secret: String::from_utf8(secret.to_vec()).unwrap(),

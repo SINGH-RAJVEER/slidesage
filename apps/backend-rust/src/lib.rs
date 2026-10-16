@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod billing;
+pub mod cache;
 pub mod cards;
 pub mod conversion;
 pub mod feedback;
@@ -25,9 +26,12 @@ use std::io;
 pub async fn serve(app: axum::Router, host: &str, port: u16) -> io::Result<()> {
 	let listener = tokio::net::TcpListener::bind((host, port)).await?;
 	println!("listening on {}", listener.local_addr()?);
-	axum::serve(listener, app)
-		.with_graceful_shutdown(shutdown())
-		.await
+	axum::serve(
+		listener,
+		app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+	)
+	.with_graceful_shutdown(shutdown())
+	.await
 }
 
 async fn shutdown() {
