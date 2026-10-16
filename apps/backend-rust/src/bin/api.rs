@@ -49,7 +49,7 @@ async fn main() -> std::io::Result<()> {
 				),
 			};
 			eprintln!(
-				"development port: health/CORS, feedback and billing balance; remaining endpoints are pending"
+				"development port: health/CORS, feedback, billing balance and presentation list/detail/delete; remaining endpoints are pending"
 			);
 			slidesage_backend::http::router_with_database(security, state)
 		}

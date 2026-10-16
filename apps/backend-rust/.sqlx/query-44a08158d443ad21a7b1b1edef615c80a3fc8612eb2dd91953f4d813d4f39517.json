@@ -1,0 +1,97 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT id, user_id, title, prompt, slides_data::text AS \"slides_data!\", created_at, updated_at FROM presentations WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "id",
+				"type_info": "Text",
+				"origin": {
+					"Table": {
+						"table": "presentations",
+						"name": "id"
+					}
+				}
+			},
+			{
+				"ordinal": 1,
+				"name": "user_id",
+				"type_info": "Text",
+				"origin": {
+					"Table": {
+						"table": "presentations",
+						"name": "user_id"
+					}
+				}
+			},
+			{
+				"ordinal": 2,
+				"name": "title",
+				"type_info": "Varchar",
+				"origin": {
+					"Table": {
+						"table": "presentations",
+						"name": "title"
+					}
+				}
+			},
+			{
+				"ordinal": 3,
+				"name": "prompt",
+				"type_info": "Text",
+				"origin": {
+					"Table": {
+						"table": "presentations",
+						"name": "prompt"
+					}
+				}
+			},
+			{
+				"ordinal": 4,
+				"name": "slides_data!",
+				"type_info": "Text",
+				"origin": "Expression"
+			},
+			{
+				"ordinal": 5,
+				"name": "created_at",
+				"type_info": "Timestamp",
+				"origin": {
+					"Table": {
+						"table": "presentations",
+						"name": "created_at"
+					}
+				}
+			},
+			{
+				"ordinal": 6,
+				"name": "updated_at",
+				"type_info": "Timestamp",
+				"origin": {
+					"Table": {
+						"table": "presentations",
+						"name": "updated_at"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text",
+				"Int8",
+				"Int8"
+			]
+		},
+		"nullable": [
+			false,
+			false,
+			false,
+			false,
+			null,
+			false,
+			false
+		]
+	},
+	"hash": "44a08158d443ad21a7b1b1edef615c80a3fc8612eb2dd91953f4d813d4f39517"
+}

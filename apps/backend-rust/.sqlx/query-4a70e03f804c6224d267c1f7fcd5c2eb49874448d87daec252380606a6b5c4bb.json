@@ -1,0 +1,24 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT EXISTS (SELECT 1 FROM generation_point_operations WHERE presentation_id = $1 AND user_id = $2 AND status = 'reserved') AS \"active!\"",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "active!",
+				"type_info": "Bool",
+				"origin": "Expression"
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text",
+				"Text"
+			]
+		},
+		"nullable": [
+			null
+		]
+	},
+	"hash": "4a70e03f804c6224d267c1f7fcd5c2eb49874448d87daec252380606a6b5c4bb"
+}

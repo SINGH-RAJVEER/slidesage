@@ -1,0 +1,15 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "DELETE FROM presentations WHERE id = $1 AND user_id = $2",
+	"describe": {
+		"columns": [],
+		"parameters": {
+			"Left": [
+				"Text",
+				"Text"
+			]
+		},
+		"nullable": []
+	},
+	"hash": "4f6abaff171687faf2b4cafebb70232a23b9b16b0f0a875c3ecd518e83302b0f"
+}

@@ -23,6 +23,7 @@ pub fn router_with_database(security: Security, state: ApiState) -> Router {
 	security.apply(
 		routes()
 			.merge(crate::billing::router(state.clone()))
+			.merge(crate::presentations::router(state.clone()))
 			.merge(crate::feedback::router(state))
 			.method_not_allowed_fallback(not_found),
 	)

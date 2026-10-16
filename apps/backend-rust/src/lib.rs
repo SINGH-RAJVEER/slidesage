@@ -5,6 +5,7 @@ pub mod billing;
 pub mod conversion;
 pub mod feedback;
 pub mod http;
+pub mod presentations;
 
 /// Go time.RFC3339Nano removes every trailing fractional zero.
 pub fn rfc3339_nano(time: chrono::DateTime<chrono::Utc>) -> String {
