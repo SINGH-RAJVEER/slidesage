@@ -35,6 +35,7 @@
 - The tab bar is a sibling of the header, not a child. The header's backdrop filter would otherwise contain the fixed bar.
 - A page under the tab bar keeps its last content clear of it. The header carries `data-app-header` and `data-tab-bar`, and `base.css` pads the parent of that header.
 - Auth pages show the top bar without tabs.
+- `--ss-tab-bar-height` holds the bar's height on mobile. The anchored ad uses it to sit directly above the bar. See [Ads](ADS.md).
 
 ## Sheets and dialogs
 

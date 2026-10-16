@@ -8,15 +8,15 @@
 
 ## Placements
 
-| Page | Desktop, 768 px and wider | Mobile, below 768 px |
+| Page | Desktop layout | Mobile layout |
 | --- | --- | --- |
 | `/generate` | Up to 728 x 90 below the prompt, at the bottom of the page | 320 x 50 anchored banner |
 | `/presentations` | Up to 970 x 90 between the search bar and the grid | 320 x 50 anchored banner |
 | `/marketplace` | Up to 970 x 90 as a full-width row after the first row of templates | 320 x 50 anchored banner |
 
-- Each page shows one ad at a time: the inline unit on desktop widths, or the anchored banner on mobile widths. Slots that are hidden at the current width are not rendered, so AdSense never fills a zero-width unit.
+- Each page shows one ad at a time: the inline unit on the desktop layout, or the anchored banner on the mobile layout. The two follow the app's shared breakpoint, so a phone held sideways gets the banner; see [Mobile UI](MOBILE_UI.md). Slots that are hidden at the current size are not rendered, so AdSense never fills a zero-width unit.
 - The marketplace row follows the first two templates when the grid has two columns and the first three when it has three. A search that leaves no second row shows no ad.
-- The anchored banner is fixed to the bottom of the screen through a portal and leaves a spacer at the end of the page so the last item can scroll above it.
+- The anchored banner is fixed to the bottom of the screen through a portal, directly above the tab bar when one is showing, and leaves a spacer at the end of the page so the last item can scroll above it.
 - Every slot that shows an ad carries a "Sponsored" label and a Remove ads link to `/purchase`.
 - A slot stays invisible until AdSense marks it `data-ad-status="filled"`. While AdSense decides, the unit keeps its full size so AdSense requests the right ad, but it is transparent, out of the page layout, and inert. The anchored banner's bar and spacer also wait for the ad.
 - A blocked script, an unfilled unit (`data-ad-status="unfilled"`), or no answer within 15 seconds removes the slot. A page without an ad looks the same as an ad-free page, with no label, gap, or reserved space.
