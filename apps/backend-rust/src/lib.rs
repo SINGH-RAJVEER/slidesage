@@ -1,7 +1,9 @@
 #![forbid(unsafe_code)]
 
 pub mod auth;
+pub mod billing;
 pub mod conversion;
+pub mod feedback;
 pub mod http;
 
 /// Go time.RFC3339Nano removes every trailing fractional zero.

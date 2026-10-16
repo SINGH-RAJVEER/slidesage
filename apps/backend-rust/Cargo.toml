@@ -28,6 +28,11 @@ uuid = { version = "1", features = ["v4"] }
 [features]
 postgres-tests = []
 
+[[test]]
+name = "feedback_postgres"
+path = "tests/feedback_postgres.rs"
+required-features = ["postgres-tests"]
+
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 

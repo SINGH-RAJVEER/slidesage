@@ -1,0 +1,28 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT balance_millis FROM users WHERE id = $1",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "balance_millis",
+				"type_info": "Int8",
+				"origin": {
+					"Table": {
+						"table": "users",
+						"name": "balance_millis"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text"
+			]
+		},
+		"nullable": [
+			false
+		]
+	},
+	"hash": "f81579ecf42bfd008b81ac43b6ae1807a140f46a745c4c40b71ebfd27034411c"
+}

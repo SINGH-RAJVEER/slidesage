@@ -1,0 +1,30 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "INSERT INTO feedback (id, user_id, message) VALUES ($1, $2, $3) RETURNING created_at",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "created_at",
+				"type_info": "Timestamptz",
+				"origin": {
+					"Table": {
+						"table": "feedback",
+						"name": "created_at"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text",
+				"Text",
+				"Text"
+			]
+		},
+		"nullable": [
+			false
+		]
+	},
+	"hash": "d39af28f03becbb5bea6773b56e2e542d3118ce99d2e6b65b3000658f7abaf14"
+}

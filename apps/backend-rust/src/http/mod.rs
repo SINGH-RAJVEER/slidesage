@@ -1,3 +1,4 @@
+pub(crate) mod json;
 mod security;
 
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
@@ -6,9 +7,25 @@ use serde_json::json;
 
 pub use security::Security;
 
+#[derive(Clone)]
+pub struct ApiState {
+	pub database: sqlx::PgPool,
+	pub auth: crate::auth::request::RequestAuth,
+	pub rate_limit_secret: String,
+}
+
 /// Development-only partial router. Other application routes have not been ported.
 pub fn router(security: Security) -> Router {
 	security.apply(routes())
+}
+
+pub fn router_with_database(security: Security, state: ApiState) -> Router {
+	security.apply(
+		routes()
+			.merge(crate::billing::router(state.clone()))
+			.merge(crate::feedback::router(state))
+			.method_not_allowed_fallback(not_found),
+	)
 }
 
 fn routes() -> Router {

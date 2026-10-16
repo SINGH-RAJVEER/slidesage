@@ -24,3 +24,9 @@
 - Migration 38 creates the `feedback` table: `id`, `user_id`, `message`, and `created_at`, with an index on `created_at` for newest-first reads.
 - Rows cascade-delete with their user.
 - There is no read API or admin view yet. Query the table directly until the feedback dashboard exists.
+
+## Rust port
+
+The isolated `rust-backend` workspace implements this route in `apps/backend-rust/src/feedback.rs`. It uses SQLx checked queries against the existing `feedback` and `api_rate_limits` tables; no migration changed. Authentication follows the existing bearer/cookie selection and JWT identity behavior. Validation preserves Go's field matching, duplicate/null handling and Unicode replacement rules.
+
+The existing Go handler tests support `API_UNDER_TEST_URL`; their persistence assertions read actual PostgreSQL rows when targeting Axum. A separate compatibility test compares Go/Rust rate counters and responses. See [Rust development](DEVELOPMENT_SETUP.md#rust-port-development) for disposable-database setup and commands. These checks cover the current cases; the complete backend still needs the full compatibility gate before cutover.
