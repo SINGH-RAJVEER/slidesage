@@ -199,11 +199,13 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 												    glyph. */}
 												<div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
 													{isSelected && (
-														<Check className="h-4 w-4 text-blue-400 group-hover/theme:invisible" />
+														<Check
+															className={`h-4 w-4 text-blue-400 group-hover/theme:invisible ${onTemplateRemove ? "[@media(hover:none)]:invisible" : ""}`}
+														/>
 													)}
 												</div>
 												{onTemplateRemove && (
-													<div className="pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-r-lg bg-gradient-to-l from-black/80 via-black/70 to-transparent pr-2 pl-8 opacity-0 transition duration-200 group-hover/theme:opacity-100 group-focus-within/theme:opacity-100">
+													<div className="pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-r-lg bg-gradient-to-l from-black/80 via-black/70 to-transparent pr-2 pl-8 opacity-0 transition duration-200 group-hover/theme:opacity-100 group-focus-within/theme:opacity-100 [@media(hover:none)]:opacity-100">
 														<button
 															type="button"
 															aria-label={`Remove ${template.name}`}

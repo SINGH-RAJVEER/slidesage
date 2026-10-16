@@ -42,3 +42,4 @@ Justfile        Common development commands
 - [Observability](docs/OBSERVABILITY.md)
 - [Feedback and bug reports](docs/FEEDBACK.md)
 - [Ads](docs/ADS.md)
+- [Mobile UI](docs/MOBILE_UI.md)

@@ -134,12 +134,12 @@ export default function PresentationErrorPage({
 		<div className="flex min-h-screen flex-col bg-transparent">
 			<Header />
 			<FloatingNotice error={retryError} onDismiss={() => setRetryError("")} />
-			<main className="flex flex-1 items-center px-6 py-12 md:px-10 md:py-16">
+			<main className="flex flex-1 items-center px-6 py-12 desktop:px-10 desktop:py-16">
 				<section aria-labelledby="presentation-error-title" className="mx-auto w-full max-w-3xl">
 					<div className="max-w-2xl">
 						<h1
 							id="presentation-error-title"
-							className="text-3xl font-semibold text-white md:text-4xl"
+							className="text-3xl font-semibold text-white desktop:text-4xl"
 						>
 							We couldn&apos;t finish this presentation
 						</h1>
@@ -156,9 +156,9 @@ export default function PresentationErrorPage({
 						)}
 					</div>
 
-					<div className="mt-10 rounded-lg border border-white/10 bg-black/20 p-5 md:p-6">
+					<div className="mt-10 rounded-lg border border-white/10 bg-black/20 p-5 desktop:p-6">
 						<h2 className="text-sm font-semibold text-white/90">What you can do</h2>
-						<ul className="mt-4 grid gap-3 text-sm leading-6 text-white/55 md:grid-cols-2">
+						<ul className="mt-4 grid gap-3 text-sm leading-6 text-white/55 sm:grid-cols-2">
 							<li className="flex gap-3">
 								<span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/30" />
 								Retry here with the same saved prompt and generation settings.

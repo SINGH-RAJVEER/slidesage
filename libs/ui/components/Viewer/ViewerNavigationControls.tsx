@@ -64,8 +64,12 @@ export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> =
 					className="viewer-navigation__previous bg-transparent border-white/5 text-white/60 hover:text-white hover:bg-white/5"
 				>
 					<ChevronLeft className="w-4 h-4 mr-2" />
-					Previous
+					<span className="viewer-navigation__label">Previous</span>
 				</Button>
+				{/* A phone shows where it is in the deck in place of First and Last. */}
+				<span aria-hidden className="viewer-navigation__counter hidden">
+					{totalSlides === 0 ? "0 / 0" : `${currentSlide + 1} / ${totalSlides}`}
+				</span>
 				<Button
 					variant="outline"
 					onClick={onNext}
@@ -73,7 +77,7 @@ export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> =
 					aria-label="Next slide"
 					className="viewer-navigation__next bg-transparent border-white/5 text-white/60 hover:text-white hover:bg-white/5"
 				>
-					Next
+					<span className="viewer-navigation__label">Next</span>
 					<ChevronRight className="w-4 h-4 ml-2" />
 				</Button>
 				<Button
@@ -97,7 +101,9 @@ export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> =
 							className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 shadow-none transition-all duration-200"
 						>
 							<X className="w-4 h-4 mr-2" />
-							Cancel generation
+							<span>
+								Cancel<span className="viewer-navigation__wide-only"> generation</span>
+							</span>
 						</Button>
 					) : (
 						<Button
@@ -108,7 +114,7 @@ export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> =
 							className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 shadow-none transition-all duration-200"
 						>
 							<Trash2 className="w-4 h-4 mr-2" />
-							Delete
+							<span>Delete</span>
 						</Button>
 					)}
 				</div>

@@ -42,7 +42,8 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 }) => {
 	return (
 		<div className="mb-2 w-full flex items-center justify-center">
-			<div className="flex w-full max-w-full flex-wrap items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-3 sm:w-fit sm:flex-nowrap sm:justify-start sm:gap-3 sm:overflow-x-auto sm:px-4 sm:whitespace-nowrap sm:custom-scrollbar xl:justify-center">
+			{/* A phone lists the options one to a row instead of in a bar. */}
+			<div className="flex w-full max-w-full flex-wrap items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-3 sm:w-fit sm:flex-nowrap sm:justify-start sm:gap-3 sm:overflow-x-auto sm:px-4 sm:whitespace-nowrap sm:custom-scrollbar xl:justify-center mobile:w-full mobile:max-w-xl mobile:flex-col mobile:flex-nowrap mobile:items-stretch mobile:gap-0 mobile:divide-y mobile:divide-white/10 mobile:overflow-visible mobile:rounded-none mobile:border-0 mobile:bg-transparent mobile:p-0 mobile:[&>*]:flex mobile:[&>*]:min-h-14 mobile:[&>*]:items-center mobile:[&>*]:justify-start mobile:[&>*]:rounded-none mobile:[&>*>button]:px-0 mobile:[&>*>button]:hover:bg-transparent">
 				<WebResearchToggle
 					enabled={useWebResearch}
 					resultCount={researchResultCount}

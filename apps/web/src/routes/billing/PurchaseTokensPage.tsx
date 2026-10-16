@@ -221,7 +221,7 @@ export default function PurchaseTokensPage() {
 			/>
 
 			{/* Main Content */}
-			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
+			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] desktop:px-8 desktop:py-8">
 				<div className="w-full max-w-[1800px] mx-auto relative">
 					<div className="mb-14 flex min-h-48 flex-col items-center justify-center space-y-2 py-10">
 						<h2 className="text-white/40 text-sm uppercase tracking-widest font-medium">
@@ -236,7 +236,7 @@ export default function PurchaseTokensPage() {
 					</div>
 
 					{/* Purchase Options */}
-					<div className="mb-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+					<div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 						{/* Option 1: 25 Tokens */}
 						<Card className="flex flex-col border border-white/10 bg-black/20 transition-colors hover:bg-white/5">
 							<CardHeader>
@@ -414,7 +414,7 @@ export default function PurchaseTokensPage() {
 														e.preventDefault();
 													}
 												}}
-												className="hide-number-spin h-[5.75rem] appearance-none border-0 bg-transparent px-0 py-0 text-center text-5xl font-bold text-white placeholder:text-white/25 shadow-none focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0 md:text-5xl"
+												className="hide-number-spin h-[5.75rem] appearance-none border-0 bg-transparent px-0 py-0 text-center text-5xl font-bold text-white placeholder:text-white/25 shadow-none focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0 desktop:text-5xl"
 											/>
 											{customAmount && !isCustomAmountValid() && (
 												<p className="text-red-400 text-sm">Must be 25-10000</p>

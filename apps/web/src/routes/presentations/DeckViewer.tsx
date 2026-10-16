@@ -16,7 +16,7 @@ import { useFullscreenMode } from "@slidesage/ui/hooks/useFullscreenMode";
 import { usePlayback } from "@slidesage/ui/hooks/usePlayback";
 import { useSlideNavigation } from "@slidesage/ui/hooks/useSlideNavigation";
 import { useViewerKeyboardNavigation } from "@slidesage/ui/hooks/useViewerKeyboardNavigation";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, type TouchEvent, useEffect, useRef, useState } from "react";
 
 export interface DeckViewerProps {
 	title: string;
@@ -238,6 +238,22 @@ export function DeckViewer({
 		move();
 	};
 
+	// A touch screen has no arrow keys, so a sideways swipe turns the slide.
+	const swipeStart = useRef<{ x: number; y: number } | null>(null);
+	const onSwipeStart = (event: TouchEvent) => {
+		const touch = event.touches[0];
+		swipeStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+	};
+	const onSwipeEnd = (event: TouchEvent) => {
+		const start = swipeStart.current;
+		const touch = event.changedTouches[0];
+		swipeStart.current = null;
+		if (!start || !touch) return;
+		const dx = touch.clientX - start.x;
+		if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(touch.clientY - start.y)) return;
+		stopAnd(() => (dx < 0 ? navigation.next() : navigation.prev()))();
+	};
+
 	return (
 		<div className="presentation-viewer flex h-dvh min-h-dvh max-h-dvh bg-transparent p-0">
 			<div
@@ -320,7 +336,11 @@ export function DeckViewer({
 				)}
 
 				{isFullscreenMode && deck && currentCard && (
-					<div className="relative flex min-h-0 flex-1 items-center justify-center bg-black">
+					<div
+						className="relative flex min-h-0 flex-1 items-center justify-center bg-black"
+						onTouchStart={onSwipeStart}
+						onTouchEnd={onSwipeEnd}
+					>
 						<CardSlide
 							key={current?.key}
 							card={currentCard}

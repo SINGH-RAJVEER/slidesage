@@ -725,7 +725,7 @@ export function SlideRingHero() {
 						}`}
 					/>
 					<div
-						className={`relative z-10 w-[68%] max-w-[880px] transition-all duration-300 ease-out ${
+						className={`relative z-10 w-[68%] max-w-[880px] mobile:w-[min(92%,calc((100dvh-5rem)*16/9))] transition-all duration-300 ease-out ${
 							previewShown ? "scale-100 opacity-100" : "scale-95 opacity-0"
 						}`}
 					>

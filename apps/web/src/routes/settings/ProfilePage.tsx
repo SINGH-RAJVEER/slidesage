@@ -446,7 +446,7 @@ export default function ProfilePage() {
 					setSuccess(null);
 				}}
 			/>
-			<div className="flex-1 px-4 py-6 md:px-8 md:py-8">
+			<div className="flex-1 px-4 py-6 desktop:px-8 desktop:py-8">
 				<div className="mx-auto w-full max-w-2xl space-y-4">
 					{/* Avatar Section */}
 					<div className="space-y-4 pb-8">

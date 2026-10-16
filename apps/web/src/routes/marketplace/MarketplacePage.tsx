@@ -51,7 +51,7 @@ export default function MarketplacePage() {
 			<main className="min-h-0 flex-1 overflow-y-auto pb-[max(5rem,env(safe-area-inset-bottom))]">
 				{/* The top padding matches the presentations grid, so the search bar
 				    sits at the same height on both catalog pages. */}
-				<section className="px-4 pt-6 pb-8 md:px-8 md:pt-8 md:pb-12">
+				<section className="px-4 pt-6 pb-8 desktop:px-8 desktop:pt-8 desktop:pb-12">
 					<div className="mx-auto max-w-7xl">
 						<div className="border-b border-white/10 pb-6">
 							<SearchBar

@@ -189,6 +189,52 @@ describe("Header", () => {
 		}
 	});
 
+	it("puts the main pages in a bottom tab bar and the account menu in a sheet on a phone", async () => {
+		mockAuthState.user = {
+			id: "user_1",
+			name: "Rajveer Singh",
+			email: "rajveer@example.com",
+			image: null,
+			emailVerified: true,
+			createdAt: new Date().toISOString(),
+			updatedAt: new Date().toISOString(),
+			slideTokens: 10,
+		};
+		const desktopMatchMedia = window.matchMedia;
+		window.matchMedia = ((query: string) => ({
+			...desktopMatchMedia(query),
+			matches: true,
+		})) as typeof window.matchMedia;
+
+		try {
+			const { default: Header } = await import("../../app/Header");
+			const view = render(
+				<MemoryRouter initialEntries={["/presentations"]}>
+					<Header />
+				</MemoryRouter>,
+			);
+
+			const tabs = view.getByRole("navigation", { name: "Main" });
+			expect(tabs).toHaveClass("fixed", "bottom-0");
+			expect(view.getByRole("link", { name: "Presentations" })).toHaveAttribute(
+				"aria-current",
+				"page",
+			);
+			expect(
+				view.getByRole("button", { name: "10.0 points. Buy more points" }),
+			).toBeInTheDocument();
+
+			fireEvent.click(view.getByRole("button", { name: "Open account menu" }));
+
+			const sheet = await view.findByRole("dialog");
+			expect(sheet).toHaveTextContent("rajveer@example.com");
+			expect(view.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+			expect(view.getByRole("button", { name: "Sign Out" })).toBeInTheDocument();
+		} finally {
+			window.matchMedia = desktopMatchMedia;
+		}
+	});
+
 	it("loads the library while the user is about to open it", async () => {
 		mockAuthState.user = {
 			id: "user_1",

@@ -226,16 +226,18 @@ export default function GenerateResearchPage() {
 				<button
 					type="button"
 					onClick={() => navigate(-1)}
-					className="absolute left-4 top-4 z-10 rounded-md p-2 text-white/60 transition-colors hover:bg-white/5 hover:text-white md:left-8 md:top-8"
+					className="absolute left-4 top-4 z-10 rounded-md p-2 text-white/60 transition-colors hover:bg-white/5 hover:text-white desktop:left-8 desktop:top-8"
 					aria-label="Go back"
 				>
 					<ArrowLeft className="h-5 w-5" />
 				</button>
 
-				<div className="mx-auto w-full max-w-7xl px-4 py-10 md:px-8 lg:px-12">
+				<div className="mx-auto w-full max-w-7xl px-4 py-10 desktop:px-8 lg:px-12">
 					<div className="space-y-8">
 						<div className="text-center">
-							<h2 className="text-3xl font-semibold text-white md:text-4xl">Research Insights</h2>
+							<h2 className="text-3xl font-semibold text-white desktop:text-4xl">
+								Research Insights
+							</h2>
 						</div>
 
 						{isLoading && (
@@ -273,14 +275,14 @@ export default function GenerateResearchPage() {
 
 								<div className="max-h-[62dvh] overflow-auto rounded-md border border-white/10 bg-black/15">
 									<table
-										className="w-full min-w-full table-fixed text-left md:min-w-[880px]"
+										className="w-full min-w-full table-fixed text-left desktop:min-w-[880px]"
 										aria-label="Research sources"
 									>
 										<colgroup>
-											<col className="w-auto md:w-[28%]" />
-											<col className="hidden md:table-column md:w-[44%]" />
-											<col className="hidden md:table-column md:w-[17%]" />
-											<col className="w-24 md:w-[11%]" />
+											<col className="w-auto desktop:w-[28%]" />
+											<col className="hidden desktop:table-column desktop:w-[44%]" />
+											<col className="hidden desktop:table-column desktop:w-[17%]" />
+											<col className="w-24 desktop:w-[11%]" />
 										</colgroup>
 										<thead className="sticky top-0 z-20 bg-[hsl(222,27%,12%)]">
 											<tr className="border-b border-white/10 bg-white/[0.025]">
@@ -292,13 +294,13 @@ export default function GenerateResearchPage() {
 												</th>
 												<th
 													scope="col"
-													className="sticky top-0 hidden bg-[hsl(222,27%,12%)] px-4 py-3 text-xs font-medium text-white/45 md:table-cell"
+													className="sticky top-0 hidden bg-[hsl(222,27%,12%)] px-4 py-3 text-xs font-medium text-white/45 desktop:table-cell"
 												>
 													Research note
 												</th>
 												<th
 													scope="col"
-													className="sticky top-0 hidden bg-[hsl(222,27%,12%)] px-4 py-3 text-xs font-medium text-white/45 md:table-cell"
+													className="sticky top-0 hidden bg-[hsl(222,27%,12%)] px-4 py-3 text-xs font-medium text-white/45 desktop:table-cell"
 												>
 													Details
 												</th>
@@ -327,20 +329,20 @@ export default function GenerateResearchPage() {
 																<p className="mt-1 truncate text-xs text-white/35">
 																	{getSourceLabel(source.url)}
 																</p>
-																<p className="mt-3 line-clamp-4 whitespace-pre-line text-sm leading-6 text-white/60 md:hidden">
+																<p className="mt-3 line-clamp-4 whitespace-pre-line text-sm leading-6 text-white/60 desktop:hidden">
 																	{source.summary ||
 																		source.snippet ||
 																		"No preview available for this source."}
 																</p>
 															</td>
-															<td className="hidden px-5 py-5 align-top md:table-cell">
+															<td className="hidden px-5 py-5 align-top desktop:table-cell">
 																<p className="line-clamp-4 whitespace-pre-line text-sm leading-6 text-white/60">
 																	{source.summary ||
 																		source.snippet ||
 																		"No preview available for this source."}
 																</p>
 															</td>
-															<td className="hidden px-5 py-5 align-top text-xs leading-5 text-white/45 md:table-cell">
+															<td className="hidden px-5 py-5 align-top text-xs leading-5 text-white/45 desktop:table-cell">
 																{source.author || source.published_date ? (
 																	<div className="space-y-0.5">
 																		{source.author && (

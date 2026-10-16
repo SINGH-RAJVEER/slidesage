@@ -5,6 +5,27 @@
 @source "../lib";
 @source "../context";
 
+/* Phones upright are narrow and phones sideways are short; both get the mobile
+   layout. `desktop` is the exact complement. Keep in step with lib/mobile.ts. */
+@custom-variant mobile {
+	@media (max-width: 767px), (max-height: 499px) {
+		@slot;
+	}
+}
+
+@custom-variant desktop {
+	@media (min-width: 768px) and (min-height: 500px) {
+		@slot;
+	}
+}
+
+/* A phone on its side, where height is the scarce dimension. */
+@custom-variant short {
+	@media (max-height: 499px) {
+		@slot;
+	}
+}
+
 /* Register the shadcn tokens as Tailwind 4 color utilities. */
 @theme inline {
 	--color-background: var(--background);
@@ -38,6 +59,15 @@ body {
 	background-color: hsl(222 27% 12%);
 	background-image: radial-gradient(circle at top, hsl(220 20% 18%), hsl(222 27% 12%) 60%);
 	position: relative;
+}
+
+/* iOS zooms into any field set smaller than 16px when it takes focus. */
+@media (max-width: 767px), (max-height: 499px) {
+	input,
+	textarea,
+	select {
+		font-size: 16px;
+	}
 }
 
 :root {
@@ -147,5 +177,67 @@ input.hide-number-spin[type="number"] {
 @media (prefers-reduced-motion: reduce) {
 	.ss-marquee-track {
 		animation: none;
+	}
+}
+
+/* Sheets and overlays enter and leave with these; Radix waits for the exit. */
+@keyframes ss-fade-in {
+	from {
+		opacity: 0;
+	}
+}
+
+@keyframes ss-fade-out {
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes ss-sheet-in-bottom {
+	from {
+		transform: translateY(100%);
+	}
+}
+
+@keyframes ss-sheet-out-bottom {
+	to {
+		transform: translateY(100%);
+	}
+}
+
+@keyframes ss-sheet-in-right {
+	from {
+		transform: translateX(100%);
+	}
+}
+
+@keyframes ss-sheet-out-right {
+	to {
+		transform: translateX(100%);
+	}
+}
+
+/* The mobile tab bar is fixed to the bottom of the screen, so the page it
+   sits over keeps its last content clear of it, and the anchored ad sits
+   above it. */
+@media (max-width: 767px), (max-height: 499px) {
+	:root {
+		--ss-tab-bar-height: 4rem;
+	}
+
+	:has(> [data-app-header][data-tab-bar]) {
+		padding-bottom: calc(var(--ss-tab-bar-height) + env(safe-area-inset-bottom));
+	}
+}
+
+@media (max-height: 499px) {
+	:root {
+		--ss-tab-bar-height: 3rem;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-state] {
+		animation-duration: 0.01ms;
 	}
 }

@@ -865,10 +865,13 @@ function WidgetContent({ node, theme }: { node: WidgetNode; theme: CardTheme }) 
 
 /** A widget and, while editing, its controls. A chart grows to fill its cell; the rest keep their height. */
 export function Widget({ node, theme }: { node: WidgetNode; theme: CardTheme }) {
+	const editing = useEditing();
 	return (
 		<div
+			// While editing, a tap focuses the widget, which shows its controls on a touch screen.
+			tabIndex={editing ? -1 : undefined}
 			className={cn(
-				"group/widget relative flex min-w-0 flex-col",
+				"group/widget relative flex min-w-0 flex-col outline-none",
 				node.type === "chart" && "min-h-0 flex-1",
 			)}
 		>

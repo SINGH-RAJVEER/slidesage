@@ -53,10 +53,10 @@ export default function FeedbackPage() {
 		<div className="flex min-h-screen flex-col bg-transparent">
 			<Header />
 			<FloatingNotice error={error} success={success} onDismiss={dismissNotice} />
-			<main className="flex-1 px-4 py-8 md:px-8 md:py-12">
+			<main className="flex-1 px-4 py-8 desktop:px-8 desktop:py-12">
 				<form className="mx-auto w-full max-w-2xl" onSubmit={handleSubmit}>
 					<div className="text-center">
-						<h1 className="text-3xl font-semibold text-white md:text-4xl">Feedback</h1>
+						<h1 className="text-3xl font-semibold text-white desktop:text-4xl">Feedback</h1>
 					</div>
 					<label htmlFor="feedback-message" className="sr-only">
 						Your feedback
@@ -67,7 +67,7 @@ export default function FeedbackPage() {
 						onChange={(event) => setMessage(event.target.value)}
 						maxLength={FEEDBACK_MAX_LENGTH}
 						placeholder="Tell us what you think..."
-						className="mt-8 min-h-48 rounded-lg border-white/15 bg-white/10 px-4 py-3 text-base text-white placeholder:text-white/40 focus-visible:border-white/30 focus-visible:ring-white/20 md:text-base"
+						className="mt-8 min-h-48 rounded-lg border-white/15 bg-white/10 px-4 py-3 text-base text-white placeholder:text-white/40 focus-visible:border-white/30 focus-visible:ring-white/20 desktop:text-base"
 					/>
 					<div className="mt-3 flex items-center justify-between gap-4">
 						<span className="text-xs text-white/50">

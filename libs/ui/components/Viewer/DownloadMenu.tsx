@@ -56,7 +56,7 @@ const DownloadMenu: React.FC<Props> = ({ onExport, disabled = false }) => {
 						) : (
 							<Download className="w-4 h-4 mr-2" />
 						)}
-						{isExporting ? "Exporting PPTX" : "Download"}
+						<span>{isExporting ? "Exporting PPTX" : "Download"}</span>
 						{!isExporting && <ChevronDown className="w-4 h-4 ml-2 opacity-60" />}
 					</Button>
 				</DropdownMenuTrigger>

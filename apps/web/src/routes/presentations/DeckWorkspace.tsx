@@ -474,7 +474,7 @@ export function DeckWorkspace({
 							className={headerButtonClassName}
 						>
 							<Link2 className="mr-2 size-4" />
-							Share
+							<span className="viewer-header__label">Share</span>
 						</Button>
 					)}
 					<Button
@@ -484,7 +484,10 @@ export function DeckWorkspace({
 						className={headerButtonClassName}
 					>
 						{editing ? <Check className="mr-2 size-4" /> : <Pencil className="mr-2 size-4" />}
-						{editing ? "Done" : "Edit"}
+						{/* Done keeps its word on a phone, where Edit and Share are icons. */}
+						<span className={editing ? undefined : "viewer-header__label"}>
+							{editing ? "Done" : "Edit"}
+						</span>
 					</Button>
 				</>
 			}
@@ -508,7 +511,7 @@ export function DeckWorkspace({
 				}
 				if (!editing && !blocked) return null;
 				return (
-					<div className="flex min-h-10 flex-wrap items-center gap-3 px-4 pt-3">
+					<div className="viewer-slide-controls flex min-h-10 flex-wrap items-center gap-3 px-4 pt-3">
 						<div
 							role="status"
 							aria-live="polite"
@@ -537,7 +540,7 @@ export function DeckWorkspace({
 							)}
 						</div>
 						{editAllowed && cardId && (
-							<div className="ml-auto">
+							<div className="viewer-slide-controls__toolbar ml-auto">
 								<CardToolbar
 									document={editor.document}
 									cardId={cardId}

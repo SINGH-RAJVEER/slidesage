@@ -381,7 +381,7 @@ export default function PresentationsGridPage() {
 					commitPendingDelete();
 				}}
 			/>
-			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-8 md:py-8">
+			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] desktop:px-8 desktop:py-8">
 				<div className="max-w-7xl mx-auto">
 					<div
 						data-horizon-reveal
@@ -415,15 +415,15 @@ export default function PresentationsGridPage() {
 								data-horizon-reveal
 								className={`grid grid-cols-1 ${
 									gridSize === 2
-										? "md:grid-cols-2"
+										? "sm:grid-cols-2"
 										: gridSize === 3
-											? "md:grid-cols-2 lg:grid-cols-3"
-											: "md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+											? "sm:grid-cols-2 lg:grid-cols-3"
+											: "sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
 								} gap-5`}
 							>
 								{filteredPresentations.length === 0 ? (
 									<div className="col-span-full flex flex-col items-center justify-center py-24 text-center">
-										<h2 className="mb-2 text-xl text-white md:text-2xl">
+										<h2 className="mb-2 text-xl text-white desktop:text-2xl">
 											{presentations.length === 0
 												? "No Presentations Generated Yet"
 												: "No presentations match your search"}

@@ -145,7 +145,7 @@ export default function VerifyEmailPage() {
 		<div className="min-h-screen bg-transparent flex flex-col">
 			<Header />
 			<FloatingNotice error={error} onDismiss={() => setError(null)} />
-			<div className="flex-1 flex items-center justify-center px-4 py-8 md:px-8">
+			<div className="flex-1 flex items-center justify-center px-4 py-8 desktop:px-8">
 				<div className="max-w-md w-full">
 					<h1 className="mb-1 text-2xl font-semibold text-white">
 						{isSignIn ? "Check your email" : "Verify email"}
