@@ -17,21 +17,22 @@ pub fn router(state: ApiState) -> Router {
 		.route("/auth/get-session", get(get_session))
 		.route("/profile", get(profile))
 		.route("/auth/sign-out", post(sign_out))
+		.merge(super::sign_in::routes(state.clone()))
 		.with_state(state)
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct User {
-	id: String,
-	name: String,
-	email: String,
-	email_verified: bool,
-	image: Option<String>,
-	slide_tokens: f64,
-	landing_page: String,
-	created_at: String,
-	updated_at: String,
+pub(super) struct User {
+	pub(super) id: String,
+	pub(super) name: String,
+	pub(super) email: String,
+	pub(super) email_verified: bool,
+	pub(super) image: Option<String>,
+	pub(super) slide_tokens: f64,
+	pub(super) landing_page: String,
+	pub(super) created_at: String,
+	pub(super) updated_at: String,
 }
 
 async fn authenticate(state: &ApiState, headers: &HeaderMap) -> Option<(String, User)> {
@@ -91,7 +92,7 @@ async fn sign_out(State(state): State<ApiState>) -> Response {
 		.into_response()
 }
 
-fn response(value: serde_json::Value) -> Response {
+pub(super) fn response(value: serde_json::Value) -> Response {
 	let text = value
 		.to_string()
 		.replace('&', "\\u0026")

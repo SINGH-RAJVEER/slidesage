@@ -122,3 +122,40 @@ fn request_auth_preserves_bearer_precedence_and_configured_cookie_name() {
 	);
 	assert_eq!(auth.user_id(&headers), None);
 }
+
+#[test]
+fn request_auth_handles_non_ascii_header_bytes_like_go() {
+	use axum::http::{HeaderMap, HeaderValue};
+	use slidesage_backend::auth::request::RequestAuth;
+	let secret = b"test-secret-key-that-is-at-least-32-bytes-long";
+	let token = issue_token(secret, "user-123", "", chrono::Utc::now().timestamp(), 3600).unwrap();
+	let auth = RequestAuth::new(secret, "slidesage_token");
+	let cookie = format!("slidesage_token={token}");
+	let mut headers = HeaderMap::new();
+	headers.insert("cookie", HeaderValue::from_str(&cookie).unwrap());
+	for suffix in ["é".as_bytes(), &[0xff]] {
+		headers.insert(
+			"authorization",
+			HeaderValue::from_bytes(&[b"Bearer ".as_slice(), suffix].concat()).unwrap(),
+		);
+		assert_eq!(
+			auth.user_id(&headers),
+			None,
+			"invalid bearer must block the valid cookie"
+		);
+		headers.remove("authorization");
+		for prefix in [b"other=".as_slice(), b"slidesage_token=".as_slice()] {
+			headers.insert(
+				"cookie",
+				HeaderValue::from_bytes(&[prefix, suffix, b"; ", cookie.as_bytes()].concat())
+					.unwrap(),
+			);
+			assert_eq!(
+				auth.user_id(&headers).as_deref(),
+				Some("user-123"),
+				"a malformed cookie must not hide a valid cookie"
+			);
+		}
+		headers.insert("cookie", HeaderValue::from_str(&cookie).unwrap());
+	}
+}

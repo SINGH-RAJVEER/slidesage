@@ -46,34 +46,78 @@ impl RequestAuth {
 		)
 	}
 
+	pub(super) fn sign_in_token(&self, user_id: &str, email: &str, now: i64) -> Option<String> {
+		super::jwt::issue_token(&self.secret, user_id, email, now, 7 * 24 * 3600).ok()
+	}
+
+	pub(super) fn sign_in_cookie(
+		&self,
+		token: &str,
+		persistent: bool,
+		expires: chrono::DateTime<chrono::Utc>,
+	) -> String {
+		format!(
+			"{}={token}; Path=/; {}HttpOnly; {}",
+			self.cookie_name,
+			if persistent {
+				format!("Expires={}; ", expires.format("%a, %d %b %Y %H:%M:%S GMT"))
+			} else {
+				String::new()
+			},
+			if self.secure_cookies {
+				"Secure; SameSite=None"
+			} else {
+				"SameSite=Lax"
+			}
+		)
+	}
+
 	fn token<'a>(&self, headers: &'a HeaderMap) -> Option<&'a str> {
-		if let Some(value) = headers
-			.get(header::AUTHORIZATION)
-			.and_then(|value| value.to_str().ok())
-			&& let Some(token) = value.strip_prefix("Bearer ")
+		if let Some(value) = headers.get(header::AUTHORIZATION)
+			&& let Some(token) = value.as_bytes().strip_prefix(b"Bearer ")
 		{
-			return Some(token);
+			// A malformed/non-ASCII bearer still blocks cookie authentication.
+			return std::str::from_utf8(token).ok();
 		}
 		for line in headers.get_all(header::COOKIE) {
-			let Ok(line) = line.to_str() else { continue };
-			for part in line.split(';') {
-				let Some((name, value)) = part.trim().split_once('=') else {
+			// Go parses cookies separately even when another cookie contains
+			// non-ASCII or invalid UTF-8 bytes in the same header line.
+			for part in line.as_bytes().split(|byte| *byte == b';') {
+				let part = trim_go_space_bytes(part);
+				let Some(separator) = part.iter().position(|byte| *byte == b'=') else {
 					continue;
 				};
-				if name.trim() != self.cookie_name {
+				let (name, value) = (&part[..separator], &part[separator + 1..]);
+				if trim_go_space_bytes(name) != self.cookie_name.as_bytes() {
 					continue;
 				}
 				let value = value
-					.strip_prefix('"')
-					.and_then(|value| value.strip_suffix('"'))
+					.strip_prefix(b"\"")
+					.and_then(|value| value.strip_suffix(b"\""))
 					.unwrap_or(value);
-				if value.bytes().all(|byte| {
+				if value.iter().copied().all(|byte| {
 					(0x20..0x7f).contains(&byte) && !matches!(byte, b'"' | b';' | b'\\')
 				}) {
-					return Some(value);
+					return std::str::from_utf8(value).ok();
 				}
 			}
 		}
 		None
 	}
+}
+
+/// strings.TrimSpace preserves malformed UTF-8 bytes. Only trim valid Unicode
+/// whitespace at either edge rather than rejecting or replacing the whole value.
+pub(super) fn trim_go_space_bytes(mut value: &[u8]) -> &[u8] {
+	if let Some(first) = value.utf8_chunks().next() {
+		let valid = first.valid();
+		value = &value[valid.len() - valid.trim_start().len()..];
+	}
+	if let Some(last) = value.utf8_chunks().last()
+		&& last.invalid().is_empty()
+	{
+		let valid = last.valid();
+		value = &value[..value.len() - (valid.len() - valid.trim_end().len())];
+	}
+	value
 }
