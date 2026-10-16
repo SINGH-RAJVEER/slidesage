@@ -46,10 +46,11 @@ async fn main() -> std::io::Result<()> {
 					} else {
 						"slidesage_token"
 					},
-				),
+				)
+				.with_secure_cookies(secure),
 			};
 			eprintln!(
-				"development port: health/CORS, feedback, billing balance and presentation list/detail/delete; remaining endpoints are pending"
+				"development port: health/CORS, session/profile reads, sign-out, feedback, billing balance and presentation list/detail/delete; remaining endpoints are pending"
 			);
 			slidesage_backend::http::router_with_database(security, state)
 		}

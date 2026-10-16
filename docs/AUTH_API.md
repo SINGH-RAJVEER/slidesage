@@ -101,3 +101,9 @@ RESEND_FROM_EMAIL=auth@example.com
 - The HTTP-only `slidesage_token` cookie contains the JWT. Local HTTP uses `SameSite=Lax`; HTTPS uses `Secure` and `SameSite=None`.
 - Remember me is enabled by default and sets cookie expiry. Clearing it creates a browser-session cookie; JWT expiry still applies.
 - Sign-out clears the cookie. Issued bearer tokens remain valid until expiry because there is no server-side session store.
+
+## Rust port
+
+The isolated Axum API implements `GET /auth/get-session`, `GET /profile` and `POST /auth/sign-out`. It reads the current user and latest non-null credential from the existing tables. Missing/invalid tokens, deleted users and user-lookup failures return `null` for session lookup and `401` for profile. The reported session expiry remains lookup-time + seven days, matching Go rather than using the JWT's expiry field. Sign-out preserves the existing cookie-only behavior.
+
+Go/Rust comparisons cover 20 cases in each normal/secure-cookie configuration, including passwordless accounts, legacy hash shapes, credential selection, fractional balances, JSON fields and exact cookie headers. Rust also tests closed-database responses. Sign-in, OTP/OAuth and profile mutations remain pending, and the current application runtime is unchanged. See [development commands](DEVELOPMENT_SETUP.md#rust-port-development) and the [migration plan](RUST_BACKEND_PORT.md).

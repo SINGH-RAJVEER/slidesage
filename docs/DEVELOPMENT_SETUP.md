@@ -33,7 +33,7 @@ just dev
 
 ## Rust port development
 
-The work-in-progress package is `apps/backend-rust`. It provides API health/CORS, password/JWT helpers, converter health/schema and SQLx-backed feedback, billing balance and presentation list/detail/delete. Most application endpoints, generation and PPTX export remain pending. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
+The work-in-progress package is `apps/backend-rust`. It provides API health/CORS, password/JWT helpers, converter health/schema and SQLx-backed session/profile reads, sign-out, feedback, billing balance and presentation list/detail/delete. Most application endpoints, generation and PPTX export remain pending. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
 
 Run from the repository root inside `devenv shell`:
 
@@ -44,7 +44,7 @@ cargo run --manifest-path apps/backend-rust/Cargo.toml --bin api
 
 The standalone API defaults to `127.0.0.1:8001`; `HOST` and `PORT` override it. In another terminal, run `cargo run --manifest-path apps/backend-rust/Cargo.toml --bin conversion_worker` for converter health and schema on `127.0.0.1:8091`. It accepts `CARD_CONVERTER_HOST` and `CARD_CONVERTER_PORT` overrides. Both stop on SIGINT/SIGTERM.
 
-Set `DATABASE_URL` to a database migrated with the existing Go runner to enable feedback, billing balance and presentation list/detail/delete. Without it, the standalone server exposes health only. `AUTH_SECRET` signs/verifies tokens; `BASE_URL` selects the existing normal or HTTPS cookie name, and `RATE_LIMIT_HASH_SECRET` defaults to `AUTH_SECRET`. HTTPS rejects short/placeholder auth secrets; production requires an explicit rate-limit hash secret. The current SQLx pool is limited to five connections.
+Set `DATABASE_URL` to a database migrated with the existing Go runner to enable the implemented application routes. Without it, the standalone server exposes health only. `AUTH_SECRET` signs/verifies tokens; `BASE_URL` selects the existing normal or HTTPS cookie name and sign-out policy, and `RATE_LIMIT_HASH_SECRET` defaults to `AUTH_SECRET`. HTTPS rejects short/placeholder auth secrets; production requires an explicit rate-limit hash secret. The current SQLx pool is limited to five connections.
 
 SQLx 0.9 requires a matching CLI for query metadata checks. Install it with `cargo install sqlx-cli --version 0.9.0 --no-default-features --features postgres,rustls`. The repository Cargo configuration defaults to offline query metadata, so builds do not contact the configured database. To refresh/check metadata against a disposable migrated database, run from `apps/backend-rust`:
 
@@ -64,6 +64,8 @@ The original Go feedback tests can target the Rust server using `API_UNDER_TEST_
 For billing balance, set `API_UNDER_TEST_URL`, `TEST_DATABASE_URL` and `TEST_AUTH_SECRET`, then run `go -C apps/api test -count=1 -tags rustcompat -run '^TestBillingBalanceMatchesRust$' ./internal/integrations/billing`. It creates/removes its own fixture users and applies identical requests and assertions to the original Go handler and Rust server. `TEST_COOKIE_NAME` defaults to `slidesage_token`; use `__Secure-slidesage_token` for a server configured with an HTTPS `BASE_URL`. The balance query uses the existing schema; it does not call Razorpay or modify balances.
 
 With the same environment, run `go -C apps/api test -count=1 -tags rustcompat -run '^TestPresentationRoutesMatchRust$' ./internal/presentation` for presentation list/detail/delete comparisons. The suite creates and removes its own users, presentations, operations, assets and share fixtures. It compares original Go routes with live Rust, including active-generation guards, failed-deletion rollback and cleanup/cache triggers. The original Go cache fixture is enabled on the reference server; Rust currently reads PostgreSQL on every list request. The explicit Rust error suite also checks authentication/validation before closed-database failures. Valkey cache query-count and late-fill behavior remain pending for Rust.
+
+For session/profile reads and sign-out, keep `API_UNDER_TEST_URL`, `TEST_DATABASE_URL` and `TEST_AUTH_SECRET` set, then run `go -C apps/api test -count=1 -tags rustcompat -run '^TestAuthReadRoutesMatchRust$' ./internal/auth`. The suite creates/removes its own user/credential fixtures and compares 20 cases with the original Go routes. Run it again with `TEST_SECURE_COOKIES=true` against a test API configured with `BASE_URL=https://slidesage.app` to check `__Secure-slidesage_token`, Secure and SameSite=None. This tests HTTPS cookie configuration; the local test transport can still use HTTP. Only `session.expiresAt` is normalized, after verifying it falls within the request's lookup-time + seven-day window.
 
 The converter handler suite targets Bun by default. Set `CONVERTER_UNDER_TEST_URL` to send every request to a running Rust worker, preserving the existing assertions. The focused command below checks the implemented health/schema subset; ten other handler cases remain required and currently fail against Rust. Running without `-t` exposes those failures. PPTX writer tests still exercise Bun directly and need their own adapter.
 

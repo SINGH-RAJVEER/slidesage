@@ -74,7 +74,13 @@
 			"method": "GET",
 			"path": "/auth/get-session",
 			"source": "apps/api/internal/auth/http.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Go/Rust normal and secure cookie configurations with live PostgreSQL user lookup",
+				"Missing/invalid/expired credentials and deleted users return null; bearer precedence preserved",
+				"Exact user/session fields with separately validated lookup-time + 7-day expiry",
+				"Closed-database response and HEAD behavior"
+			]
 		},
 		{
 			"method": "POST",
@@ -104,7 +110,13 @@
 			"method": "POST",
 			"path": "/auth/sign-out",
 			"source": "apps/api/internal/auth/http.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Go/Rust exact cookie clearing headers for HTTP Lax and HTTPS Secure/None configurations",
+				"Unauthenticated, invalid and valid credentials all return success; request body ignored",
+				"Bearer token remains valid after sign-out, matching stateless Go behavior",
+				"Closed-database response; wrong method returns 404"
+			]
 		},
 		{
 			"method": "POST",
@@ -328,7 +340,13 @@
 			"method": "GET",
 			"path": "/profile",
 			"source": "apps/api/internal/auth/http.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Go/Rust user fields, null/URL images, unverified users and fractional/maximum balances",
+				"Latest non-null credential selection and Go hash-shape checks, including passwordless/OAuth accounts",
+				"Normal and secure-cookie authentication; missing/deleted users return 401",
+				"Closed-database response, HEAD, JSON escaping and timestamps"
+			]
 		},
 		{
 			"method": "PUT",

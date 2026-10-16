@@ -1,0 +1,28 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT password FROM accounts WHERE user_id = $1 AND provider_id = 'credential' AND password IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "password",
+				"type_info": "Text",
+				"origin": {
+					"Table": {
+						"table": "accounts",
+						"name": "password"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text"
+			]
+		},
+		"nullable": [
+			true
+		]
+	},
+	"hash": "862fa9b753e8e2760070444d3988e46500112348249e1a4759918568e659350e"
+}

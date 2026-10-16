@@ -22,6 +22,7 @@ pub fn router(security: Security) -> Router {
 pub fn router_with_database(security: Security, state: ApiState) -> Router {
 	security.apply(
 		routes()
+			.merge(crate::auth::http::router(state.clone()))
 			.merge(crate::billing::router(state.clone()))
 			.merge(crate::presentations::router(state.clone()))
 			.merge(crate::feedback::router(state))

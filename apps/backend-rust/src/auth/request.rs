@@ -6,6 +6,7 @@ use axum::http::{HeaderMap, header};
 pub struct RequestAuth {
 	secret: Vec<u8>,
 	cookie_name: String,
+	secure_cookies: bool,
 }
 
 impl RequestAuth {
@@ -13,13 +14,36 @@ impl RequestAuth {
 		Self {
 			secret: secret.to_vec(),
 			cookie_name: cookie_name.to_owned(),
+			secure_cookies: false,
 		}
 	}
 
 	pub fn user_id(&self, headers: &HeaderMap) -> Option<String> {
-		let token = self.token(headers)?;
-		let user_id = super::jwt::verify_token(&self.secret, token).ok()?;
+		let (_, user_id) = self.session(headers)?;
 		(!user_id.trim().is_empty()).then_some(user_id)
+	}
+
+	/// Match the API startup policy: HTTPS uses Secure and SameSite=None.
+	pub fn with_secure_cookies(mut self, secure: bool) -> Self {
+		self.secure_cookies = secure;
+		self
+	}
+
+	pub(super) fn session<'a>(&self, headers: &'a HeaderMap) -> Option<(&'a str, String)> {
+		let token = self.token(headers)?;
+		Some((token, super::jwt::verify_token(&self.secret, token).ok()?))
+	}
+
+	pub(super) fn sign_out_cookie(&self) -> String {
+		format!(
+			"{}=; Path=/; Max-Age=0; HttpOnly; {}",
+			self.cookie_name,
+			if self.secure_cookies {
+				"Secure; SameSite=None"
+			} else {
+				"SameSite=Lax"
+			}
+		)
 	}
 
 	fn token<'a>(&self, headers: &'a HeaderMap) -> Option<&'a str> {

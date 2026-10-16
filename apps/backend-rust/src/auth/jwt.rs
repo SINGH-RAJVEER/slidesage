@@ -1,4 +1,4 @@
-//! HS256 token behavior from internal/auth/jwt.go. Cookie/user lookup is not ported yet.
+//! HS256 token behavior from internal/auth/jwt.go.
 
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
