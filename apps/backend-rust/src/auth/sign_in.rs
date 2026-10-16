@@ -108,7 +108,10 @@ async fn sign_in(State(state): State<ApiState>, request: Request) -> Response {
 		.into_response()
 }
 
-async fn user_by_email(state: &ApiState, email: &str) -> Result<Option<User>, sqlx::Error> {
+pub(super) async fn user_by_email(
+	state: &ApiState,
+	email: &str,
+) -> Result<Option<User>, sqlx::Error> {
 	let row = sqlx::query!(
 		"SELECT id, name, email, email_verified, image, balance_millis::double precision / 1000 AS \"slide_tokens!\", landing_page, created_at, updated_at FROM users WHERE email = $1", email
 	).fetch_optional(&state.database).await?;
@@ -125,7 +128,7 @@ async fn user_by_email(state: &ApiState, email: &str) -> Result<Option<User>, sq
 	}))
 }
 
-fn normalize_email(email: &str) -> String {
+pub(super) fn normalize_email(email: &str) -> String {
 	// Go strings.ToLower uses Unicode simple case mappings. U+0130 is the only
 	// expanding Rust lowercase mapping and must become a plain i here.
 	let email: String = email
@@ -178,7 +181,11 @@ fn with_status(status: StatusCode, value: serde_json::Value) -> Response {
 
 /// Go peeks at most 32KiB + 1 for the email counter and replaces the request
 /// body with those bytes, even when the original stream was longer.
-async fn protect(State(state): State<ApiState>, mut request: Request, next: Next) -> Response {
+pub(super) async fn protect(
+	State(state): State<ApiState>,
+	mut request: Request,
+	next: Next,
+) -> Response {
 	let address = client_address(&request);
 	let now = Utc::now();
 	let mut bytes = Vec::new();
@@ -315,8 +322,8 @@ struct SignInInput {
 }
 
 #[derive(Default)]
-struct EmailInput {
-	email: String,
+pub(super) struct EmailInput<const STRICT: bool = false> {
+	pub(super) email: String,
 }
 
 fn folded(value: &str) -> String {
@@ -370,24 +377,26 @@ impl<'de> Deserialize<'de> for SignInInput {
 	}
 }
 
-impl<'de> Deserialize<'de> for EmailInput {
+impl<'de, const STRICT: bool> Deserialize<'de> for EmailInput<STRICT> {
 	fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-		struct EmailVisitor;
-		impl<'de> Visitor<'de> for EmailVisitor {
-			type Value = EmailInput;
+		struct EmailVisitor<const STRICT: bool>;
+		impl<'de, const STRICT: bool> Visitor<'de> for EmailVisitor<STRICT> {
+			type Value = EmailInput<STRICT>;
 			fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
 				f.write_str("an object or null")
 			}
 			fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
-				Ok(EmailInput::default())
+				Ok(EmailInput::<STRICT>::default())
 			}
 			fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Self::Value, M::Error> {
-				let mut input = EmailInput::default();
+				let mut input = EmailInput::<STRICT>::default();
 				while let Some(key) = map.next_key::<String>()? {
 					if folded(&key) == "EMAIL" {
 						if let Some(value) = map.next_value::<Option<String>>()? {
 							input.email = value;
 						}
+					} else if STRICT {
+						return Err(de::Error::custom("unknown field"));
 					} else {
 						map.next_value::<IgnoredAny>()?;
 					}
@@ -395,6 +404,6 @@ impl<'de> Deserialize<'de> for EmailInput {
 				Ok(input)
 			}
 		}
-		deserializer.deserialize_any(EmailVisitor)
+		deserializer.deserialize_any(EmailVisitor::<STRICT>)
 	}
 }

@@ -1,4 +1,4 @@
-//! Read-only JWT session/profile routes and stateless sign-out from auth/http.go.
+//! Session/profile reads, sign-in route composition and stateless sign-out.
 
 use axum::{
 	Router,
@@ -18,6 +18,7 @@ pub fn router(state: ApiState) -> Router {
 		.route("/profile", get(profile))
 		.route("/auth/sign-out", post(sign_out))
 		.merge(super::sign_in::routes(state.clone()))
+		.merge(super::sign_in_options::routes(state.clone()))
 		.with_state(state)
 }
 
