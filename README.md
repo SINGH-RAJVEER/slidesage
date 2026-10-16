@@ -15,6 +15,7 @@ SlideSage is a presentation builder with AI-assisted research and generation. Th
 ```text
 apps/
     api/        Go API, Goose migrations, repositories, and provider integrations
+	backend-rust/  In-progress Axum API and Rust conversion worker
     web/        React web application
     converter/  Bun service that validates drafts into card documents
 libs/
@@ -41,3 +42,4 @@ Justfile        Common development commands
 - [Prefetching](docs/PREFETCHING.md)
 - [Observability](docs/OBSERVABILITY.md)
 - [Feedback and bug reports](docs/FEEDBACK.md)
+- [Rust backend exploration](docs/RUST_BACKEND_PORT.md)

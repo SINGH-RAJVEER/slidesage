@@ -1,0 +1,420 @@
+{
+	"reference_commit": "f922c831",
+	"release_ready": false,
+	"required_case_manifest_complete": false,
+	"note": "Route inventory only. A ported route is not a claim of complete behavioral compatibility. Pending routes remain required. Crypto helper tests do not mark auth endpoints as ported.",
+	"api": [
+		{
+			"method": "GET",
+			"path": "/ai/config",
+			"source": "apps/api/internal/integrations/ai/handlers.go",
+			"state": "pending"
+		},
+		{
+			"method": "PUT",
+			"path": "/ai/connections/{provider}/enabled",
+			"source": "apps/api/internal/integrations/ai/handlers.go",
+			"state": "pending"
+		},
+		{
+			"method": "DELETE",
+			"path": "/ai/connections/{provider}",
+			"source": "apps/api/internal/integrations/ai/handlers.go",
+			"state": "pending"
+		},
+		{
+			"method": "PUT",
+			"path": "/ai/connections/{provider}",
+			"source": "apps/api/internal/integrations/ai/handlers.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/ai/connections",
+			"source": "apps/api/internal/integrations/ai/handlers.go",
+			"state": "pending"
+		},
+		{
+			"method": "PUT",
+			"path": "/ai/selection",
+			"source": "apps/api/internal/integrations/ai/handlers.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/auth/callback/{provider}",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/email-otp/request-password-reset",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/email-otp/reset-password",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/email-otp/send-verification-otp",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/email-otp/verify-email",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/auth/get-session",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/sign-in/email-otp",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/sign-in/email",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/sign-in/options",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/sign-in/social",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/sign-out",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/auth/sign-up/email",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/billing/balance",
+			"source": "apps/api/internal/integrations/billing/handlers.go",
+			"state": "ported",
+			"verified_cases": [
+				"Original Go handler and live Rust API: 16 identical request cases on migrated PostgreSQL",
+				"Default, zero, fractional and maximum bigint balances with unchanged stored millis",
+				"Bearer/cookie selection, user isolation, expired/invalid tokens and deleted-user errors",
+				"Billing JSON charset/newline, HEAD, unsupported methods and closed-pool error responses"
+			]
+		},
+		{
+			"method": "POST",
+			"path": "/billing/checkout",
+			"source": "apps/api/internal/integrations/billing/handlers.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/billing/verify",
+			"source": "apps/api/internal/integrations/billing/handlers.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/billing/webhook",
+			"source": "apps/api/internal/integrations/billing/handlers.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/feedback",
+			"source": "apps/api/internal/feedback/feedback.go",
+			"state": "ported",
+			"verified_cases": [
+				"existing Go validation/storage cases against Axum",
+				"Unicode/JSON edge cases",
+				"PostgreSQL writes and FK failures",
+				"Go/Rust persisted rate limit compatibility"
+			]
+		},
+		{
+			"method": "POST",
+			"path": "/generation-jobs/{id}/cancel",
+			"source": "apps/api/internal/generation/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/generation-jobs/{id}/events",
+			"source": "apps/api/internal/generation/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/generation-jobs/{id}",
+			"source": "apps/api/internal/generation/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/health",
+			"source": "apps/api/cmd/api/main.go",
+			"state": "ported"
+		},
+		{
+			"method": "GET",
+			"path": "/images/search",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/live",
+			"source": "apps/api/cmd/worker/main.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/presentation-jobs",
+			"source": "apps/api/internal/generation/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/presentation-outlines",
+			"source": "apps/api/internal/generation/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/presentations/{id}/assets/{sha256}",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/presentations/{id}/assets/stock",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/presentations/{id}/assets/upload",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/presentations/{id}/document",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "PUT",
+			"path": "/presentations/{id}/document",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/presentations/{id}/export/pptx",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "DELETE",
+			"path": "/presentations/{id}/share",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/presentations/{id}/share",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/presentations/{id}/share",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/presentations/{id}/templates/{templateId}",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "DELETE",
+			"path": "/presentations/{id}",
+			"source": "apps/api/internal/presentation/handlers.go",
+			"state": "ported",
+			"verified_cases": [
+				"Authentication, owner/foreign/missing IDs, active generation guard and empty 204 response",
+				"Foreign-key errors match Go and roll back queue/cache-version triggers",
+				"Asset/share cascades, durable object cleanup queue and finalized operation retention",
+				"Repeat deletion returns 404; closed-database errors"
+			]
+		},
+		{
+			"method": "GET",
+			"path": "/presentations/{id}",
+			"source": "apps/api/internal/presentation/handlers.go",
+			"state": "ported",
+			"verified_cases": [
+				"Authentication, owner/foreign/missing users, trimmed IDs and HEAD",
+				"Original Go JSON escaping/timestamps and lossless large JSONB numbers",
+				"Closed-database response errors"
+			]
+		},
+		{
+			"method": "GET",
+			"path": "/presentations",
+			"source": "apps/api/internal/presentation/handlers.go",
+			"state": "ported",
+			"verified_cases": [
+				"Original Go routes with existing cache fixture compared to live Rust on disposable PostgreSQL",
+				"Pagination bounds, URL query decoding, repeated/invalid query pairs, empty pages and stable ordering",
+				"Legacy summary partial/case-folded decoding, research flags and user isolation",
+				"Committed writes, rollback, ownership transfer and unchanged database cache triggers"
+			],
+			"pending_cases": [
+				"Optional Valkey caching, query counts and late cache fills"
+			]
+		},
+		{
+			"method": "GET",
+			"path": "/profile/avatar/image/{id}",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/profile/avatar/upload",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/profile/avatar",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/profile/email/verify",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/profile",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "PUT",
+			"path": "/profile",
+			"source": "apps/api/internal/auth/http.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/ready",
+			"source": "apps/api/cmd/worker/main.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/shared/{token}/assets/{sha256}",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "GET",
+			"path": "/shared/{token}",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/templates/{templateId}/presentations",
+			"source": "apps/api/internal/carddocument/routes.go",
+			"state": "pending"
+		}
+	],
+	"converter": [
+		{
+			"method": "GET",
+			"path": "/health",
+			"source": "apps/converter/src/handler.ts",
+			"state": "ported"
+		},
+		{
+			"method": "GET",
+			"path": "/v1/schema",
+			"source": "apps/converter/src/handler.ts",
+			"state": "ported",
+			"verified_cases": [
+				"Existing converter handler assertions target a live Rust worker through CONVERTER_UNDER_TEST_URL",
+				"Full response equals current TypeScript draftingSchema(), including all rules, limits and guidance",
+				"Query parameters, ignored schema-version headers, unsupported methods and trailing slash",
+				"Exact Bun JSON charset; conversion and validation routes remain pending"
+			]
+		},
+		{
+			"method": "POST",
+			"path": "/v1/cards",
+			"source": "apps/converter/src/handler.ts",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/v1/templates",
+			"source": "apps/converter/src/handler.ts",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/v1/documents",
+			"source": "apps/converter/src/handler.ts",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/v1/documents/validate",
+			"source": "apps/converter/src/handler.ts",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/v1/documents/drafts",
+			"source": "apps/converter/src/handler.ts",
+			"state": "pending"
+		},
+		{
+			"method": "POST",
+			"path": "/v1/documents/pptx",
+			"source": "apps/converter/src/handler.ts",
+			"state": "pending"
+		}
+	]
+}

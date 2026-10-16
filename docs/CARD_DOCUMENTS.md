@@ -40,6 +40,10 @@
 - Run `just converter` locally or `just converter-bundle` for the image bundle. Default address is `127.0.0.1:8090`.
 - Production sidecars have no public ingress. Go services use `CARD_CONVERTER_URL=http://127.0.0.1:8090`.
 
+The isolated Rust port currently serves only converter health and `GET /v1/schema`. It embeds the complete drafting descriptor and compares it against the current TypeScript function through the existing handler tests. `CONVERTER_UNDER_TEST_URL` switches all those tests to a running worker; conversion, validation, templates and PPTX tests still fail against Rust until ported. This worker is outside application startup/deployment. See [Rust development commands](DEVELOPMENT_SETUP.md#rust-port-development) and the [single-cutover plan](RUST_BACKEND_PORT.md).
+
+The isolated Rust API also implements presentation list/detail/delete. Deletion preserves the current generation-operation guard and uses the existing database cascades and triggers to remove asset/share rows and queue object cleanup. It does not delete object files directly. Go/Rust fixtures verify that foreign-key failures roll back queue and cache-version changes. Card document reads/writes, sharing endpoints and the cleanup worker itself remain pending in Rust.
+
 ## Generation
 
 `cardDrafter` in `apps/api/internal/generation/cards.go`:
