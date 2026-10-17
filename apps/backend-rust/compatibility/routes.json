@@ -104,7 +104,13 @@
 			"method": "POST",
 			"path": "/auth/sign-in/options",
 			"source": "apps/api/internal/auth/http.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Original Go service/handler compared with live Rust under both cookie configurations",
+				"Passwordless, legacy, OAuth, latest non-null credential and unverified accounts",
+				"Strict JSON, unknown/duplicate fields, Unicode normalization and body limits",
+				"Shared persisted sign-in IP/email limits and guarded disposable database failures"
+			]
 		},
 		{
 			"method": "POST",
@@ -242,7 +248,13 @@
 			"method": "GET",
 			"path": "/presentations/{id}/document",
 			"source": "apps/api/internal/carddocument/routes.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Go current-document responses, revision metadata, HEAD and private no-store headers",
+				"Owner/foreign/missing presentations, absent revisions and database failures",
+				"Lossless JSONB numbers, referenced assets, fresh metadata and current revision changes",
+				"Go/Rust native Valkey body interchange, one-hour TTL, corruption and ownership/deletion checks"
+			]
 		},
 		{
 			"method": "PUT",
@@ -432,7 +444,13 @@
 			"method": "POST",
 			"path": "/v1/documents/validate",
 			"source": "apps/converter/src/handler.ts",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Native schema and layout validation compared with current TypeScript validator",
+				"Curated documents, assets, schema upgrades and existing editor-validation assertions",
+				"First issue/path ordering, identifiers, rich text, widgets and layout constraints",
+				"JavaScript JSON numbers, key ordering and UTF-16 strings, plus request/version errors"
+			]
 		},
 		{
 			"method": "POST",

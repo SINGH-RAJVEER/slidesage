@@ -93,6 +93,7 @@ const env = {
 	CGO_ENABLED: "0",
 	DATABASE_URL: databaseURL,
 	TEST_DATABASE_URL: databaseURL,
+	TEST_RUST_DISPOSABLE_DATABASE: "true",
 	FEEDBACK_TEST_DATABASE_URL: databaseURL,
 	PGUSER: "slidesage",
 	PGHOST: "127.0.0.1",
@@ -400,6 +401,7 @@ try {
 		"rustcompat",
 		"./internal/auth",
 		"./internal/presentation",
+		"./internal/carddocument",
 		"./internal/integrations/billing",
 		"./internal/feedback",
 		"./internal/middleware",
@@ -416,7 +418,7 @@ try {
 			"-tags",
 			"rustcompat",
 			"-run",
-			"^TestAuthReadRoutesMatchRust$|^TestPasswordSignInMatchesRust$",
+			"^TestAuthReadRoutesMatchRust$|^TestPasswordSignInMatchesRust$|^TestSignInOptionsMatchesRust$",
 			"./internal/auth",
 		],
 		{
@@ -434,7 +436,7 @@ try {
 	if (!fullConverter)
 		converterTests.push(
 			"-t",
-			"reports health|serves the drafting schema|preserves schema routing|schema version|template",
+			"reports health|serves the drafting schema|preserves schema routing|schema version|template|validates all starter decks|validates an edited document|document validation",
 		);
 	await run(
 		fullConverter

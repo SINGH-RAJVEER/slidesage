@@ -33,7 +33,7 @@ just dev
 
 ## Rust port development
 
-The work-in-progress package is `apps/backend-rust`. It provides API health/CORS, password sign-in, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete with optional Valkey caching, and converter health/schema/templates. Most application endpoints, generation and PPTX export remain pending. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
+The work-in-progress package is `apps/backend-rust`. It provides API health/CORS, password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete, saved-document reads with optional Valkey caching, and converter health/schema/templates/document validation. Most application endpoints, generation and PPTX export remain pending. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
 
 Run the implemented compatibility subset with one command:
 
@@ -77,14 +77,18 @@ With the same environment, run `go -C apps/api test -count=1 -tags rustcompat -r
 
 Set `CACHE_VALKEY_ADDR` on the Rust API and `TEST_VALKEY_ADDR` on tests to the same disposable no-auth Valkey, then run `TestRustPresentationListSharesGoCache` in that Go package. It fills entries in both directions, blocks presentation-table reads to prove cache hits, checks corruption recovery and verifies the 30-second TTL. Native Rust tests also cover committed invalidation, rollback, ownership changes, account deletion, late fills, size limits, expiry and outages. PostgreSQL still supplies the current cache generation on every list request. See [cache details](DATABASE_CACHE.md#isolated-rust-port).
 
+Owner document reads use `TestCurrentCardDocumentMatchesRust` and `TestRustCurrentCardDocumentSharesGoCache` in `./internal/carddocument`. With the same disposable database/auth/Valkey variables, these compare current revision metadata, referenced assets, raw numeric precision, fresh ownership/head/assets, cache interchange and one-hour TTLs. The runner includes the original Go card-document tests too. Stored documents retain their JSONB values; this read endpoint does not run the converter validator or rewrite stored bytes.
+
 For session/profile reads and sign-out, keep `API_UNDER_TEST_URL`, `TEST_DATABASE_URL` and `TEST_AUTH_SECRET` set, then run `go -C apps/api test -count=1 -tags rustcompat -run '^TestAuthReadRoutesMatchRust$' ./internal/auth`. The suite creates/removes its own user/credential fixtures and compares 25 cases with the original Go routes. Run it again with `TEST_SECURE_COOKIES=true` against a test API configured with `BASE_URL=https://slidesage.app` to check `__Secure-slidesage_token`, Secure and SameSite=None. This tests HTTPS cookie configuration; the local test transport can still use HTTP. Only `session.expiresAt` is normalized, after verifying it falls within the request's lookup-time + seven-day window.
 
 For password sign-in, run `go -C apps/api test -count=1 -tags rustcompat -run '^TestPasswordSignInMatchesRust$' ./internal/auth` with the same database/auth variables. Set `TRUST_PROXY_HEADERS=true` on both the test process and test API for the synthetic proxy/rate-limit cases. Set `TEST_RATE_LIMIT_HASH_SECRET` if the server uses a separate rate secret. Cases compare credentials, JSON parsing, normalization, JWT claims, cookie policy and persisted IP/email counters. Repeat against the secure-cookie API as above. Password checks use a bounded blocking pool; no verification mail is sent by this endpoint in the reference implementation.
 
-The converter handler suite targets Bun by default. Set `CONVERTER_UNDER_TEST_URL` to send every request to a running Rust worker, preserving the existing assertions. The focused command below checks health/schema/templates; eight other handler cases remain required and currently fail against Rust. Running without `-t` exposes those failures. PPTX writer tests still exercise Bun directly and need their own adapter.
+The runner also executes `TestSignInOptionsMatchesRust` in both configurations. Its required database-failure assertions briefly rename columns, then restore them, and require `TEST_RUST_DISPOSABLE_DATABASE=true`. Run that oracle through the disposable runner to keep those mutations inside a fresh private database. It checks strict request decoding, credential availability, missing accounts and the shared sign-in rate counters.
+
+The converter handler suite targets Bun by default. Set `CONVERTER_UNDER_TEST_URL` to send requests to a running Rust worker, preserving the existing assertions. The focused command below checks health/schema/templates/document validation. Unported conversion, assembly and draft handler failures remain required; running without `-t` exposes them. The editor-validation test prepares its input using the reference implementation, then sends its original validation assertions to the selected worker. PPTX writer tests still exercise Bun directly and need their own adapter.
 
 ```bash
-CONVERTER_UNDER_TEST_URL=http://127.0.0.1:8091 bun test --isolate apps/converter/src/handler.test.ts -t 'reports health|serves the drafting schema|preserves schema routing|schema version|template'
+CONVERTER_UNDER_TEST_URL=http://127.0.0.1:8091 bun test --isolate apps/converter/src/handler.test.ts -t 'reports health|serves the drafting schema|preserves schema routing|schema version|template|validates all starter decks|validates an edited document|document validation'
 ```
 
 The Rust drafting descriptor is embedded at `apps/backend-rust/src/cards/drafting-schema.json`. Keep it aligned with `libs/cards/src/draft-format.ts`, `layouts.ts` and `schema.ts`; the schema test compares the full response with the current TypeScript function, so stale metadata fails. This is drafting metadata, not a document validator.
