@@ -21,11 +21,10 @@ async fn dispatch(method: Method, uri: Uri, headers: HeaderMap, body: Body) -> R
 		"/health" => health(method).await,
 		"/v1/schema" => schema(method).await,
 		"/v1/templates" => templates(method, headers, body).await,
-		"/v1/cards"
-		| "/v1/documents"
-		| "/v1/documents/validate"
-		| "/v1/documents/drafts"
-		| "/v1/documents/pptx" => pending(method, headers).await,
+		"/v1/documents/validate" => validate_document(method, headers, body).await,
+		"/v1/cards" | "/v1/documents" | "/v1/documents/drafts" | "/v1/documents/pptx" => {
+			pending(method, headers).await
+		}
 		_ => not_found().await,
 	}
 }
@@ -116,6 +115,22 @@ async fn read_template_id(
 	headers: HeaderMap,
 	body: Body,
 ) -> Result<String, (StatusCode, &'static str)> {
+	let input = read_object(headers, body).await?;
+	let id = input
+		.get("templateId")
+		.string()
+		.filter(|value| !value.blank())
+		.ok_or((
+			StatusCode::BAD_REQUEST,
+			"templateId must be a non-empty string",
+		))?;
+	Ok(id.display())
+}
+
+async fn read_object(
+	headers: HeaderMap,
+	body: Body,
+) -> Result<crate::cards::validation::json::Object, (StatusCode, &'static str)> {
 	let too_large = (StatusCode::PAYLOAD_TOO_LARGE, "request body is too large");
 	let invalid_json = (StatusCode::BAD_REQUEST, "request body is not JSON");
 	if headers
@@ -145,40 +160,62 @@ async fn read_template_id(
 	if text.encode_utf16().count() > MAX_BODY_UNITS {
 		return Err(too_large);
 	}
-	let normalized = crate::http::json::replace_lone_surrogates(text);
 	let raw: Box<serde_json::value::RawValue> =
-		serde_json::from_str(&normalized).map_err(|_| invalid_json)?;
-	if !raw.get().starts_with('{') {
-		return Err((StatusCode::BAD_REQUEST, "request body must be an object"));
-	}
-	let input: std::collections::HashMap<String, Box<serde_json::value::RawValue>> =
-		serde_json::from_str(raw.get()).map_err(|_| invalid_json)?;
-	let id = input
-		.get("templateId")
-		.and_then(|value| serde_json::from_str::<String>(value.get()).ok())
-		.filter(|value| !value.trim_matches(js_whitespace).is_empty())
-		.ok_or((
-			StatusCode::BAD_REQUEST,
-			"templateId must be a non-empty string",
-		))?;
-	Ok(id)
+		serde_json::from_str(text).map_err(|_| invalid_json)?;
+	crate::cards::validation::json::Value::parse(raw)
+		.record()
+		.ok_or((StatusCode::BAD_REQUEST, "request body must be an object"))
 }
 
-fn js_whitespace(character: char) -> bool {
-	matches!(
-		character,
-		'\u{0009}'..='\u{000d}'
-			| '\u{0020}'
-			| '\u{00a0}'
-			| '\u{1680}'
-			| '\u{2000}'..='\u{200a}'
-			| '\u{2028}'
-			| '\u{2029}'
-			| '\u{202f}'
-			| '\u{205f}'
-			| '\u{3000}'
-			| '\u{feff}'
-	)
+async fn validate_document(method: Method, headers: HeaderMap, body: Body) -> Response {
+	use crate::cards::validation::{self, json::Value};
+	if let Some(response) = negotiation_error(method, &headers) {
+		return response;
+	}
+	let input = match read_object(headers, body).await {
+		Ok(input) => input,
+		Err((status, error)) => return json_response(status, json!({"error": error})),
+	};
+	let mut assets = std::collections::HashSet::new();
+	if !input.get("assetIds").nullish() {
+		let Some(values) = input.get("assetIds").array() else {
+			return json_response(
+				StatusCode::BAD_REQUEST,
+				json!({"error":"assetIds must be an array"}),
+			);
+		};
+		for (index, value) in values.iter().enumerate() {
+			let Some(value) = value.string().filter(|value| !value.blank()) else {
+				return json_response(
+					StatusCode::BAD_REQUEST,
+					json!({"error":format!("assetIds[{index}] must be a non-empty string")}),
+				);
+			};
+			assets.insert(value);
+		}
+	}
+	match validation::document(input.get("document"), &assets) {
+		Ok(document) => json_response(
+			StatusCode::OK,
+			Value::object([("schemaVersion", Value::Number(3.)), ("document", document)]),
+		),
+		Err(validation::Error::Conversion) => json_response(
+			StatusCode::INTERNAL_SERVER_ERROR,
+			json!({"error":"conversion failed"}),
+		),
+		Err(validation::Error::Schema(issue)) => {
+			#[derive(serde::Serialize)]
+			struct InvalidDocument {
+				#[serde(rename = "schemaVersion")]
+				version: u8,
+				issue: validation::Issue,
+			}
+			json_response(
+				StatusCode::UNPROCESSABLE_ENTITY,
+				InvalidDocument { version: 3, issue },
+			)
+		}
+	}
 }
 
 async fn health(method: Method) -> Response {

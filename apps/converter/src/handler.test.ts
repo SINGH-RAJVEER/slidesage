@@ -198,12 +198,20 @@ describe("converter", () => {
 	});
 
 	it("validates an edited document against the presentation's assets", async () => {
-		const converted = await post("/v1/cards", {
+		const fixturePost = (path: string, body: unknown) =>
+			referenceHandle(
+				new Request(`http://converter${path}`, {
+					method: "POST",
+					headers: { [SCHEMA_VERSION_HEADER]: "3" },
+					body: JSON.stringify(body),
+				}),
+			);
+		const converted = await fixturePost("/v1/cards", {
 			operationId: "op-1",
 			cards: [{ position: 1, takeaway: "Opening", role: "opening", draft }],
 		});
 		const { results } = (await converted.json()) as { results: Array<{ card: unknown }> };
-		const assembled = await post("/v1/documents", {
+		const assembled = await fixturePost("/v1/documents", {
 			title: "Grid storage",
 			theme: "slate",
 			cards: results.map((result) => result.card),
@@ -435,5 +443,287 @@ describe("template catalog endpoint", () => {
 			}),
 		);
 		expect(missing.status).toBe(404);
+	});
+});
+
+describe("document validation parity", () => {
+	async function compare(body: string, label: string) {
+		const make = () =>
+			new Request("http://converter/v1/documents/validate", {
+				method: "POST",
+				headers: { "Content-Type": "application/json", [SCHEMA_VERSION_HEADER]: "3" },
+				body,
+			});
+		const reference = await referenceHandle(make());
+		const actual = await handle(make());
+		expect({ label, status: actual.status, body: await actual.json() }).toEqual({
+			label,
+			status: reference.status,
+			body: await reference.json(),
+		});
+	}
+	function simpleDocument(
+		nodes: unknown[] = [{ id: "n_heading1", type: "heading", text: [{ text: "A heading" }] }],
+		layout = "title",
+	) {
+		return {
+			schemaVersion: 3,
+			title: "A document",
+			theme: "paper",
+			cardOrder: ["c_first001"],
+			cards: {
+				c_first001: {
+					id: "c_first001",
+					takeaway: "One point",
+					role: "opening",
+					layout,
+					nodes,
+					sourceIds: ["s1", "s1", "s2"],
+				},
+			},
+		};
+	}
+	it("normalizes every template and old schema version with exact asset checks", async () => {
+		for (const template of CARD_TEMPLATES) {
+			for (const schemaVersion of [1, 2, 3]) {
+				await compare(
+					JSON.stringify({
+						document: { ...template.document, schemaVersion },
+						assetIds: Object.keys(template.assets),
+					}),
+					`${template.id} version ${schemaVersion}`,
+				);
+			}
+			await compare(
+				JSON.stringify({ document: template.document, assetIds: [] }),
+				`${template.id} unregistered assets`,
+			);
+		}
+	});
+	it("matches first issues for every template field and node", async () => {
+		for (const template of CARD_TEMPLATES) {
+			const original = { document: template.document, assetIds: Object.keys(template.assets) };
+			const paths: string[][] = [];
+			function visit(value: unknown, path: string[]) {
+				if (Array.isArray(value)) {
+					value.forEach((entry, index) => {
+						visit(entry, [...path, String(index)]);
+					});
+					return;
+				}
+				if (typeof value !== "object" || value === null) return;
+				for (const [key, entry] of Object.entries(value)) {
+					paths.push([...path, key]);
+					visit(entry, [...path, key]);
+				}
+			}
+			visit(original.document, ["document"]);
+			for (const path of paths) {
+				for (const replacement of [undefined, null, false, [], {}, "", "\ufeff"]) {
+					const changed = JSON.parse(JSON.stringify(original)) as Record<string, unknown>;
+					let parent = changed;
+					for (const key of path.slice(0, -1)) parent = parent[key] as Record<string, unknown>;
+					const key = path.at(-1) ?? "";
+					if (replacement === undefined) delete parent[key];
+					else parent[key] = replacement;
+					await compare(
+						JSON.stringify(changed),
+						`${template.id} ${path.join(".")}=${JSON.stringify(replacement)}`,
+					);
+				}
+			}
+		}
+	}, 120000);
+	it("matches widget constraints, ID order and all layout rules", async () => {
+		const heading = { id: "n_heading1", type: "heading", text: [{ text: "Heading" }] };
+		const chart = {
+			id: "n_chart001",
+			type: "chart",
+			kind: "column",
+			size: "medium",
+			categories: ["A", "B"],
+			series: [{ id: "s_series01", name: "Revenue", values: [1, 2] }],
+		};
+		const progress = {
+			id: "n_meter001",
+			type: "progress",
+			size: "small",
+			items: [{ id: "i_meter001", label: "Done", value: 50 }],
+		};
+		const table = {
+			id: "n_table001",
+			type: "table",
+			size: "large",
+			columns: ["A", "B"],
+			rows: [{ id: "r_row0001", cells: ["", "Value"] }],
+		};
+		const callout = {
+			id: "n_call0001",
+			type: "callout",
+			size: "small",
+			tone: "note",
+			text: [{ text: "Attention", bold: true }],
+		};
+		for (const layout of Object.keys(draftingSchema().layouts)) {
+			for (const nodes of [
+				[],
+				[heading],
+				[heading, chart],
+				[heading, table],
+				[heading, progress, callout],
+				[heading, chart, progress, table, callout],
+			]) {
+				await compare(
+					JSON.stringify({ document: simpleDocument(nodes, layout) }),
+					`${layout} ${nodes.map((node) => node.type).join(",")}`,
+				);
+			}
+		}
+		for (const kind of [
+			"column",
+			"bar",
+			"stacked-column",
+			"line",
+			"area",
+			"pie",
+			"donut",
+			"invalid",
+		]) {
+			for (const values of [[0, 0], [-1, 2], [1, 2], [1], [1, 1e13]]) {
+				await compare(
+					JSON.stringify({
+						document: simpleDocument(
+							[heading, { ...chart, kind, series: [{ ...chart.series[0], values }] }],
+							"chart",
+						),
+					}),
+					`chart ${kind} ${values}`,
+				);
+			}
+		}
+		for (const size of ["small", "medium", "large", "full", "invalid"]) {
+			await compare(
+				JSON.stringify({
+					document: simpleDocument([heading, { ...progress, size }, callout], "dashboard"),
+				}),
+				`dashboard ${size}`,
+			);
+		}
+		for (const type of [
+			undefined,
+			null,
+			false,
+			1,
+			1e-7,
+			1e-6,
+			1e20,
+			1e21,
+			Number("2116746914230136.25"),
+			Number("763677196871030.25"),
+			Number("230459269801584.625"),
+			{ a: 1 },
+			[1, "x"],
+			"bad",
+		]) {
+			await compare(
+				JSON.stringify({ document: simpleDocument([{ type }]) }),
+				`unsupported type ${JSON.stringify(type)}`,
+			);
+		}
+	});
+	it("matches Unicode lengths, unknown-key order and malformed request data", async () => {
+		for (const content of [
+			"\ud800",
+			"\udfff",
+			"😀".repeat(90),
+			"😀".repeat(91),
+			"\u0085",
+			"\ufeff",
+			"\ud800".repeat(91),
+		]) {
+			await compare(
+				JSON.stringify({
+					document: simpleDocument([
+						{ id: "n_heading1", type: "heading", text: [{ text: content }] },
+					]),
+				}),
+				`text ${content.length}`,
+			);
+		}
+		await compare(
+			JSON.stringify({
+				document: simpleDocument(
+					[
+						{ id: "n_heading1", type: "heading", text: [{ text: "Heading" }] },
+						{
+							id: "n_columns1",
+							type: "columns",
+							columns: [
+								{ id: "c_column01", heading: "\ud800", items: [] },
+								{ id: "c_column02", heading: "Other", items: [] },
+							],
+						},
+					],
+					"comparison",
+				),
+			}),
+			"surrogate column count issue",
+		);
+		const splitPair = simpleDocument([
+			{
+				id: "n_heading1",
+				type: "heading",
+				text: [{ text: "\ud83d" }, { text: "\ude00".repeat(90) }],
+			},
+		]);
+		await compare(JSON.stringify({ document: splitPair }), "UTF16 pair crossing rich text runs");
+		for (const name of [
+			"toString",
+			"constructor",
+			"__proto__",
+			"hasOwnProperty",
+			"__defineGetter__",
+		]) {
+			await compare(
+				JSON.stringify({
+					document: { ...simpleDocument(), cardOrder: [name], cards: { [name]: {} } },
+				}),
+				`prototype ${name}`,
+			);
+		}
+		for (const cardOrder of [
+			[{ toString: null }],
+			[[{ toString: 0 }]],
+			[{ toString: {} }],
+			[{ valueOf: null }],
+		]) {
+			for (const cards of [null, {}, { "[object Object]": {} }]) {
+				await compare(
+					JSON.stringify({ document: { ...simpleDocument(), cardOrder, cards } }),
+					`coercion ${JSON.stringify(cardOrder)} cards=${JSON.stringify(cards)}`,
+				);
+			}
+		}
+		const base = JSON.stringify({ document: simpleDocument() });
+		for (const body of [
+			"",
+			"{",
+			"null",
+			"[]",
+			"true",
+			"0",
+			'{"assetIds":[null]}',
+			'{"assetIds":false}',
+			'{"assetIds":["\ufeff"]}',
+			'{"document":{"z":1,"10":1,"2":1,"a":2}}',
+			'{"document":{"schemaVersion":3,"cardOrder":[1e999],"cards":{"Infinity":{}}}}',
+			'{"document":{"\\ud800":1,"a":2}}',
+			base.replace('"type":"heading"', '"type":1e999'),
+			base.replace('"schemaVersion":3', '"schemaVersion":1e999'),
+			base.replace('"type":"heading"', '"type":{"z":1,"2":2,"a":-0,"n":1e999}'),
+			base.replace('"title":"A document"', '"title":"bad","title":"A document"'),
+		]) {
+			await compare(body, `raw ${body.slice(0, 100)}`);
+		}
 	});
 });

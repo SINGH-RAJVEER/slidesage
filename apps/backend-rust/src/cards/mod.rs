@@ -1,4 +1,4 @@
-//! Static drafting metadata. Document validation and card conversion are pending.
+//! Drafting metadata, curated templates and native document validation.
 
 mod templates;
 pub use templates::template_deck;
@@ -17,3 +17,5 @@ pub fn drafting_schema() -> &'static Value {
 	});
 	&SCHEMA
 }
+
+pub mod validation;
