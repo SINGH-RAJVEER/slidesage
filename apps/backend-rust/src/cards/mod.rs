@@ -19,5 +19,6 @@ pub fn drafting_schema() -> &'static Value {
 }
 
 pub mod assembly;
+pub mod convert;
 pub mod drafts;
 pub mod validation;

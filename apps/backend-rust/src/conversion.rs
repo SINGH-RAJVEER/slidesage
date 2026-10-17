@@ -24,7 +24,8 @@ async fn dispatch(method: Method, uri: Uri, headers: HeaderMap, body: Body) -> R
 		"/v1/documents/validate" => validate_document(method, headers, body).await,
 		"/v1/documents" => assemble_document(method, headers, body).await,
 		"/v1/documents/drafts" => extract_drafts(method, headers, body).await,
-		"/v1/cards" | "/v1/documents/pptx" => pending(method, headers).await,
+		"/v1/cards" => convert_cards(method, headers, body).await,
+		"/v1/documents/pptx" => pending(method, headers).await,
 		_ => not_found().await,
 	}
 }
@@ -205,6 +206,23 @@ fn validate_input(
 	}
 	validation::document(input.get("document"), &assets)
 		.map_err(|error| Box::new(validation_failure(error)))
+}
+
+async fn convert_cards(method: Method, headers: HeaderMap, body: Body) -> Response {
+	if let Some(response) = negotiation_error(method, &headers) {
+		return response;
+	}
+	let input = match read_object(headers, body).await {
+		Ok(input) => input,
+		Err((status, error)) => return json_response(status, json!({"error": error})),
+	};
+	match crate::cards::convert::convert(&input) {
+		Ok(result) => json_response(StatusCode::OK, result),
+		Err(crate::cards::convert::Error::Request(message)) => {
+			json_response(StatusCode::BAD_REQUEST, json!({"error": message}))
+		}
+		Err(crate::cards::convert::Error::Validation(error)) => validation_failure(error),
+	}
 }
 
 async fn assemble_document(method: Method, headers: HeaderMap, body: Body) -> Response {

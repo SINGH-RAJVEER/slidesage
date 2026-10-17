@@ -5,7 +5,7 @@ async fn main() -> std::io::Result<()> {
 		.parse::<u16>()
 		.map_err(std::io::Error::other)?;
 	eprintln!(
-		"development port: converter health, schema, templates, document validation, assembly and drafts; card conversion/export are pending"
+		"development port: converter health, schema, templates, card conversion, document validation, assembly and drafts; PPTX export is pending"
 	);
 	slidesage_backend::serve(slidesage_backend::conversion::router(), &host, port).await
 }

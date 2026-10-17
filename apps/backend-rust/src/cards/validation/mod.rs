@@ -173,6 +173,7 @@ fn card(
 	path: &Text,
 	seen: &mut HashSet<Text>,
 	assets: &HashSet<Text>,
+	known_sources: Option<&HashSet<Text>>,
 ) -> Result<Value> {
 	let raw = record(
 		value,
@@ -217,6 +218,12 @@ fn card(
 		}) else {
 			return fail(&path.child("sourceIds").index(index), "is not a source ID");
 		};
+		if known_sources.is_some_and(|known| !known.contains(&source)) {
+			return fail(
+				&path.child("sourceIds").index(index),
+				format!("names unknown source {}", source.display()),
+			);
+		}
 		if unique.insert(source.clone()) {
 			source_ids.push(Value::String(source));
 		}
@@ -253,6 +260,21 @@ impl From<Issue> for Error {
 	fn from(issue: Issue) -> Self {
 		Self::Schema(issue)
 	}
+}
+
+pub fn card_for_conversion(
+	value: &Value,
+	sources: &HashSet<Text>,
+	assets: &HashSet<Text>,
+) -> std::result::Result<Value, Error> {
+	card(
+		value,
+		&Text::new("card"),
+		&mut HashSet::new(),
+		assets,
+		Some(sources),
+	)
+	.map_err(Into::into)
 }
 
 pub fn document(value: &Value, assets: &HashSet<Text>) -> std::result::Result<Value, Error> {
@@ -323,7 +345,7 @@ pub fn document(value: &Value, assets: &HashSet<Text>) -> std::result::Result<Va
 			.map_err(Into::into);
 		}
 		let p = path.child("cards").child_text(&key);
-		let parsed = card(cards_raw.get_text(&key), &p, &mut seen, assets)?;
+		let parsed = card(cards_raw.get_text(&key), &p, &mut seen, assets, None)?;
 		if parsed.record().unwrap().get("id").string() != Some(key.clone()) {
 			return fail(&p.child("id"), "does not match its key").map_err(Into::into);
 		}
