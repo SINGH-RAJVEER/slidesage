@@ -1,30 +1,29 @@
 [package]
 name = "slidesage-backend"
-version = "0.1.0"
-edition = "2024"
-rust-version = "1.95"
-publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 default-run = "api"
 
 [dependencies]
-axum = "0.8.9"
+axum.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 hex = "0.4"
-http-body-util = "0.1"
+http-body-util.workspace = true
 jsonwebtoken = { version = "10", default-features = false, features = ["rust_crypto"] }
 percent-encoding = "2"
 rand = "0.9"
-ryu-js = "1.0.3"
 redis = { version = "1.7", default-features = false, features = ["tokio-rustls-comp", "tls-rustls-webpki-roots"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 scrypt = { version = "0.11", default-features = false }
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["raw_value"] }
+serde.workspace = true
+serde_json.workspace = true
 sha2 = "0.10"
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "chrono", "macros"] }
 subtle = "2.6"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { workspace = true, features = ["sync", "time"] }
 unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v4"] }
 
@@ -37,13 +36,4 @@ path = "tests/feedback_postgres.rs"
 required-features = ["postgres-tests"]
 
 [dev-dependencies]
-tower = { version = "0.5", features = ["util"] }
-
-[profile.dev.package.scrypt]
-opt-level = 2
-
-[profile.dev.package.salsa20]
-opt-level = 2
-
-[profile.dev.package.pbkdf2]
-opt-level = 2
+tower.workspace = true

@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use axum::{
 	Json, Router,
 	body::{Body, to_bytes},
@@ -7,11 +9,11 @@ use axum::{
 use serde_json::json;
 use std::error::Error;
 
-pub use crate::cards::SCHEMA_VERSION as CARD_SCHEMA_VERSION;
+pub use slidesage_cards::SCHEMA_VERSION as CARD_SCHEMA_VERSION;
 
 const MAX_BODY_UNITS: usize = 1024 * 1024;
 
-/// Native document routes. Card conversion and PPTX writing remain pending.
+/// Private native conversion routes. PPTX writing remains pending.
 pub fn router() -> Router {
 	Router::new().fallback(dispatch)
 }
@@ -101,7 +103,7 @@ async fn templates(method: Method, headers: HeaderMap, body: Body) -> Response {
 		return response;
 	}
 	match read_template_id(headers, body).await {
-		Ok(id) => match crate::cards::template_deck(&id) {
+		Ok(id) => match slidesage_cards::template_deck(&id) {
 			Some(deck) => json_response(StatusCode::OK, deck),
 			None => json_response(
 				StatusCode::NOT_FOUND,
@@ -131,7 +133,7 @@ async fn read_template_id(
 async fn read_object(
 	headers: HeaderMap,
 	body: Body,
-) -> Result<crate::cards::validation::json::Object, (StatusCode, &'static str)> {
+) -> Result<slidesage_cards::validation::json::Object, (StatusCode, &'static str)> {
 	let too_large = (StatusCode::PAYLOAD_TOO_LARGE, "request body is too large");
 	let invalid_json = (StatusCode::BAD_REQUEST, "request body is not JSON");
 	if headers
@@ -163,7 +165,7 @@ async fn read_object(
 	}
 	let raw: Box<serde_json::value::RawValue> =
 		serde_json::from_str(text).map_err(|_| invalid_json)?;
-	crate::cards::validation::json::Value::parse(raw)
+	slidesage_cards::validation::json::Value::parse(raw)
 		.record()
 		.ok_or((StatusCode::BAD_REQUEST, "request body must be an object"))
 }
@@ -183,9 +185,9 @@ async fn validate_document(method: Method, headers: HeaderMap, body: Body) -> Re
 }
 
 fn validate_input(
-	input: &crate::cards::validation::json::Object,
-) -> Result<crate::cards::validation::json::Value, Box<Response>> {
-	use crate::cards::validation;
+	input: &slidesage_cards::validation::json::Object,
+) -> Result<slidesage_cards::validation::json::Value, Box<Response>> {
+	use slidesage_cards::validation;
 	let mut assets = std::collections::HashSet::new();
 	if !input.get("assetIds").nullish() {
 		let Some(values) = input.get("assetIds").array() else {
@@ -216,12 +218,12 @@ async fn convert_cards(method: Method, headers: HeaderMap, body: Body) -> Respon
 		Ok(input) => input,
 		Err((status, error)) => return json_response(status, json!({"error": error})),
 	};
-	match crate::cards::convert::convert(&input) {
+	match slidesage_cards::convert::convert(&input) {
 		Ok(result) => json_response(StatusCode::OK, result),
-		Err(crate::cards::convert::Error::Request(message)) => {
+		Err(slidesage_cards::convert::Error::Request(message)) => {
 			json_response(StatusCode::BAD_REQUEST, json!({"error": message}))
 		}
-		Err(crate::cards::convert::Error::Validation(error)) => validation_failure(error),
+		Err(slidesage_cards::convert::Error::Validation(error)) => validation_failure(error),
 	}
 }
 
@@ -233,17 +235,17 @@ async fn assemble_document(method: Method, headers: HeaderMap, body: Body) -> Re
 		Ok(input) => input,
 		Err((status, error)) => return json_response(status, json!({"error": error})),
 	};
-	match crate::cards::assembly::assemble(&input) {
+	match slidesage_cards::assembly::assemble(&input) {
 		Ok(document) => document_response(document),
-		Err(crate::cards::assembly::Error::Request(message)) => {
+		Err(slidesage_cards::assembly::Error::Request(message)) => {
 			json_response(StatusCode::BAD_REQUEST, json!({"error": message}))
 		}
-		Err(crate::cards::assembly::Error::Validation(error)) => validation_failure(error),
+		Err(slidesage_cards::assembly::Error::Validation(error)) => validation_failure(error),
 	}
 }
 
 async fn extract_drafts(method: Method, headers: HeaderMap, body: Body) -> Response {
-	use crate::cards::validation::json::Value;
+	use slidesage_cards::validation::json::Value;
 	if let Some(response) = negotiation_error(method, &headers) {
 		return response;
 	}
@@ -256,23 +258,23 @@ async fn extract_drafts(method: Method, headers: HeaderMap, body: Body) -> Respo
 			StatusCode::OK,
 			Value::object([
 				("schemaVersion", Value::Number(3.)),
-				("cards", crate::cards::drafts::from_document(&document)),
+				("cards", slidesage_cards::drafts::from_document(&document)),
 			]),
 		),
 		Err(response) => *response,
 	}
 }
 
-fn document_response(document: crate::cards::validation::json::Value) -> Response {
-	use crate::cards::validation::json::Value;
+fn document_response(document: slidesage_cards::validation::json::Value) -> Response {
+	use slidesage_cards::validation::json::Value;
 	json_response(
 		StatusCode::OK,
 		Value::object([("schemaVersion", Value::Number(3.)), ("document", document)]),
 	)
 }
 
-fn validation_failure(error: crate::cards::validation::Error) -> Response {
-	use crate::cards::validation;
+fn validation_failure(error: slidesage_cards::validation::Error) -> Response {
+	use slidesage_cards::validation;
 	match error {
 		validation::Error::Conversion => json_response(
 			StatusCode::INTERNAL_SERVER_ERROR,
@@ -307,7 +309,7 @@ async fn schema(method: Method) -> Response {
 	if method != Method::GET {
 		return not_found().await;
 	}
-	json_response(StatusCode::OK, crate::cards::drafting_schema())
+	json_response(StatusCode::OK, slidesage_cards::drafting_schema())
 }
 
 async fn not_found() -> Response {

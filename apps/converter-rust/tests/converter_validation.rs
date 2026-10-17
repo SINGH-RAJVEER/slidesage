@@ -2,11 +2,10 @@ use axum::{
 	body::{Body, to_bytes},
 	http::{Request, StatusCode},
 };
-use slidesage_backend::conversion;
 use tower::ServiceExt;
 
 async fn validate(body: &str) -> (StatusCode, String) {
-	let response = conversion::router()
+	let response = slidesage_converter::router()
 		.oneshot(
 			Request::post("/v1/documents/validate")
 				.header("X-Card-Schema-Version", "3")
@@ -44,7 +43,7 @@ async fn validates_asset_list_before_document_and_negotiates_before_body() {
 		body,
 		r#"{"error":"assetIds[0] must be a non-empty string"}"#
 	);
-	let response = conversion::router()
+	let response = slidesage_converter::router()
 		.oneshot(
 			Request::post("/v1/documents/validate")
 				.body(Body::from("not JSON"))

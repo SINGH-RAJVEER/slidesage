@@ -1,4 +1,4 @@
-//! HTTP behavior from cmd/api/main.go and converter/src/handler.ts.
+//! HTTP behavior from cmd/api/main.go.
 
 use axum::{
 	Router,
@@ -6,10 +6,7 @@ use axum::{
 	http::{Method, Request, StatusCode},
 };
 use serde_json::{Value, json};
-use slidesage_backend::{
-	conversion,
-	http::{Security, router},
-};
+use slidesage_backend::http::{Security, router};
 use tower::ServiceExt;
 
 fn api() -> Router {
@@ -167,22 +164,4 @@ async fn unknown_routes_return_the_existing_error_shape() {
 		&to_bytes(response.into_body(), 4096).await.unwrap()[..],
 		b"{\"error\":{\"message\":\"Resource not found\"}}\n"
 	);
-}
-
-#[tokio::test]
-async fn converter_health_reports_the_current_schema_version() {
-	// Same expected JSON as handler.test.ts: reports health with its schema version.
-	let response = conversion::router()
-		.oneshot(Request::get("/health").body(Body::empty()).unwrap())
-		.await
-		.unwrap();
-	assert_eq!(response.status(), StatusCode::OK);
-	let body: Value =
-		serde_json::from_slice(&to_bytes(response.into_body(), 4096).await.unwrap()).unwrap();
-	assert_eq!(body, json!({"status": "ok", "schemaVersion": 3}));
-	let response = conversion::router()
-		.oneshot(Request::head("/health").body(Body::empty()).unwrap())
-		.await
-		.unwrap();
-	assert_eq!(response.status(), StatusCode::NOT_FOUND);
 }

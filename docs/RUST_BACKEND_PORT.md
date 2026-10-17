@@ -4,7 +4,7 @@ Updated 18 October 2026. Reference implementation at `f922c831`; development is 
 
 ## Implementation status
 
-The Rust files are in [apps/backend-rust](../apps/backend-rust/Cargo.toml). The standalone API implements health, not-found errors and CORS/origin rules. With a database configured it also serves password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation listing/detail/deletion, saved-document reads, owner share management and public shared-deck reads. Optional Valkey list/body caching and converter health/schema/templates/card conversion/validation/assembly/drafts are implemented. Neither binary is wired into application startup or deployment.
+The root [Cargo workspace](../Cargo.toml) contains the [API](../apps/backend-rust/Cargo.toml), [conversion worker](../apps/converter-rust/Cargo.toml) and [shared card library](../libs/cards-rust/Cargo.toml). The standalone API implements health, not-found errors and CORS/origin rules. With a database configured it also serves password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation listing/detail/deletion, saved-document reads, owner share management and public shared-deck reads. Optional Valkey list/body caching and converter health/schema/templates/card conversion/validation/assembly/drafts are implemented. Neither binary is wired into application startup or deployment.
 
 The tests reuse Go password/JWT cases and run the existing Go CORS and feedback assertions against a live Axum server. Feedback adapters check actual database rows; PostgreSQL integration tests cover validation, cookies, bearer precedence, insertion failures and the 10-per-hour limit. Go/Rust rate-counter checks verify the same hashing/window behavior. Committed `.sqlx` metadata supports offline builds; `cargo sqlx prepare --check` validates it against a database migrated with the unchanged Goose/River runner. [Development commands](DEVELOPMENT_SETUP.md#rust-port-development).
 
@@ -75,27 +75,30 @@ The target runtime removes Go application processes and the Bun converter servic
 
 The cost is rewriting working behavior, learning async ownership, longer builds, and maintaining two implementations during rollout. SQLx cannot prove business correctness or protect a query that omits an ownership check.
 
-## Proposed structure
+## Package structure
 
-Start with one Cargo package under `apps/backend-rust`, with API, generation-worker and conversion-worker binaries. Share card logic inside the package.
+The API and conversion worker are separate Cargo packages and executables. The converter owns its private HTTP routes, configuration and graceful shutdown; it imports card logic directly from `slidesage-cards`, with no dependency on the backend crate, SQLx, authentication or Valkey. The card library contains no HTTP or database runtime. There are no re-exports at the old backend paths.
 
 ```text
-apps/backend-rust/
-	Cargo.toml
+Cargo.toml                        workspace and shared dependency settings
+Cargo.lock                        one dependency lockfile
+rustfmt.toml                      shared formatting settings
+.sqlx/                            checked query metadata
+apps/backend-rust/                API, authentication, PostgreSQL and Valkey
 	src/bin/api.rs
-	src/bin/worker.rs
-	src/bin/conversion_worker.rs
-	src/http/          routes, auth extraction, errors, SSE
-	src/domain/        IDs, lifecycle, points, service rules
-	src/postgres/      SQLx repositories and transactions
-	src/jobs/          River adapters and worker execution
-	src/cards/         schema, validation, assembly, templates, themes
-	src/pptx/          editable slide layout and native PPTX writing
-	src/conversion/    private worker routes and bounded execution
-	src/integrations/  providers, billing, mail, worker client, Valkey
-	src/telemetry.rs
-	.sqlx/             checked query metadata
+	tests/                        API tests and PostgreSQL checks
+	compatibility/                isolated test runner and route inventory
+apps/converter-rust/              private conversion worker
+	src/main.rs                   conversion_worker executable
+	src/lib.rs                    native HTTP handlers
+	tests/                        converter HTTP assertions
+libs/cards-rust/                  reusable card rules, templates and metadata
+	src/                          conversion, assembly, validation and drafts
+	tests/                        card logic assertions
+	scripts/templates.ts          build-time catalog generator
 ```
+
+All three packages share the root lockfile and `target/` directory. Each app can be built and run separately. Its process can have independent resource limits and restarts when production wiring is added. The durable generation port remains pending and will live in its own `apps/worker-rust` package; no generation-worker package or placeholder executable exists yet. This organization does not change the single-cutover release gate.
 
 Handlers validate requests, services own transaction boundaries, repositories accept the caller's transaction, and integrations perform external I/O. Do not keep a database transaction or checked-out connection open while waiting for AI output or a slow SSE client.
 

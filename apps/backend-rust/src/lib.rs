@@ -4,8 +4,6 @@ pub mod auth;
 pub mod billing;
 pub mod cache;
 pub mod card_documents;
-pub mod cards;
-pub mod conversion;
 pub mod feedback;
 pub mod http;
 pub mod presentations;
@@ -25,7 +23,7 @@ pub fn rfc3339_nano(time: chrono::DateTime<chrono::Utc>) -> String {
 
 use std::io;
 
-/// Used by both standalone development servers. Production wiring is still pending.
+/// Runs the standalone API. Production wiring is still pending.
 pub async fn serve(app: axum::Router, host: &str, port: u16) -> io::Result<()> {
 	let listener = tokio::net::TcpListener::bind((host, port)).await?;
 	println!("listening on {}", listener.local_addr()?);

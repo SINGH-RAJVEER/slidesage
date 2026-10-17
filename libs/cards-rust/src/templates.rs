@@ -3,7 +3,7 @@
 use serde_json::Value;
 use std::sync::LazyLock;
 
-/// Regenerate the embedded catalog with `bun apps/backend-rust/scripts/templates.ts`.
+/// Regenerate the embedded catalog with `bun libs/cards-rust/scripts/templates.ts`.
 /// Converter tests compare every response with the current TypeScript catalog.
 pub fn template_deck(id: &str) -> Option<&'static Value> {
 	static TEMPLATES: LazyLock<Value> = LazyLock::new(|| {

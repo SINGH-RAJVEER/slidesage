@@ -1,4 +1,4 @@
-use slidesage_backend::cards::{
+use slidesage_cards::{
 	convert::{self, Error},
 	validation::json::{Text, Value},
 };

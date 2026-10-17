@@ -3,7 +3,6 @@ use axum::{
 	http::{Request, StatusCode},
 };
 use serde_json::{Value, json};
-use slidesage_backend::conversion;
 use tower::ServiceExt;
 
 async fn submit(body: impl Into<Body>, version: Option<&str>) -> (StatusCode, Value) {
@@ -11,7 +10,7 @@ async fn submit(body: impl Into<Body>, version: Option<&str>) -> (StatusCode, Va
 	if let Some(version) = version {
 		request = request.header("X-Card-Schema-Version", version);
 	}
-	let response = conversion::router()
+	let response = slidesage_converter::router()
 		.oneshot(request.body(body.into()).unwrap())
 		.await
 		.unwrap();
@@ -109,7 +108,7 @@ async fn template_body_limit_counts_utf16_units_and_checks_declared_bytes() {
 			json!({"error": "request body is too large"})
 		)
 	);
-	let response = conversion::router()
+	let response = slidesage_converter::router()
 		.oneshot(
 			Request::post("/v1/templates")
 				.header("X-Card-Schema-Version", "3")
@@ -131,7 +130,7 @@ async fn converter_matches_fetch_header_joining_and_url_path_normalization() {
 		"/discard/%2e%2E/v1/templates",
 		"/v1\\templates",
 	] {
-		let response = conversion::router()
+		let response = slidesage_converter::router()
 			.oneshot(
 				Request::post(path)
 					.header("X-Card-Schema-Version", "3")
@@ -142,7 +141,7 @@ async fn converter_matches_fetch_header_joining_and_url_path_normalization() {
 			.unwrap();
 		assert_eq!(response.status(), StatusCode::OK, "{path}");
 	}
-	let response = conversion::router()
+	let response = slidesage_converter::router()
 		.oneshot(
 			Request::post("/v1/templates")
 				.header("X-Card-Schema-Version", "3")

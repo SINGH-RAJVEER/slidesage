@@ -33,7 +33,7 @@ just dev
 
 ## Rust port development
 
-The work-in-progress package is `apps/backend-rust`. It provides API health/CORS, password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete, saved-document reads with optional Valkey caching, share management, public shared-deck reads, and converter health/schema/templates/card conversion/validation/assembly/drafts. Most application endpoints, generation and PPTX export remain pending. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
+The root Cargo workspace contains the API in `apps/backend-rust`, the conversion worker in `apps/converter-rust`, and shared card logic in `libs/cards-rust`. The API provides health/CORS, password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete, saved-document reads with optional Valkey caching, share management and public shared-deck reads. The converter provides health/schema/templates/card conversion/validation/assembly/drafts. It depends on the shared card library and has no backend, database, authentication or cache dependency. The shared library has no HTTP runtime. Most application endpoints, durable generation and PPTX export remain pending. The generation port will get its own package at `apps/worker-rust`; that package is not implemented yet. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
 
 Run the implemented compatibility subset with one command:
 
@@ -48,25 +48,25 @@ A passing run keeps `release_ready: false`. All converter handler assertions run
 Run from the repository root inside `devenv shell`:
 
 ```bash
-cargo test --manifest-path apps/backend-rust/Cargo.toml --locked --all-targets
-cargo run --manifest-path apps/backend-rust/Cargo.toml --bin api
+cargo test --workspace --locked --all-targets
+cargo run -p slidesage-backend --bin api
 ```
 
-The standalone API defaults to `127.0.0.1:8001`; `HOST` and `PORT` override it. In another terminal, run `cargo run --manifest-path apps/backend-rust/Cargo.toml --bin conversion_worker` for the implemented converter routes on `127.0.0.1:8091`. It accepts `CARD_CONVERTER_HOST` and `CARD_CONVERTER_PORT` overrides. Both stop on SIGINT/SIGTERM.
+The standalone API defaults to `127.0.0.1:8001`; `HOST` and `PORT` override it. In another terminal, run `cargo run -p slidesage-converter --bin conversion_worker` for the implemented converter routes on `127.0.0.1:8091`. It accepts `CARD_CONVERTER_HOST` and `CARD_CONVERTER_PORT` overrides. Both stop on SIGINT/SIGTERM. They can be built separately with `cargo build --locked -p slidesage-backend --bin api` and `cargo build --locked -p slidesage-converter --bin conversion_worker`. All packages share the root `Cargo.lock`, `target/` and formatting configuration; SQLx metadata lives in the root `.sqlx/`.
 
 Set `DATABASE_URL` to a database migrated with the existing Go runner to enable the implemented application routes. Without it, the standalone server exposes health only. `AUTH_SECRET` signs/verifies tokens; `BASE_URL` selects the existing normal or HTTPS cookie name and sign-out policy, and `RATE_LIMIT_HASH_SECRET` defaults to `AUTH_SECRET`. HTTPS rejects short/placeholder auth secrets; production requires an explicit rate-limit hash secret. The current SQLx pool is limited to five connections.
 
-SQLx 0.9 requires a matching CLI for query metadata checks. Install it with `cargo install sqlx-cli --version 0.9.0 --no-default-features --features postgres,rustls`. The repository Cargo configuration defaults to offline query metadata, so builds do not contact the configured database. To refresh/check metadata against a disposable migrated database, run from `apps/backend-rust`:
+SQLx 0.9 requires a matching CLI for query metadata checks. Install it with `cargo install sqlx-cli --version 0.9.0 --no-default-features --features postgres,rustls`. The repository Cargo configuration defaults to offline query metadata, so builds do not contact the configured database. To refresh/check workspace metadata against a disposable migrated database, run from the repository root:
 
 ```bash
-DATABASE_URL=postgresql://slidesage@127.0.0.1:5432/slidesage_test cargo sqlx prepare -- --all-targets --all-features
-DATABASE_URL=postgresql://slidesage@127.0.0.1:5432/slidesage_test cargo sqlx prepare --check -- --all-targets --all-features
+DATABASE_URL=postgresql://slidesage@127.0.0.1:5432/slidesage_test cargo sqlx prepare --workspace -- --locked --all-targets --all-features
+DATABASE_URL=postgresql://slidesage@127.0.0.1:5432/slidesage_test cargo sqlx prepare --workspace --check -- --locked --all-targets --all-features
 ```
 
 The explicit PostgreSQL suite requires a disposable UTF-8 database with the unchanged application and River migrations applied. It fails if `TEST_DATABASE_URL` is absent:
 
 ```bash
-TEST_DATABASE_URL=postgresql://slidesage@127.0.0.1:5432/slidesage_test cargo test --manifest-path apps/backend-rust/Cargo.toml --locked --all-targets --features postgres-tests
+TEST_DATABASE_URL=postgresql://slidesage@127.0.0.1:5432/slidesage_test cargo test --workspace --locked --all-targets --all-features
 ```
 
 The original Go feedback tests can target the Rust server using `API_UNDER_TEST_URL`, `FEEDBACK_TEST_DATABASE_URL` and `TEST_AUTH_SECRET`. Seed a synthetic `users` row with ID `user-1` in that disposable database first. Run `go -C apps/api test -count=1 ./internal/feedback`; the adapter resets only that fixture user's feedback rate counter for each independent validation case and verifies real persisted rows. The separate `go -C apps/api test -count=1 -tags rustcompat -run '^TestFeedbackRateLimitMatchesRust$' ./internal/middleware` compares Go/Rust limits and counter hashes with fresh synthetic identities. If the server uses a separate rate secret, set `TEST_RATE_LIMIT_HASH_SECRET` to the same test value.
@@ -93,9 +93,9 @@ The converter tests target Bun by default. Set `CONVERTER_UNDER_TEST_URL` to sen
 CONVERTER_UNDER_TEST_URL=http://127.0.0.1:8091 bun test --isolate apps/converter/src/handler.test.ts apps/converter/src/cards.compatibility.test.ts apps/converter/src/assembly.compatibility.test.ts apps/converter/src/drafts.compatibility.test.ts
 ```
 
-The Rust drafting descriptor is embedded at `apps/backend-rust/src/cards/drafting-schema.json`. Keep it aligned with `libs/cards/src/draft-format.ts`, `layouts.ts` and `schema.ts`; the schema test compares the full response with the current TypeScript function, so stale metadata fails. This is drafting metadata, not a document validator.
+The Rust drafting descriptor is embedded at `libs/cards-rust/src/drafting-schema.json`. Keep it aligned with `libs/cards/src/draft-format.ts`, `layouts.ts` and `schema.ts`; the schema test compares the full response with the current TypeScript function, so stale metadata fails. This is drafting metadata, not a document validator.
 
-Curated template documents/assets are embedded in `apps/backend-rust/src/cards/templates.json`. Regenerate them with `bun apps/backend-rust/scripts/templates.ts` after changing the TypeScript catalog. Handler tests compare all six responses with the current catalog; the Rust worker needs no Bun process or runtime catalog files.
+Curated template documents/assets are embedded in `libs/cards-rust/src/templates.json`. Regenerate them with `bun libs/cards-rust/scripts/templates.ts` after changing the TypeScript catalog. Handler tests compare all six responses with the current catalog; the Rust worker needs no Bun process or runtime catalog files.
 
 The original Go CORS tests can target the running Rust API. Configure matching origins on that server, then run:
 
@@ -106,11 +106,11 @@ API_UNDER_TEST_URL=http://127.0.0.1:8001 go -C apps/api test -count=1 -run '^Tes
 Cross-language auth checks use synthetic credentials through stdin and compare the original Go functions with the Rust helpers in both directions:
 
 ```bash
-cargo build --manifest-path apps/backend-rust/Cargo.toml --locked --example auth_compat
-RUST_AUTH_COMPAT_BIN="$PWD/apps/backend-rust/target/debug/examples/auth_compat" go -C apps/api test -count=1 -tags rustcompat -run '^TestRustPasswordAndJWTCompatibility$' ./internal/auth
+cargo build -p slidesage-backend --locked --example auth_compat
+RUST_AUTH_COMPAT_BIN="$PWD/target/debug/examples/auth_compat" go -C apps/api test -count=1 -tags rustcompat -run '^TestRustPasswordAndJWTCompatibility$' ./internal/auth
 ```
 
-The build-tagged auth check fails if its example executable is unavailable; ordinary Go tests do not include it. Format with `cargo fmt --manifest-path apps/backend-rust/Cargo.toml`, and check with `cargo clippy --manifest-path apps/backend-rust/Cargo.toml --locked --all-targets --all-features -- -D warnings`. The [port plan](RUST_BACKEND_PORT.md) distinguishes implemented helpers from application endpoint compatibility.
+The build-tagged auth check fails if its example executable is unavailable; ordinary Go tests do not include it. Format with `cargo fmt --all`, and check with `cargo clippy --workspace --locked --all-targets --all-features -- -D warnings`. The [port plan](RUST_BACKEND_PORT.md) distinguishes implemented helpers from application endpoint compatibility.
 
 ## Go hot reload
 

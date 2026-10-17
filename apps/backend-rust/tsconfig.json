@@ -3,5 +3,5 @@
 	"compilerOptions": {
 		"types": ["bun"]
 	},
-	"include": ["compatibility/**/*.ts", "scripts/**/*.ts"]
+	"include": ["compatibility/**/*.ts"]
 }

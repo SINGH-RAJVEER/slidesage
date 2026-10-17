@@ -26,7 +26,7 @@ if (args.includes("--help")) {
 if (args.length > 0) throw new Error("Unknown argument; use --help");
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const rustRoot = join(root, "apps/backend-rust");
+const targetRoot = join(root, "target");
 for (const executable of [
 	"bun",
 	"go",
@@ -112,10 +112,10 @@ const env = {
 	CACHE_TIMEOUT_MS: "100",
 	TEST_SECURE_COOKIES: "false",
 	TEST_COOKIE_NAME: "slidesage_token",
-	CARGO_TARGET_DIR: join(rustRoot, "target"),
+	CARGO_TARGET_DIR: targetRoot,
 	API_UNDER_TEST_URL: `http://127.0.0.1:${apiPort}`,
 	CONVERTER_UNDER_TEST_URL: `http://127.0.0.1:${converterPort}`,
-	RUST_AUTH_COMPAT_BIN: join(rustRoot, "target/debug/examples/auth_compat"),
+	RUST_AUTH_COMPAT_BIN: join(targetRoot, "debug/examples/auth_compat"),
 };
 
 async function run(
@@ -341,17 +341,21 @@ try {
 		"no",
 	]);
 	await readyValkey(valkey);
-	await run(
-		"check SQLx metadata",
-		["cargo", "sqlx", "prepare", "--check", "--", "--locked", "--all-targets", "--all-features"],
-		{},
-		rustRoot,
-	);
+	await run("check SQLx metadata", [
+		"cargo",
+		"sqlx",
+		"prepare",
+		"--workspace",
+		"--check",
+		"--",
+		"--locked",
+		"--all-targets",
+		"--all-features",
+	]);
 	await run("Rust tests with PostgreSQL and Valkey", [
 		"cargo",
 		"test",
-		"--manifest-path",
-		"apps/backend-rust/Cargo.toml",
+		"--workspace",
 		"--locked",
 		"--all-targets",
 		"--all-features",
@@ -359,24 +363,23 @@ try {
 	await run("build compatibility servers", [
 		"cargo",
 		"build",
-		"--manifest-path",
-		"apps/backend-rust/Cargo.toml",
+		"--workspace",
 		"--locked",
 		"--bins",
 		"--example",
 		"auth_compat",
 	]);
 	if (valkey.process.exitCode !== null) throw new Error(`Test Valkey exited; log: ${valkey.log}`);
-	const api = start("rust-api", [join(rustRoot, "target/debug/api")], {
+	const api = start("rust-api", [join(targetRoot, "debug/api")], {
 		HOST: "127.0.0.1",
 		PORT: String(apiPort),
 	});
-	const secureApi = start("rust-api-secure-cookie", [join(rustRoot, "target/debug/api")], {
+	const secureApi = start("rust-api-secure-cookie", [join(targetRoot, "debug/api")], {
 		HOST: "127.0.0.1",
 		PORT: String(securePort),
 		BASE_URL: "https://slidesage.app",
 	});
-	const converter = start("rust-converter", [join(rustRoot, "target/debug/conversion_worker")], {
+	const converter = start("rust-converter", [join(targetRoot, "debug/conversion_worker")], {
 		CARD_CONVERTER_HOST: "127.0.0.1",
 		CARD_CONVERTER_PORT: String(converterPort),
 	});

@@ -1,0 +1,22 @@
+[package]
+name = "slidesage-converter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+default-run = "conversion_worker"
+
+[[bin]]
+name = "conversion_worker"
+path = "src/main.rs"
+
+[dependencies]
+axum.workspace = true
+http-body-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+slidesage-cards.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tower.workspace = true

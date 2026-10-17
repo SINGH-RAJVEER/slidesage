@@ -3,11 +3,10 @@ use axum::{
 	http::{Request, StatusCode},
 };
 use serde_json::json;
-use slidesage_backend::conversion;
 use tower::ServiceExt;
 
 async fn extract(body: String) -> (StatusCode, String) {
-	let response = conversion::router()
+	let response = slidesage_converter::router()
 		.oneshot(
 			Request::post("/v1/documents/drafts")
 				.header("X-Card-Schema-Version", "3")

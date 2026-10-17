@@ -37,7 +37,7 @@ apps/api/worker
 apps/api/migrate
 
 # Rust backend build artifacts
-apps/backend-rust/target/
+/target/
 
 # Release binaries compiled for the container images
 /dist

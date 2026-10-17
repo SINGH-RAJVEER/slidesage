@@ -1,5 +1,7 @@
 //! Drafting metadata, curated templates and native document validation.
 
+#![forbid(unsafe_code)]
+
 mod templates;
 pub use templates::template_deck;
 
