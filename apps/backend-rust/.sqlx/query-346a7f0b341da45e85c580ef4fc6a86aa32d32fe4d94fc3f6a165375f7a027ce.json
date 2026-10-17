@@ -1,0 +1,24 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT EXISTS (SELECT 1 FROM presentations WHERE id = $1 AND user_id = $2) AS \"exists!\"",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "exists!",
+				"type_info": "Bool",
+				"origin": "Expression"
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text",
+				"Text"
+			]
+		},
+		"nullable": [
+			null
+		]
+	},
+	"hash": "346a7f0b341da45e85c580ef4fc6a86aa32d32fe4d94fc3f6a165375f7a027ce"
+}

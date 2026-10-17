@@ -51,11 +51,11 @@ podman run --rm --name slidesage-valkey -p 127.0.0.1:6379:6379 docker.io/valkey/
 
 ## Isolated Rust port
 
-The Rust backend currently caches `GET /presentations` lists. It shares the Go key hash, payload format and 30-second TTL, and reads the PostgreSQL generation before every lookup. Existing SQL migrations provide invalidation. The deployed backend remains unchanged.
+The Rust backend caches `GET /presentations` lists and immutable bodies for `GET /presentations/{id}/document`. It shares Go's key hashes, payload formats and TTLs. Lists read the PostgreSQL generation before every lookup; document reads always check ownership and the current revision, then fetch fresh asset metadata. A document cache miss repeats authorization before reading the body. Existing SQL migrations remain unchanged. The deployed backend remains unchanged.
 
 The Rust client opens one multiplexed RESP2 connection lazily and permits at most eight concurrent operations. Its timeout includes waiting for an operation slot and connecting. Errors trigger a five-second bypass; missing, oversized or corrupt values fall back to PostgreSQL. This differs from the Go client's pool of up to eight connections.
 
-The disposable compatibility runner verifies native Valkey expiry and size limits, committed writes, rollback, late fills, ownership transfer and account deletion. Go-to-Rust and Rust-to-Go cache tests use real Valkey entries. They also lock the presentation table to prove that a cache hit skips count and body queries. A separate local run verified password authentication over TLS with a custom CA, including round-trip reads, writes and expiry.
+The disposable compatibility runner verifies native Valkey expiry and size limits, committed writes, rollback, late fills, ownership transfer and account deletion. Go-to-Rust and Rust-to-Go cache tests use real Valkey entries, including raw document bodies with a one-hour TTL. List tests lock the presentation table to prove that a cache hit skips count and body queries. Document tests check fresh head, ownership and asset metadata, plus corrupted entries and Go decoder edge cases. A separate local run verified password authentication over TLS with a custom CA, including round-trip reads, writes and expiry.
 
 To repeat the native client test against a disposable authenticated or TLS server, set `TEST_VALKEY_ADDR`, optional `TEST_VALKEY_PASSWORD`, and optional `TEST_VALKEY_CA_PEM` containing the CA certificate text:
 
@@ -63,4 +63,4 @@ To repeat the native client test against a disposable authenticated or TLS serve
 cargo test --manifest-path apps/backend-rust/Cargo.toml --locked --lib --features postgres-tests cache::tests::native_valkey_round_trip_expiry_and_size_limit -- --exact
 ```
 
-Rust card-body caching and the cache OpenTelemetry counters and histograms are still pending. These checks validate the isolated list-cache port; they do not establish complete backend compatibility or a production deployment.
+The cache OpenTelemetry counters and histograms are still pending. These checks validate the isolated read-cache port; they do not establish complete backend compatibility or a production deployment.

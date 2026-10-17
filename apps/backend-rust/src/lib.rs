@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod billing;
 pub mod cache;
+pub mod card_documents;
 pub mod cards;
 pub mod conversion;
 pub mod feedback;

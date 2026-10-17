@@ -1,0 +1,81 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT sha256::text AS \"sha256!\", mime_type, COALESCE(byte_size, 0) AS \"byte_size!\", width, height, source::text AS \"source!\", COALESCE(remote_url, '') AS \"url!\" FROM card_assets WHERE presentation_id = $1 AND sha256 = ANY($2)",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "sha256!",
+				"type_info": "Text",
+				"origin": "Expression"
+			},
+			{
+				"ordinal": 1,
+				"name": "mime_type",
+				"type_info": "Text",
+				"origin": {
+					"Table": {
+						"table": "card_assets",
+						"name": "mime_type"
+					}
+				}
+			},
+			{
+				"ordinal": 2,
+				"name": "byte_size!",
+				"type_info": "Int8",
+				"origin": "Expression"
+			},
+			{
+				"ordinal": 3,
+				"name": "width",
+				"type_info": "Int4",
+				"origin": {
+					"Table": {
+						"table": "card_assets",
+						"name": "width"
+					}
+				}
+			},
+			{
+				"ordinal": 4,
+				"name": "height",
+				"type_info": "Int4",
+				"origin": {
+					"Table": {
+						"table": "card_assets",
+						"name": "height"
+					}
+				}
+			},
+			{
+				"ordinal": 5,
+				"name": "source!",
+				"type_info": "Text",
+				"origin": "Expression"
+			},
+			{
+				"ordinal": 6,
+				"name": "url!",
+				"type_info": "Text",
+				"origin": "Expression"
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text",
+				"BpcharArray"
+			]
+		},
+		"nullable": [
+			null,
+			false,
+			null,
+			false,
+			false,
+			null,
+			null
+		]
+	},
+	"hash": "4f744ac703ab470e610eff3d311a6da012b26f2b14c7fcf95fe9364e3eb41eb2"
+}

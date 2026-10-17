@@ -1,0 +1,25 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT r.document::text AS \"document!\" FROM card_revisions r JOIN presentations p ON p.id = r.presentation_id WHERE p.id = $1 AND p.user_id = $2 AND r.revision = $3",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "document!",
+				"type_info": "Text",
+				"origin": "Expression"
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text",
+				"Text",
+				"Int4"
+			]
+		},
+		"nullable": [
+			null
+		]
+	},
+	"hash": "c973050edd174dd44d117b0919ea426cc813eed88fe3469031110a9b3664bfc8"
+}

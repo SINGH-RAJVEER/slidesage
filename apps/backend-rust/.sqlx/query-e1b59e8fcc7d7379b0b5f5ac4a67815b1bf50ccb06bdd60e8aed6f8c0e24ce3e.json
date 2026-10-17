@@ -1,0 +1,122 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT r.presentation_id, r.revision, r.sha256::text AS \"sha256!\", r.byte_size, r.card_count, r.schema_version, r.operation_kind::text AS \"operation_kind!\", r.base_revision, r.created_at, r.document::text AS \"document?\" FROM presentations p JOIN card_revisions r ON r.presentation_id = p.id AND r.revision = p.current_card_revision WHERE p.id = $1 AND p.user_id = $2",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "presentation_id",
+				"type_info": "Text",
+				"origin": {
+					"Table": {
+						"table": "card_revisions",
+						"name": "presentation_id"
+					}
+				}
+			},
+			{
+				"ordinal": 1,
+				"name": "revision",
+				"type_info": "Int4",
+				"origin": {
+					"Table": {
+						"table": "card_revisions",
+						"name": "revision"
+					}
+				}
+			},
+			{
+				"ordinal": 2,
+				"name": "sha256!",
+				"type_info": "Text",
+				"origin": "Expression"
+			},
+			{
+				"ordinal": 3,
+				"name": "byte_size",
+				"type_info": "Int8",
+				"origin": {
+					"Table": {
+						"table": "card_revisions",
+						"name": "byte_size"
+					}
+				}
+			},
+			{
+				"ordinal": 4,
+				"name": "card_count",
+				"type_info": "Int4",
+				"origin": {
+					"Table": {
+						"table": "card_revisions",
+						"name": "card_count"
+					}
+				}
+			},
+			{
+				"ordinal": 5,
+				"name": "schema_version",
+				"type_info": "Int4",
+				"origin": {
+					"Table": {
+						"table": "card_revisions",
+						"name": "schema_version"
+					}
+				}
+			},
+			{
+				"ordinal": 6,
+				"name": "operation_kind!",
+				"type_info": "Text",
+				"origin": "Expression"
+			},
+			{
+				"ordinal": 7,
+				"name": "base_revision",
+				"type_info": "Int4",
+				"origin": {
+					"Table": {
+						"table": "card_revisions",
+						"name": "base_revision"
+					}
+				}
+			},
+			{
+				"ordinal": 8,
+				"name": "created_at",
+				"type_info": "Timestamptz",
+				"origin": {
+					"Table": {
+						"table": "card_revisions",
+						"name": "created_at"
+					}
+				}
+			},
+			{
+				"ordinal": 9,
+				"name": "document?",
+				"type_info": "Text",
+				"origin": "Expression"
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text",
+				"Text"
+			]
+		},
+		"nullable": [
+			false,
+			false,
+			null,
+			false,
+			false,
+			false,
+			null,
+			true,
+			false,
+			null
+		]
+	},
+	"hash": "e1b59e8fcc7d7379b0b5f5ac4a67815b1bf50ccb06bdd60e8aed6f8c0e24ce3e"
+}
