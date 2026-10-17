@@ -1,0 +1,28 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT created_at FROM presentation_shares WHERE presentation_id = $1 AND revoked_at IS NULL",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "created_at",
+				"type_info": "Timestamptz",
+				"origin": {
+					"Table": {
+						"table": "presentation_shares",
+						"name": "created_at"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text"
+			]
+		},
+		"nullable": [
+			false
+		]
+	},
+	"hash": "c62a150469e0cb47fbb288fec56fa579e054a3eb694cd3d6bc86ed8765fcaf92"
+}

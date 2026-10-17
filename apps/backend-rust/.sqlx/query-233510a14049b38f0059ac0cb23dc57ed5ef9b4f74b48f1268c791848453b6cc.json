@@ -1,0 +1,31 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "INSERT INTO presentation_shares (id, presentation_id, token_sha256, created_by) VALUES ($1::text::uuid, $2, $3, $4) RETURNING created_at",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "created_at",
+				"type_info": "Timestamptz",
+				"origin": {
+					"Table": {
+						"table": "presentation_shares",
+						"name": "created_at"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text",
+				"Text",
+				"Bpchar",
+				"Text"
+			]
+		},
+		"nullable": [
+			false
+		]
+	},
+	"hash": "233510a14049b38f0059ac0cb23dc57ed5ef9b4f74b48f1268c791848453b6cc"
+}

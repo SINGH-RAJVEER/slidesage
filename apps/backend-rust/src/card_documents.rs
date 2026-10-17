@@ -130,7 +130,7 @@ async fn current(
 	}
 }
 
-fn revision_timestamp(time: DateTime<Utc>) -> String {
+pub(crate) fn revision_timestamp(time: DateTime<Utc>) -> String {
 	// pgx scans timestamptz using time.Local. These revision timestamps retain
 	// that local offset, unlike the API's UTC timestamp-without-zone fields.
 	offset_timestamp(time.with_timezone(&chrono::Local).fixed_offset())

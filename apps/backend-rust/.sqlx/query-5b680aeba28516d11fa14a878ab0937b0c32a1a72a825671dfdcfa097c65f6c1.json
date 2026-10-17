@@ -1,0 +1,14 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "UPDATE presentation_shares SET revoked_at = NOW() WHERE presentation_id = $1 AND revoked_at IS NULL",
+	"describe": {
+		"columns": [],
+		"parameters": {
+			"Left": [
+				"Text"
+			]
+		},
+		"nullable": []
+	},
+	"hash": "5b680aeba28516d11fa14a878ab0937b0c32a1a72a825671dfdcfa097c65f6c1"
+}
