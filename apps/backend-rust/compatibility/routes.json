@@ -272,19 +272,32 @@
 			"method": "DELETE",
 			"path": "/presentations/{id}/share",
 			"source": "apps/api/internal/carddocument/routes.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Owner-only revocation, repeated/no-live-link success and empty 204 response headers",
+				"Update errors preserve active state; successful zero-row updates match Go"
+			]
 		},
 		{
 			"method": "GET",
 			"path": "/presentations/{id}/share",
 			"source": "apps/api/internal/carddocument/routes.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Go/Rust ownership, missing users/presentations, HEAD and invalid UTF-8 path precedence",
+				"Absent/live/revoked state; token never exposed by inspection; private no-store JSON headers"
+			]
 		},
 		{
 			"method": "POST",
 			"path": "/presentations/{id}/share",
 			"source": "apps/api/internal/carddocument/routes.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Original Go lifecycle compared with live Rust on disposable PostgreSQL",
+				"256-bit URL-safe tokens, SHA256 digest, UUIDv4, created-by and local timestamp relationships",
+				"Atomic rotation; insert errors and no-row inserts roll back revocation; request body ignored"
+			]
 		},
 		{
 			"method": "POST",
@@ -413,7 +426,7 @@
 				"Existing converter handler assertions target a live Rust worker through CONVERTER_UNDER_TEST_URL",
 				"Full response equals current TypeScript draftingSchema(), including all rules, limits and guidance",
 				"Query parameters, ignored schema-version headers, unsupported methods and trailing slash",
-				"Exact Bun JSON charset; conversion and validation routes remain pending"
+				"Exact Bun JSON charset; drafting metadata remains separate from document validation"
 			]
 		},
 		{
@@ -438,7 +451,13 @@
 			"method": "POST",
 			"path": "/v1/documents",
 			"source": "apps/converter/src/handler.ts",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"All curated template/theme combinations match current TypeScript assembly",
+				"Theme/title/cards/assets validation order, duplicate IDs and JavaScript property-key coercion",
+				"Native NFC/markup/control/whitespace cleanup preserving lone UTF-16 surrogates",
+				"Schema issues, generic conversion failures and original assembly assertions against live Rust"
+			]
 		},
 		{
 			"method": "POST",
@@ -456,7 +475,13 @@
 			"method": "POST",
 			"path": "/v1/documents/drafts",
 			"source": "apps/converter/src/handler.ts",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Every curated document and readable schema version compared with current TypeScript",
+				"All node/widget mappings, rich-text emphasis, notes and deduplicated source IDs",
+				"Images and internal IDs omitted; chart/table/progress values and UTF-16 strings preserved",
+				"Shared validation, asset ownership and schema-version/body error behavior"
+			]
 		},
 		{
 			"method": "POST",

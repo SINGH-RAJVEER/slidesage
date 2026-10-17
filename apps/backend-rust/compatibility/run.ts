@@ -429,14 +429,28 @@ try {
 	);
 	await run(
 		"Bun converter reference assertions",
-		["bun", "test", "--isolate", "apps/converter/src/handler.test.ts"],
+		[
+			"bun",
+			"test",
+			"--isolate",
+			"apps/converter/src/handler.test.ts",
+			"apps/converter/src/assembly.compatibility.test.ts",
+			"apps/converter/src/drafts.compatibility.test.ts",
+		],
 		{ CONVERTER_UNDER_TEST_URL: "" },
 	);
+	await run("assembly and draft assertions against Rust", [
+		"bun",
+		"test",
+		"--isolate",
+		"apps/converter/src/assembly.compatibility.test.ts",
+		"apps/converter/src/drafts.compatibility.test.ts",
+	]);
 	const converterTests = ["bun", "test", "--isolate", "apps/converter/src/handler.test.ts"];
 	if (!fullConverter)
 		converterTests.push(
 			"-t",
-			"reports health|serves the drafting schema|preserves schema routing|schema version|template|validates all starter decks|validates an edited document|document validation",
+			"reports health|serves the drafting schema|preserves schema routing|schema version|template|validates all starter decks|validates an edited document|document validation|accepts every shared theme|assembles converted cards|assembled document is invalid|returns each card",
 		);
 	await run(
 		fullConverter
