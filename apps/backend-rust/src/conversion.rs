@@ -11,7 +11,7 @@ pub use crate::cards::SCHEMA_VERSION as CARD_SCHEMA_VERSION;
 
 const MAX_BODY_UNITS: usize = 1024 * 1024;
 
-/// Curated templates and metadata are implemented. Conversion/PPTX writing are pending.
+/// Native document routes. Card conversion and PPTX writing remain pending.
 pub fn router() -> Router {
 	Router::new().fallback(dispatch)
 }
@@ -22,9 +22,9 @@ async fn dispatch(method: Method, uri: Uri, headers: HeaderMap, body: Body) -> R
 		"/v1/schema" => schema(method).await,
 		"/v1/templates" => templates(method, headers, body).await,
 		"/v1/documents/validate" => validate_document(method, headers, body).await,
-		"/v1/cards" | "/v1/documents" | "/v1/documents/drafts" | "/v1/documents/pptx" => {
-			pending(method, headers).await
-		}
+		"/v1/documents" => assemble_document(method, headers, body).await,
+		"/v1/documents/drafts" => extract_drafts(method, headers, body).await,
+		"/v1/cards" | "/v1/documents/pptx" => pending(method, headers).await,
 		_ => not_found().await,
 	}
 }
@@ -168,7 +168,6 @@ async fn read_object(
 }
 
 async fn validate_document(method: Method, headers: HeaderMap, body: Body) -> Response {
-	use crate::cards::validation::{self, json::Value};
 	if let Some(response) = negotiation_error(method, &headers) {
 		return response;
 	}
@@ -176,34 +175,92 @@ async fn validate_document(method: Method, headers: HeaderMap, body: Body) -> Re
 		Ok(input) => input,
 		Err((status, error)) => return json_response(status, json!({"error": error})),
 	};
+	match validate_input(&input) {
+		Ok(document) => document_response(document),
+		Err(response) => *response,
+	}
+}
+
+fn validate_input(
+	input: &crate::cards::validation::json::Object,
+) -> Result<crate::cards::validation::json::Value, Box<Response>> {
+	use crate::cards::validation;
 	let mut assets = std::collections::HashSet::new();
 	if !input.get("assetIds").nullish() {
 		let Some(values) = input.get("assetIds").array() else {
-			return json_response(
+			return Err(Box::new(json_response(
 				StatusCode::BAD_REQUEST,
 				json!({"error":"assetIds must be an array"}),
-			);
+			)));
 		};
 		for (index, value) in values.iter().enumerate() {
 			let Some(value) = value.string().filter(|value| !value.blank()) else {
-				return json_response(
+				return Err(Box::new(json_response(
 					StatusCode::BAD_REQUEST,
 					json!({"error":format!("assetIds[{index}] must be a non-empty string")}),
-				);
+				)));
 			};
 			assets.insert(value);
 		}
 	}
-	match validation::document(input.get("document"), &assets) {
+	validation::document(input.get("document"), &assets)
+		.map_err(|error| Box::new(validation_failure(error)))
+}
+
+async fn assemble_document(method: Method, headers: HeaderMap, body: Body) -> Response {
+	if let Some(response) = negotiation_error(method, &headers) {
+		return response;
+	}
+	let input = match read_object(headers, body).await {
+		Ok(input) => input,
+		Err((status, error)) => return json_response(status, json!({"error": error})),
+	};
+	match crate::cards::assembly::assemble(&input) {
+		Ok(document) => document_response(document),
+		Err(crate::cards::assembly::Error::Request(message)) => {
+			json_response(StatusCode::BAD_REQUEST, json!({"error": message}))
+		}
+		Err(crate::cards::assembly::Error::Validation(error)) => validation_failure(error),
+	}
+}
+
+async fn extract_drafts(method: Method, headers: HeaderMap, body: Body) -> Response {
+	use crate::cards::validation::json::Value;
+	if let Some(response) = negotiation_error(method, &headers) {
+		return response;
+	}
+	let input = match read_object(headers, body).await {
+		Ok(input) => input,
+		Err((status, error)) => return json_response(status, json!({"error": error})),
+	};
+	match validate_input(&input) {
 		Ok(document) => json_response(
 			StatusCode::OK,
-			Value::object([("schemaVersion", Value::Number(3.)), ("document", document)]),
+			Value::object([
+				("schemaVersion", Value::Number(3.)),
+				("cards", crate::cards::drafts::from_document(&document)),
+			]),
 		),
-		Err(validation::Error::Conversion) => json_response(
+		Err(response) => *response,
+	}
+}
+
+fn document_response(document: crate::cards::validation::json::Value) -> Response {
+	use crate::cards::validation::json::Value;
+	json_response(
+		StatusCode::OK,
+		Value::object([("schemaVersion", Value::Number(3.)), ("document", document)]),
+	)
+}
+
+fn validation_failure(error: crate::cards::validation::Error) -> Response {
+	use crate::cards::validation;
+	match error {
+		validation::Error::Conversion => json_response(
 			StatusCode::INTERNAL_SERVER_ERROR,
 			json!({"error":"conversion failed"}),
 		),
-		Err(validation::Error::Schema(issue)) => {
+		validation::Error::Schema(issue) => {
 			#[derive(serde::Serialize)]
 			struct InvalidDocument {
 				#[serde(rename = "schemaVersion")]

@@ -341,7 +341,7 @@ pub fn document(value: &Value, assets: &HashSet<Text>) -> std::result::Result<Va
 		("cards", Value::Object(Object(cards))),
 	]))
 }
-fn js_string(value: &Value) -> Option<Text> {
+pub(crate) fn js_string(value: &Value) -> Option<Text> {
 	if let Some(number) = value.number()
 		&& number.is_infinite()
 	{

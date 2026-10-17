@@ -47,6 +47,17 @@ function post(path: string, body: unknown, version = "3") {
 	);
 }
 
+// Prepare card fixtures with the reference until the card conversion route is ported.
+function referencePost(path: string, body: unknown) {
+	return referenceHandle(
+		new Request(`http://converter${path}`, {
+			method: "POST",
+			headers: { [SCHEMA_VERSION_HEADER]: "3" },
+			body: JSON.stringify(body),
+		}),
+	);
+}
+
 function rawPost(base: string, path: string, headers: string[] = []) {
 	return new Promise<{ status: number; body: unknown }>((resolve, reject) => {
 		const request = httpRequest(base, { method: "POST", path, headers }, (response) => {
@@ -172,7 +183,7 @@ describe("converter", () => {
 	});
 
 	it("assembles converted cards into a document", async () => {
-		const converted = await post("/v1/cards", {
+		const converted = await referencePost("/v1/cards", {
 			operationId: "op-1",
 			cards: [{ position: 1, takeaway: "Opening", role: "opening", draft }],
 		});
@@ -198,20 +209,12 @@ describe("converter", () => {
 	});
 
 	it("validates an edited document against the presentation's assets", async () => {
-		const fixturePost = (path: string, body: unknown) =>
-			referenceHandle(
-				new Request(`http://converter${path}`, {
-					method: "POST",
-					headers: { [SCHEMA_VERSION_HEADER]: "3" },
-					body: JSON.stringify(body),
-				}),
-			);
-		const converted = await fixturePost("/v1/cards", {
+		const converted = await referencePost("/v1/cards", {
 			operationId: "op-1",
 			cards: [{ position: 1, takeaway: "Opening", role: "opening", draft }],
 		});
 		const { results } = (await converted.json()) as { results: Array<{ card: unknown }> };
-		const assembled = await fixturePost("/v1/documents", {
+		const assembled = await post("/v1/documents", {
 			title: "Grid storage",
 			theme: "slate",
 			cards: results.map((result) => result.card),
@@ -233,7 +236,7 @@ describe("converter", () => {
 	});
 
 	it("returns each card of a document in draft form", async () => {
-		const converted = await post("/v1/cards", {
+		const converted = await referencePost("/v1/cards", {
 			operationId: "op-1",
 			cards: [{ position: 1, takeaway: "Opening", role: "opening", draft }],
 		});

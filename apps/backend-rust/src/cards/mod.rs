@@ -18,4 +18,6 @@ pub fn drafting_schema() -> &'static Value {
 	&SCHEMA
 }
 
+pub mod assembly;
+pub mod drafts;
 pub mod validation;
