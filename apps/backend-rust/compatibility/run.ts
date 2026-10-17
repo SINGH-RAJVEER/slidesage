@@ -14,23 +14,19 @@ import { fileURLToPath } from "node:url";
 
 const args = process.argv.slice(2);
 if (args.includes("--help")) {
-	console.log("Usage: bun apps/backend-rust/compatibility/run.ts [--converter-full]");
+	console.log("Usage: bun apps/backend-rust/compatibility/run.ts");
 	console.log(
 		"Creates fresh UTF-8 PostgreSQL and Valkey instances, applies unchanged migrations, and tests the implemented Rust subset.",
-	);
-	console.log(
-		"--converter-full includes unported converter handler cases and currently exits unsuccessfully.",
 	);
 	console.log(
 		"Requires bun, go, cargo, SQLx CLI 0.9, PostgreSQL with pgvector, valkey-server and valkey-cli on PATH. Run inside devenv shell.",
 	);
 	process.exit(0);
 }
-if (args.some((arg) => arg !== "--converter-full")) throw new Error("Unknown argument; use --help");
+if (args.length > 0) throw new Error("Unknown argument; use --help");
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const rustRoot = join(root, "apps/backend-rust");
-const fullConverter = args.includes("--converter-full");
 for (const executable of [
 	"bun",
 	"go",
@@ -265,7 +261,7 @@ async function readyValkey(service: (typeof services)[number]): Promise<void> {
 function writeResults(): void {
 	writeFileSync(
 		join(artifacts, "results.json"),
-		`${JSON.stringify({ scope: fullConverter ? "implemented-backend-and-full-converter-handler-suite" : "implemented-subset", release_ready: false, passed: failure === undefined, failure, results }, null, "\t")}\n`,
+		`${JSON.stringify({ scope: "implemented-backend-and-converter-handler-tests", release_ready: false, passed: failure === undefined, failure, results }, null, "\t")}\n`,
 		{ mode: 0o600 },
 	);
 }
@@ -436,28 +432,24 @@ try {
 			"apps/converter/src/handler.test.ts",
 			"apps/converter/src/assembly.compatibility.test.ts",
 			"apps/converter/src/drafts.compatibility.test.ts",
+			"apps/converter/src/cards.compatibility.test.ts",
 		],
 		{ CONVERTER_UNDER_TEST_URL: "" },
 	);
-	await run("assembly and draft assertions against Rust", [
+	await run("card, assembly and draft assertions against Rust", [
 		"bun",
 		"test",
 		"--isolate",
 		"apps/converter/src/assembly.compatibility.test.ts",
 		"apps/converter/src/drafts.compatibility.test.ts",
+		"apps/converter/src/cards.compatibility.test.ts",
 	]);
-	const converterTests = ["bun", "test", "--isolate", "apps/converter/src/handler.test.ts"];
-	if (!fullConverter)
-		converterTests.push(
-			"-t",
-			"reports health|serves the drafting schema|preserves schema routing|schema version|template|validates all starter decks|validates an edited document|document validation|accepts every shared theme|assembles converted cards|assembled document is invalid|returns each card",
-		);
-	await run(
-		fullConverter
-			? "full converter assertions against Rust"
-			: "implemented converter assertions against Rust",
-		converterTests,
-	);
+	await run("all converter handler assertions against Rust", [
+		"bun",
+		"test",
+		"--isolate",
+		"apps/converter/src/handler.test.ts",
+	]);
 } catch (error) {
 	failure ??= error instanceof Error ? error.message : String(error);
 	console.error(`[compat] ${failure}`);

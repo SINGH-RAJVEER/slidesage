@@ -33,7 +33,7 @@ just dev
 
 ## Rust port development
 
-The work-in-progress package is `apps/backend-rust`. It provides API health/CORS, password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete, saved-document reads with optional Valkey caching, share management, and converter health/schema/templates/validation/assembly/drafts. Most application endpoints, generation and PPTX export remain pending. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
+The work-in-progress package is `apps/backend-rust`. It provides API health/CORS, password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete, saved-document reads with optional Valkey caching, share management, public shared-deck reads, and converter health/schema/templates/card conversion/validation/assembly/drafts. Most application endpoints, generation and PPTX export remain pending. The full backend will switch together after the compatibility gate; these development servers are not part of `just dev` or deployment.
 
 Run the implemented compatibility subset with one command:
 
@@ -43,7 +43,7 @@ bun apps/backend-rust/compatibility/run.ts
 
 The runner requires Bun, Go, Cargo, SQLx CLI 0.9, PostgreSQL tools with pgvector, and `valkey-server`/`valkey-cli` on PATH. It creates private UTF-8 PostgreSQL and Valkey instances on temporary loopback ports, applies the unchanged Goose/River migrations, runs native Rust tests and Go comparisons against live Rust, then checks the Bun converter reference and implemented Rust handlers. Both normal and secure-cookie configurations run. It supplies synthetic credentials and its own database URL, independently of your application database. Owned services stop on success, failure or interruption; logs and `results.json` remain under the printed temporary directory.
 
-A passing subset keeps `release_ready: false`. Add `--converter-full` to include the required, still-unported converter handler cases and expose their failures. This runner does not yet cover the complete API, generation or PPTX export contract.
+A passing run keeps `release_ready: false`. All converter handler assertions run unconditionally. This runner does not yet cover the complete API, generation or PPTX export contract.
 
 Run from the repository root inside `devenv shell`:
 
@@ -52,7 +52,7 @@ cargo test --manifest-path apps/backend-rust/Cargo.toml --locked --all-targets
 cargo run --manifest-path apps/backend-rust/Cargo.toml --bin api
 ```
 
-The standalone API defaults to `127.0.0.1:8001`; `HOST` and `PORT` override it. In another terminal, run `cargo run --manifest-path apps/backend-rust/Cargo.toml --bin conversion_worker` for converter health, schema and template lookup on `127.0.0.1:8091`. It accepts `CARD_CONVERTER_HOST` and `CARD_CONVERTER_PORT` overrides. Both stop on SIGINT/SIGTERM.
+The standalone API defaults to `127.0.0.1:8001`; `HOST` and `PORT` override it. In another terminal, run `cargo run --manifest-path apps/backend-rust/Cargo.toml --bin conversion_worker` for the implemented converter routes on `127.0.0.1:8091`. It accepts `CARD_CONVERTER_HOST` and `CARD_CONVERTER_PORT` overrides. Both stop on SIGINT/SIGTERM.
 
 Set `DATABASE_URL` to a database migrated with the existing Go runner to enable the implemented application routes. Without it, the standalone server exposes health only. `AUTH_SECRET` signs/verifies tokens; `BASE_URL` selects the existing normal or HTTPS cookie name and sign-out policy, and `RATE_LIMIT_HASH_SECRET` defaults to `AUTH_SECRET`. HTTPS rejects short/placeholder auth secrets; production requires an explicit rate-limit hash secret. The current SQLx pool is limited to five connections.
 
@@ -79,7 +79,7 @@ Set `CACHE_VALKEY_ADDR` on the Rust API and `TEST_VALKEY_ADDR` on tests to the s
 
 Owner document reads use `TestCurrentCardDocumentMatchesRust` and `TestRustCurrentCardDocumentSharesGoCache` in `./internal/carddocument`. With the same disposable database/auth/Valkey variables, these compare current revision metadata, referenced assets, raw numeric precision, fresh ownership/head/assets, cache interchange and one-hour TTLs. The runner includes the original Go card-document tests too. Stored documents retain their JSONB values; this read endpoint does not run the converter validator or rewrite stored bytes.
 
-Share management uses `TestShareManagementMatchesRust` and `TestShareManagementRustRollbackAndNoRowSemantics` in that package. The oracle checks token/digest/UUID/timestamp relationships before normalizing random fields, plus rotation, privacy and idempotent revocation. Failure cases install fixture-specific triggers and require the runner's disposable-database guard. Public share reads are still pending.
+Share management uses `TestShareManagementMatchesRust` and `TestShareManagementRustRollbackAndNoRowSemantics` in that package. The oracle checks token/digest/UUID/timestamp relationships before normalizing random fields, plus rotation, privacy and idempotent revocation. Failure cases install fixture-specific triggers and require the runner's disposable-database guard. `TestSharedPresentationMatchesRust` compares public reads, citation privacy, live token checks, current content/ownership, revocation, rotation, deletion and malformed data. Public asset downloads remain pending.
 
 For session/profile reads and sign-out, keep `API_UNDER_TEST_URL`, `TEST_DATABASE_URL` and `TEST_AUTH_SECRET` set, then run `go -C apps/api test -count=1 -tags rustcompat -run '^TestAuthReadRoutesMatchRust$' ./internal/auth`. The suite creates/removes its own user/credential fixtures and compares 25 cases with the original Go routes. Run it again with `TEST_SECURE_COOKIES=true` against a test API configured with `BASE_URL=https://slidesage.app` to check `__Secure-slidesage_token`, Secure and SameSite=None. This tests HTTPS cookie configuration; the local test transport can still use HTTP. Only `session.expiresAt` is normalized, after verifying it falls within the request's lookup-time + seven-day window.
 
@@ -87,10 +87,10 @@ For password sign-in, run `go -C apps/api test -count=1 -tags rustcompat -run '^
 
 The runner also executes `TestSignInOptionsMatchesRust` in both configurations. Its required database-failure assertions briefly rename columns, then restore them, and require `TEST_RUST_DISPOSABLE_DATABASE=true`. Run that oracle through the disposable runner to keep those mutations inside a fresh private database. It checks strict request decoding, credential availability, missing accounts and the shared sign-in rate counters.
 
-The converter tests target Bun by default. Set `CONVERTER_UNDER_TEST_URL` to send requests to a running Rust worker. The runner includes the existing handler assertions and `assembly.compatibility.test.ts`/`drafts.compatibility.test.ts`. These preserve schema/layout checks and compare every node type, title cleanup, Unicode and JavaScript coercion against the current TypeScript functions. Assembly, editor-validation and draft tests prepare their card fixtures with the reference converter until `/v1/cards` is ported; their endpoint assertions still run against Rust. The two card-conversion handler failures remain required. PPTX writer tests still exercise Bun directly and need their own adapter.
+The converter tests target Bun by default. Set `CONVERTER_UNDER_TEST_URL` to send requests to a running Rust worker. The runner includes all existing handler assertions plus `cards.compatibility.test.ts`, `assembly.compatibility.test.ts` and `drafts.compatibility.test.ts`. These compare deterministic IDs, node/widget rules, text cleanup, Unicode and JavaScript coercion against the TypeScript reference. Handler workflows convert and assemble cards through the selected worker throughout. These files are test adapters; the Rust worker executes native code. PPTX writer tests still exercise Bun directly and need their own adapter.
 
 ```bash
-CONVERTER_UNDER_TEST_URL=http://127.0.0.1:8091 bun test --isolate apps/converter/src/assembly.compatibility.test.ts apps/converter/src/drafts.compatibility.test.ts
+CONVERTER_UNDER_TEST_URL=http://127.0.0.1:8091 bun test --isolate apps/converter/src/handler.test.ts apps/converter/src/cards.compatibility.test.ts apps/converter/src/assembly.compatibility.test.ts apps/converter/src/drafts.compatibility.test.ts
 ```
 
 The Rust drafting descriptor is embedded at `apps/backend-rust/src/cards/drafting-schema.json`. Keep it aligned with `libs/cards/src/draft-format.ts`, `layouts.ts` and `schema.ts`; the schema test compares the full response with the current TypeScript function, so stale metadata fails. This is drafting metadata, not a document validator.
