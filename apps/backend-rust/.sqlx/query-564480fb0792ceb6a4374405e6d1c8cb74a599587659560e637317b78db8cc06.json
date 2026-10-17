@@ -1,0 +1,40 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT p.id, p.user_id FROM presentation_shares s JOIN presentations p ON p.id = s.presentation_id WHERE s.token_sha256 = $1 AND s.revoked_at IS NULL AND COALESCE(p.slides_data->>'status', '') = 'ready'",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "id",
+				"type_info": "Text",
+				"origin": {
+					"Table": {
+						"table": "presentations",
+						"name": "id"
+					}
+				}
+			},
+			{
+				"ordinal": 1,
+				"name": "user_id",
+				"type_info": "Text",
+				"origin": {
+					"Table": {
+						"table": "presentations",
+						"name": "user_id"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Bpchar"
+			]
+		},
+		"nullable": [
+			false,
+			false
+		]
+	},
+	"hash": "564480fb0792ceb6a4374405e6d1c8cb74a599587659560e637317b78db8cc06"
+}

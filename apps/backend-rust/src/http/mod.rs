@@ -28,6 +28,7 @@ pub fn router_with_database(security: Security, state: ApiState) -> Router {
 			.merge(crate::presentations::router(state.clone()))
 			.merge(crate::card_documents::router(state.clone()))
 			.merge(crate::shares::router(state.clone()))
+			.merge(crate::shared_presentations::router(state.clone()))
 			.merge(crate::feedback::router(state))
 			.method_not_allowed_fallback(not_found),
 	)

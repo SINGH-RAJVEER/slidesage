@@ -56,7 +56,7 @@ struct RevisionView<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Asset {
+pub(crate) struct Asset {
 	mime_type: String,
 	byte_size: i64,
 	width: i32,
@@ -66,7 +66,7 @@ struct Asset {
 	url: Option<String>,
 }
 
-enum ReadError {
+pub(crate) enum ReadError {
 	Missing,
 	NoRevision,
 	Invalid,
@@ -144,6 +144,15 @@ fn offset_timestamp(time: DateTime<chrono::FixedOffset>) -> String {
 		"{}{offset}",
 		main.trim_end_matches('0').trim_end_matches('.')
 	)
+}
+
+pub(crate) async fn read_content(
+	state: &ApiState,
+	id: &str,
+	user: &str,
+) -> Result<(Box<RawValue>, BTreeMap<String, Asset>), ReadError> {
+	let (_, document, assets) = load(state, id, user).await?;
+	Ok((document, assets))
 }
 
 async fn load(
@@ -382,7 +391,7 @@ fn error(status: StatusCode, message: &str) -> Response {
 	response(status, json!({"error": {"message": message}}))
 }
 
-fn response(status: StatusCode, value: impl Serialize) -> Response {
+pub(crate) fn response(status: StatusCode, value: impl Serialize) -> Response {
 	let body = serde_json::to_string(&value)
 		.unwrap()
 		.replace('&', "\\u0026")

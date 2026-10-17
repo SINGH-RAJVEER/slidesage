@@ -51,7 +51,7 @@ async fn main() -> std::io::Result<()> {
 				.with_secure_cookies(secure),
 			};
 			eprintln!(
-				"development port: health/CORS, password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete, saved document reads and share management; remaining endpoints are pending"
+				"development port: health/CORS, password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete, saved document reads, share management and public shared-deck reads; remaining endpoints are pending"
 			);
 			slidesage_backend::http::router_with_database(security, state)
 		}

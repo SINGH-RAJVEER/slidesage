@@ -9,6 +9,7 @@ pub mod conversion;
 pub mod feedback;
 pub mod http;
 pub mod presentations;
+pub mod shared_presentations;
 pub mod shares;
 
 /// Go time.RFC3339Nano removes every trailing fractional zero.

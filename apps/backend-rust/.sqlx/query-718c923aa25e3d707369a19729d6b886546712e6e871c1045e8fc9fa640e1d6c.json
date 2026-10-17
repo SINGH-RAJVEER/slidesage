@@ -1,0 +1,23 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT COALESCE(slides_data->'sources', '[]'::jsonb)::text AS \"sources!\" FROM presentations WHERE id = $1",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "sources!",
+				"type_info": "Text",
+				"origin": "Expression"
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text"
+			]
+		},
+		"nullable": [
+			null
+		]
+	},
+	"hash": "718c923aa25e3d707369a19729d6b886546712e6e871c1045e8fc9fa640e1d6c"
+}
