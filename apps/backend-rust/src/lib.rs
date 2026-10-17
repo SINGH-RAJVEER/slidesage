@@ -1,11 +1,13 @@
 #![forbid(unsafe_code)]
 
+pub mod asset_reads;
 pub mod auth;
 pub mod billing;
 pub mod cache;
 pub mod card_documents;
 pub mod feedback;
 pub mod http;
+pub mod object_store;
 pub mod presentations;
 pub mod shared_presentations;
 pub mod shares;

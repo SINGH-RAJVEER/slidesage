@@ -1,0 +1,28 @@
+{
+	"db_name": "PostgreSQL",
+	"query": "SELECT user_id FROM presentations WHERE id = $1",
+	"describe": {
+		"columns": [
+			{
+				"ordinal": 0,
+				"name": "user_id",
+				"type_info": "Text",
+				"origin": {
+					"Table": {
+						"table": "presentations",
+						"name": "user_id"
+					}
+				}
+			}
+		],
+		"parameters": {
+			"Left": [
+				"Text"
+			]
+		},
+		"nullable": [
+			false
+		]
+	},
+	"hash": "c94f7d62001702959706c7e845ab0f2aabb9d8d43a31a6419ced111364a1b78b"
+}

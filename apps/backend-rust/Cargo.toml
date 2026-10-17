@@ -23,7 +23,8 @@ sha2 = "0.10"
 sqlx = { version = "0.9", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls-ring-webpki", "chrono", "macros"] }
 subtle = "2.6"
 thiserror = "2"
-tokio = { workspace = true, features = ["sync", "time"] }
+tokio = { workspace = true, features = ["fs", "io-util", "sync", "time"] }
+tokio-util = { version = "0.7", features = ["io"] }
 unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v4"] }
 

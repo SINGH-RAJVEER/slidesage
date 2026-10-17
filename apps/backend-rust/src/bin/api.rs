@@ -38,6 +38,12 @@ async fn main() -> std::io::Result<()> {
 				.map_err(std::io::Error::other)?;
 			let state = slidesage_backend::http::ApiState {
 				database,
+				objects: std::env::var("PRESENTATION_STORAGE_DIR")
+					.ok()
+					.filter(|root| !root.trim().is_empty())
+					.map(|root| slidesage_backend::object_store::FileBlobStore::new(root.trim()))
+					.transpose()?
+					.map(std::sync::Arc::new),
 				cache: slidesage_backend::cache::from_env().map_err(std::io::Error::other)?,
 				rate_limit_secret: slidesage_backend::env_or("RATE_LIMIT_HASH_SECRET", &secret),
 				auth: slidesage_backend::auth::request::RequestAuth::new(
@@ -51,7 +57,7 @@ async fn main() -> std::io::Result<()> {
 				.with_secure_cookies(secure),
 			};
 			eprintln!(
-				"development port: health/CORS, password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete, saved document reads, share management and public shared-deck reads; remaining endpoints are pending"
+				"development port: health/CORS, password sign-in/options, session/profile reads, sign-out, feedback, billing balance, presentation list/detail/delete, saved document reads, share management, public shared-deck reads and owner/shared asset downloads; remaining endpoints are pending"
 			);
 			slidesage_backend::http::router_with_database(security, state)
 		}

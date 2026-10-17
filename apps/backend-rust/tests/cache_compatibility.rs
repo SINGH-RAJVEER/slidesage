@@ -90,6 +90,7 @@ async fn list_cache_tracks_committed_writes_and_never_reactivates_late_fills() {
 	let app = router_with_database(
 		Security::new("https://slidesage.app"),
 		ApiState {
+			objects: None,
 			database: database.clone(),
 			auth: RequestAuth::new(SECRET, "slidesage_token"),
 			rate_limit_secret: String::new(),

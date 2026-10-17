@@ -69,7 +69,7 @@ async fn current(
 
 // RawURLEncoding's non-strict decoder ignores CR/LF and the unused final bits.
 // Hashing still uses the exact original spelling, including those ignored bytes.
-fn valid_token(token: &str) -> bool {
+pub(crate) fn valid_token(token: &str) -> bool {
 	let mut count = 0;
 	for byte in token.bytes() {
 		if matches!(byte, b'\r' | b'\n') {

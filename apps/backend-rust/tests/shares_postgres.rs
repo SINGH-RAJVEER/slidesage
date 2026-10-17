@@ -32,6 +32,7 @@ async fn share_management_preserves_rotation_digest_privacy_and_revocation() {
 	let secret = b"share-test-secret-with-at-least-32-bytes";
 	let token = issue_token(secret, &owner, "", chrono::Utc::now().timestamp(), 3600).unwrap();
 	let state = ApiState {
+		objects: None,
 		database: database.clone(),
 		auth: RequestAuth::new(secret, "slidesage_token"),
 		rate_limit_secret: String::from_utf8(secret.to_vec()).unwrap(),

@@ -1840,6 +1840,7 @@ dependencies = [
 	"subtle",
 	"thiserror",
 	"tokio",
+	"tokio-util",
 	"tower",
 	"unicode-normalization",
 	"uuid",

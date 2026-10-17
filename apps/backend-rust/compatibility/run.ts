@@ -43,7 +43,9 @@ for (const executable of [
 const artifacts = mkdtempSync(join(tmpdir(), "slidesage-rust-compat-"));
 const postgresData = join(artifacts, "postgres");
 const cacheData = join(artifacts, "valkey");
+const objectsData = join(artifacts, "objects");
 mkdirSync(cacheData);
+mkdirSync(objectsData);
 const results: { name: string; exitCode: number; milliseconds: number }[] = [];
 const active = new Set<ReturnType<typeof Bun.spawn>>();
 const services: { process: ReturnType<typeof Bun.spawn>; log: string }[] = [];
@@ -77,9 +79,9 @@ async function ports(count: number): Promise<number[]> {
 	return assigned;
 }
 
-const allocated = await ports(5);
-const [postgresPort, cachePort, apiPort, securePort, converterPort] = allocated;
-if (!postgresPort || !cachePort || !apiPort || !securePort || !converterPort)
+const allocated = await ports(6);
+const [postgresPort, cachePort, apiPort, securePort, converterPort, noStoragePort] = allocated;
+if (!postgresPort || !cachePort || !apiPort || !securePort || !converterPort || !noStoragePort)
 	throw new Error("Missing allocated port");
 const databaseURL = `postgresql://slidesage@127.0.0.1:${postgresPort}/rust_compat?sslmode=disable`;
 const authSecret = `rust-compat-${crypto.randomUUID()}-${crypto.randomUUID()}`;
@@ -112,8 +114,11 @@ const env = {
 	CACHE_TIMEOUT_MS: "100",
 	TEST_SECURE_COOKIES: "false",
 	TEST_COOKIE_NAME: "slidesage_token",
+	PRESENTATION_STORAGE_DIR: objectsData,
+	TEST_PRESENTATION_STORAGE_DIR: objectsData,
 	CARGO_TARGET_DIR: targetRoot,
 	API_UNDER_TEST_URL: `http://127.0.0.1:${apiPort}`,
+	API_WITHOUT_STORAGE_UNDER_TEST_URL: `http://127.0.0.1:${noStoragePort}`,
 	CONVERTER_UNDER_TEST_URL: `http://127.0.0.1:${converterPort}`,
 	RUST_AUTH_COMPAT_BIN: join(targetRoot, "debug/examples/auth_compat"),
 };
@@ -383,10 +388,16 @@ try {
 		CARD_CONVERTER_HOST: "127.0.0.1",
 		CARD_CONVERTER_PORT: String(converterPort),
 	});
+	const noStorageApi = start("rust-api-without-storage", [join(targetRoot, "debug/api")], {
+		HOST: "127.0.0.1",
+		PORT: String(noStoragePort),
+		PRESENTATION_STORAGE_DIR: "",
+	});
 	await Promise.all([
 		ready(api, `${env.API_UNDER_TEST_URL}/health`),
 		ready(secureApi, `http://127.0.0.1:${securePort}/health`),
 		ready(converter, `${env.CONVERTER_UNDER_TEST_URL}/health`),
+		ready(noStorageApi, `${env.API_WITHOUT_STORAGE_UNDER_TEST_URL}/health`),
 	]);
 	await run("Go assertions against Rust", [
 		"go",

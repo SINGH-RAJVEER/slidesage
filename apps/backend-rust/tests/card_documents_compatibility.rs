@@ -20,6 +20,7 @@ fn app(
 	router_with_database(
 		Security::new("https://slidesage.app"),
 		ApiState {
+			objects: None,
 			database,
 			auth: RequestAuth::new(SECRET, "slidesage_token"),
 			rate_limit_secret: String::new(),

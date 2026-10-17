@@ -13,6 +13,7 @@ pub struct ApiState {
 	pub auth: crate::auth::request::RequestAuth,
 	pub rate_limit_secret: String,
 	pub cache: Option<std::sync::Arc<dyn crate::cache::Store>>,
+	pub objects: Option<std::sync::Arc<crate::object_store::FileBlobStore>>,
 }
 
 /// Development-only partial router. Other application routes have not been ported.
@@ -29,6 +30,7 @@ pub fn router_with_database(security: Security, state: ApiState) -> Router {
 			.merge(crate::card_documents::router(state.clone()))
 			.merge(crate::shares::router(state.clone()))
 			.merge(crate::shared_presentations::router(state.clone()))
+			.merge(crate::asset_reads::router(state.clone()))
 			.merge(crate::feedback::router(state))
 			.method_not_allowed_fallback(not_found),
 	)

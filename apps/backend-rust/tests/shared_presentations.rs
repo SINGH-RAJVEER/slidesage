@@ -77,6 +77,7 @@ async fn public_reads_resolve_live_tokens_and_current_owners_before_cached_bodie
 	sqlx::query("INSERT INTO presentation_shares(id,presentation_id,token_sha256,created_by) VALUES($1::text::uuid,$2,$3,$4)").bind(uuid::Uuid::new_v4().to_string()).bind(&id).bind(&digest).bind(&owner).execute(&database).await.unwrap();
 	let cache = Arc::new(Cache::default());
 	let app = slidesage_backend::shared_presentations::router(ApiState {
+		objects: None,
 		database: database.clone(),
 		auth: RequestAuth::new(b"unused-public-test-secret", "slidesage_token"),
 		rate_limit_secret: "unused".into(),

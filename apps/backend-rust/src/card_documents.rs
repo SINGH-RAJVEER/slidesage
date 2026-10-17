@@ -160,6 +160,44 @@ async fn load(
 	id: &str,
 	user: &str,
 ) -> Result<(Revision, Box<RawValue>, BTreeMap<String, Asset>), ReadError> {
+	let (revision, document) = load_document(state, id, user).await?;
+	let ids = referenced_assets(document.get())?;
+	let mut assets = BTreeMap::new();
+	if !ids.is_empty() {
+		let rows = sqlx::query!("SELECT sha256::text AS \"sha256!\", mime_type, COALESCE(byte_size, 0) AS \"byte_size!\", width, height, source::text AS \"source!\", COALESCE(remote_url, '') AS \"url!\" FROM card_assets WHERE presentation_id = $1 AND sha256 = ANY($2)", revision.presentation_id, &ids)
+			.fetch_all(&state.database).await?;
+		for row in rows {
+			assets.insert(
+				row.sha256,
+				Asset {
+					mime_type: row.mime_type,
+					byte_size: row.byte_size,
+					width: row.width,
+					height: row.height,
+					source: raw_document(row.source.as_bytes())?,
+					url: (!row.url.is_empty()).then_some(row.url),
+				},
+			);
+		}
+	}
+	Ok((revision, document, assets))
+}
+
+pub(crate) async fn read_document(
+	state: &ApiState,
+	id: &str,
+	user: &str,
+) -> Result<Box<RawValue>, ReadError> {
+	load_document(state, id, user)
+		.await
+		.map(|(_, document)| document)
+}
+
+async fn load_document(
+	state: &ApiState,
+	id: &str,
+	user: &str,
+) -> Result<(Revision, Box<RawValue>), ReadError> {
 	// Omitting document from the cache-hit query avoids loading its TOAST body.
 	let selected = if state.cache.is_some() {
 		sqlx::query_as!(Revision,
@@ -218,26 +256,7 @@ async fn load(
 				.as_bytes(),
 		)?
 	};
-	let ids = referenced_assets(document.get())?;
-	let mut assets = BTreeMap::new();
-	if !ids.is_empty() {
-		let rows = sqlx::query!("SELECT sha256::text AS \"sha256!\", mime_type, COALESCE(byte_size, 0) AS \"byte_size!\", width, height, source::text AS \"source!\", COALESCE(remote_url, '') AS \"url!\" FROM card_assets WHERE presentation_id = $1 AND sha256 = ANY($2)", revision.presentation_id, &ids)
-			.fetch_all(&state.database).await?;
-		for row in rows {
-			assets.insert(
-				row.sha256,
-				Asset {
-					mime_type: row.mime_type,
-					byte_size: row.byte_size,
-					width: row.width,
-					height: row.height,
-					source: raw_document(row.source.as_bytes())?,
-					url: (!row.url.is_empty()).then_some(row.url),
-				},
-			);
-		}
-	}
-	Ok((revision, document, assets))
+	Ok((revision, document))
 }
 
 fn raw_document(bytes: &[u8]) -> Result<Box<RawValue>, ReadError> {
@@ -319,7 +338,7 @@ fn matches(key: &str, field: &str) -> bool {
 	key.replace('ſ', "s").eq_ignore_ascii_case(field)
 }
 
-fn referenced_assets(document: &str) -> Result<Vec<String>, ReadError> {
+pub(crate) fn referenced_assets(document: &str) -> Result<Vec<String>, ReadError> {
 	// JSONB rejects lone surrogates, but a syntactically valid disposable cache
 	// entry may contain them. Go replaces them while decoding struct fields.
 	let normalized = crate::http::json::replace_lone_surrogates(document);

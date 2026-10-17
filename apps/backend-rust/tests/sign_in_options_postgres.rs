@@ -39,6 +39,7 @@ async fn sign_in_options_reports_password_shape_and_handles_request_failures() {
 	let app = router_with_database(
 		Security::new(""),
 		ApiState {
+			objects: None,
 			cache: None,
 			database: database.clone(),
 			auth: RequestAuth::new(secret.as_bytes(), "slidesage_token"),

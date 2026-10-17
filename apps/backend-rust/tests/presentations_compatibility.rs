@@ -21,6 +21,7 @@ async fn presentation_routes_preserve_auth_validation_and_closed_database_errors
 	let app = router_with_database(
 		Security::new("https://slidesage.app"),
 		ApiState {
+			objects: None,
 			cache: None,
 			database,
 			auth: RequestAuth::new(secret, "slidesage_token"),

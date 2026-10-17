@@ -40,6 +40,7 @@ async fn password_sign_in_issues_compatible_cookies_and_fails_closed() {
 	let secret = format!("test-secret-{user}");
 	let ip = Ipv6Addr::from(*uuid::Uuid::new_v4().as_bytes());
 	let state = |secure| ApiState {
+		objects: None,
 		cache: None,
 		database: database.clone(),
 		auth: RequestAuth::new(
