@@ -10,6 +10,9 @@ import (
 
 var ErrNotFound = errors.New("auth record not found")
 
+// signupPoints is the balance credited to every newly created user.
+const signupPoints = 10
+
 type Repository struct {
 	database *sql.DB
 }
@@ -339,14 +342,14 @@ func (repository *Repository) UpsertOAuthUser(ctx context.Context, provider, pro
 		if idErr != nil {
 			return User{}, idErr
 		}
-		user = User{ID: userID, Name: name, Email: email, EmailVerified: true, SlideTokens: 50, CreatedAt: now, UpdatedAt: now}
+		user = User{ID: userID, Name: name, Email: email, EmailVerified: true, SlideTokens: signupPoints, CreatedAt: now, UpdatedAt: now}
 		if image != "" {
 			user.Image = &image
 		}
-		if _, err = transaction.ExecContext(ctx, `INSERT INTO users (id, name, email, email_verified, image, balance_millis, created_at, updated_at) VALUES ($1, $2, $3, true, $4, 50000, $5, $5)`, user.ID, user.Name, user.Email, user.Image, now); err != nil {
+		if _, err = transaction.ExecContext(ctx, `INSERT INTO users (id, name, email, email_verified, image, balance_millis, created_at, updated_at) VALUES ($1, $2, $3, true, $4, $5, $6, $6)`, user.ID, user.Name, user.Email, user.Image, pointsToMillis(signupPoints), now); err != nil {
 			return User{}, err
 		}
-		if _, err = transaction.ExecContext(ctx, `INSERT INTO point_ledger (id, user_id, entry_type, delta_millis, balance_after_millis) VALUES (md5(random()::text || clock_timestamp()::text), $1, 'signup_credit', 50000, 50000)`, user.ID); err != nil {
+		if _, err = transaction.ExecContext(ctx, `INSERT INTO point_ledger (id, user_id, entry_type, delta_millis, balance_after_millis) VALUES (md5(random()::text || clock_timestamp()::text), $1, 'signup_credit', $2, $2)`, user.ID, pointsToMillis(signupPoints)); err != nil {
 			return User{}, err
 		}
 	} else if err != nil {
