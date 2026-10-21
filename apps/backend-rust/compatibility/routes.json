@@ -230,7 +230,13 @@
 			"method": "GET",
 			"path": "/presentations/{id}/assets/{sha256}",
 			"source": "apps/api/internal/carddocument/routes.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Original Go owner handler compared with live Rust using the same disposable filesystem and migrated PostgreSQL",
+				"Exact binary bytes, HEAD, ETag/304 headers, private immutable caching, ignored Range and remote redirects",
+				"Authentication precedes storage configuration and ownership checks; live ownership and deleted presentations",
+				"Missing/corrupt objects, unsafe keys, malformed digest lookups and Go-compatible redirect header sanitization"
+			]
 		},
 		{
 			"method": "POST",
@@ -395,7 +401,13 @@
 			"method": "GET",
 			"path": "/shared/{token}/assets/{sha256}",
 			"source": "apps/api/internal/carddocument/routes.go",
-			"state": "pending"
+			"state": "ported",
+			"verified_cases": [
+				"Live share and ready status plus current-document membership checked before bytes, redirects or ETags",
+				"Original Go public handler compared with native Rust streaming and remote GET/HEAD redirects",
+				"Current revision/ownership changes, unused assets, revocation, rotation and deleted presentations",
+				"Invalid authentication ignored; disabled storage distinguishes stored bytes from remote images"
+			]
 		},
 		{
 			"method": "GET",

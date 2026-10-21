@@ -114,6 +114,8 @@
 | `UNSPLASH_ACCESS_KEY` | Stock photos | Yes | Unsplash key; without it stock routes return `503` and generation uses text layouts. Uploads remain available |
 | `UNSPLASH_API_BASE` | No | No | Unsplash API base URL; defaults to `https://api.unsplash.com`. Only for tests and local stubs |
 
+The isolated Rust API also uses `PRESENTATION_STORAGE_DIR` for native owner/shared image downloads. It creates the directory at startup when configured and reads existing keys without changing their format. Its current filesystem port supports reads; upload and cleanup processing are still pending.
+
 - Production enables photos when `UNSPLASH_ACCESS_KEY` is set in the server `.env`, and disables them when it is empty.
 
 ## Observability
