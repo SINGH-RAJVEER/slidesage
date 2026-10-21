@@ -55,6 +55,12 @@ func RateLimit(database *sql.DB, secret string, identity Identity, next http.Han
 				}{emailPolicy, email})
 			}
 		}
+		if ipPolicy, ok := ipPolicyFor(request.Method, request.URL.Path); ok {
+			policies = append(policies, struct {
+				policy ratePolicy
+				key    string
+			}{ipPolicy, clientAddress(request)})
+		}
 		for _, item := range policies {
 			itemStart := now.Truncate(item.policy.window)
 			itemExpiry := itemStart.Add(item.policy.window)
@@ -88,6 +94,15 @@ func emailPolicyFor(method, path string) (ratePolicy, bool) {
 	default:
 		return ratePolicy{}, false
 	}
+}
+
+// ipPolicyFor adds a client-IP limit to authenticated routes where one host
+// signing in as many users is itself the abuse.
+func ipPolicyFor(method, path string) (ratePolicy, bool) {
+	if method == http.MethodPost && path == "/rewards/ads/sessions" {
+		return ratePolicy{"ad-reward-session-ip", 30, time.Hour, false}, true
+	}
+	return ratePolicy{}, false
 }
 
 func requestEmail(request *http.Request) string {
@@ -164,6 +179,10 @@ func policyFor(method, path string) (ratePolicy, bool) {
 		return ratePolicy{"photo-search", 60, hour, true}, true
 	case method == http.MethodPost && path == "/feedback":
 		return ratePolicy{"feedback-submit", 10, hour, true}, true
+	case method == http.MethodPost && path == "/rewards/ads/sessions":
+		return ratePolicy{"ad-reward-session", 10, hour, true}, true
+	case method == http.MethodPost && strings.HasPrefix(path, "/rewards/ads/sessions/") && strings.HasSuffix(path, "/claim"):
+		return ratePolicy{"ad-reward-claim", 10, hour, true}, true
 	case method == http.MethodPost && path == "/billing/webhook":
 		return ratePolicy{"billing-webhook", 120, minute, false}, true
 	default:

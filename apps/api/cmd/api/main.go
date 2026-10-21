@@ -25,6 +25,7 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/middleware"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/observability"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/rewards"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -101,6 +102,7 @@ func main() {
 	}, researchService, database)
 	ai.RegisterRoutes(mux, ai.ConnectionService{DB: database}, identity)
 	feedback.RegisterRoutes(mux, feedback.Repository{DB: database}, identity)
+	rewards.RegisterRoutes(mux, rewards.Service{DB: database, Config: rewards.ConfigFromEnv()}, identity)
 	razorpay, err := billing.NewRazorpayClientFromEnv()
 	if err != nil {
 		fatal(logger, err)
