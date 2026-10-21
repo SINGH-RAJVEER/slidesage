@@ -131,7 +131,7 @@ Telemetry: `rewards.ad.sessions` and `rewards.ad.claims` count outcomes by an `o
 
 - The ad unit path comes from `GET /rewards/ads`, so the web build needs no ad configuration and the section is hidden whenever the API reports the feature off.
 - `routes/billing/rewarded-ad.ts` loads GPT (`securepubads.g.doubleclick.net/tag/js/gpt.js`) only when the user presses "Watch ad". It defines a `REWARDED` out-of-page slot, creates the server session on `rewardedSlotReady` before calling `makeRewardedVisible()`, records `rewardedSlotGranted`, and destroys the slot on `rewardedSlotClosed`. No fill within 8 seconds, an unsupported browser or a blocked script reports "No ad is available right now" without creating a session.
-- `routes/billing/EarnPointsSection.tsx` sits under the balance on the purchase page. After a granted ad it waits until `claimable_at`, claims, and publishes the new balance. It shows views and points left, or the reason the user cannot earn, and refreshes when a short cooldown ends.
+- `routes/billing/EarnPointsSection.tsx` sits under the balance on the purchase page. After a granted ad it waits out `min_watch_seconds` from when the session arrived, so device clock skew cannot cause an early claim, retries once if the server still answers `AD_REWARD_TOO_EARLY`, and publishes the new balance. It shows views and points left, or the reason the user cannot earn, and refreshes when a short cooldown ends.
 - Insufficient-points errors on the outline page offer a "Get points" action that opens the purchase page.
 - `apps/web/public/ads.txt` declares the AdSense publisher. Add the line Ad Manager gives you, if its publisher ID differs.
 - If a CSP is added later, it must allow the GPT and DoubleClick origins. None is set today.

@@ -32,20 +32,45 @@ interface EarnPointsSectionProps {
 	onSuccess(message: string): void;
 }
 
+class AdRewardError extends Error {
+	readonly code?: string;
+	readonly retryAfterSeconds?: number;
+
+	constructor(message: string, code?: string, retryAfterSeconds?: number) {
+		super(message);
+		this.code = code;
+		this.retryAfterSeconds = retryAfterSeconds;
+	}
+}
+
 async function postJson<T>(path: string): Promise<T> {
 	const response = await fetch(`${API_URL}${path}`, { method: "POST", credentials: "include" });
-	const body = await readJsonResponse<T | ApiErrorResponse>(response);
+	const body = await readJsonResponse<T | (ApiErrorResponse & { retry_after?: number })>(response);
 	if (!response.ok || body === null || (typeof body === "object" && "error" in body)) {
-		const message =
-			body && typeof body === "object" && "error" in body ? body.error.message : undefined;
-		throw new Error(message ?? "Ad reward request failed");
+		const failure = body && typeof body === "object" && "error" in body ? body : null;
+		throw new AdRewardError(
+			failure?.error.message ?? "Ad reward request failed",
+			failure?.error.code,
+			failure?.retry_after,
+		);
 	}
 	return body as T;
 }
 
-function wait(until: string): Promise<void> {
-	const delay = new Date(until).getTime() - Date.now();
-	return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, delay)));
+function sleep(milliseconds: number): Promise<void> {
+	return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, milliseconds)));
+}
+
+/** Claims a watched view, retrying once if the server says the minimum watch time has not passed. */
+async function claimSession(sessionID: string): Promise<AdRewardClaimResponse> {
+	const path = `/rewards/ads/sessions/${encodeURIComponent(sessionID)}/claim`;
+	try {
+		return await postJson<AdRewardClaimResponse>(path);
+	} catch (error) {
+		if (!(error instanceof AdRewardError) || error.code !== "AD_REWARD_TOO_EARLY") throw error;
+		await sleep((error.retryAfterSeconds ?? 1) * 1000);
+		return postJson<AdRewardClaimResponse>(path);
+	}
 }
 
 /** Offers an opt-in rewarded ad. Renders nothing while ad rewards are off. */
@@ -79,10 +104,11 @@ export default function EarnPointsSection({
 	const watch = async () => {
 		setPhase("loading");
 		// Set inside the ad callback, so held in an object TypeScript does not narrow.
-		const issued: { session?: AdRewardSessionResponse } = {};
+		const issued: { session?: AdRewardSessionResponse; receivedAt?: number } = {};
 		try {
 			const outcome = await showRewardedAd(status.ad_unit, async () => {
 				issued.session = await postJson<AdRewardSessionResponse>("/rewards/ads/sessions");
+				issued.receivedAt = Date.now();
 				setPhase("watching");
 			});
 			if (outcome === "unavailable") {
@@ -90,13 +116,11 @@ export default function EarnPointsSection({
 			} else if (outcome === "dismissed") {
 				onError("Watch the whole ad to earn points.");
 			} else if (issued.session) {
-				const { session_id, claimable_at } = issued.session;
 				setPhase("claiming");
-				// The server refuses claims before the minimum watch time.
-				await wait(claimable_at);
-				const claim = await postJson<AdRewardClaimResponse>(
-					`/rewards/ads/sessions/${encodeURIComponent(session_id)}/claim`,
-				);
+				// The server refuses claims before the minimum watch time. Timing it
+				// from local receipt, not the server timestamp, ignores clock skew.
+				await sleep((issued.receivedAt ?? 0) + status.min_watch_seconds * 1000 - Date.now());
+				const claim = await claimSession(issued.session.session_id);
 				onBalance(claim.new_balance);
 				publishPointsBalance(claim.new_balance);
 				onSuccess(`${claim.points_awarded} points added to your account!`);
