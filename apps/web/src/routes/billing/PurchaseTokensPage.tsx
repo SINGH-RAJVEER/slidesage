@@ -24,6 +24,7 @@ import { Check } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "../../app/Header";
 import { takeBalance } from "./billing-data";
+import EarnPointsSection from "./EarnPointsSection";
 
 declare global {
 	interface Window {
@@ -234,6 +235,18 @@ export default function PurchaseTokensPage() {
 							<span className="text-lg text-white/40 font-light">points</span>
 						</div>
 					</div>
+
+					<EarnPointsSection
+						onBalance={(newBalance) => setBalance({ slide_tokens: newBalance })}
+						onError={(message) => {
+							setSuccessMessage(null);
+							setErrorMessage(message);
+						}}
+						onSuccess={(message) => {
+							setErrorMessage(null);
+							setSuccessMessage(message);
+						}}
+					/>
 
 					{/* Purchase Options */}
 					<div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
