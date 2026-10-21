@@ -123,6 +123,9 @@ Owner authentication is required except for `/shared` routes:
 | `POST` | `/billing/checkout` | User | Create Razorpay order |
 | `POST` | `/billing/verify` | User | Verify captured payment and credit points |
 | `POST` | `/billing/webhook` | Signature | Process `payment.captured` |
+| `GET` | `/rewards/ads` | User | Ad reward status: `enabled`, `ad_unit`, `eligible`, `reason`, points and views left, `next_available_at` |
+| `POST` | `/rewards/ads/sessions` | User | Open a session for one rewarded ad view; `403` ineligible, `429` capped or cooling down |
+| `POST` | `/rewards/ads/sessions/:id/claim` | User | Credit a watched view once; `409` before the minimum watch time, `410` expired. See [Ad rewards](AD_REWARDS.md) |
 
 | Plan | Points | INR price |
 | --- | --- | --- |

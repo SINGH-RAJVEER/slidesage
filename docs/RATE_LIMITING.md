@@ -20,6 +20,9 @@
 | `POST /presentation-jobs` | Authenticated user | 15 | 1 minute |
 | `POST /billing/checkout` | Authenticated user | 10 | 10 minutes |
 | `POST /billing/verify` | Authenticated user | 20 | 15 minutes |
+| `POST /rewards/ads/sessions` | Authenticated user | 10 | 1 hour |
+| `POST /rewards/ads/sessions` | Client IP | 30 | 1 hour |
+| `POST /rewards/ads/sessions/:id/claim` | Authenticated user | 10 | 1 hour |
 | `POST /billing/webhook` | Client IP | 120 | 1 minute |
 | `GET /shared/:token` | Client IP | 60 | 1 minute |
 | `GET /shared/:token/assets/:sha256` | Client IP | 600 | 1 minute |
