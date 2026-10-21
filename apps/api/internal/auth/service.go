@@ -73,7 +73,7 @@ func (service *Service) SignUp(ctx context.Context, name, email, password string
 	if err != nil {
 		return User{}, err
 	}
-	user := User{ID: userID, Name: name, Email: email, SlideTokens: 50, CreatedAt: now, UpdatedAt: now}
+	user := User{ID: userID, Name: name, Email: email, SlideTokens: signupPoints, CreatedAt: now, UpdatedAt: now}
 	if err := service.repository.CreateUserWithCredential(ctx, user, accountID, hash); err != nil {
 		return User{}, err
 	}
