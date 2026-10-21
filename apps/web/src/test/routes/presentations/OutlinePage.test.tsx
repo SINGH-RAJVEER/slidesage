@@ -176,6 +176,7 @@ describe("OutlinePage", () => {
 		const reason = await view.findByRole("alert");
 		expect(reason).toHaveTextContent("Insufficient points for an outline");
 		expect(reason.closest(".fixed")).toBeNull();
+		expect(view.getByRole("button", { name: "Get points" })).toBeInTheDocument();
 
 		fireEvent.click(view.getByRole("button", { name: "Back to generate" }));
 

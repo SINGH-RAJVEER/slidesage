@@ -106,6 +106,11 @@ function outlineProblem(outline: Outline): string | null {
  * points, reorder or remove cards, and choose layouts; drafting then follows
  * the approved outline exactly.
  */
+/** Points errors offer the purchase page, where points can be bought or earned from ads. */
+function needsPoints(message: string | null): boolean {
+	return message !== null && /insufficient points/i.test(message);
+}
+
 export default function OutlinePage() {
 	const location = useLocation();
 	return <OutlineVisit key={location.key} />;
@@ -339,7 +344,15 @@ function OutlineVisit() {
 	return (
 		<div className="flex min-h-dvh w-full flex-col bg-transparent">
 			<Header />
-			<FloatingNotice error={error} onDismiss={() => setError(null)} />
+			<FloatingNotice
+				error={error}
+				onDismiss={() => setError(null)}
+				action={
+					needsPoints(error)
+						? { label: "Get points", onClick: () => navigate(ROUTES.purchase) }
+						: null
+				}
+			/>
 			<main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-10 desktop:px-8">
 				{!outline && !loadError && (
 					<section
@@ -355,9 +368,16 @@ function OutlineVisit() {
 						<p role="alert" className="max-w-xl text-sm leading-6 text-red-200">
 							{loadError}
 						</p>
-						<Button variant="ghost" onClick={back}>
-							{request?.researchPayload ? "Back to research" : "Back to generate"}
-						</Button>
+						<div className="flex gap-2">
+							<Button variant="ghost" onClick={back}>
+								{request?.researchPayload ? "Back to research" : "Back to generate"}
+							</Button>
+							{needsPoints(loadError) ? (
+								<Button variant="ghost" onClick={() => navigate(ROUTES.purchase)}>
+									Get points
+								</Button>
+							) : null}
+						</div>
 					</section>
 				)}
 				{outline && (
