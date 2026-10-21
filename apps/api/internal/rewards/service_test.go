@@ -209,3 +209,17 @@ func insertUser(t *testing.T, database *sql.DB, verified bool, age time.Duration
 	t.Cleanup(func() { _, _ = database.Exec(`DELETE FROM users WHERE id = $1`, userID) })
 	return userID
 }
+
+func TestConfigFromEnvNeedsAnAdUnit(t *testing.T) {
+	t.Setenv("AD_REWARDS_ENABLED", "true")
+	t.Setenv("AD_REWARD_GPT_AD_UNIT", "")
+	if ConfigFromEnv().Enabled {
+		t.Fatal("enabled without an ad unit")
+	}
+	t.Setenv("AD_REWARD_GPT_AD_UNIT", " /1234/rewarded ")
+	t.Setenv("AD_REWARD_POINTS_PER_VIEW", "3")
+	config := ConfigFromEnv()
+	if !config.Enabled || config.AdUnit != "/1234/rewarded" || config.RewardMillis != 3000 || config.DailyViews != 5 {
+		t.Fatalf("config = %+v", config)
+	}
+}

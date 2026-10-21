@@ -76,7 +76,7 @@ func TestRoutesMapOutcomes(t *testing.T) {
 
 func TestStatusReportsPoints(t *testing.T) {
 	next := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
-	store := &fakeStore{status: Status{Enabled: true, Reason: ReasonDailyCap, RewardMillis: 2000, MillisLeftThisMonth: 50000, NextAvailableAt: &next, MinWatch: 15 * time.Second}}
+	store := &fakeStore{status: Status{Enabled: true, AdUnit: "/1234/rewarded", Reason: ReasonDailyCap, RewardMillis: 2000, MillisLeftThisMonth: 50000, NextAvailableAt: &next, MinWatch: 15 * time.Second}}
 	mux := http.NewServeMux()
 	RegisterRoutes(mux, store, func(*http.Request) (string, error) { return "user-1", nil })
 	recorder := httptest.NewRecorder()
@@ -85,7 +85,7 @@ func TestStatusReportsPoints(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["eligible"] != false || body["reason"] != ReasonDailyCap || body["points_per_view"] != 2.0 || body["points_left_this_month"] != 50.0 || body["next_available_at"] != "2026-11-01T00:00:00Z" || body["min_watch_seconds"] != 15.0 {
+	if body["ad_unit"] != "/1234/rewarded" || body["eligible"] != false || body["reason"] != ReasonDailyCap || body["points_per_view"] != 2.0 || body["points_left_this_month"] != 50.0 || body["next_available_at"] != "2026-11-01T00:00:00Z" || body["min_watch_seconds"] != 15.0 {
 		t.Fatalf("status body = %v", body)
 	}
 }

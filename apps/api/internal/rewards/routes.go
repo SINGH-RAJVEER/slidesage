@@ -42,6 +42,7 @@ func (r router) status(w http.ResponseWriter, request *http.Request) {
 	}
 	body := map[string]any{"enabled": status.Enabled}
 	if status.Enabled {
+		body["ad_unit"] = status.AdUnit
 		body["eligible"] = status.Reason == ""
 		body["reason"] = nullable(status.Reason)
 		body["points_per_view"] = points(status.RewardMillis)

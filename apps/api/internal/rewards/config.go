@@ -16,6 +16,9 @@ import (
 // so it can be tuned from observed fill and eCPM without a release.
 type Config struct {
 	Enabled bool
+	// AdUnit is the Google Ad Manager rewarded ad unit path the web client
+	// requests, such as /1234567/slidesage_rewarded.
+	AdUnit string
 	// RewardMillis is the credit for one completed view.
 	RewardMillis int64
 	// DailyViews caps claimed views per user per UTC day.
@@ -47,10 +50,11 @@ func DefaultConfig() Config {
 }
 
 // ConfigFromEnv reads AD_REWARD* variables over DefaultConfig. Ad rewards stay
-// off unless AD_REWARDS_ENABLED is true.
+// off unless AD_REWARDS_ENABLED is true and an ad unit is configured.
 func ConfigFromEnv() Config {
 	config := DefaultConfig()
 	config.Enabled, _ = strconv.ParseBool(strings.TrimSpace(os.Getenv("AD_REWARDS_ENABLED")))
+	config.AdUnit = strings.TrimSpace(os.Getenv("AD_REWARD_GPT_AD_UNIT"))
 	config.RewardMillis = int64(envInt("AD_REWARD_POINTS_PER_VIEW", int(config.RewardMillis/1000))) * 1000
 	config.DailyViews = envInt("AD_REWARD_DAILY_VIEWS", config.DailyViews)
 	config.MonthlyMillis = int64(envInt("AD_REWARD_MONTHLY_POINTS", int(config.MonthlyMillis/1000))) * 1000
@@ -59,7 +63,7 @@ func ConfigFromEnv() Config {
 	config.SessionTTL = time.Duration(envInt("AD_REWARD_SESSION_TTL_SECONDS", int(config.SessionTTL/time.Second))) * time.Second
 	config.MinAccountAge = time.Duration(envInt("AD_REWARD_MIN_ACCOUNT_AGE_HOURS", int(config.MinAccountAge/time.Hour))) * time.Hour
 	// A configuration that can never credit points is the same as disabled.
-	if config.RewardMillis <= 0 || config.DailyViews <= 0 || config.MonthlyMillis <= 0 || config.SessionTTL <= config.MinWatch {
+	if config.AdUnit == "" || config.RewardMillis <= 0 || config.DailyViews <= 0 || config.MonthlyMillis <= 0 || config.SessionTTL <= config.MinWatch {
 		config.Enabled = false
 	}
 	return config

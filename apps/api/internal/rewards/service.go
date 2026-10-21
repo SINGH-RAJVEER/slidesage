@@ -43,6 +43,7 @@ func (TooEarly) Error() string { return "ad reward claimed too early" }
 // Status is what the earn UI shows before offering an ad.
 type Status struct {
 	Enabled             bool
+	AdUnit              string
 	Reason              string
 	RewardMillis        int64
 	ViewsLeftToday      int
@@ -238,6 +239,7 @@ func (c Config) evaluate(current usage) Status {
 	now := current.now.UTC()
 	status := Status{
 		Enabled:             true,
+		AdUnit:              c.AdUnit,
 		RewardMillis:        c.RewardMillis,
 		ViewsLeftToday:      max(0, c.DailyViews-current.viewsToday),
 		MillisLeftThisMonth: max(0, c.MonthlyMillis-current.monthMillis),
