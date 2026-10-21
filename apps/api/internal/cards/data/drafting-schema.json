@@ -1,0 +1,461 @@
+{
+	"schemaVersion": 3,
+	"themes": [
+		"slate",
+		"paper",
+		"ember",
+		"ocean",
+		"grove",
+		"orchid",
+		"sand",
+		"cobalt",
+		"mono"
+	],
+	"roles": [
+		"opening",
+		"context",
+		"evidence",
+		"comparison",
+		"process",
+		"insight",
+		"closing"
+	],
+	"layouts": {
+		"title": {
+			"nodes": {
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"paragraph": {
+					"min": 0,
+					"max": 1
+				}
+			},
+			"description": "Large heading with an optional one-paragraph subtitle. For opening and closing cards."
+		},
+		"statement": {
+			"nodes": {
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"paragraph": {
+					"min": 1,
+					"max": 2
+				}
+			},
+			"description": "Heading with one or two short paragraphs making a single argument."
+		},
+		"bullets": {
+			"nodes": {
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"bullets": {
+					"min": 1,
+					"max": 1
+				},
+				"paragraph": {
+					"min": 0,
+					"max": 1
+				}
+			},
+			"items": {
+				"min": 2,
+				"max": 6
+			},
+			"description": "Heading, two to six bullets, and an optional closing paragraph."
+		},
+		"comparison": {
+			"nodes": {
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"columns": {
+					"min": 1,
+					"max": 1
+				}
+			},
+			"items": {
+				"min": 2,
+				"max": 5
+			},
+			"description": "Heading and two or three columns, each with a short heading and two to five items."
+		},
+		"process": {
+			"nodes": {
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"steps": {
+					"min": 1,
+					"max": 1
+				}
+			},
+			"items": {
+				"min": 3,
+				"max": 6
+			},
+			"description": "Heading and three to six ordered steps, each with a title and optional detail."
+		},
+		"quote": {
+			"nodes": {
+				"heading": {
+					"min": 0,
+					"max": 1
+				},
+				"quote": {
+					"min": 1,
+					"max": 1
+				}
+			},
+			"description": "A single quotation with attribution and an optional heading."
+		},
+		"stats": {
+			"nodes": {
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"stat": {
+					"min": 2,
+					"max": 4
+				},
+				"paragraph": {
+					"min": 0,
+					"max": 1
+				}
+			},
+			"description": "Heading, two to four headline figures with labels, and an optional paragraph."
+		},
+		"image-left": {
+			"nodes": {
+				"image": {
+					"min": 1,
+					"max": 1
+				},
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"paragraph": {
+					"min": 0,
+					"max": 1
+				},
+				"bullets": {
+					"min": 0,
+					"max": 1
+				}
+			},
+			"items": {
+				"min": 2,
+				"max": 4
+			},
+			"requireOneOf": [
+				"paragraph",
+				"bullets"
+			],
+			"image": true,
+			"description": "Photo on the left half; heading with a short paragraph or two to four bullets on the right."
+		},
+		"image-right": {
+			"nodes": {
+				"image": {
+					"min": 1,
+					"max": 1
+				},
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"paragraph": {
+					"min": 0,
+					"max": 1
+				},
+				"bullets": {
+					"min": 0,
+					"max": 1
+				}
+			},
+			"items": {
+				"min": 2,
+				"max": 4
+			},
+			"requireOneOf": [
+				"paragraph",
+				"bullets"
+			],
+			"image": true,
+			"description": "Heading with a short paragraph or two to four bullets on the left; photo on the right half."
+		},
+		"cover": {
+			"nodes": {
+				"image": {
+					"min": 1,
+					"max": 1
+				},
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"paragraph": {
+					"min": 0,
+					"max": 1
+				}
+			},
+			"image": true,
+			"description": "Full-bleed photo behind a large heading and optional subtitle. For openings, section breaks, and closings."
+		},
+		"chart": {
+			"nodes": {
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"chart": {
+					"min": 1,
+					"max": 1
+				},
+				"paragraph": {
+					"min": 0,
+					"max": 1
+				},
+				"bullets": {
+					"min": 0,
+					"max": 1
+				},
+				"callout": {
+					"min": 0,
+					"max": 1
+				}
+			},
+			"items": {
+				"min": 2,
+				"max": 4
+			},
+			"description": "Heading and one chart of real figures, with an optional short paragraph, two to four bullets, or a callout reading the chart. The chart's size sets its share of the width beside the text; a full chart sits above the text."
+		},
+		"table": {
+			"nodes": {
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"table": {
+					"min": 1,
+					"max": 1
+				},
+				"paragraph": {
+					"min": 0,
+					"max": 1
+				},
+				"callout": {
+					"min": 0,
+					"max": 1
+				}
+			},
+			"description": "Heading and one table of two to five columns and up to eight rows, with an optional paragraph or callout. The table's size sets its share of the width beside the text; a full table sits above it."
+		},
+		"dashboard": {
+			"nodes": {
+				"heading": {
+					"min": 1,
+					"max": 1
+				},
+				"chart": {
+					"min": 0,
+					"max": 4
+				},
+				"progress": {
+					"min": 0,
+					"max": 4
+				},
+				"table": {
+					"min": 0,
+					"max": 2
+				},
+				"callout": {
+					"min": 0,
+					"max": 4
+				}
+			},
+			"widgets": {
+				"min": 2,
+				"max": 4
+			},
+			"description": "Heading and two to four widgets (charts, progress meters, tables, callouts) in up to two rows. Widgets fill a row left to right by size: small is a third, medium a half, large two thirds, full the whole row."
+		}
+	},
+	"limits": {
+		"cards": {
+			"min": 1,
+			"max": 40
+		},
+		"title": 120,
+		"takeaway": 200,
+		"notes": 1200,
+		"heading": 90,
+		"paragraph": 420,
+		"listItem": 160,
+		"quote": 280,
+		"attribution": 80,
+		"statValue": 16,
+		"statLabel": 60,
+		"stepTitle": 60,
+		"stepDetail": 200,
+		"columnHeading": 40,
+		"imageAlt": 200,
+		"sourceIds": 8,
+		"chartCategories": {
+			"min": 2,
+			"max": 12
+		},
+		"chartSeries": {
+			"min": 1,
+			"max": 4
+		},
+		"categoryLabel": 24,
+		"seriesName": 40,
+		"affix": 8,
+		"chartCaption": 120,
+		"chartValue": 1000000000000,
+		"meters": {
+			"min": 1,
+			"max": 6
+		},
+		"meterLabel": 60,
+		"tableColumns": {
+			"min": 2,
+			"max": 5
+		},
+		"tableRows": {
+			"min": 1,
+			"max": 8
+		},
+		"tableHeading": 32,
+		"tableCell": 60,
+		"callout": 240
+	},
+	"card": {
+		"position": "number, as assigned in the plan",
+		"layout": "one of title, statement, bullets, comparison, process, quote, stats, image-left, image-right, cover, chart, table, dashboard",
+		"nodes": "array of nodes in reading order",
+		"sourceIds": "array of research source IDs the card uses, e.g. s1",
+		"notes": "optional speaker notes"
+	},
+	"nodes": {
+		"heading": {
+			"type": "heading",
+			"text": "string"
+		},
+		"paragraph": {
+			"type": "paragraph",
+			"text": "string"
+		},
+		"bullets": {
+			"type": "bullets",
+			"items": [
+				"string"
+			]
+		},
+		"quote": {
+			"type": "quote",
+			"text": "string",
+			"attribution": "optional string"
+		},
+		"stat": {
+			"type": "stat",
+			"value": "string, e.g. 42% or $3.1B",
+			"label": "string"
+		},
+		"steps": {
+			"type": "steps",
+			"items": [
+				{
+					"title": "string",
+					"detail": "optional string"
+				}
+			]
+		},
+		"columns": {
+			"type": "columns",
+			"columns": [
+				{
+					"heading": "string",
+					"items": [
+						"string"
+					]
+				}
+			]
+		},
+		"image": {
+			"type": "image",
+			"note": "Never write image nodes. For a layout that holds an image, the image node is added for you; draft only the text nodes."
+		},
+		"chart": {
+			"type": "chart",
+			"kind": "one of column, bar, stacked-column, line, area, pie, donut",
+			"size": "one of small, medium, large, full",
+			"categories": [
+				"string, e.g. 2023 or Europe"
+			],
+			"series": [
+				{
+					"name": "string",
+					"values": [
+						"number, one per category, without units"
+					]
+				}
+			],
+			"prefix": "optional string written before values, e.g. $",
+			"suffix": "optional string written after values, e.g. % or B",
+			"caption": "optional string naming where the figures come from"
+		},
+		"progress": {
+			"type": "progress",
+			"size": "one of small, medium, large, full",
+			"items": [
+				{
+					"label": "string",
+					"value": "number from 0 to 100, a percentage"
+				}
+			]
+		},
+		"table": {
+			"type": "table",
+			"size": "one of small, medium, large, full",
+			"columns": [
+				"string column heading"
+			],
+			"rows": [
+				[
+					"string cell, one per column"
+				]
+			]
+		},
+		"callout": {
+			"type": "callout",
+			"size": "one of small, medium, large, full",
+			"tone": "one of note, positive, caution",
+			"text": "string"
+		}
+	},
+	"widgets": {
+		"data": "Charts, meters, and tables show only figures stated in the research sources or the user's notes. Never invent, estimate, or round figures into new ones; when the figures are missing, use a text layout instead.",
+		"kinds": {
+			"column": "values compared across a few categories, or a short series over time",
+			"bar": "values compared across categories with long names, or ranked",
+			"stacked-column": "how two to four parts make up each category's total",
+			"line": "change over time across many periods, for one to four series",
+			"area": "change in one or two totals over time, where the volume matters",
+			"pie": "parts of one whole, two to six slices; one series only",
+			"donut": "parts of one whole with the total as the point; one series only"
+		},
+		"sizes": "small is a third of a row, medium a half, large two thirds, full the whole row. In a chart or table card the size is the widget's share of the width beside the text, and a full widget sits above it.",
+		"tones": "note for context, positive for a gain or success, caution for a risk or limit"
+	}
+}
