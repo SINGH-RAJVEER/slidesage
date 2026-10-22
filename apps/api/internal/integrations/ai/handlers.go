@@ -105,19 +105,8 @@ func (r aiRouter) config(w http.ResponseWriter, request *http.Request) {
 	if !validSelection && selection == nil {
 		selection = defaultSelection(models)
 	}
-	if r.connections.DB == nil {
-		r.errorResponse(w, errors.New("database is required"))
-		return
-	}
-	var balanceMillis int64
-	err = r.connections.DB.QueryRowContext(request.Context(), `SELECT balance_millis FROM users WHERE id = $1`, userID).Scan(&balanceMillis)
-	if err != nil {
-		r.errorResponse(w, err)
-		return
-	}
 	generation, selectionBody := generationState(validProviders, enabledProviders, selection, storedSelection)
-	balance := float64(balanceMillis) / 1000
-	response := map[string]any{"generation": generation, "eligibility": map[string]any{"eligible": balanceMillis > 50000, "slideTokens": balance, "minimumPointsExclusive": 50}, "connections": summaries, "models": models, "selection": selectionBody}
+	response := map[string]any{"generation": generation, "connections": summaries, "models": models, "selection": selectionBody}
 	if len(catalogErrors) > 0 {
 		response["modelCatalogErrors"] = catalogErrors
 	}
@@ -310,10 +299,6 @@ func (r aiRouter) errorResponse(w http.ResponseWriter, err error) {
 		} else {
 			aiError(w, http.StatusBadGateway, validation.Message, "PROVIDER_VALIDATION_UNAVAILABLE")
 		}
-		return
-	}
-	if strings.Contains(err.Error(), "more than 50 points") {
-		writeAIJSON(w, http.StatusForbidden, map[string]any{"error": map[string]string{"message": err.Error(), "code": "BYOK_POINTS_REQUIRED"}, "minimum_points_exclusive": 50})
 		return
 	}
 	log.Printf("ai connection request failed: %v", err)

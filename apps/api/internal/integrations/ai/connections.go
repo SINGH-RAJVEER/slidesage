@@ -33,9 +33,6 @@ func (s ConnectionService) Connect(ctx context.Context, userID string, provider 
 	if len(key) < 8 || len(key) > 512 || strings.ContainsAny(key, "\r\n\x00") {
 		return Connection{}, nil, errors.New("enter a valid API key")
 	}
-	if err := s.requireEligibility(ctx, userID); err != nil {
-		return Connection{}, nil, err
-	}
 	models, err := ValidateProviderKey(ctx, provider, key, nil)
 	if err != nil {
 		return Connection{}, nil, err
@@ -127,12 +124,9 @@ func (s ConnectionService) SetSelection(ctx context.Context, userID string, sele
 	return err
 }
 
-// Select validates that the user remains eligible, connected, and that the model
+// Select validates that the provider is still connected and that the model
 // is still available before persisting the preference.
 func (s ConnectionService) Select(ctx context.Context, userID string, selection Selection) error {
-	if err := s.requireEligibility(ctx, userID); err != nil {
-		return err
-	}
 	selected, _, err := s.ResolveSelection(ctx, userID, &selection)
 	if err != nil {
 		return err
@@ -250,21 +244,6 @@ func (s ConnectionService) CredentialForGeneration(ctx context.Context, userID s
 		return nil, "", err
 	}
 	return selected, key, nil
-}
-
-func (s ConnectionService) requireEligibility(ctx context.Context, userID string) error {
-	var balanceMillis int64
-	err := s.DB.QueryRowContext(ctx, `SELECT balance_millis FROM users WHERE id = $1`, userID).Scan(&balanceMillis)
-	if errors.Is(err, sql.ErrNoRows) {
-		return errors.New("user not found")
-	}
-	if err != nil {
-		return err
-	}
-	if balanceMillis <= 50000 {
-		return errors.New("provider connections require more than 50 points")
-	}
-	return nil
 }
 
 func (s ConnectionService) upsert(ctx context.Context, userID string, provider Provider, key EncryptedCredential) (Connection, error) {
