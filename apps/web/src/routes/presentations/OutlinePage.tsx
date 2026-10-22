@@ -23,7 +23,7 @@ import {
 import { ThinkingOrb } from "@slidesage/ui/components/thinking-orb";
 import { API_URL } from "@slidesage/ui/lib/api";
 import { publishPointsBalance } from "@slidesage/ui/lib/points";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Coins, Plus, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Header from "../../app/Header";
@@ -364,19 +364,46 @@ function OutlineVisit() {
 					</section>
 				)}
 				{loadError && !outline && (
-					<section className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-						<p role="alert" className="max-w-xl text-sm leading-6 text-red-200">
+					<section
+						aria-labelledby="outline-error-title"
+						className="flex flex-1 flex-col items-center justify-center text-center"
+					>
+						<h1
+							id="outline-error-title"
+							className="text-3xl font-semibold text-white desktop:text-4xl"
+						>
+							{needsPoints(loadError) ? "You need more points" : "We couldn't plan this outline"}
+						</h1>
+						<p role="alert" className="mt-3 max-w-xl text-sm leading-6 text-red-200">
 							{loadError}
 						</p>
-						<div className="flex gap-2">
-							<Button variant="ghost" onClick={back}>
-								{request?.researchPayload ? "Back to research" : "Back to generate"}
-							</Button>
+						{needsPoints(loadError) ? (
+							<p className="mt-3 max-w-xl text-sm leading-6 text-white/45">
+								Planning an outline uses points. Add more from the purchase page, then try again.
+							</p>
+						) : null}
+						<div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
 							{needsPoints(loadError) ? (
-								<Button variant="ghost" onClick={() => navigate(ROUTES.purchase)}>
+								<Button
+									onClick={() => navigate(ROUTES.purchase)}
+									className="h-11 bg-white px-5 text-[#151c2a] hover:bg-white/90"
+								>
+									<Coins className="h-4 w-4" />
 									Get points
 								</Button>
 							) : null}
+							<Button
+								onClick={back}
+								variant={needsPoints(loadError) ? "ghost" : "default"}
+								className={
+									needsPoints(loadError)
+										? "h-11 px-5 text-white/70 hover:bg-white/10 hover:text-white"
+										: "h-11 bg-white px-5 text-[#151c2a] hover:bg-white/90"
+								}
+							>
+								<ArrowLeft className="h-4 w-4" />
+								{request?.researchPayload ? "Back to research" : "Back to generate"}
+							</Button>
 						</div>
 					</section>
 				)}
