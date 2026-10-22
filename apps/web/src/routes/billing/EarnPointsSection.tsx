@@ -135,12 +135,16 @@ export default function EarnPointsSection({
 
 	const busy = phase !== "idle";
 	const label =
-		phase === "loading" ? "Loading ad..." : phase === "idle" ? "Watch ad" : "Adding points...";
+		phase === "loading"
+			? "Loading ad..."
+			: phase === "idle"
+				? `Watch ad for ${status.points_per_view} points`
+				: "Adding points...";
 
 	return (
 		<section
 			aria-labelledby="earn-points-heading"
-			className="mb-14 flex flex-col items-center gap-3 text-center"
+			className="flex flex-col items-center justify-center gap-3 text-center desktop:ml-16 desktop:border-l desktop:border-white/10 desktop:pl-16"
 		>
 			<h2
 				id="earn-points-heading"
@@ -148,7 +152,6 @@ export default function EarnPointsSection({
 			>
 				Earn points
 			</h2>
-			<p className="text-white/70">Watch a short ad to earn {status.points_per_view} points.</p>
 			<Button
 				className="h-11 border border-white/10 bg-white/5 px-6 font-semibold text-white backdrop-blur-lg hover:bg-white/10"
 				onClick={() => void watch()}

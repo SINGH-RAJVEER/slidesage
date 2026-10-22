@@ -151,6 +151,7 @@ export interface UserProfile {
 	emailVerified: boolean;
 	slideTokens: number;
 	landingPage: LandingPage;
+	showAdRewards: boolean;
 	createdAt: string;
 }
 
@@ -166,6 +167,7 @@ export interface UpdateProfileRequest {
 	currentPassword?: string;
 	newPassword?: string;
 	landingPage?: LandingPage;
+	showAdRewards?: boolean;
 }
 
 export interface UpdateAvatarRequest {

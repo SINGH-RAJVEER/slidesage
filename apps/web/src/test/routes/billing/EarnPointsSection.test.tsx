@@ -81,7 +81,7 @@ it("credits a granted ad and reports the new balance", async () => {
 		/>,
 	);
 	expect(await view.findByText("5 left today, 60 points left this month")).toBeInTheDocument();
-	fireEvent.click(view.getByRole("button", { name: "Watch ad" }));
+	fireEvent.click(view.getByRole("button", { name: /Watch ad/ }));
 	await waitFor(() => expect(successes).toEqual(["2 points added to your account!"]));
 	expect(balances).toEqual([12]);
 	expect(requests.slice(0, 3)).toEqual([
@@ -102,7 +102,7 @@ it("does not claim an ad closed early", async () => {
 			onSuccess={() => {}}
 		/>,
 	);
-	fireEvent.click(await view.findByRole("button", { name: "Watch ad" }));
+	fireEvent.click(await view.findByRole("button", { name: /Watch ad/ }));
 	await waitFor(() => expect(errors).toEqual(["Watch the whole ad to earn points."]));
 	expect(requests).not.toContain("POST /rewards/ads/sessions/s1/claim");
 });
@@ -113,7 +113,7 @@ it("explains why an ineligible user cannot watch", async () => {
 		<EarnPointsSection onBalance={() => {}} onError={() => {}} onSuccess={() => {}} />,
 	);
 	expect(await view.findByText("Verify your email to earn points from ads.")).toBeInTheDocument();
-	expect(view.getByRole("button", { name: "Watch ad" })).toBeDisabled();
+	expect(view.getByRole("button", { name: /Watch ad/ })).toBeDisabled();
 });
 
 it("retries a claim the server calls early once", async () => {
@@ -126,7 +126,7 @@ it("retries a claim the server calls early once", async () => {
 			onSuccess={(message) => successes.push(message)}
 		/>,
 	);
-	fireEvent.click(await view.findByRole("button", { name: "Watch ad" }));
+	fireEvent.click(await view.findByRole("button", { name: /Watch ad/ }));
 	await waitFor(() => expect(successes).toEqual(["2 points added to your account!"]));
 	expect(requests.filter((request) => request.endsWith("/claim"))).toHaveLength(2);
 });
