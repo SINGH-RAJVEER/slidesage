@@ -142,7 +142,7 @@ func (deck *presentation) app() string {
 		"{{titleCount}}", integer(count+1+2),
 		"{{slideCount}}", integer(count),
 		"{{slideTitles}}", titles.String(),
-		"{{company}}", "PptxGenJS",
+		"{{company}}", "SlideSage",
 	).Replace(template("app.xml.tmpl"))
 }
 
@@ -150,8 +150,8 @@ func (deck *presentation) core(now time.Time) string {
 	stamp := now.UTC().Format("2006-01-02T15:04:05Z")
 	return strings.NewReplacer(
 		"{{title}}", encode(deck.title),
-		"{{subject}}", "PptxGenJS Presentation",
-		"{{author}}", "PptxGenJS",
+		"{{subject}}", "SlideSage Presentation",
+		"{{author}}", "SlideSage",
 		"{{revision}}", "1",
 		"{{timestamp}}", stamp,
 	).Replace(template("core.xml.tmpl"))

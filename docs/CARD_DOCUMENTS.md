@@ -38,7 +38,7 @@
 - Markdown bold and italic become rich-text runs. Operation ID and card position produce repeatable IDs.
 - Numeric strings such as `"1,200"` become chart values; values with units such as `"4%"` are rejected.
 - Run `just converter` locally. `just binaries` builds the image binary, and `converter -health` checks a running service. Default address is `127.0.0.1:8090`.
-- `apps/api/internal/cardconverter/testdata` holds 500 requests with their expected answers: statuses, JSON bytes, and a hash of every PPTX part. A Go test replays them against the handler and fails on any difference.
+- `apps/api/internal/cardconverter/testdata` holds 500 requests with their expected answers: statuses, JSON bytes, and a hash of every PPTX part. A Go test replays them against the handler and fails on any difference. After an intended output change, re-record with `go test ./internal/cardconverter -run TestAnswersMatchTheRecordedConverter -update` from `apps/api` and review which parts changed.
 - Templates, the drafting schema, and theme colors are generated from `libs/cards` into embedded files by `apps/api/internal/cards/data/generate.ts`. Go tests regenerate them and fail on drift. The fixed PPTX parts in `apps/api/internal/cards/pptx/templates` are maintained by hand.
 - Production sidecars have no public ingress. Go services use `CARD_CONVERTER_URL=http://127.0.0.1:8090`.
 
@@ -168,7 +168,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Owner `GET /presentations/{id}/export/pptx` exports the current saved revision.
 - API sends document, sources, and up to 64 MiB of referenced images to `/v1/documents/pptx`; converter body limit is 96 MiB for base64 encoding.
 - Unsplash images download and normalize for that export. Unavailable photos return `502`.
-- `apps/api/internal/cards/pptx` writes one 13.333 × 7.5 inch slide per card. The same document and images always produce the same parts, byte for byte apart from timestamps. Fixed parts live in `apps/api/internal/cards/pptx/templates`; `.tmpl` parts fill `{{name}}` placeholders per deck.
+- `apps/api/internal/cards/pptx` writes one 13.333 × 7.5 inch slide per card. The same document and images always produce the same parts, byte for byte apart from timestamps. Fixed parts live in `apps/api/internal/cards/pptx/templates`; `.tmpl` parts fill `{{name}}` placeholders per deck. File properties, including those of embedded chart workbooks, name SlideSage as author and company.
 - Text, lists, comparison/process content, pictures, charts with editable data, tables, meters, and callouts use native PowerPoint objects.
 - Image crops and widget geometry follow browser layouts. Theme translucency flattens onto the card surface; cover gradients use a PNG overlay.
 - Citations hyperlink HTTP/HTTPS sources, photos retain linked credits, and notes become speaker notes. Donut totals are omitted.

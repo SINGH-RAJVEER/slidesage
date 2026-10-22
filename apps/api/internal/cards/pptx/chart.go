@@ -747,8 +747,8 @@ func (chart *chartObject) workbook(now time.Time, templates map[string][]byte) [
 	sheet.file("docProps/app.xml", templates["sheet-app.xml"])
 	stamp := now.UTC().Format("2006-01-02T15:04:05.000Z")
 	sheet.text("docProps/core.xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">`+
-		"<dc:creator>PptxGenJS</dc:creator>"+
-		"<cp:lastModifiedBy>PptxGenJS</cp:lastModifiedBy>"+
+		"<dc:creator>SlideSage</dc:creator>"+
+		"<cp:lastModifiedBy>SlideSage</cp:lastModifiedBy>"+
 		`<dcterms:created xsi:type="dcterms:W3CDTF">`+stamp+"</dcterms:created>"+
 		`<dcterms:modified xsi:type="dcterms:W3CDTF">`+stamp+"</dcterms:modified>"+
 		"</cp:coreProperties>")
