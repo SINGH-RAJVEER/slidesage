@@ -140,6 +140,16 @@
 					"working-directory": "apps/api"
 				},
 				{
+					"name": "Compare the Go card converter with the TypeScript converter",
+					"if": "steps.scope.outputs.api == 'true'",
+					"shell": "bash",
+					"env": {
+						"CARD_CONVERTER_PORT": "18090",
+						"CONVERTER_UNDER_TEST_URL": "http://127.0.0.1:18090"
+					},
+					"run": "set -euo pipefail\ngo -C apps/api build -o \"$RUNNER_TEMP/converter\" ./cmd/converter\n\"$RUNNER_TEMP/converter\" &\nready=false\nfor _ in {1..30}; do\n\tif \"$RUNNER_TEMP/converter\" -health; then\n\t\tready=true\n\t\tbreak\n\tfi\n\tsleep 1\ndone\ntest \"$ready\" = true\nbun --cwd apps/converter test --isolate\n"
+				},
+				{
 					"if": "steps.scope.outputs.web == 'true'",
 					"run": "bun run build\n"
 				},
