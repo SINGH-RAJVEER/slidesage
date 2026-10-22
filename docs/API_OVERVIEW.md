@@ -21,7 +21,7 @@
 | Method | Path | Body | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/profile` | None | Current profile |
-| `PUT` | `/profile` | `name`, `email`, `currentPassword`, `newPassword`, `landingPage` | Update profile or preferences |
+| `PUT` | `/profile` | `name`, `email`, `currentPassword`, `newPassword`, `landingPage`, `showAdRewards` | Update profile or preferences |
 | `POST` | `/profile/email/verify` | `email`, `otp` | Complete email change |
 | `POST` | `/profile/avatar` | `imageUrl` | Set avatar URL |
 | `POST` | `/profile/avatar/upload` | Multipart `file` | Upload avatar |
@@ -32,6 +32,7 @@
 - Avatar URLs must be HTTPS, at most 2,048 characters, and contain no embedded credentials or control characters.
 - Avatar uploads accept PNG, JPEG, WebP, and GIF up to 800 KB and replace the previous image.
 - `landingPage` accepts `generate`, `presentations`, or `landing`, defaults to `generate`, updates independently, and appears in profile/session responses.
+- `showAdRewards` is a boolean that defaults to true, updates independently, and appears in profile/session responses. Setting it to false hides the rewarded ad offer on the purchase page.
 
 ## Presentations
 

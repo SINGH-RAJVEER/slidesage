@@ -4,6 +4,8 @@ Signed-in users with a verified email can watch an optional rewarded video ad on
 
 ## Open prerequisites
 
+When rewards are enabled, the purchase page places the watch-ad option beside the balance on desktop. Settings includes an "Offer ads for points" switch. Turning it off removes the offer and centers the balance. This preference is saved to the account as `showAdRewards`, defaults to true, and syncs across devices through `PUT /profile`. It controls visibility only; earning remains subject to the server's eligibility checks and caps.
+
 These block turning the feature on, not deploying it.
 
 1. **Ad account type.** On the web, rewarded inventory is served through Google Ad Manager GPT with an out-of-page rewarded slot. AdSense Offerwall is a content gate that a visitor clears by watching an ad, so it cannot grant in-app currency. Confirm that an Ad Manager account, or an MCM partner offering web rewarded demand, is available.
