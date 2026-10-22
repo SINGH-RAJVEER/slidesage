@@ -49,7 +49,7 @@
 					"uses": "dorny/paths-filter@v4",
 					"with": {
 						"base": "${{ steps.base.outputs.ref }}",
-						"filters": "api:\n  - 'apps/api/**'\n  - 'apps/converter/**'\n  - 'libs/cards/**'\n  - 'libs/types/**'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\nweb:\n  - 'apps/web/**'\n  - 'apps/converter/**'\n  - 'libs/**'\n  - 'package.json'\n  - 'bun.lock'\n  - 'tsconfig.json'\n  - 'biome.json'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\n"
+						"filters": "api:\n  - 'apps/api/**'\n  - 'libs/cards/**'\n  - 'libs/types/**'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\nweb:\n  - 'apps/web/**'\n  - 'libs/**'\n  - 'package.json'\n  - 'bun.lock'\n  - 'tsconfig.json'\n  - 'biome.json'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\n"
 					}
 				},
 				{
@@ -97,10 +97,6 @@
 				{
 					"if": "steps.scope.outputs.web == 'true'",
 					"run": "bun run test:cards\n"
-				},
-				{
-					"if": "steps.scope.outputs.web == 'true'",
-					"run": "bun run test:converter\n"
 				},
 				{
 					"if": "steps.scope.outputs.web == 'true'",

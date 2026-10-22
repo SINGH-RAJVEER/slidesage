@@ -8,7 +8,7 @@
 
 ### Implemented so far
 
-- Version 3 schema, private Bun converter, immutable JSONB revisions, and local file image storage.
+- Version 3 schema, private Go converter, immutable JSONB revisions, and local file image storage.
 - Approved outlines, bounded drafting batches, targeted repairs, and live previews.
 - Direct editing, selected-card AI revisions, stock and uploaded photos, presenting, and read-only sharing.
 - Charts, meters, tables, and callouts with shared browser/export geometry.
@@ -53,7 +53,7 @@ Remaining work:
 
 ## Runtime placement
 
-- Go API and worker images contain their binaries. API and worker call the private Bun converter service at `http://converter:8090`.
+- Go API and worker images contain their binaries. API and worker call the private Go converter service at `http://converter:8090`.
 - API uses conversion for outlines, save validation, and export. Worker uses it for drafting and assembly.
 - All four runtime images use the same commit. Browser and converter must agree on schema version; older saved revisions must remain readable.
 - Converter calls use timeouts and operation IDs. A converter restart must not lose the River job or commit a partial document.

@@ -16,7 +16,6 @@ SlideSage is a presentation builder with AI-assisted research and generation. Th
 apps/
     api/        Go API, Goose migrations, repositories, and provider integrations
     web/        React web application
-    converter/  Bun service that validates drafts into card documents
 libs/
     cards/      Card document schema and validation
     types/      Shared TypeScript contracts

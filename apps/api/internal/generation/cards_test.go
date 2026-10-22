@@ -6,16 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/cardconverter"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/carddocument"
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/presentation"
 )
@@ -49,43 +47,13 @@ func (store *memoryObjects) OpenObject(_ context.Context, key string) (io.ReadCl
 	return io.NopCloser(bytes.NewReader(contents)), nil
 }
 
-// startConverter runs the real Bun converter, the schema authority, so the
-// drafter is tested against the validation production uses.
+// startConverter serves the production card converter in process, the schema
+// authority, so the drafter is tested against the validation production uses.
 func startConverter(t *testing.T, document ...*json.RawMessage) *carddocument.Converter {
 	t.Helper()
-	bun, err := exec.LookPath("bun")
-	if err != nil {
-		t.Skip("bun is not installed")
-	}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	listener.Close()
-	command := exec.Command(bun, "src/main.ts")
-	command.Dir, _ = filepath.Abs("../../../converter")
-	command.Env = append(os.Environ(), fmt.Sprintf("CARD_CONVERTER_PORT=%d", port))
-	if err := command.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		_ = command.Process.Kill()
-		_ = command.Wait()
-	})
-	baseURL := fmt.Sprintf("http://127.0.0.1:%d", port)
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		response, err := http.Get(baseURL + "/health")
-		if err == nil {
-			response.Body.Close()
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("converter did not start: %v", err)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+	server := httptest.NewServer(cardconverter.Handler{})
+	t.Cleanup(server.Close)
+	baseURL := server.URL
 	client := &http.Client{Timeout: 5 * time.Second}
 	if len(document) > 0 {
 		client.Transport = documentCaptureTransport{document: document[0]}

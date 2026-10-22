@@ -1,7 +1,7 @@
 # CI/CD
 
-- `.github/workflows/checks.yml` runs every application suite on pull requests into `main` and `dev`. This includes TypeScript type checks, card/converter/UI/web tests, Go integration tests against a migrated disposable database and Valkey, `go vet`, and application builds. Pushes to `dev` use path filtering; unresolved comparisons run both application groups. Every run also validates Actions, shell scripts, Compose, Docker Bake, and Nginx with disposable credentials and a temporary certificate.
-- `.github/workflows/deploy.yml` runs on pushes to `main` and manual dispatches with `main` selected. PR checks gate merging; deployment does not repeat them. It compiles three Linux amd64 release binaries, bundles the converter, and builds the frontend with the production `VITE_API_URL=https://${API_DOMAIN}` before publishing images. Other branches cannot deploy through this workflow.
+- `.github/workflows/checks.yml` runs every application suite on pull requests into `main` and `dev`. This includes TypeScript type checks, card/UI/web tests, Go integration tests against a migrated disposable database and Valkey, `go vet`, and application builds. Pushes to `dev` use path filtering; unresolved comparisons run both application groups. Every run also validates Actions, shell scripts, Compose, Docker Bake, and Nginx with disposable credentials and a temporary certificate.
+- `.github/workflows/deploy.yml` runs on pushes to `main` and manual dispatches with `main` selected. PR checks gate merging; deployment does not repeat them. It compiles four Linux amd64 release binaries, including the card converter, and builds the frontend with the production `VITE_API_URL=https://${API_DOMAIN}` before publishing images. Other branches cannot deploy through this workflow.
 - Docker Bake publishes `api`, `worker`, `migrate`, `converter`, and `web` to `ghcr.io/<lowercase-owner>/slidesage/<component>:<commit-sha>`. Deployments use SHA tags; `latest` is only a convenience tag.
 - The frontend build reads optional `VITE_ADSENSE_*` repository variables for the publisher and ad placements. Unset values keep ads disabled. See [Ads](ADS.md) for the variable names.
 - The `web` image contains Nginx and the built React app. GitHub builds and publishes the frontend together with the backend.
@@ -68,7 +68,7 @@ Run in the development shell from the release checkout:
 ```bash
 bun install --frozen-lockfile
 docker login ghcr.io
-just binaries converter-bundle
+just binaries
 just web-bundle https://api.slidesage.app
 IMAGE_VERSION=<commit-sha> docker buildx bake -f docker-bake.hcl --push
 ssh slidesage@<vps> 'mkdir -p /opt/slidesage/.releases/<commit-sha>'

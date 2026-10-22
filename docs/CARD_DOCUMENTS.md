@@ -5,7 +5,7 @@
 
 ## Schema
 
-- `libs/cards`, published internally as `@slidesage/cards`, owns schema version 3. Converter and browser use the same validation.
+- `libs/cards`, published internally as `@slidesage/cards`, owns schema version 3 for the browser. `apps/api/internal/cards` implements the same schema in Go for the converter. A Go test keeps the shared data identical; validation rules must be changed in both by hand.
 - Versions 1 and 2 upgrade on read; saves write version 3.
 - Documents contain `schemaVersion`, `title`, `theme`, `cardOrder`, and `cards` keyed by ID.
 - Cards contain `takeaway`, `role`, `layout`, `nodes`, `sourceIds`, and optional `notes`.
@@ -20,7 +20,7 @@
 
 ## Converter
 
-- `apps/converter` is a private Bun HTTP service. Conversion requests send `X-Card-Schema-Version: 3`; mismatches return `409`.
+- `apps/api/cmd/converter` is a private Go HTTP service. Conversion requests send `X-Card-Schema-Version: 3`; mismatches return `409`.
 - Conversion, assembly, and validation receive owned `assetIds`.
 
 | Method | Path | Purpose |
@@ -37,7 +37,9 @@
 - Conversion strips HTML formatting tags, control/zero-width characters, and bidirectional overrides, while preserving literal comparisons such as `a<b`.
 - Markdown bold and italic become rich-text runs. Operation ID and card position produce repeatable IDs.
 - Numeric strings such as `"1,200"` become chart values; values with units such as `"4%"` are rejected.
-- Run `just converter` locally or `just converter-bundle` for the image bundle. Default address is `127.0.0.1:8090`.
+- Run `just converter` locally. `just binaries` builds the image binary, and `converter -health` checks a running service. Default address is `127.0.0.1:8090`.
+- `apps/api/internal/cardconverter/testdata` holds 500 requests with their expected answers: statuses, JSON bytes, and a hash of every PPTX part. A Go test replays them against the handler and fails on any difference. After an intended output change, re-record with `go test ./internal/cardconverter -run TestAnswersMatchTheRecordedConverter -update` from `apps/api` and review which parts changed.
+- Templates, the drafting schema, and theme colors are generated from `libs/cards` into embedded files by `apps/api/internal/cards/data/generate.ts`. Go tests regenerate them and fail on drift. The fixed PPTX parts in `apps/api/internal/cards/pptx/templates` are maintained by hand.
 - Production sidecars have no public ingress. Go services use `CARD_CONVERTER_URL=http://127.0.0.1:8090`.
 
 ## Generation
@@ -166,13 +168,13 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Owner `GET /presentations/{id}/export/pptx` exports the current saved revision.
 - API sends document, sources, and up to 64 MiB of referenced images to `/v1/documents/pptx`; converter body limit is 96 MiB for base64 encoding.
 - Unsplash images download and normalize for that export. Unavailable photos return `502`.
-- `apps/converter/src/pptx.ts` uses pptxgenjs to write one 13.333 × 7.5 inch slide per card.
+- `apps/api/internal/cards/pptx` writes one 13.333 × 7.5 inch slide per card. The same document and images always produce the same parts, byte for byte apart from timestamps. Fixed parts live in `apps/api/internal/cards/pptx/templates`; `.tmpl` parts fill `{{name}}` placeholders per deck. File properties, including those of embedded chart workbooks, name SlideSage as author and company.
 - Text, lists, comparison/process content, pictures, charts with editable data, tables, meters, and callouts use native PowerPoint objects.
 - Image crops and widget geometry follow browser layouts. Theme translucency flattens onto the card surface; cover gradients use a PNG overlay.
 - Citations hyperlink HTTP/HTTPS sources, photos retain linked credits, and notes become speaker notes. Donut totals are omitted.
 - Text shrinks to half its designed size instead of splitting cards. Fit uses average glyph-width estimates; PowerPoint shrink-on-overflow activates after text editing.
 - Download names use the title. Browser download is disabled during editing or unsaved changes.
-- Exports are unrecorded and include creation time, so repeated downloads are not byte-identical. Fonts are referenced, never embedded.
+- Exports are unrecorded and include creation time, so repeated downloads are not byte-identical. Charts are numbered from one in every file. Fonts are referenced, never embedded.
 
 ## Browser
 

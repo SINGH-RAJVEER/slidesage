@@ -1,0 +1,256 @@
+{
+	"themes": {
+		"slate": {
+			"palette": {
+				"surface": "#1b2130",
+				"heading": "#ffffff",
+				"body": "#d1d3d6",
+				"muted": "#82858d",
+				"accent": "#7dd3fc",
+				"rule": "#323745"
+			},
+			"chart": {
+				"series": [
+					"#3987e5",
+					"#d95926",
+					"#199e70",
+					"#c98500",
+					"#d55181",
+					"#008300"
+				],
+				"positive": "#0ca30c",
+				"caution": "#fab219"
+			},
+			"fonts": {
+				"heading": "Arial",
+				"body": "Arial"
+			}
+		},
+		"paper": {
+			"palette": {
+				"surface": "#f7f5f0",
+				"heading": "#1d1f24",
+				"body": "#3a3d44",
+				"muted": "#7a7d85",
+				"accent": "#b4532a",
+				"rule": "#deddd8"
+			},
+			"chart": {
+				"series": [
+					"#2a78d6",
+					"#eb6834",
+					"#1baf7a",
+					"#eda100",
+					"#e87ba4",
+					"#008300"
+				],
+				"positive": "#0a7f0a",
+				"caution": "#b26b00"
+			},
+			"fonts": {
+				"heading": "Arial",
+				"body": "Arial"
+			}
+		},
+		"ember": {
+			"palette": {
+				"surface": "#231a17",
+				"heading": "#fbeee4",
+				"body": "#d2bcae",
+				"muted": "#807067",
+				"accent": "#ff9b6a",
+				"rule": "#3c312c"
+			},
+			"chart": {
+				"series": [
+					"#3987e5",
+					"#d95926",
+					"#199e70",
+					"#c98500",
+					"#d55181",
+					"#008300"
+				],
+				"positive": "#0ca30c",
+				"caution": "#fab219"
+			},
+			"fonts": {
+				"heading": "Arial",
+				"body": "Arial"
+			}
+		},
+		"ocean": {
+			"palette": {
+				"surface": "#102f3b",
+				"heading": "#effafb",
+				"body": "#c5dce1",
+				"muted": "#91b3bd",
+				"accent": "#70dfc3",
+				"rule": "#365864"
+			},
+			"chart": {
+				"series": [
+					"#3987e5",
+					"#d95926",
+					"#199e70",
+					"#c98500",
+					"#d55181",
+					"#008300"
+				],
+				"positive": "#0ca30c",
+				"caution": "#fab219"
+			},
+			"fonts": {
+				"heading": "Space Grotesk",
+				"body": "DM Sans"
+			}
+		},
+		"grove": {
+			"palette": {
+				"surface": "#edf3e8",
+				"heading": "#23392d",
+				"body": "#3b5143",
+				"muted": "#627565",
+				"accent": "#466e38",
+				"rule": "#c6d4be"
+			},
+			"chart": {
+				"series": [
+					"#2a78d6",
+					"#eb6834",
+					"#1baf7a",
+					"#eda100",
+					"#e87ba4",
+					"#008300"
+				],
+				"positive": "#0a7f0a",
+				"caution": "#b26b00"
+			},
+			"fonts": {
+				"heading": "Fraunces",
+				"body": "DM Sans"
+			}
+		},
+		"orchid": {
+			"palette": {
+				"surface": "#f0eafa",
+				"heading": "#38234f",
+				"body": "#554167",
+				"muted": "#77628a",
+				"accent": "#843caf",
+				"rule": "#d6c7e7"
+			},
+			"chart": {
+				"series": [
+					"#2a78d6",
+					"#eb6834",
+					"#1baf7a",
+					"#eda100",
+					"#e87ba4",
+					"#008300"
+				],
+				"positive": "#0a7f0a",
+				"caution": "#b26b00"
+			},
+			"fonts": {
+				"heading": "Space Grotesk",
+				"body": "DM Sans"
+			}
+		},
+		"sand": {
+			"palette": {
+				"surface": "#f4ead8",
+				"heading": "#42382b",
+				"body": "#5c5141",
+				"muted": "#7b6e5b",
+				"accent": "#926016",
+				"rule": "#d8c8ad"
+			},
+			"chart": {
+				"series": [
+					"#2a78d6",
+					"#eb6834",
+					"#1baf7a",
+					"#eda100",
+					"#e87ba4",
+					"#008300"
+				],
+				"positive": "#0a7f0a",
+				"caution": "#b26b00"
+			},
+			"fonts": {
+				"heading": "Georgia",
+				"body": "DM Sans"
+			}
+		},
+		"cobalt": {
+			"palette": {
+				"surface": "#1739b5",
+				"heading": "#ffffff",
+				"body": "#e1e8ff",
+				"muted": "#b5c5ff",
+				"accent": "#f4f38a",
+				"rule": "#5874d0"
+			},
+			"chart": {
+				"series": [
+					"#fd95dc",
+					"#db9152",
+					"#17eace",
+					"#5fbf49",
+					"#ddcc6b",
+					"#30aff8"
+				],
+				"positive": "#7ee08a",
+				"caution": "#ffd166"
+			},
+			"fonts": {
+				"heading": "Space Grotesk",
+				"body": "DM Sans"
+			}
+		},
+		"mono": {
+			"palette": {
+				"surface": "#eef0f2",
+				"heading": "#202a35",
+				"body": "#3e4b59",
+				"muted": "#677482",
+				"accent": "#245e8a",
+				"rule": "#c8cfd7"
+			},
+			"chart": {
+				"series": [
+					"#2a78d6",
+					"#eb6834",
+					"#1baf7a",
+					"#eda100",
+					"#e87ba4",
+					"#008300"
+				],
+				"positive": "#0a7f0a",
+				"caution": "#b26b00"
+			},
+			"fonts": {
+				"heading": "IBM Plex Mono",
+				"body": "Arial"
+			}
+		}
+	},
+	"cover": {
+		"surface": "#000000",
+		"heading": "#ffffff",
+		"body": "#f2f2f2",
+		"muted": "#d0d0d0",
+		"accent": "#ffffff",
+		"rule": "#ffffff"
+	},
+	"stockLibraries": {
+		"pexels": {
+			"name": "Pexels",
+			"url": "https://www.pexels.com"
+		},
+		"unsplash": {
+			"name": "Unsplash",
+			"url": "https://unsplash.com/?utm_source=slidesage&utm_medium=referral"
+		}
+	}
+}

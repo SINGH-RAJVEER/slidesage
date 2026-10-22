@@ -75,8 +75,8 @@
 			};
 		};
 		converter = {
-			exec = "bun src/main.ts";
-			cwd = "apps/converter";
+			exec = "go run ./cmd/converter";
+			cwd = "apps/api";
 			ready = {
 				http.get = {
 					host = "127.0.0.1";
