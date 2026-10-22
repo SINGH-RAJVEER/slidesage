@@ -7,7 +7,6 @@
 | `apps/api` | Go HTTP API, River worker, migrations, repositories, and integrations |
 | `apps/web` | React application and Vite build |
 | `apps/api/cmd/converter` | Private card validation and PPTX export service |
-| `apps/converter` | TypeScript reference converter for compatibility tests |
 | `libs/cards` | Card schema, layouts, themes, and draft conversion |
 | `libs/types` | Shared API contracts |
 | `libs/ui` | React components, card renderer, hooks, and client helpers |
