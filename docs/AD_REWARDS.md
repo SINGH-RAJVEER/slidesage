@@ -1,6 +1,6 @@
 # Ad rewards
 
-Signed-in users with a verified email can watch an optional rewarded video ad on the purchase page and receive a small number of points. The feature ships disabled (`AD_REWARDS_ENABLED=false`). This document records the economics, the trust model, and how it is built.
+Signed-in users with a verified email can watch an optional rewarded video ad on the purchase page and receive a small number of points. It is separate from the display ads in [Ads](ADS.md): it shows for every balance, including readers at the 250-point ad-free threshold, because nothing plays unless the user asks. The feature ships disabled (`AD_REWARDS_ENABLED=false`). This document records the economics, the trust model, and how it is built.
 
 ## Open prerequisites
 
@@ -131,7 +131,7 @@ Telemetry: `rewards.ad.sessions` and `rewards.ad.claims` count outcomes by an `o
 - `routes/billing/rewarded-ad.ts` loads GPT (`securepubads.g.doubleclick.net/tag/js/gpt.js`) only when the user presses "Watch ad". It defines a `REWARDED` out-of-page slot, creates the server session on `rewardedSlotReady` before calling `makeRewardedVisible()`, records `rewardedSlotGranted`, and destroys the slot on `rewardedSlotClosed`. No fill within 8 seconds, an unsupported browser or a blocked script reports "No ad is available right now" without creating a session.
 - `routes/billing/EarnPointsSection.tsx` sits under the balance on the purchase page. After a granted ad it waits out `min_watch_seconds` from when the session arrived, so device clock skew cannot cause an early claim, retries once if the server still answers `AD_REWARD_TOO_EARLY`, and publishes the new balance. It shows views and points left, or the reason the user cannot earn, and refreshes when a short cooldown ends.
 - Insufficient-points errors on the outline page offer a "Get points" action that opens the purchase page.
-- `apps/web/public/ads.txt` declares the AdSense publisher. Add the line Ad Manager gives you, if its publisher ID differs.
+- `ads.txt` is emitted by the web build from `VITE_ADSENSE_CLIENT_ID` (see [Ads](ADS.md)). If Ad Manager shows a different publisher ID for the rewarded unit, add its line there.
 - If a CSP is added later, it must allow the GPT and DoubleClick origins. None is set today.
 
 ## Rust port
