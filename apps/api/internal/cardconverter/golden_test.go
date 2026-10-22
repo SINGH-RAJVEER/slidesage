@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -18,7 +19,12 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
+
+// update rewrites testdata/exchanges.jsonl.gz from the handler's answers:
+// go test ./internal/cardconverter -run TestAnswersMatchTheRecordedConverter -update
+var update = flag.Bool("update", false, "rewrite the recorded answers")
 
 // exchange is one request and the answer the converter must give it. A PPTX
 // answer is kept as a hash of every normalized part instead of the file
@@ -28,13 +34,13 @@ type exchange struct {
 	Method         string            `json:"method"`
 	Path           string            `json:"path"`
 	Headers        map[string]string `json:"headers"`
-	Body           *string           `json:"body"`
-	BodyBase64     string            `json:"bodyBase64"`
+	Body           *string           `json:"body,omitempty"`
+	BodyBase64     string            `json:"bodyBase64,omitempty"`
 	Status         int               `json:"status"`
 	ContentType    string            `json:"contentType"`
-	Response       *string           `json:"response"`
-	ResponseBase64 string            `json:"responseBase64"`
-	Parts          [][2]string       `json:"parts"`
+	Response       *string           `json:"response,omitempty"`
+	ResponseBase64 string            `json:"responseBase64,omitempty"`
+	Parts          [][2]string       `json:"parts,omitempty"`
 }
 
 func bytesOf(text *string, encoded string) []byte {
@@ -59,6 +65,7 @@ func TestAnswersMatchTheRecordedConverter(t *testing.T) {
 	scanner.Buffer(nil, 16<<20)
 	handler := Handler{Logger: discardLogger()}
 	count := 0
+	var recorded []exchange
 	for scanner.Scan() {
 		var want exchange
 		if err := json.Unmarshal(scanner.Bytes(), &want); err != nil {
@@ -72,6 +79,10 @@ func TestAnswersMatchTheRecordedConverter(t *testing.T) {
 		}
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, request)
+		if *update {
+			recorded = append(recorded, rerecord(want, recorder))
+			continue
+		}
 		if recorder.Code != want.Status || recorder.Header().Get("Content-Type") != want.ContentType {
 			t.Errorf("%s: got %d %q, want %d %q", want.Name, recorder.Code, recorder.Header().Get("Content-Type"), want.Status, want.ContentType)
 			continue
@@ -94,6 +105,52 @@ func TestAnswersMatchTheRecordedConverter(t *testing.T) {
 	}
 	if count < 400 {
 		t.Fatalf("replayed %d exchanges", count)
+	}
+	if *update {
+		writeExchanges(t, recorded)
+	}
+}
+
+// rerecord replaces an exchange's answer with the one the handler gave.
+func rerecord(want exchange, recorder *httptest.ResponseRecorder) exchange {
+	want.Status = recorder.Code
+	want.ContentType = recorder.Header().Get("Content-Type")
+	want.Response, want.ResponseBase64, want.Parts = nil, "", nil
+	body := recorder.Body.Bytes()
+	if want.ContentType == pptxType {
+		parts, err := exportParts(body)
+		if err == nil {
+			want.Parts = parts
+			return want
+		}
+	}
+	if utf8.Valid(body) {
+		text := string(body)
+		want.Response = &text
+	} else {
+		want.ResponseBase64 = base64.StdEncoding.EncodeToString(body)
+	}
+	return want
+}
+
+func writeExchanges(t *testing.T, exchanges []exchange) {
+	var buffer bytes.Buffer
+	writer, err := gzip.NewWriterLevel(&buffer, gzip.BestCompression)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoder := json.NewEncoder(writer)
+	encoder.SetEscapeHTML(false)
+	for _, entry := range exchanges {
+		if err := encoder.Encode(entry); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("testdata/exchanges.jsonl.gz", buffer.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
