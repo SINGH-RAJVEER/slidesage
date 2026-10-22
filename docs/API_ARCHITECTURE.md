@@ -49,6 +49,11 @@
 - `internal/feedback` validates and stores signed-in users' feedback messages in the `feedback` table.
 - See [Feedback and bug reports](FEEDBACK.md) for the route, limits, and storage.
 
+## Ad rewards
+
+- `internal/rewards` issues rewarded ad sessions and credits completed views to `users.balance_millis` with an `ad_reward` ledger entry.
+- See [Ad rewards](AD_REWARDS.md) for the trust model, caps, and economics.
+
 ## Persistence
 
 - Domain repositories own SQL. Handlers validate HTTP input and translate service results.

@@ -30,7 +30,7 @@ func (service *Service) SeedUser(ctx context.Context, name, email, password stri
 		if err != nil {
 			return User{}, err
 		}
-		user := User{ID: userID, Name: name, Email: email, EmailVerified: true, SlideTokens: slideTokens, CreatedAt: now, UpdatedAt: now}
+		user := User{ID: userID, Name: name, Email: email, EmailVerified: true, SlideTokens: slideTokens, ShowAdRewards: true, CreatedAt: now, UpdatedAt: now}
 		return user, service.repository.CreateUserWithCredential(ctx, user, accountID, hash)
 	}
 	if err != nil {

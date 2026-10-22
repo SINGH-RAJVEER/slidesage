@@ -21,7 +21,7 @@
 | Method | Path | Body | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/profile` | None | Current profile |
-| `PUT` | `/profile` | `name`, `email`, `currentPassword`, `newPassword`, `landingPage` | Update profile or preferences |
+| `PUT` | `/profile` | `name`, `email`, `currentPassword`, `newPassword`, `landingPage`, `showAdRewards` | Update profile or preferences |
 | `POST` | `/profile/email/verify` | `email`, `otp` | Complete email change |
 | `POST` | `/profile/avatar` | `imageUrl` | Set avatar URL |
 | `POST` | `/profile/avatar/upload` | Multipart `file` | Upload avatar |
@@ -32,6 +32,7 @@
 - Avatar URLs must be HTTPS, at most 2,048 characters, and contain no embedded credentials or control characters.
 - Avatar uploads accept PNG, JPEG, WebP, and GIF up to 800 KB and replace the previous image.
 - `landingPage` accepts `generate`, `presentations`, or `landing`, defaults to `generate`, updates independently, and appears in profile/session responses.
+- `showAdRewards` is a boolean that defaults to true, updates independently, and appears in profile/session responses. Setting it to false hides the rewarded ad offer on the purchase page.
 
 ## Presentations
 
@@ -123,6 +124,9 @@ Owner authentication is required except for `/shared` routes:
 | `POST` | `/billing/checkout` | User | Create Razorpay order |
 | `POST` | `/billing/verify` | User | Verify captured payment and credit points |
 | `POST` | `/billing/webhook` | Signature | Process `payment.captured` |
+| `GET` | `/rewards/ads` | User | Ad reward status: `enabled`, `ad_unit`, `eligible`, `reason`, points and views left, `next_available_at` |
+| `POST` | `/rewards/ads/sessions` | User | Open a session for one rewarded ad view; `403` ineligible, `429` capped or cooling down |
+| `POST` | `/rewards/ads/sessions/:id/claim` | User | Credit a watched view once; `409` before the minimum watch time, `410` expired. See [Ad rewards](AD_REWARDS.md) |
 
 | Plan | Points | INR price |
 | --- | --- | --- |

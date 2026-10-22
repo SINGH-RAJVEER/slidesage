@@ -115,6 +115,23 @@
 
 - API startup requires all three Razorpay credentials. Local `.env.example` includes placeholders.
 
+## Ad rewards
+
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `AD_REWARDS_ENABLED` | No | `false` | Offers rewarded ads for points |
+| `AD_REWARD_GPT_AD_UNIT` | When enabled | None | Google Ad Manager rewarded ad unit path served to the web client |
+| `AD_REWARD_POINTS_PER_VIEW` | No | `5` | Points credited per completed view |
+| `AD_REWARD_DAILY_VIEWS` | No | `5` | Credited views per user per UTC day |
+| `AD_REWARD_MONTHLY_POINTS` | No | `60` | Ad points per user per UTC month |
+| `AD_REWARD_MIN_WATCH_SECONDS` | No | `15` | Shortest accepted time from session to claim |
+| `AD_REWARD_COOLDOWN_SECONDS` | No | `60` | Wait after a credited view before the next session |
+| `AD_REWARD_SESSION_TTL_SECONDS` | No | `600` | How long a session stays claimable |
+| `AD_REWARD_MIN_ACCOUNT_AGE_HOURS` | No | `24` | Account age before a user can earn |
+
+- Ad rewards stay off unless `AD_REWARDS_ENABLED=true` and an ad unit is set. A zero reward or cap, or a TTL not longer than the minimum watch time, also turns them off.
+- The reasoning behind the defaults is in [Ad rewards](AD_REWARDS.md#economics).
+
 ## Card documents and image storage
 
 | Variable | Required | Secret | Purpose |

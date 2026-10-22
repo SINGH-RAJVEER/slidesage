@@ -8,6 +8,7 @@ import {
 	type BillingVerifyRequest,
 	type BillingVerifyResponse,
 } from "@slidesage/types";
+import { useAuth } from "@slidesage/ui";
 import { Button } from "@slidesage/ui/components/button";
 import {
 	Card,
@@ -24,6 +25,7 @@ import { Check } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Header from "../../app/Header";
 import { takeBalance } from "./billing-data";
+import EarnPointsSection from "./EarnPointsSection";
 
 declare global {
 	interface Window {
@@ -62,6 +64,7 @@ function loadRazorpayScript(): Promise<void> {
 }
 
 export default function PurchaseTokensPage() {
+	const { user } = useAuth();
 	const [customAmount, setCustomAmount] = useState<string>("");
 	const [selectedOption, setSelectedOption] = useState<BillingPackName | null>(null);
 	const [isProcessing, setIsProcessing] = useState(false);
@@ -223,16 +226,32 @@ export default function PurchaseTokensPage() {
 			{/* Main Content */}
 			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] desktop:px-8 desktop:py-8">
 				<div className="w-full max-w-[1800px] mx-auto relative">
-					<div className="mb-14 flex min-h-48 flex-col items-center justify-center space-y-2 py-10">
-						<h2 className="text-white/40 text-sm uppercase tracking-widest font-medium">
-							Current Balance
-						</h2>
-						<div className="flex items-baseline gap-2">
-							<span className="text-4xl font-light text-white">
-								{balance?.slide_tokens?.toFixed(1) ?? "0.0"}
-							</span>
-							<span className="text-lg text-white/40 font-light">points</span>
+					{/* The earn section sits beside the balance; without it the balance stays centered. */}
+					<div className="mb-14 flex min-h-48 flex-col items-center justify-center gap-8 py-10 desktop:flex-row desktop:items-stretch desktop:gap-0">
+						<div className="flex flex-col items-center justify-center space-y-2">
+							<h2 className="text-white/40 text-sm uppercase tracking-widest font-medium">
+								Current Balance
+							</h2>
+							<div className="flex items-baseline gap-2">
+								<span className="text-4xl font-light text-white">
+									{balance?.slide_tokens?.toFixed(1) ?? "0.0"}
+								</span>
+								<span className="text-lg text-white/40 font-light">points</span>
+							</div>
 						</div>
+						{user?.showAdRewards !== false ? (
+							<EarnPointsSection
+								onBalance={(newBalance) => setBalance({ slide_tokens: newBalance })}
+								onError={(message) => {
+									setSuccessMessage(null);
+									setErrorMessage(message);
+								}}
+								onSuccess={(message) => {
+									setErrorMessage(null);
+									setSuccessMessage(message);
+								}}
+							/>
+						) : null}
 					</div>
 
 					{/* Purchase Options */}

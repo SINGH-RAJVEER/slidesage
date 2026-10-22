@@ -9,6 +9,8 @@ export interface SessionUser {
 	emailVerified: boolean;
 	slideTokens: number;
 	landingPage?: LandingPage;
+	/** Whether the purchase page offers rewarded ads; absent means yes. */
+	showAdRewards?: boolean;
 	createdAt: string;
 	updatedAt: string;
 }

@@ -36,6 +36,8 @@ func TestPolicyForShareLinks(t *testing.T) {
 		{http.MethodGet, "/images/search", "photo-search", true},
 		{http.MethodGet, "/presentations/p1/export/pptx", "presentation-export", true},
 		{http.MethodPost, "/feedback", "feedback-submit", true},
+		{http.MethodPost, "/rewards/ads/sessions", "ad-reward-session", true},
+		{http.MethodPost, "/rewards/ads/sessions/s1/claim", "ad-reward-claim", true},
 	} {
 		policy, ok := policyFor(item.method, item.path)
 		if !ok || policy.scope != item.scope || policy.authenticated != item.authenticated {
@@ -51,5 +53,15 @@ func TestHashKeyIsScopedAndStable(t *testing.T) {
 	}
 	if first == hashKey("secret", "scope-b", "identity") {
 		t.Fatal("scope did not affect hash")
+	}
+}
+
+func TestIPPolicyOnlyForAdRewardSessions(t *testing.T) {
+	policy, ok := ipPolicyFor(http.MethodPost, "/rewards/ads/sessions")
+	if !ok || policy.scope != "ad-reward-session-ip" || policy.limit != 30 || policy.window != time.Hour {
+		t.Fatalf("policy: %#v", policy)
+	}
+	if _, ok := ipPolicyFor(http.MethodPost, "/rewards/ads/sessions/s1/claim"); ok {
+		t.Fatal("claims should not carry the session IP policy")
 	}
 }

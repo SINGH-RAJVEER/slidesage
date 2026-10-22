@@ -237,11 +237,12 @@ func (service *Service) updateProfileHandler(writer http.ResponseWriter, request
 		CurrentPassword string  `json:"currentPassword"`
 		NewPassword     *string `json:"newPassword"`
 		LandingPage     *string `json:"landingPage"`
+		ShowAdRewards   *bool   `json:"showAdRewards"`
 	}
 	if !decodeJSON(writer, request, &body) {
 		return
 	}
-	if body.NewPassword != nil && (body.Name != nil || body.Email != nil || body.LandingPage != nil) {
+	if body.NewPassword != nil && (body.Name != nil || body.Email != nil || body.LandingPage != nil || body.ShowAdRewards != nil) {
 		writeError(writer, http.StatusBadRequest, "Password changes cannot be combined with profile updates")
 		return
 	}
@@ -268,6 +269,19 @@ func (service *Service) updateProfileHandler(writer http.ResponseWriter, request
 			return
 		}
 		writeJSON(writer, http.StatusOK, map[string]any{"user": pending, "pending_email": normalizeEmail(*body.Email), "verification_required": true})
+		return
+	}
+	if body.ShowAdRewards != nil {
+		if body.Name != nil || body.Email != nil || body.LandingPage != nil {
+			writeError(writer, http.StatusBadRequest, "Ad reward visibility cannot be combined with other profile updates")
+			return
+		}
+		updated, err := service.UpdateShowAdRewards(request.Context(), user.ID, *body.ShowAdRewards)
+		if err != nil {
+			writeServiceError(writer, err)
+			return
+		}
+		writeJSON(writer, http.StatusOK, map[string]any{"user": updated})
 		return
 	}
 	if body.LandingPage != nil {

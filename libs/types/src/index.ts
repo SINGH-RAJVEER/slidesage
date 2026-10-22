@@ -151,6 +151,7 @@ export interface UserProfile {
 	emailVerified: boolean;
 	slideTokens: number;
 	landingPage: LandingPage;
+	showAdRewards: boolean;
 	createdAt: string;
 }
 
@@ -166,6 +167,7 @@ export interface UpdateProfileRequest {
 	currentPassword?: string;
 	newPassword?: string;
 	landingPage?: LandingPage;
+	showAdRewards?: boolean;
 }
 
 export interface UpdateAvatarRequest {
@@ -218,6 +220,40 @@ export interface BillingVerifyRequest {
 export interface BillingVerifyResponse {
 	success: true;
 	tokens_awarded: number;
+	new_balance: number;
+}
+
+/** Why a signed-in user cannot earn points from an ad right now. */
+export type AdRewardReason =
+	| "email_unverified"
+	| "account_too_new"
+	| "daily_cap"
+	| "monthly_cap"
+	| "cooldown";
+
+export type AdRewardStatusResponse =
+	| { enabled: false }
+	| {
+			enabled: true;
+			/** Google Ad Manager rewarded ad unit path. */
+			ad_unit: string;
+			eligible: boolean;
+			reason: AdRewardReason | null;
+			points_per_view: number;
+			views_left_today: number;
+			points_left_this_month: number;
+			next_available_at: string | null;
+			min_watch_seconds: number;
+	  };
+
+export interface AdRewardSessionResponse {
+	session_id: string;
+	claimable_at: string;
+	expires_at: string;
+}
+
+export interface AdRewardClaimResponse {
+	points_awarded: number;
 	new_balance: number;
 }
 
