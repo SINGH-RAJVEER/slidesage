@@ -2,9 +2,9 @@ package cards
 
 import "github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/cards/jsvalue"
 
-// The methods below write validated documents as the JavaScript objects the
-// TypeScript validator builds, so their JSON keeps the same key order and
-// leaves out the same absent fields.
+// The methods below write validated documents with a fixed key order and
+// without absent fields, the shape the browser's libs/cards validator also
+// produces.
 
 func (run TextRun) value() jsvalue.Value {
 	result := jsvalue.ObjectValue(member{Key: "text", Value: str(run.Text)})

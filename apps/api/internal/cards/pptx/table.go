@@ -11,7 +11,7 @@ type border struct {
 	pt    float64
 }
 
-// tableCell is one cell with the options pptx.ts gives it.
+// tableCell is one table cell and its formatting.
 type tableCell struct {
 	text     string
 	bold     bool
@@ -32,12 +32,12 @@ type tableObject struct {
 	margin     [4]float64
 	valign     string
 	// color is the table's default color, unset when any cell mentions a
-	// hyperlink, as addTableDefinition decides.
+	// hyperlink.
 	color string
 }
 
-// addTable is Slide.addTable with column widths, row heights, and a margin in
-// points, as the export always passes them.
+// addTable places a table with column widths, row heights, and a margin in
+// points.
 func (target *slide) addTable(cells [][]tableCell, x, y, w float64, columns, rows []float64, fontSize float64, margin [4]float64, valign string) {
 	table := &tableObject{
 		objectName: "Table " + integer(target.count(tableKind)),
@@ -65,7 +65,7 @@ func (target *slide) addTable(cells [][]tableCell, x, y, w float64, columns, row
 		table.color = "000000"
 	}
 	if len(columns) != len(cells[0]) {
-		// pptxgenjs drops mismatched widths; the export never sends them.
+		// Mismatched widths are dropped; the export never passes them.
 		table.columns = nil
 	}
 	table.w = w

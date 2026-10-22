@@ -9,9 +9,8 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/cards/jsvalue"
 )
 
-// This file reproduces the parts of pptxgenjs 4.0.1 that the export uses:
-// text boxes, shapes, pictures, tables, and notes, written as the same XML,
-// including the option defaults and mutations that reach the output.
+// This file holds the slide model and its XML: text boxes, shapes, pictures,
+// tables, and notes, with the option defaults each one fills in.
 
 const (
 	emu         = 914400
@@ -95,7 +94,7 @@ func colorElement(color, inner string) string {
 	return "<a:" + tag + ` val="` + value + `"/>`
 }
 
-// solidFill is genXmlColorSelection for a solid color with no transparency.
+// solidFill fills with a solid color with no transparency.
 func solidFill(color string) string {
 	return "<a:solidFill>" + colorElement(color, "") + "</a:solidFill>"
 }
@@ -114,8 +113,8 @@ type bullet struct {
 	indent        float64
 }
 
-// textOptions are the options of a text box or of one run. Zero values stand
-// for the falsy values JavaScript would see.
+// textOptions are the options of a text box or of one run. Zero values mean
+// unset.
 type textOptions struct {
 	x, y, w, h      float64
 	margin          bool
@@ -243,8 +242,8 @@ func (target *slide) count(kind objectKind) int {
 	return total
 }
 
-// clean applies addTextDefinition's cleanOpts. parentColor is the text box's
-// own color, already cleaned, for its runs.
+// clean fills in a text box's or run's defaults. parentColor is the text
+// box's own color, already cleaned, for its runs.
 func (target *slide) clean(options *textOptions, parentColor string) {
 	if options.color == "" {
 		options.color = parentColor
@@ -268,8 +267,8 @@ func (target *slide) clean(options *textOptions, parentColor string) {
 	}
 }
 
-// addText is Slide.addText with a list of runs. A run without options gets
-// its own empty options, as addTextDefinition gives it.
+// addText places a text box of runs. A run without options gets its own
+// empty options.
 func (target *slide) addText(runs []*textRun, options *textOptions) {
 	if len(runs) == 0 {
 		runs = []*textRun{{}}
@@ -292,13 +291,12 @@ func (target *slide) addText(runs []*textRun, options *textOptions) {
 	target.objects = append(target.objects, &slideObject{kind: textKind, options: options, runs: runs, shape: "rect", line: &lineOptions{}})
 }
 
-// addTextString is Slide.addText with a string, whose one run shares the text
-// box's options.
+// addTextString places a text box of one run that shares the box's options.
 func (target *slide) addTextString(text string, options *textOptions) {
 	target.addText([]*textRun{{text: text, options: options}}, options)
 }
 
-// addShape is Slide.addShape for a preset shape.
+// addShape places a preset shape.
 func (target *slide) addShape(shape string, x, y, w, h float64, fill string, line *lineOptions, radius float64) {
 	if line == nil {
 		line = &lineOptions{none: true}
@@ -307,7 +305,7 @@ func (target *slide) addShape(shape string, x, y, w, h float64, fill string, lin
 	target.objects = append(target.objects, &slideObject{kind: textKind, options: options, shape: shape, fill: fill, line: line, radius: radius})
 }
 
-// addImage is Slide.addImage for base64 data of the given extension.
+// addImage places a picture from image data of the given extension.
 func (target *slide) addImage(extension string, data []byte, x, y, w, h float64, altText string, crop *cropBox) {
 	relID := target.newRelID()
 	image := &imageObject{
@@ -465,7 +463,7 @@ func imageXML(index int, image *imageObject) string {
 	return builder.String()
 }
 
-// paragraphProperties is genXmlParagraphProperties for a run.
+// paragraphProperties writes a run's paragraph properties.
 func paragraphProperties(options *textOptions) string {
 	var properties strings.Builder
 	properties.WriteString("<a:pPr")
@@ -508,7 +506,7 @@ func paragraphProperties(options *textOptions) string {
 	return properties.String()
 }
 
-// runProperties is genXmlTextRunProperties for a run.
+// runProperties writes a run's text properties.
 func runProperties(options *textOptions) string {
 	var properties strings.Builder
 	properties.WriteString(`<a:rPr lang="en-US"`)
@@ -559,8 +557,8 @@ func runProperties(options *textOptions) string {
 var lineBreaks = regexp.MustCompile(`\r*\n`)
 
 // inherit copies a text box's options onto a run wherever the run's own
-// value is falsy, as genXmlTextBody's Object.entries loop does for the keys
-// that reach the XML. Links keep their own color.
+// value is unset, for the keys that reach the XML. Links keep their own
+// color.
 func inherit(run, box *textOptions) {
 	if run == box {
 		return
@@ -594,7 +592,8 @@ func inherit(run, box *textOptions) {
 	}
 }
 
-// textBody is genXmlTextBody for a text box or, with cell set, a table cell.
+// textBody writes the text body of a text box or, with cell set, a table
+// cell.
 func textBody(object *slideObject, cell bool) string {
 	box := object.options
 	var builder strings.Builder

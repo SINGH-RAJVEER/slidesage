@@ -1,6 +1,6 @@
-// Package jsvalue holds JSON values with the semantics JavaScript gives them,
-// so code ported from the TypeScript converter reads, orders, coerces, and
-// writes values exactly as the original does.
+// Package jsvalue holds JSON values with the semantics JavaScript gives them:
+// property order, coercion, and number formatting. The card schema and its
+// wire format are defined in those terms, and the browser reads them that way.
 //
 // Strings are WTF-8: valid UTF-8, except that an unpaired UTF-16 surrogate,
 // which JSON.parse accepts from a \u escape, is kept as its three-byte form.

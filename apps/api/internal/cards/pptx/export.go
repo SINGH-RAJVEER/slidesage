@@ -1,16 +1,16 @@
 // Package pptx writes a card document as a PowerPoint file of native,
 // editable shapes: text boxes, lists, pictures, charts, and tables, placed the
-// way the web card view places them. It began as a port of the TypeScript
-// exporter and the pptxgenjs 4.0.1 code it called, and still writes the parts
-// that exporter wrote, byte for byte apart from timestamps.
+// way the web card view places them. The output is deterministic: the same
+// document and assets always give the same parts, byte for byte apart from
+// timestamps.
 //
 // A card can grow taller than one slide in the browser; here its text shrinks
 // until it fits, down to a floor, and PowerPoint's own shrink-on-overflow is
 // left on for anything the estimate misses.
 //
-// Arithmetic follows the TypeScript expression by expression in float64.
-// Literal subexpressions go through n(), so Go never folds them exactly where
-// JavaScript rounds each step.
+// Layout arithmetic runs step by step in float64, rounding after every
+// operation. Literal subexpressions go through n() so Go never folds them
+// exactly at compile time.
 package pptx
 
 import (
@@ -44,12 +44,11 @@ type Source struct {
 	HasTitle bool
 }
 
-// ErrInput stands for a TypeError the TypeScript export throws on asset
-// metadata of an unexpected type.
+// ErrInput reports asset metadata of a type the export cannot read.
 var ErrInput = jsvalue.ErrType
 
 // n keeps a literal a float64 value, so the expression around it is
-// evaluated step by step as JavaScript does.
+// evaluated and rounded step by step.
 func n(value float64) float64 { return value }
 
 // Slide geometry in inches. One "cqw" is 1% of the card width, the unit the
@@ -1185,9 +1184,9 @@ var prototypeNames = map[string]string{
 	"__proto__":            "",
 }
 
-// runFrom turns an asset metadata value into a run's text as pptxgenjs reads
-// a run's text: strings and numbers as text, falsy values as no text, an
-// array as its joined text, and anything else as a TypeError.
+// runFrom turns an asset metadata value into a run's text: strings and
+// numbers as text, falsy values as no text, an array as its joined text, and
+// anything else as ErrInput.
 func runFrom(value jsvalue.Value) (*textRun, error) {
 	switch value.Kind() {
 	case jsvalue.String:
@@ -1222,10 +1221,9 @@ func runFrom(value jsvalue.Value) (*textRun, error) {
 	return nil, ErrInput
 }
 
-// hasOptions reports an array that pptxgenjs's hyperlink scan cannot walk:
-// it reads every item as a text object, so a null item throws, and an object
-// item with options or nested text becomes text formatting. The export does
-// not reproduce that formatting and refuses such metadata instead.
+// hasOptions reports an array the export refuses: one with a null item, or
+// an object item with options or nested text, which would read as text
+// formatting.
 func hasOptions(value jsvalue.Value) bool {
 	for _, item := range value.Items() {
 		switch {
@@ -1403,7 +1401,7 @@ func addCard(context *drawing, card *cards.Card, position int, theme palette, as
 
 // coverScrim is the cover card's scrim: black fading from 80% at the bottom
 // to 5% at the top, as a one-pixel-wide PNG stretched over the slide. It is
-// the PNG the TypeScript export compressed, extracted from its output.
+// embedded as a fixed PNG so every export writes the same bytes.
 func coverScrim() []byte {
 	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(template("scrim.png.base64")))
 	if err != nil {

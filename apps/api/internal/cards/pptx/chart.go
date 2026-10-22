@@ -18,8 +18,8 @@ type chartSeries struct {
 	values []float64
 }
 
-// chartOptions are the options pptx.ts passes, after addChartDefinition has
-// filled in its defaults.
+// chartOptions are a chart's formatting, after addChart has filled in its
+// defaults.
 type chartOptions struct {
 	x, y, w, h float64
 	altText    string
@@ -80,8 +80,8 @@ type chartObject struct {
 	number     int
 }
 
-// addChart is Slide.addChart. kind is a pptxgenjs chart type: bar, line,
-// area, pie, or doughnut.
+// addChart places a chart on a slide. kind is bar, line, area, pie, or
+// doughnut.
 func (deck *presentation) addChart(target *slide, kind string, series []chartSeries, options chartOptions) {
 	deck.chartSeen++
 	chart := &chartObject{kind: kind, series: series, options: options, number: deck.chartSeen}
@@ -214,7 +214,7 @@ func cacheValue(value float64) string {
 	return number(value)
 }
 
-// sheetValue writes a worksheet value, where pptxgenjs leaves zero empty.
+// sheetValue writes a worksheet value, leaving zero empty.
 func sheetValue(value float64) string {
 	if value == 0 || value != value {
 		return ""

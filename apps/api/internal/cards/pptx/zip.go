@@ -10,9 +10,8 @@ import (
 	"github.com/SINGH-RAJVEER/SlideSage/apps/api/internal/cards/jsvalue"
 )
 
-// archive writes an uncompressed zip the way JSZip does for pptxgenjs:
-// folder entries where JSZip creates them, entries in insertion order, DOS
-// times in UTC, and no data descriptors or extra fields.
+// archive writes an uncompressed zip: explicit folder entries, entries in
+// insertion order, DOS times in UTC, and no data descriptors or extra fields.
 type archive struct {
 	entries []entry
 	names   map[string]bool
@@ -28,7 +27,7 @@ func newArchive(now time.Time) *archive {
 	return &archive{names: map[string]bool{}, time: now.UTC()}
 }
 
-// folder adds a folder entry and its missing parents, as JSZip's folder does.
+// folder adds a folder entry and its missing parents.
 func (archive *archive) folder(name string) {
 	name = strings.TrimSuffix(name, "/") + "/"
 	if archive.names[name] {

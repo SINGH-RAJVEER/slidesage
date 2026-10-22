@@ -20,9 +20,9 @@ import (
 	"testing"
 )
 
-// exchange is one request and the answer the TypeScript converter gave it,
-// recorded before that converter was retired. A PPTX answer is kept as a hash
-// of every normalized part instead of the file itself.
+// exchange is one request and the answer the converter must give it. A PPTX
+// answer is kept as a hash of every normalized part instead of the file
+// itself.
 type exchange struct {
 	Name           string            `json:"name"`
 	Method         string            `json:"method"`

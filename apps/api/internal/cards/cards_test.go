@@ -12,7 +12,7 @@ import (
 )
 
 func TestHashMatchesCyrb53(t *testing.T) {
-	// Values from the TypeScript converter's IDs.
+	// IDs already stored in documents depend on these values.
 	for input, want := range map[string]string{"op-1:card:1": "2aj3l1c48zd", "op-1:1:1": "t35ew3ivo3"} {
 		if got := hash(input); got != want {
 			t.Errorf("hash(%q) = %s, want %s", input, got, want)

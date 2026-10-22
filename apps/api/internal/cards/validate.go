@@ -15,13 +15,13 @@ type Issue struct {
 	Message string
 }
 
-// SchemaError reports the first issue found, as a thrown SchemaError does.
+// SchemaError reports the first issue found.
 type SchemaError struct{ Issue Issue }
 
 func (err *SchemaError) Error() string { return err.Issue.Path + ": " + err.Issue.Message }
 
-// ErrType stands for a TypeError the TypeScript code throws on input it does
-// not expect, which the converter answers with a server error.
+// ErrType reports input of a type validation cannot read at all, which the
+// converter answers with a server error.
 var ErrType = jsvalue.ErrType
 
 var (
@@ -30,13 +30,14 @@ var (
 	assetIDPattern  = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
-// fail throws a schema error. Validation panics the way the TypeScript code
-// throws, and recover turns the panic back into an error at each entry point.
+// fail throws a schema error. Validation stops at the first issue by
+// panicking, and recover turns the panic back into an error at each entry
+// point.
 func fail(path, message string) {
 	panic(&SchemaError{Issue{Path: path, Message: message}})
 }
 
-// typeError throws the TypeError JavaScript would.
+// typeError throws ErrType.
 func typeError() { panic(ErrType) }
 
 // catch recovers a thrown schema or type error into err.
@@ -471,7 +472,7 @@ var objectPrototype = []string{
 // ParseDocument checks a value against the card document schema and returns
 // it as the current version. knownAssets limits the assets the document may
 // show; nil accepts any asset ID. The error is a *SchemaError, or ErrType
-// where the TypeScript code would throw a TypeError.
+// for input of a type validation cannot read.
 func ParseDocument(value jsvalue.Value, knownAssets map[string]bool) (document *Document, err error) {
 	defer catch(&err)
 	return parseDocument(value, knownAssets), nil

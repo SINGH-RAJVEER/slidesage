@@ -6,9 +6,8 @@ import (
 	"time"
 )
 
-// The templates are parts pptxgenjs 4.0.1 writes the same way for every deck,
-// or its own template literals for parts that vary, extracted from it once.
-// They are maintained here now.
+// The templates are the parts every deck shares, plus .tmpl parts whose
+// {{name}} placeholders are filled per deck.
 //
 //go:embed templates/*.xml templates/*.rels templates/*.tmpl templates/*.base64
 var templateFiles embed.FS
@@ -35,8 +34,7 @@ const xmlHeader = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`
 
 const slideNumberField = "{F7021451-1387-4CA6-816F-3879F97B5CBC}"
 
-// write is exportPresentation: the parts of the file, in the order JSZip
-// receives them.
+// write returns the file: its folders, then its parts in archive order.
 func (deck *presentation) write(now time.Time) []byte {
 	zip := newArchive(now)
 	for _, folder := range []string{
@@ -69,7 +67,7 @@ func (deck *presentation) write(now time.Time) []byte {
 			"<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>")
 		zip.text("ppt/slides/_rels/slide"+number+".xml.rels", page.relsXML())
 		zip.text("ppt/notesSlides/notesSlide"+number+".xml", page.notesXML())
-		zip.text("ppt/notesSlides/_rels/notesSlide"+number+".xml.rels", strings.Replace(template("notesSlide.rels.tmpl"), "${slideNumber}", number, 1))
+		zip.text("ppt/notesSlides/_rels/notesSlide"+number+".xml.rels", strings.Replace(template("notesSlide.rels.tmpl"), "{{slideNumber}}", number, 1))
 	}
 	zip.file("ppt/slideMasters/slideMaster1.xml", templates["slideMaster.xml"])
 	zip.file("ppt/slideMasters/_rels/slideMaster1.xml.rels", templates["slideMaster.rels"])
@@ -140,22 +138,22 @@ func (deck *presentation) app() string {
 		titles.WriteString("<vt:lpstr>Slide " + integer(index+1) + "</vt:lpstr>")
 	}
 	return strings.NewReplacer(
-		"${CRLF}", crlf,
-		"${slides.length + 1 + 2}", integer(count+1+2),
-		"${slides.length}", integer(count),
-		"${slides.map((_slideObj, idx) => `<vt:lpstr>Slide ${idx + 1}</vt:lpstr>`).join('')}", titles.String(),
-		"${company}", "PptxGenJS",
+		"{{crlf}}", crlf,
+		"{{titleCount}}", integer(count+1+2),
+		"{{slideCount}}", integer(count),
+		"{{slideTitles}}", titles.String(),
+		"{{company}}", "PptxGenJS",
 	).Replace(template("app.xml.tmpl"))
 }
 
 func (deck *presentation) core(now time.Time) string {
 	stamp := now.UTC().Format("2006-01-02T15:04:05Z")
 	return strings.NewReplacer(
-		"${encodeXmlEntities(title)}", encode(deck.title),
-		"${encodeXmlEntities(subject)}", "PptxGenJS Presentation",
-		"${encodeXmlEntities(author)}", "PptxGenJS",
-		"${revision}", "1",
-		"${new Date().toISOString().replace(/\\.\\d\\d\\dZ/, 'Z')}", stamp,
+		"{{title}}", encode(deck.title),
+		"{{subject}}", "PptxGenJS Presentation",
+		"{{author}}", "PptxGenJS",
+		"{{revision}}", "1",
+		"{{timestamp}}", stamp,
 	).Replace(template("core.xml.tmpl"))
 }
 
@@ -235,9 +233,9 @@ func (page *slide) notesXML() string {
 	}
 	text := lineBreaks.ReplaceAllLiteralString(notes.String(), crlf)
 	return strings.NewReplacer(
-		"${CRLF}", crlf,
-		"${encodeXmlEntities(getNotesFromSlide(slide))}", encode(text),
-		"${SLDNUMFLDID}", slideNumberField,
-		"${slide._slideNum}", integer(page.number),
+		"{{crlf}}", crlf,
+		"{{notes}}", encode(text),
+		"{{slideNumberField}}", slideNumberField,
+		"{{slideNumber}}", integer(page.number),
 	).Replace(template("notesSlide.xml.tmpl"))
 }

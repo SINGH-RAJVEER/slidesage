@@ -1,7 +1,7 @@
 // Package cardconverter serves the private card converter: validation, draft
-// conversion, assembly, templates, and PPTX export. It answers the requests
-// the Bun converter it replaced answered, with the same statuses and JSON
-// bytes; testdata holds that converter's recorded answers.
+// conversion, assembly, templates, and PPTX export. Its statuses and JSON
+// bytes are a fixed contract; testdata holds the expected answer to every
+// recorded request.
 package cardconverter
 
 import (
@@ -25,7 +25,7 @@ const (
 	maxBodyBytes = 1024 * 1024
 	// maxExportBodyBytes allows an export to carry the deck's images.
 	maxExportBodyBytes = 96 * 1024 * 1024
-	// maxServerBodyBytes is where the Bun server it replaced refused a body.
+	// maxServerBodyBytes is the largest body any route accepts.
 	maxServerBodyBytes = 128 * 1024 * 1024
 )
 
@@ -99,8 +99,8 @@ func (handler Handler) handle(request *http.Request) (result response) {
 		handler.logger().Error("card conversion failed", "error", fmt.Sprint(recovered))
 		result = jsonResponse(http.StatusInternalServerError, errorBody("conversion failed"))
 	}()
-	// The raw target keeps percent escapes and backslashes, which the URL
-	// parser of the Bun server it replaced treated in its own way.
+	// Routing reads the raw target, so percent escapes and backslashes are
+	// resolved by pathname rather than by net/http.
 	path := pathname(rawPath(request.RequestURI))
 	result, err := handler.route(request, path)
 	if err == nil {
@@ -210,7 +210,7 @@ func pathname(path string) string {
 }
 
 // readBody reads a JSON object body. The limit applies to the declared length
-// and to the decoded text's UTF-16 length, as the Bun converter checked it.
+// and to the decoded text's UTF-16 length.
 func readBody(request *http.Request, limit int) (*jsvalue.Obj, error) {
 	if request.ContentLength > int64(limit) {
 		return nil, &requestError{http.StatusRequestEntityTooLarge, "request body is too large"}
