@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"log/slog"
 	"net"
 	"net/http"
@@ -17,8 +18,13 @@ import (
 )
 
 func main() {
+	health := flag.Bool("health", false, "check that the converter on this host answers, for container health checks")
+	flag.Parse()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	port := firstSet("CARD_CONVERTER_PORT", "PORT", "8090")
+	if *health {
+		os.Exit(check(port))
+	}
 	host := "127.0.0.1"
 	if value, ok := os.LookupEnv("CARD_CONVERTER_HOST"); ok {
 		host = value
@@ -58,4 +64,19 @@ func firstSet(first, second, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// check reports whether the converter listening on port answers its health
+// route, as an exit status. The image has no shell or HTTP client of its own.
+func check(port string) int {
+	client := http.Client{Timeout: 3 * time.Second}
+	response, err := client.Get("http://" + net.JoinHostPort("127.0.0.1", port) + "/health")
+	if err != nil {
+		return 1
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
