@@ -1,4 +1,7 @@
 -- +goose Up
+-- Whether the purchase page offers rewarded ads; users can turn it off in settings.
+ALTER TABLE users ADD COLUMN show_ad_rewards boolean NOT NULL DEFAULT true;
+
 CREATE TABLE ad_reward_sessions (
 	id text PRIMARY KEY,
 	user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -45,3 +48,4 @@ ALTER TABLE point_ledger ADD CONSTRAINT point_ledger_entry_type_check
 
 ALTER TABLE point_ledger DROP COLUMN ad_reward_session_id;
 DROP TABLE ad_reward_sessions;
+ALTER TABLE users DROP COLUMN show_ad_rewards;

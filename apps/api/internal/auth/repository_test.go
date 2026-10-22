@@ -45,3 +45,37 @@ func TestUpsertOAuthUserCreditsSignupPoints(t *testing.T) {
 		t.Fatalf("user has %v points, balance %d, signup credit %d; want %d", user.SlideTokens, balance, credited, want)
 	}
 }
+
+func TestShowAdRewardsDefaultsOnAndUpdates(t *testing.T) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		databaseURL = "postgresql://slidesage:slidesage@127.0.0.1:5432/slidesage"
+	}
+	database, err := sql.Open("pgx", databaseURL)
+	if err != nil {
+		t.Skipf("open PostgreSQL integration database: %v", err)
+	}
+	defer database.Close()
+	if err := database.Ping(); err != nil {
+		t.Skipf("PostgreSQL integration database is unavailable: %v", err)
+	}
+	value := make([]byte, 12)
+	if _, err := rand.Read(value); err != nil {
+		t.Fatal(err)
+	}
+	email := hex.EncodeToString(value) + "@oauth.test"
+	repository := NewRepository(database)
+	user, err := repository.UpsertOAuthUser(context.Background(), "google", "google-"+email, "Ads Test", email, "", "access", "", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = database.Exec(`DELETE FROM users WHERE id = $1`, user.ID) })
+	stored, err := repository.UserByID(context.Background(), user.ID)
+	if err != nil || !user.ShowAdRewards || !stored.ShowAdRewards {
+		t.Fatalf("new user shows ad rewards: created %v, stored %v, %v", user.ShowAdRewards, stored.ShowAdRewards, err)
+	}
+	updated, err := repository.UpdateShowAdRewards(context.Background(), user.ID, false)
+	if err != nil || updated.ShowAdRewards {
+		t.Fatalf("updated user = %+v, %v", updated, err)
+	}
+}

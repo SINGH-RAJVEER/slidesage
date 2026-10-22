@@ -6,13 +6,15 @@ import (
 )
 
 type User struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Email         string    `json:"email"`
-	EmailVerified bool      `json:"emailVerified"`
-	Image         *string   `json:"image"`
-	SlideTokens   float64   `json:"slideTokens"`
-	LandingPage   string    `json:"landingPage"`
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Email         string  `json:"email"`
+	EmailVerified bool    `json:"emailVerified"`
+	Image         *string `json:"image"`
+	SlideTokens   float64 `json:"slideTokens"`
+	LandingPage   string  `json:"landingPage"`
+	// ShowAdRewards is whether the purchase page offers rewarded ads for points.
+	ShowAdRewards bool      `json:"showAdRewards"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 }

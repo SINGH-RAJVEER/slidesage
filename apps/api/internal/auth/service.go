@@ -73,7 +73,7 @@ func (service *Service) SignUp(ctx context.Context, name, email, password string
 	if err != nil {
 		return User{}, err
 	}
-	user := User{ID: userID, Name: name, Email: email, SlideTokens: signupPoints, CreatedAt: now, UpdatedAt: now}
+	user := User{ID: userID, Name: name, Email: email, SlideTokens: signupPoints, ShowAdRewards: true, CreatedAt: now, UpdatedAt: now}
 	if err := service.repository.CreateUserWithCredential(ctx, user, accountID, hash); err != nil {
 		return User{}, err
 	}
@@ -402,6 +402,11 @@ func (service *Service) UpdateLandingPage(ctx context.Context, userID, landingPa
 		return User{}, errors.New("landing page must be generate, presentations, or landing")
 	}
 	return service.repository.UpdateLandingPage(ctx, userID, landingPage)
+}
+
+// UpdateShowAdRewards turns the purchase page's rewarded ads offer on or off.
+func (service *Service) UpdateShowAdRewards(ctx context.Context, userID string, show bool) (User, error) {
+	return service.repository.UpdateShowAdRewards(ctx, userID, show)
 }
 
 func (service *Service) UpdateAvatar(ctx context.Context, userID, image string) (User, error) {
