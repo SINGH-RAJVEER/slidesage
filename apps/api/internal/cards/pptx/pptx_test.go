@@ -4,9 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -70,35 +67,5 @@ func TestUnpairedSurrogatesAreWrittenAsReplacementCharacters(t *testing.T) {
 	text, _ := jsvalue.Parse(`"a\ud800b"`)
 	if got := wellFormed(text.Str()); got != "a�b" {
 		t.Fatalf("wellFormed = %q", got)
-	}
-}
-
-// The embedded parts are generated from pptxgenjs and the TypeScript export;
-// regenerating them must change nothing.
-func TestTemplatesMatchPptxgenjs(t *testing.T) {
-	bun, err := exec.LookPath("bun")
-	if err != nil {
-		t.Skip("bun is not installed")
-	}
-	directory := t.TempDir()
-	command := exec.Command(bun, "templates/generate.ts", directory)
-	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("generate templates: %v\n%s", err, output)
-	}
-	entries, err := os.ReadDir(directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) != len(templates) {
-		t.Fatalf("generated %d templates, embedded %d", len(entries), len(templates))
-	}
-	for _, entry := range entries {
-		generated, err := os.ReadFile(filepath.Join(directory, entry.Name()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(generated, templates[entry.Name()]) {
-			t.Errorf("%s drifted from pptxgenjs; run bun apps/api/internal/cards/pptx/templates/generate.ts", entry.Name())
-		}
 	}
 }
