@@ -31,7 +31,7 @@ Worst case is a forged claim on every capped slot. At the recommended caps that 
 | --- | --- | --- |
 | Sale price of a point | Rs 2.00 (Starter 25 for Rs 50, custom 200 paise/pt), Rs 1.80 (Pro), Rs 1.60 (Premium) | `billing/razorpay.go` `ResolvePackPrice` |
 | Provider tokens per point | 1,000 (`actualCharge` bills one millipoint per token) | `generation/billing.go` |
-| Signup credit | 10 points after migration 00040 (was 50) | `00040_reduce_signup_points.sql` |
+| Signup credit | 10 points, email and OAuth alike | `signupPoints` in `internal/auth/repository.go` |
 | Research fee | 1 point flat | `presentation/research_accounting.go` |
 
 The **reservation**, not the settled charge, decides whether a generation can start. That makes it the number to size rewards against. Computed from `outlineAuthorizationMillis` and `cardAuthorizationMillis` with a 40-character topic and no research:
@@ -91,7 +91,7 @@ Every value above is server configuration, so it can be tuned from real fill and
 
 ### Related finding
 
-After 00040, a new email signup gets 10 points, which is below the roughly 15 points needed for even a 5-slide deck. Ad rewards make that recoverable in one day: 10 signup points plus 5 views reaches 20, enough for an 8-slide deck. Decide whether that onboarding cost is intended. Separately, `auth/repository.go` (OAuth sign-up path, around line 346) hard-codes `50000` millis and the ledger entry, so OAuth users still get 50 points regardless of the column default.
+A new account starts with 10 points, below the roughly 15 needed for even a 5-slide deck. Ad rewards make that recoverable: 10 signup points plus 5 views reaches 20, enough for an 8-slide deck. The 24-hour minimum account age means a brand-new user waits a day before their first ad, so decide whether that onboarding gap is intended.
 
 ## Data model
 
@@ -100,8 +100,6 @@ Migration `00041_ad_rewards.sql` adds:
 - `ad_reward_sessions`: one row per ad view, `issued`, then `claimed` or `expired`, with `reward_millis`, `issued_at`, `expires_at` and `claimed_at`. A partial unique index allows each user one `issued` session; issuing a new one expires the old.
 - `point_ledger.ad_reward_session_id`, with `UNIQUE (ad_reward_session_id, entry_type)`, so a session can credit points once at the database level.
 - `ad_reward` in the `entry_type` check, and `point_ledger_source_present` accepting an ad reward session as the source.
-
-The migration is numbered 00041 on the assumption that `00040_reduce_signup_points.sql` lands first. Goose refuses to apply a lower version after a higher one, so if 00040 is dropped or lands later, renumber this one.
 
 ## API
 
