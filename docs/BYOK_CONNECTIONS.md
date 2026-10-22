@@ -2,12 +2,11 @@
 
 Use OpenAI, Google Gemini, or Anthropic keys for direct generation and AI revisions.
 
-## Eligibility
+## Access and billing
 
-- Connecting or replacing a key and changing the selected model require more than 50 points.
-- Existing connections remain visible, usable, and removable below that threshold.
+- Any signed-in user can connect or replace a key and change the selected model, regardless of their point balance.
 - Direct generation is billed by the provider and consumes no SlideSage model points.
-- Exa research still costs one point per successful request and uses the server key.
+- Exa research still costs one point per successful request and uses the server key, including when generation uses BYOK. Research requires at least one point and returns `402` when the balance is insufficient; failed searches are refunded.
 
 ## Credential handling
 
