@@ -57,7 +57,7 @@
 						"GOOS": "linux",
 						"GOARCH": "amd64"
 					},
-					"run": "set -euo pipefail\nmkdir -p \"$GITHUB_WORKSPACE/dist\"\nfor component in api worker migrate; do\n\tgo build -mod=readonly -trimpath -buildvcs=false -ldflags=\"-s -w\" \\\n\t\t-o \"$GITHUB_WORKSPACE/dist/$component\" \"./cmd/$component\"\n\ttest -x \"$GITHUB_WORKSPACE/dist/$component\"\ndone\n"
+					"run": "set -euo pipefail\nmkdir -p \"$GITHUB_WORKSPACE/dist\"\nfor component in api worker migrate converter; do\n\tgo build -mod=readonly -trimpath -buildvcs=false -ldflags=\"-s -w\" \\\n\t\t-o \"$GITHUB_WORKSPACE/dist/$component\" \"./cmd/$component\"\n\ttest -x \"$GITHUB_WORKSPACE/dist/$component\"\ndone\n"
 				},
 				{
 					"uses": "oven-sh/setup-bun@v2",
@@ -66,7 +66,7 @@
 					}
 				},
 				{
-					"name": "Bundle the card converter and the frontend",
+					"name": "Bundle the frontend",
 					"env": {
 						"VITE_ADSENSE_CLIENT_ID": "${{ vars.VITE_ADSENSE_CLIENT_ID }}",
 						"VITE_ADSENSE_SLOT_GENERATE": "${{ vars.VITE_ADSENSE_SLOT_GENERATE }}",
@@ -74,7 +74,7 @@
 						"VITE_ADSENSE_SLOT_MARKETPLACE": "${{ vars.VITE_ADSENSE_SLOT_MARKETPLACE }}",
 						"VITE_ADSENSE_SLOT_ANCHOR": "${{ vars.VITE_ADSENSE_SLOT_ANCHOR }}"
 					},
-					"run": "set -euo pipefail\nbun install --frozen-lockfile\nbun build apps/converter/src/main.ts --target bun --outfile dist/converter.js\ntest -s dist/converter.js\nVITE_API_URL=\"https://$API_DOMAIN\" bun run --cwd apps/web build\ncp -r apps/web/dist dist/web\ngrep -rqF \"https://$API_DOMAIN\" dist/web/assets\n"
+					"run": "set -euo pipefail\nbun install --frozen-lockfile\nVITE_API_URL=\"https://$API_DOMAIN\" bun run --cwd apps/web build\ncp -r apps/web/dist dist/web\ngrep -rqF \"https://$API_DOMAIN\" dist/web/assets\n"
 				},
 				{
 					"name": "Resolve the image registry path",

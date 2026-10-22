@@ -57,20 +57,15 @@ format:
 # Compile the release binaries the container images copy in
 binaries:
 	mkdir -p dist
-	for component in api worker migrate; do \
+	for component in api worker migrate converter; do \
 		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C apps/api build \
 			-mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" \
 			-o "$PWD/dist/$component" "./cmd/$component"; \
 	done
 
-# Bundle the card converter into the file its container image copies in
-converter-bundle:
-	mkdir -p dist
-	bun build apps/converter/src/main.ts --target bun --outfile dist/converter.js
-
 # Run the card converter only
 converter:
-	bun run dev:converter
+	go -C apps/api run ./cmd/converter
 
 # Build the frontend into the directory its nginx image copies in. The API
 # origin is fixed at build time.
@@ -81,7 +76,7 @@ web-bundle api_url="https://api.slidesage.app":
 	cp -r apps/web/dist dist/web
 
 # Build and push the release images to GHCR under a tag, normally the commit SHA
-push-images tag: binaries converter-bundle web-bundle
+push-images tag: binaries web-bundle
 	IMAGE_VERSION={{tag}} docker buildx bake -f docker-bake.hcl --push
 
 # Build a container image from the repo root context. Run `just binaries` first.

@@ -125,7 +125,7 @@
 				"CARD_CONVERTER_PORT": "8090"
 			},
 			"healthcheck": {
-				"test": ["CMD", "/usr/local/bin/bun", "-e", "const response = await fetch('http://127.0.0.1:8090/health'); process.exit(response.ok ? 0 : 1)"],
+				"test": ["CMD", "/app/converter", "-health"],
 				"interval": "10s",
 				"timeout": "3s",
 				"retries": 5,

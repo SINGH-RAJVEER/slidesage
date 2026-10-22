@@ -51,3 +51,14 @@ from base as migrate
 copy dist/migrate /app/migrate
 
 entrypoint ["/app/migrate"]
+
+# card converter, private to the compose network
+from base as converter
+
+copy dist/converter /app/converter
+
+env CARD_CONVERTER_HOST=0.0.0.0
+
+expose 8090
+
+entrypoint ["/app/converter"]

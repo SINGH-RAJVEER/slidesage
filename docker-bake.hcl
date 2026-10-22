@@ -1,7 +1,7 @@
 # Bake definition for the runtime images.
 #
-# The Go images copy prebuilt binaries from dist/. The converter image copies a
-# Bun bundle and the web image the built frontend from the same directory. One
+# The Go images, the card converter among them, copy prebuilt binaries from
+# dist/. The web image copies the built frontend from the same directory. One
 # bake publishes the whole release.
 
 # Registry path the images are pushed under, without the image name.
@@ -57,10 +57,8 @@ target "migrate" {
 }
 
 target "converter" {
-	context    = "."
-	dockerfile = "apps/converter/Dockerfile"
-	target     = "converter"
-	platforms  = ["linux/amd64"]
+	inherits = ["common"]
+	target   = "converter"
 	tags = [
 		"${image("converter")}:${IMAGE_VERSION}",
 		"${image("converter")}:latest",
