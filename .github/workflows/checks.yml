@@ -49,7 +49,7 @@
 					"uses": "dorny/paths-filter@v4",
 					"with": {
 						"base": "${{ steps.base.outputs.ref }}",
-						"filters": "api:\n  - 'apps/api/**'\n  - 'apps/converter/**'\n  - 'libs/cards/**'\n  - 'libs/types/**'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\nweb:\n  - 'apps/web/**'\n  - 'apps/converter/**'\n  - 'libs/**'\n  - 'package.json'\n  - 'bun.lock'\n  - 'tsconfig.json'\n  - 'biome.json'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\n"
+						"filters": "api:\n  - 'apps/api/**'\n  - 'libs/cards/**'\n  - 'libs/types/**'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\nweb:\n  - 'apps/web/**'\n  - 'libs/**'\n  - 'package.json'\n  - 'bun.lock'\n  - 'tsconfig.json'\n  - 'biome.json'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\n"
 					}
 				},
 				{
@@ -100,10 +100,6 @@
 				},
 				{
 					"if": "steps.scope.outputs.web == 'true'",
-					"run": "bun run test:converter\n"
-				},
-				{
-					"if": "steps.scope.outputs.web == 'true'",
 					"run": "bun run test:ui\n"
 				},
 				{
@@ -138,16 +134,6 @@
 					"if": "steps.scope.outputs.api == 'true'",
 					"run": "go vet ./...\n",
 					"working-directory": "apps/api"
-				},
-				{
-					"name": "Compare the Go card converter with the TypeScript converter",
-					"if": "steps.scope.outputs.api == 'true'",
-					"shell": "bash",
-					"env": {
-						"CARD_CONVERTER_PORT": "18090",
-						"CONVERTER_UNDER_TEST_URL": "http://127.0.0.1:18090"
-					},
-					"run": "set -euo pipefail\ngo -C apps/api build -o \"$RUNNER_TEMP/converter\" ./cmd/converter\n\"$RUNNER_TEMP/converter\" &\nready=false\nfor _ in {1..30}; do\n\tif \"$RUNNER_TEMP/converter\" -health; then\n\t\tready=true\n\t\tbreak\n\tfi\n\tsleep 1\ndone\ntest \"$ready\" = true\nbun --cwd apps/converter test --isolate\n"
 				},
 				{
 					"if": "steps.scope.outputs.web == 'true'",
