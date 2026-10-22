@@ -25,13 +25,13 @@ func TestEvaluateOrdersDenials(t *testing.T) {
 		retryAt time.Time
 		reward  int64
 	}{
-		{"eligible", adult, "", time.Time{}, 2000},
-		{"unverified", usage{createdAt: adult.createdAt, now: now}, ReasonEmailUnverified, time.Time{}, 2000},
-		{"new account", usage{verified: true, createdAt: now.Add(-time.Hour), now: now}, ReasonAccountTooNew, now.Add(23 * time.Hour), 2000},
-		{"daily cap", usage{verified: true, createdAt: adult.createdAt, now: now, viewsToday: 5, monthMillis: 10000}, ReasonDailyCap, time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), 2000},
+		{"eligible", adult, "", time.Time{}, 5000},
+		{"unverified", usage{createdAt: adult.createdAt, now: now}, ReasonEmailUnverified, time.Time{}, 5000},
+		{"new account", usage{verified: true, createdAt: now.Add(-time.Hour), now: now}, ReasonAccountTooNew, now.Add(23 * time.Hour), 5000},
+		{"daily cap", usage{verified: true, createdAt: adult.createdAt, now: now, viewsToday: 5, monthMillis: 10000}, ReasonDailyCap, time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), 5000},
 		{"monthly cap", usage{verified: true, createdAt: adult.createdAt, now: now, viewsToday: 5, monthMillis: 60000}, ReasonMonthlyCap, time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), 0},
 		{"partial month", usage{verified: true, createdAt: adult.createdAt, now: now, monthMillis: 59000}, "", time.Time{}, 1000},
-		{"cooldown", usage{verified: true, createdAt: adult.createdAt, now: now, lastClaim: sql.NullTime{Time: now.Add(-10 * time.Second), Valid: true}}, ReasonCooldown, now.Add(50 * time.Second), 2000},
+		{"cooldown", usage{verified: true, createdAt: adult.createdAt, now: now, lastClaim: sql.NullTime{Time: now.Add(-10 * time.Second), Valid: true}}, ReasonCooldown, now.Add(50 * time.Second), 5000},
 	} {
 		status := config.evaluate(item.usage)
 		if status.Reason != item.reason || status.RewardMillis != item.reward {
@@ -75,7 +75,7 @@ func TestClaimCreditsOnceAfterMinimumWatch(t *testing.T) {
 	}
 	wait.Wait()
 	for index, claim := range results {
-		if failures[index] != nil || claim != (Claim{2000, 12000}) {
+		if failures[index] != nil || claim != (Claim{5000, 15000}) {
 			t.Fatalf("claim %d = %+v, %v", index, claim, failures[index])
 		}
 	}
@@ -84,7 +84,7 @@ func TestClaimCreditsOnceAfterMinimumWatch(t *testing.T) {
 	if err := database.QueryRow(`SELECT COUNT(*), COALESCE(SUM(delta_millis), 0) FROM point_ledger WHERE user_id = $1 AND entry_type = 'ad_reward'`, userID).Scan(&entries, &delta); err != nil {
 		t.Fatal(err)
 	}
-	if entries != 1 || delta != 2000 {
+	if entries != 1 || delta != 5000 {
 		t.Fatalf("ledger has %d ad credits totalling %d", entries, delta)
 	}
 
@@ -139,7 +139,7 @@ func TestClaimRetiresExpiredAndOverCapSessions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := database.Exec(`INSERT INTO ad_reward_sessions (id, user_id, status, reward_millis, issued_at, expires_at, claimed_at) VALUES ($1, $2, 'claimed', 2000, NOW() - INTERVAL '3 hours', NOW(), date_trunc('day', NOW(), 'UTC') + INTERVAL '1 second')`, id, userID); err != nil {
+		if _, err := database.Exec(`INSERT INTO ad_reward_sessions (id, user_id, status, reward_millis, issued_at, expires_at, claimed_at) VALUES ($1, $2, 'claimed', 5000, NOW() - INTERVAL '3 hours', NOW(), date_trunc('day', NOW(), 'UTC') + INTERVAL '1 second')`, id, userID); err != nil {
 			t.Fatal(err)
 		}
 	}

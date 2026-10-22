@@ -81,17 +81,17 @@ Break-even points per view = revenue per view / cost per point.
 
 ### Recommendation
 
-- **2 points per completed view.** This stays profitable at the base case on any model up to cheap paid, and at the conservative case on the free model. Move to a mid-tier platform model only together with a lower reward.
-- **At most 5 views per day** (10 points per day), with a **60-second cooldown** between views.
-- **At most 60 points per calendar month.** That is two to three short decks a month for someone who keeps watching. It cannot replace buying: Starter delivers 25 points instantly for Rs 50, while the same 25 points through ads take 13 views over three days.
+- **5 points per completed view.** At base eCPM this stays profitable on the free model and on a cheap paid model (break-even 8). At conservative eCPM only the free model covers it. Move to a mid-tier platform model only together with a lower reward.
+- **At most 5 views per day** (up to 25 points per day), with a **60-second cooldown** between views.
+- **At most 60 points per calendar month**, which 5 points a view reaches after 12 views. That is two to three short decks a month for someone who keeps watching. Ads can stand in for a Starter pack: its 25 points take one day of views (5 ads) instead of Rs 50. The monthly cap is what keeps ads from replacing larger packs.
 - **Minimum watch time 15 seconds** from session issue to claim. **Sessions expire after 10 minutes.**
-- **Monthly exposure per user at the cap:** 30 views earn about Rs 5 at base eCPM. Serving them costs about Rs 0 on the free model, Rs 1.2 on cheap paid, or up to Rs 26 if every point goes to research at about Rs 0.43 per Exa call. That research worst case is the main reason for the monthly cap.
+- **Monthly exposure per user at the cap:** 12 views earn about Rs 2 at base eCPM. Serving them costs about Rs 0 on the free model, Rs 1.2 on cheap paid, or up to Rs 26 if every point goes to research at about Rs 0.43 per Exa call. That research worst case is the main reason for the monthly cap.
 
 Every value above is server configuration, so it can be tuned from real fill and eCPM data without a deploy.
 
 ### Related finding
 
-A new account starts with 10 points, below the roughly 15 needed for even a 5-slide deck. Ad rewards make that recoverable: 10 signup points plus 5 views reaches 20, enough for an 8-slide deck. The 24-hour minimum account age means a brand-new user waits a day before their first ad, so decide whether that onboarding gap is intended.
+A new account starts with 10 points, below the roughly 15 needed for even a 5-slide deck. Ad rewards make that recoverable: 10 signup points plus one day of 5 views reaches 35, enough for a 10-slide deck. The 24-hour minimum account age means a brand-new user waits a day before their first ad, so decide whether that onboarding gap is intended.
 
 ## Data model
 

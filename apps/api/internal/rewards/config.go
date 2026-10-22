@@ -39,7 +39,7 @@ type Config struct {
 // DefaultConfig is the reward economics documented in docs/AD_REWARDS.md.
 func DefaultConfig() Config {
 	return Config{
-		RewardMillis:  2000,
+		RewardMillis:  5000,
 		DailyViews:    5,
 		MonthlyMillis: 60000,
 		MinWatch:      15 * time.Second,

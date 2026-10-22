@@ -121,7 +121,7 @@
 | --- | --- | --- | --- |
 | `AD_REWARDS_ENABLED` | No | `false` | Offers rewarded ads for points |
 | `AD_REWARD_GPT_AD_UNIT` | When enabled | None | Google Ad Manager rewarded ad unit path served to the web client |
-| `AD_REWARD_POINTS_PER_VIEW` | No | `2` | Points credited per completed view |
+| `AD_REWARD_POINTS_PER_VIEW` | No | `5` | Points credited per completed view |
 | `AD_REWARD_DAILY_VIEWS` | No | `5` | Credited views per user per UTC day |
 | `AD_REWARD_MONTHLY_POINTS` | No | `60` | Ad points per user per UTC month |
 | `AD_REWARD_MIN_WATCH_SECONDS` | No | `15` | Shortest accepted time from session to claim |
