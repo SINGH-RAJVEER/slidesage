@@ -208,12 +208,6 @@ export function AISettings({
 						</TooltipContent>
 					</Tooltip>
 				</div>
-				{!config.eligibility.eligible ? (
-					<p className="mt-4 rounded-lg border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100">
-						More than 50 points are required to add keys or change models. Existing connected keys
-						continue to generate normally.
-					</p>
-				) : null}
 				<div className="mt-5">
 					{PROVIDERS.map((provider) => {
 						const connection = config.connections.find((item) => item.provider === provider.id);
@@ -270,9 +264,7 @@ export function AISettings({
 								{connection && providerModels.length > 0 ? (
 									<Select
 										value={config.selection?.provider === provider.id ? config.selection.model : ""}
-										disabled={
-											!connection.enabled || !config.eligibility.eligible || busy === "selection"
-										}
+										disabled={!connection.enabled || busy === "selection"}
 										onValueChange={(model) => void selectModel({ provider: provider.id, model })}
 									>
 										<SelectTrigger
@@ -303,17 +295,13 @@ export function AISettings({
 													[provider.id]: event.target.value,
 												}))
 											}
-											disabled={!config.eligibility.eligible || busy === provider.id}
+											disabled={busy === provider.id}
 											placeholder="Enter API key"
 											className="h-10 min-w-0 shrink-0 rounded-md border border-white/10 bg-black/30 px-3 text-sm sm:flex-1 text-white outline-none transition-colors focus:border-white/25 disabled:opacity-50"
 										/>
 										<Button
 											type="button"
-											disabled={
-												!config.eligibility.eligible ||
-												busy === provider.id ||
-												!keys[provider.id]?.trim()
-											}
+											disabled={busy === provider.id || !keys[provider.id]?.trim()}
 											onClick={() => void connect(provider.id)}
 											className="h-10 w-full bg-white text-black hover:bg-white/90 sm:w-auto"
 										>

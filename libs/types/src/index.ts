@@ -46,11 +46,6 @@ export interface AIConfigurationResponse {
 		model: string | null;
 		billing: "points" | "provider";
 	};
-	eligibility: {
-		eligible: boolean;
-		slideTokens: number;
-		minimumPointsExclusive: 50;
-	};
 	connections: AIConnectionSummary[];
 	models: AIModelDescriptor[];
 	modelCatalogErrors?: Partial<Record<AIProvider, string>>;

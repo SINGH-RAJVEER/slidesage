@@ -26,11 +26,6 @@ it("shows point-funded OpenRouter until a provider is connected", async () => {
 					model: "openrouter/free",
 					billing: "points",
 				},
-				eligibility: {
-					eligible: true,
-					slideTokens: 100,
-					minimumPointsExclusive: 50,
-				},
 				connections: [],
 				models: [],
 				selection: null,
@@ -55,11 +50,6 @@ it("shows a provider-local model catalog error without hiding key controls", asy
 		Promise.resolve(
 			jsonResponse({
 				generation: { mode: "byok", model: "gpt-5.1", billing: "provider" },
-				eligibility: {
-					eligible: true,
-					slideTokens: 100,
-					minimumPointsExclusive: 50,
-				},
 				connections: [
 					{
 						provider: "openai",
@@ -90,7 +80,6 @@ it("shows a provider-local model catalog error without hiding key controls", asy
 it("updates the saved default model from settings", async () => {
 	const config = {
 		generation: { mode: "byok", model: "gpt-4.1", billing: "provider" },
-		eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
 		connections: [
 			{
 				provider: "openai",
@@ -147,7 +136,6 @@ it("toggles a connected provider from the row without showing replacement contro
 		generation: enabled
 			? { mode: "byok", model: "gpt-4.1", billing: "provider" }
 			: { mode: "openrouter", model: null, billing: "points" },
-		eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
 		connections: [
 			{
 				provider: "openai",
@@ -199,7 +187,6 @@ it("allows selecting a Gemini model after enabling its connected provider", asyn
 	let selection: { provider: "google"; model: string } | null = null;
 	const config = () => ({
 		generation: { mode: "openrouter" as const, model: null, billing: "points" as const },
-		eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
 		connections: [
 			{
 				provider: "google" as const,
@@ -249,7 +236,6 @@ it("selects the top model when enabling OpenAI or Anthropic", async () => {
 		let selection: { provider: typeof provider.id; model: string } | null = null;
 		const config = () => ({
 			generation: { mode: "openrouter" as const, model: null, billing: "points" as const },
-			eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
 			connections: [
 				{
 					provider: provider.id,
@@ -301,7 +287,6 @@ it("removes a connected provider from the delete icon", async () => {
 		generation: connected
 			? { mode: "byok", model: "gpt-4.1", billing: "provider" }
 			: { mode: "openrouter", model: null, billing: "points" },
-		eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
 		connections: connected
 			? [
 					{

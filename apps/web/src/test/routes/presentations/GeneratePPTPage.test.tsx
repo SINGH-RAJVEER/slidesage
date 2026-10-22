@@ -275,7 +275,6 @@ it("starts generation on Enter even when focus sits on an options-bar control", 
 	globalThis.fetch = mock(async () =>
 		Response.json({
 			generation: { mode: "openrouter", model: "openrouter/default", billing: "points" },
-			eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
 			connections: [],
 			models: [],
 			selection: null,
@@ -314,7 +313,6 @@ it("focuses the prompt box on Enter when the prompt is empty", async () => {
 	globalThis.fetch = mock(async () =>
 		Response.json({
 			generation: { mode: "openrouter", model: "openrouter/default", billing: "points" },
-			eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
 			connections: [],
 			models: [],
 			selection: null,
@@ -346,7 +344,6 @@ it("preserves retry AI selection when routing through research", async () => {
 	globalThis.fetch = mock(async () =>
 		Response.json({
 			generation: { mode: "byok", model: "gpt-4.1", billing: "provider" },
-			eligibility: { eligible: true, slideTokens: 100, minimumPointsExclusive: 50 },
 			connections: [],
 			models: [],
 			selection: null,
