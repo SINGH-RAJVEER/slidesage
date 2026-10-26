@@ -57,7 +57,7 @@ format:
 # Compile the release binaries the container images copy in
 binaries:
 	mkdir -p dist
-	for component in api worker migrate converter; do \
+	for component in api worker migrate converter container migrate-objects; do \
 		CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go -C apps/api build \
 			-mod=readonly -trimpath -buildvcs=false -ldflags="-s -w" \
 			-o "$PWD/dist/$component" "./cmd/$component"; \
@@ -67,18 +67,14 @@ binaries:
 converter:
 	go -C apps/api run ./cmd/converter
 
-# Build the frontend into the directory its nginx image copies in. The API
-# origin is fixed at build time.
+# Build the Cloudflare Pages upload directory. The API origin is fixed at build time.
 web-bundle api_url="https://api.slidesage.app":
 	VITE_API_URL={{api_url}} bun run --cwd apps/web build
-	rm -rf dist/web
-	mkdir -p dist
-	cp -r apps/web/dist dist/web
 
-# Build and push the release images to GHCR under a tag, normally the commit SHA
-push-images tag: binaries web-bundle
-	IMAGE_VERSION={{tag}} docker buildx bake -f docker-bake.hcl --push
+# Build the API/worker image used by Wrangler.
+image: binaries
+	docker build --platform linux/amd64 --file infra/cloudflare/Dockerfile --tag slidesage-backend .
 
-# Build a container image from the repo root context. Run `just binaries` first.
-image target="api": binaries
-	docker build --target {{target}} --file apps/api/Dockerfile --tag slidesage-{{target}} .
+# Deploy only after completing the database, secrets, and image cutover runbook.
+deploy-backend: binaries
+	bun run --cwd apps/edge deploy

@@ -44,7 +44,7 @@
 
 - Without a valid publisher ID there are no ads anywhere, which is how development, tests, and preview builds run. A placement without a valid numeric unit ID stays empty.
 - Create the units in AdSense as display units. The slots set their own width and height, so AdSense serves a size that fits.
-- Production values are GitHub repository variables with the names above. The VPS workflow passes them to the frontend build before baking its output into the `web` image. Unset variables keep ads disabled. Changes take effect on the next `main` deployment.
+- Production values are Cloudflare Pages build environment variables with the names above. Unset variables keep ads disabled. Changes take effect after rebuilding the Pages production deployment.
 - A build with a publisher ID emits `ads.txt` with `google.com, pub-..., DIRECT, f08c47fec0942fa0`.
 
 ## Before turning ads on

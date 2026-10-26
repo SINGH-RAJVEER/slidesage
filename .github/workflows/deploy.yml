@@ -1,180 +1,46 @@
 {
-	"name": "Build and deploy to the VPS",
+	"name": "Deploy Cloudflare Containers",
 	"on": {
-		"push": {
-			"branches": [
-				"main"
-			]
-		},
-		"workflow_dispatch": null
-	},
-	"concurrency": {
-		"group": "slidesage-vps-production",
-		"cancel-in-progress": false
-	},
-	"env": {
-		"IMAGE_VERSION": "${{ github.sha }}",
-		"WEB_DOMAIN": "${{ vars.WEB_DOMAIN || 'slidesage.app' }}",
-		"API_DOMAIN": "${{ vars.API_DOMAIN || 'api.slidesage.app' }}"
-	},
-	"jobs": {
-		"build": {
-			"if": "github.ref == 'refs/heads/main'",
-			"runs-on": "ubuntu-latest",
-			"permissions": {
-				"contents": "read",
-				"packages": "write"
-			},
-			"steps": [
-				{
-					"uses": "actions/checkout@v4"
-				},
-				{
-					"uses": "actions/setup-go@v5",
-					"with": {
-						"go-version-file": "apps/api/go.mod",
-						"cache": "false"
-					}
-				},
-				{
-					"name": "Stamp the Go cache key",
-					"run": "echo \"GO_CACHE_DATE=$(date -u +%Y-%m-%d)\" >> \"$GITHUB_ENV\"\n"
-				},
-				{
-					"name": "Restore the Go module and build caches",
-					"uses": "actions/cache/restore@v4",
-					"with": {
-						"path": "~/.cache/go-build\n~/go/pkg/mod\n",
-						"key": "${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-${{ env.GO_CACHE_DATE }}",
-						"restore-keys": "${{ runner.os }}-go-${{ hashFiles('apps/api/go.sum') }}-\n${{ runner.os }}-go-\n"
-					}
-				},
-				{
-					"name": "Build the release binaries",
-					"working-directory": "apps/api",
-					"env": {
-						"CGO_ENABLED": "0",
-						"GOOS": "linux",
-						"GOARCH": "amd64"
-					},
-					"run": "set -euo pipefail\nmkdir -p \"$GITHUB_WORKSPACE/dist\"\nfor component in api worker migrate converter; do\n\tgo build -mod=readonly -trimpath -buildvcs=false -ldflags=\"-s -w\" \\\n\t\t-o \"$GITHUB_WORKSPACE/dist/$component\" \"./cmd/$component\"\n\ttest -x \"$GITHUB_WORKSPACE/dist/$component\"\ndone\n"
-				},
-				{
-					"uses": "oven-sh/setup-bun@v2",
-					"with": {
-						"bun-version": "1.3.13"
-					}
-				},
-				{
-					"name": "Bundle the frontend",
-					"env": {
-						"VITE_ADSENSE_CLIENT_ID": "${{ vars.VITE_ADSENSE_CLIENT_ID }}",
-						"VITE_ADSENSE_SLOT_GENERATE": "${{ vars.VITE_ADSENSE_SLOT_GENERATE }}",
-						"VITE_ADSENSE_SLOT_PRESENTATIONS": "${{ vars.VITE_ADSENSE_SLOT_PRESENTATIONS }}",
-						"VITE_ADSENSE_SLOT_MARKETPLACE": "${{ vars.VITE_ADSENSE_SLOT_MARKETPLACE }}",
-						"VITE_ADSENSE_SLOT_ANCHOR": "${{ vars.VITE_ADSENSE_SLOT_ANCHOR }}"
-					},
-					"run": "set -euo pipefail\nbun install --frozen-lockfile\nVITE_API_URL=\"https://$API_DOMAIN\" bun run --cwd apps/web build\ncp -r apps/web/dist dist/web\ngrep -rqF \"https://$API_DOMAIN\" dist/web/assets\n"
-				},
-				{
-					"name": "Resolve the image registry path",
-					"run": "registry=\"ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/slidesage\"\necho \"REGISTRY=$registry\" >> \"$GITHUB_ENV\"\necho \"registry=$registry\" >> \"$GITHUB_OUTPUT\"\n",
-					"id": "registry"
-				},
-				{
-					"uses": "docker/login-action@v3",
-					"with": {
-						"registry": "ghcr.io",
-						"username": "${{ github.actor }}",
-						"password": "${{ secrets.GITHUB_TOKEN }}"
-					}
-				},
-				{
-					"uses": "docker/setup-buildx-action@v3"
-				},
-				{
-					"name": "Build and push the runtime images",
-					"uses": "docker/bake-action@v7",
-					"with": {
-						"source": ".",
-						"files": "docker-bake.hcl",
-						"push": "true",
-						"set": "api.cache-from=type=gha,scope=vps-api\napi.cache-to=type=gha,scope=vps-api,mode=max\nworker.cache-from=type=gha,scope=vps-worker\nworker.cache-to=type=gha,scope=vps-worker,mode=max\nmigrate.cache-from=type=gha,scope=vps-migrate\nmigrate.cache-to=type=gha,scope=vps-migrate,mode=max\nconverter.cache-from=type=gha,scope=vps-converter\nconverter.cache-to=type=gha,scope=vps-converter,mode=max\nweb.cache-from=type=gha,scope=vps-web\nweb.cache-to=type=gha,scope=vps-web,mode=max"
-					}
-				},
-				{
-					"name": "Record published images",
-					"run": "printf 'Published five images under %s/*:%s.\\n' \"$REGISTRY\" \"$IMAGE_VERSION\" >> \"$GITHUB_STEP_SUMMARY\"\nif [[ \"$VPS_DEPLOY_ENABLED\" != true ]]; then\n\tprintf 'VPS deployment is disabled. Configure the server and set VPS_DEPLOY_ENABLED=true.\\n' >> \"$GITHUB_STEP_SUMMARY\"\nfi\n",
-					"env": {
-						"VPS_DEPLOY_ENABLED": "${{ vars.VPS_DEPLOY_ENABLED }}"
-					}
+		"workflow_dispatch": {
+			"inputs": {
+				"database_prepared": {
+					"description": "VPS backup, schema migrations, SSH tunnel, secrets and object migration are prepared per the cutover runbook",
+					"type": "boolean",
+					"required": true,
+					"default": false
 				}
-			],
-			"timeout-minutes": 30,
-			"outputs": {
-				"registry": "${{ steps.registry.outputs.registry }}"
-			}
-		},
-		"deploy": {
-			"needs": "build",
-			"if": "github.ref == 'refs/heads/main' && vars.VPS_DEPLOY_ENABLED == 'true'",
-			"runs-on": "ubuntu-latest",
-			"permissions": {
-				"contents": "read"
-			},
-			"env": {
-				"VPS_HOST": "${{ secrets.VPS_HOST }}",
-				"VPS_USER": "${{ vars.VPS_USER || 'slidesage' }}",
-				"VPS_PORT": "${{ vars.VPS_PORT || '22' }}",
-				"REGISTRY": "${{ needs.build.outputs.registry }}",
-				"RELEASE_DIRECTORY": "/opt/slidesage/.releases/${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}"
-			},
-			"steps": [
-				{
-					"uses": "actions/checkout@v4"
-				},
-				{
-					"name": "Configure pinned SSH connection",
-					"env": {
-						"VPS_SSH_KEY": "${{ secrets.VPS_SSH_KEY }}",
-						"VPS_KNOWN_HOSTS": "${{ secrets.VPS_KNOWN_HOSTS }}"
-					},
-					"run": "set -euo pipefail\nfor setting in VPS_HOST VPS_USER VPS_PORT VPS_SSH_KEY VPS_KNOWN_HOSTS; do\n\tif [[ -z ${!setting} ]]; then\n\t\techo \"::error::Missing $setting. See docs/CI_CD.md.\"\n\t\texit 1\n\tfi\ndone\n[[ $VPS_HOST =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]\n[[ $VPS_USER =~ ^[a-z_][a-z0-9_-]*$ ]]\n[[ $VPS_PORT =~ ^[0-9]{1,5}$ ]] && (( 10#$VPS_PORT > 0 && 10#$VPS_PORT <= 65535 ))\nfor domain in \"$WEB_DOMAIN\" \"$API_DOMAIN\"; do\n\t[[ $domain =~ ^[a-z0-9][a-z0-9.-]*[a-z0-9]$ ]]\ndone\ninstall -m 700 -d ~/.ssh\nprintf '%s\\n' \"$VPS_SSH_KEY\" > ~/.ssh/slidesage_vps\nchmod 600 ~/.ssh/slidesage_vps\nssh-keygen -y -f ~/.ssh/slidesage_vps >/dev/null\nprintf '%s\\n' \"$VPS_KNOWN_HOSTS\" > ~/.ssh/slidesage_known_hosts\ncat > ~/.ssh/config <<EOF\nHost slidesage-vps\n\tHostName $VPS_HOST\n\tUser $VPS_USER\n\tPort $VPS_PORT\n\tIdentityFile ~/.ssh/slidesage_vps\n\tIdentitiesOnly yes\n\tBatchMode yes\n\tStrictHostKeyChecking yes\n\tUserKnownHostsFile ~/.ssh/slidesage_known_hosts\n\tConnectTimeout 15\n\tServerAliveInterval 15\n\tServerAliveCountMax 4\nEOF\nchmod 600 ~/.ssh/config\n"
-				},
-				{
-					"name": "Check server prerequisites",
-					"run": "set -euo pipefail\n# Expand only the generated release path on the runner.\n# shellcheck disable=SC2087\nssh slidesage-vps \"bash -se\" <<EOF\nset -euo pipefail\ncommand -v rsync >/dev/null\ncommand -v flock >/dev/null\ndocker compose version >/dev/null\ndocker info >/dev/null\ncd /opt/slidesage\ntest -w .\nfor required in .env certs/origin.pem certs/origin.key; do\n\tif [[ ! -f \"\\$required\" ]]; then\n\t\techo \"Missing server file: \\$required\" >&2\n\t\texit 1\n\tfi\ndone\nmkdir -p '$RELEASE_DIRECTORY'\nEOF\n"
-				},
-				{
-					"name": "Upload isolated release files",
-					"run": "set -euo pipefail\nrsync -a --exclude='.env' --exclude='certs/' --exclude='secrets/' \\\n\t--exclude='backups/' --exclude='.deploy*' infra/ \"slidesage-vps:$RELEASE_DIRECTORY/\"\n"
-				},
-				{
-					"name": "Install, back up, migrate, and deploy under one lock",
-					"run": "set -euo pipefail\n# These values are a SHA, a derived registry, and validated domain names.\n# shellcheck disable=SC2029\nssh slidesage-vps \"'$RELEASE_DIRECTORY/activate-release.sh' '$IMAGE_VERSION' '$REGISTRY' '$WEB_DOMAIN' '$API_DOMAIN'\"\n"
-				},
-				{
-					"name": "Verify public endpoints",
-					"run": "set -euo pipefail\nfor endpoint in \"https://$API_DOMAIN/health\" \"https://$WEB_DOMAIN/\" \"https://$WEB_DOMAIN/sign-in\"; do\n\tcurl --fail --silent --show-error --connect-timeout 10 --max-time 30 \\\n\t\t--retry 5 --retry-delay 3 --retry-all-errors \"$endpoint\" -o /tmp/slidesage-response\n\tif [[ $endpoint != \"https://$API_DOMAIN/health\" ]]; then\n\t\tgrep -q 'id=\"root\"' /tmp/slidesage-response\n\tfi\ndone\n"
-				},
-				{
-					"name": "Record deployed release and remove upload",
-					"run": "set -euo pipefail\n# shellcheck disable=SC2029\nssh slidesage-vps \"test \\\"\\$(cat /opt/slidesage/.deployed-release)\\\" = '$IMAGE_VERSION' && rm -rf -- '$RELEASE_DIRECTORY'\"\nprintf 'Deployed %s to https://%s\\n' \"$IMAGE_VERSION\" \"$WEB_DOMAIN\" >> \"$GITHUB_STEP_SUMMARY\"\n"
-				}
-			],
-			"timeout-minutes": 30,
-			"environment": {
-				"name": "vps-production",
-				"url": "https://${{ vars.WEB_DOMAIN || 'slidesage.app' }}"
 			}
 		}
 	},
-	"permissions": {
-		"contents": "read"
-	},
-	"defaults": {
-		"run": {
-			"shell": "bash"
+	"permissions": { "contents": "read" },
+	"concurrency": { "group": "cloudflare-production", "cancel-in-progress": false },
+	"jobs": {
+		"deploy": {
+			"if": "github.ref == 'refs/heads/main' && inputs.database_prepared",
+			"runs-on": "ubuntu-latest",
+			"timeout-minutes": 30,
+			"environment": { "name": "cloudflare-production", "url": "https://api.slidesage.app/health" },
+			"steps": [
+				{ "uses": "actions/checkout@v4" },
+				{ "uses": "actions/setup-go@v5", "with": { "go-version-file": "apps/api/go.mod", "cache-dependency-path": "apps/api/go.sum" } },
+				{ "uses": "actions/setup-node@v4", "with": { "node-version": "24" } },
+				{ "uses": "oven-sh/setup-bun@v2", "with": { "bun-version": "1.3.13" } },
+				{ "run": "bun install --frozen-lockfile" },
+				{
+					"name": "Compile the Container runtime",
+					"env": { "CGO_ENABLED": "0", "GOOS": "linux", "GOARCH": "amd64" },
+					"run": "set -euo pipefail\nmkdir -p dist\nfor component in api worker converter container; do\n\tgo -C apps/api build -mod=readonly -trimpath -buildvcs=false -ldflags='-s -w' -o \"$GITHUB_WORKSPACE/dist/$component\" \"./cmd/$component\"\ndone\n"
+				},
+				{
+					"name": "Deploy the Worker and Container images",
+					"env": { "CLOUDFLARE_API_TOKEN": "${{ secrets.CLOUDFLARE_API_TOKEN }}", "CLOUDFLARE_ACCOUNT_ID": "${{ vars.CLOUDFLARE_ACCOUNT_ID }}" },
+					"run": "bun run --cwd apps/edge deploy"
+				},
+				{
+					"name": "Check API health",
+					"run": "curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --max-time 90 https://api.slidesage.app/health"
+				}
+			]
 		}
 	}
 }

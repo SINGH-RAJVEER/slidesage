@@ -1,4 +1,4 @@
-# Runtime images copy release binaries and the built frontend from dist/.
+# Runtime images copy release binaries from dist/.
 # Keep credentials and the rest of the repository out.
 *
 !dist
