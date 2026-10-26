@@ -2,5 +2,20 @@
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "slidesage",
 	"compatibility_date": "2026-10-26",
-	"pages_build_output_dir": "./apps/web/dist"
+	"pages_build_output_dir": "./apps/web/dist",
+	"vars": {
+		"VITE_API_URL": "https://api.slidesage.app",
+		"VITE_ADSENSE_CLIENT_ID": "ca-pub-4278696689336146",
+		"BUN_VERSION": "1.3.13",
+		"NODE_VERSION": "24"
+	},
+	"env": {
+		"preview": {
+			"vars": {
+				"VITE_API_URL": "https://api.slidesage.app",
+				"BUN_VERSION": "1.3.13",
+				"NODE_VERSION": "24"
+			}
+		}
+	}
 }
