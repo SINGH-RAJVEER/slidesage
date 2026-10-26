@@ -24,10 +24,22 @@ type FileBlobStore struct {
 
 var _ ObjectStore = (*FileBlobStore)(nil)
 
-// StoreFromEnv opens the store at PRESENTATION_STORAGE_DIR. It returns nil
-// when the variable is unset, which leaves documents text-only.
-func StoreFromEnv() (*FileBlobStore, error) {
+// BlobStore also removes objects queued by presentation deletion.
+type BlobStore interface {
+	ObjectStore
+	DeleteObject(context.Context, string) error
+}
+
+// StoreFromEnv selects the remote object gateway or local development disk.
+func StoreFromEnv() (BlobStore, error) {
 	root := strings.TrimSpace(os.Getenv("PRESENTATION_STORAGE_DIR"))
+	endpoint := strings.TrimSpace(os.Getenv("OBJECT_STORAGE_URL"))
+	if endpoint != "" {
+		if root != "" {
+			return nil, errors.New("configure only one of OBJECT_STORAGE_URL and PRESENTATION_STORAGE_DIR")
+		}
+		return NewHTTPBlobStore(endpoint, os.Getenv("OBJECT_STORAGE_TOKEN"), nil)
+	}
 	if root == "" {
 		return nil, nil
 	}

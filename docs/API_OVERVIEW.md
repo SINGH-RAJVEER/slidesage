@@ -69,7 +69,7 @@ Owner authentication is required except for `/shared` routes:
 - Retry uses `retry_presentation_id` for an owned failed deck and reuses that row.
 - Request fields use snake case, except nested research options documented below.
 - Missing `CARD_CONVERTER_URL` returns `503` before reserving points; research previews remain available.
-- Documents use versioned cards in PostgreSQL JSONB. Stored images require `PRESENTATION_STORAGE_DIR`; text-only documents do not.
+- Documents use versioned cards in PostgreSQL JSONB. Stored images require `OBJECT_STORAGE_URL` and its token in Containers, or `PRESENTATION_STORAGE_DIR` locally; text-only documents do not.
 - Editing, outlines, photos, shares, and export contracts are in [Card documents](CARD_DOCUMENTS.md).
 - List pagination uses `limit` from 1 to 100, default 20, and non-negative `offset`, default 0, bounded by JavaScript's maximum safe integer. Responses include `presentations`, `total`, `limit`, `offset`, and `has_more`.
 - Summaries expose `generating`, `ready`, or `failed` status and `has_research`. Failed decks retain `failure.retry` settings for recovery, including the approved outline as `plan` when the job had one.
