@@ -49,3 +49,9 @@ infra/backups/
 infra/.deploy.lock
 infra/.deploy-incomplete
 infra/.deployed-release
+
+# Cloudflare local credentials, build state, and generated deployment bundles
+.wrangler/
+apps/edge/.dev.vars
+apps/edge/.env
+infra/cloudflare/secrets.json

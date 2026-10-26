@@ -65,7 +65,7 @@ Points pay only for the server-owned `OPEN_ROUTER_MODEL`. BYOK generations quote
 
 | Platform model | Blended price | Cost per point |
 | --- | --- | --- |
-| Current default `nemotron-3-super-120b-a12b:free` | $0 | Rs 0. The model is rate-limited, so ad-funded decks consume shared free capacity. |
+| Current default `openrouter/free` | $0 | Rs 0. OpenRouter picks a free model per request; free models are rate-limited, so ad-funded decks consume shared free capacity. |
 | Cheap paid, about $0.10 in / $0.40 out per 1M | about $0.25/1M | Rs 0.02 |
 | Mid-tier, about $1 in / $4 out per 1M | about $2.50/1M | Rs 0.21 |
 

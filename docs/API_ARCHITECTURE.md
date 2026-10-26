@@ -40,7 +40,7 @@
 
 ## Presentation documents
 
-- `internal/carddocument` stores immutable card revisions in PostgreSQL JSONB and image bytes as files under `PRESENTATION_STORAGE_DIR`.
+- `internal/carddocument` stores immutable card revisions in PostgreSQL JSONB and image bytes through the private R2 gateway in Containers, or as local files under `PRESENTATION_STORAGE_DIR` during development.
 - The browser renders the saved card revision; the converter derives an editable PPTX from it.
 - See [Card documents](CARD_DOCUMENTS.md) for the schema, editing, sharing, and export limits.
 
@@ -65,7 +65,7 @@
 
 ## Deployment
 
-- Build API, worker, migration, and converter images from the same commit.
-- Compose runs a shared card converter on the VPS private network.
-- Authenticated Cloud Tasks requests own production River clients so active work has an HTTP lease while the worker scales from zero.
+- Build API, worker, migration, converter, and Container supervisor binaries from the same commit. The API and worker roles use one Container image.
+- Each Cloudflare application Container runs a private loopback card converter. Devenv starts one shared converter for local API and worker processes.
+- The fixed generation Container owns a continuous River client. A Cloudflare Cron heartbeat keeps it active independently of browser requests; PostgreSQL retains the durable queue.
 - Run migrations before updating runtimes. See [CI/CD](CI_CD.md) for the release sequence.

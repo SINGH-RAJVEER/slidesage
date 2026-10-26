@@ -1,22 +1,21 @@
 # Production infrastructure
 
-- One x86-64 VPS runs the React frontend, Nginx, Go API, continuous generation worker, card converter, PostgreSQL 18 with pgvector, and Valkey through `infra/compose.json`.
-- Nginx serves the frontend baked into the `web` image and proxies `api.slidesage.app` to the private API port. Cloudflare provides DNS and edge TLS. The frontend has no Cloudflare Pages deployment.
-- Provision the VPS, DNS records, and origin certificate manually. GitHub Actions owns application releases.
-- GitHub Actions publishes five commit-tagged images to GHCR and deploys over SSH. All application components use the same release tag.
+The prepared deployment puts the React frontend on Cloudflare Pages and the Go API and continuous River worker in Cloudflare Containers. PostgreSQL and pgvector stay on the existing VPS for the first cutover. This describes the target configuration; production cutover requires the checks in [Cloudflare deployment](CLOUDFLARE_DEPLOYMENT.md).
 
-| Resource | Configuration |
+| Component | Configuration |
 | --- | --- |
-| Nginx and frontend | Ports 80 and 443, Cloudflare sources only, SPA fallback and static asset caching |
-| API | Internal port 8000, 512 MiB limit, `GOMEMLIMIT=400MiB` |
-| Generation worker | Continuous River client, 1 GiB limit, no published port |
-| Converter | Internal port 8090, no secrets or internet route |
-| PostgreSQL | Persistent `postgres-data` volume, no published port |
-| Valkey | Password auth, disposable read cache, no published port |
-| Migrate | Runs to completion before API and worker start |
-| Maintenance | Systemd timer every 15 minutes, shares the release lock |
-| Backups | Verified custom-format database dumps before releases and daily |
-| Card images | Local files in the `objects` Docker volume |
+| Frontend | Pages project `slidesage`, domain `slidesage.app`, Vite output `apps/web/dist` |
+| Public API | Edge Worker custom domain `api.slidesage.app`, fixed API Container on port 8000 |
+| Generation | Fixed private generation Container, River jobs stored in PostgreSQL, readiness port 8080 |
+| Converter | Separate loopback process in each application Container on port 8090 |
+| PostgreSQL | Existing VPS volume `slidesage_postgres-data`, published only to VPS `127.0.0.1:15432` |
+| Database connection | Dedicated SSH key restricted to forwarding that database port; pinned host key |
+| Images | Private R2 bucket `slidesage-objects`, authenticated gateway, existing API authorization |
+| Read cache | Disabled for the first cutover; PostgreSQL remains authoritative |
+| Lifecycle | One-minute Cloudflare Cron heartbeat, five-minute inactivity timeout, graceful image replacement |
+| Maintenance | Generation worker runs recovery and cleanup every 15 minutes |
+| Backups and migrations | Retained VPS backup timer and explicit `infra/migrate.sh` |
 
-- Back up PostgreSQL and the `slidesage_objects` volume off-server. Preserve encryption keys when moving production data.
-- Setup, DNS cutover, migration, and recovery are in [VPS deployment](VPS_DEPLOYMENT.md). Release configuration is in [CI/CD](CI_CD.md).
+The current direct Container API uses `standard-1` instances. Each role also runs its own converter, so old Compose memory limits cannot be carried across without measurement. Containers are billed resources and their disks are ephemeral. See [Cloudflare limits](https://developers.cloudflare.com/containers/platform/limits/) and [lifecycle](https://developers.cloudflare.com/containers/concepts/architecture/).
+
+The VPS Compose configuration now declares PostgreSQL only. It retains the original database and image volume names so changing configuration does not delete data. Preserve the old image volume until its contents and the R2 copies are verified. Keep database backups off-server, preserve all auth/BYOK encryption keys, and retain old configuration for an intentional rollback. [VPS operations](VPS_DEPLOYMENT.md) covers the database; [CI/CD](CI_CD.md) covers releases.

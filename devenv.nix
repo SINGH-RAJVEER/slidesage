@@ -4,6 +4,10 @@
 
 	packages = [
 		pkgs.bun
+		pkgs.nodejs_24
+		pkgs.openssh
+		pkgs.docker-client
+		pkgs.shellcheck
 		pkgs.go
 		pkgs.watchexec
 		pkgs.goose

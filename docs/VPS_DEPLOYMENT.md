@@ -1,168 +1,65 @@
-# VPS deployment
+# VPS database operations
 
-- `infra/compose.json` runs the frontend and backend on one VPS. Nginx serves the React app from the `web` image and proxies the API. Cloudflare provides DNS and edge TLS; GitHub Actions deploys the complete application directly to the VPS.
-- The Go binaries and images target Linux amd64. Use an x86-64 Ubuntu or Debian VPS with at least 2 vCPU and 4 GB RAM, persistent disk, Docker Engine with Compose v2 or newer, `rsync`, `curl`, and `flock`. Follow the [Docker Engine installation instructions](https://docs.docker.com/engine/install/).
+PostgreSQL and pgvector remain on the VPS during the first Cloudflare Containers cutover. The prepared `infra/compose.json` declares only PostgreSQL and preserves `slidesage_postgres-data` and the retained `slidesage_objects` volume. The API, worker, converter, frontend, Nginx, Valkey, and application maintenance timer are no longer part of the target VPS setup. See [Cloudflare deployment](CLOUDFLARE_DEPLOYMENT.md) for the ordered migration.
 
-## Architecture
+## Database and backup setup
 
-| Component | Address | Exposure |
-| --- | --- | --- |
-| React frontend and Nginx | `https://slidesage.app`, `www` redirects to apex | VPS ports 80 and 443 through Cloudflare |
-| API | `https://api.slidesage.app` | Nginx proxies to `api:8000` |
-| Worker | `worker:8080`, continuous River client | No host port; `/ready` checked on deploy |
-| Converter | `converter:8090` | Internal network only |
-| PostgreSQL 18 with pgvector | `postgres:5432` | Internal network, persistent volume |
-| Valkey | `valkey:6379` | Internal network, password auth, no persistence |
-| Migrate and maintenance | One-off containers | No host ports |
-| Card images | `/data/objects` on `slidesage_objects` | Persistent Docker volume shared by API, worker, and maintenance |
-
-- Only Nginx publishes ports. PostgreSQL, Valkey, and converter join the `internal` private network. API, worker, and jobs also join the public network for outbound provider and storage calls.
-- The worker runs continuously and claims jobs directly from PostgreSQL through River.
-- The frontend, API, worker, migrations, and converter share one immutable release tag.
-
-## Files
-
-| Path | Purpose |
-| --- | --- |
-| `infra/compose.json` | Production services and networks |
-| `infra/env.example` | Server `.env` template |
-| `infra/templates/default.conf.template` | Frontend routes, TLS, API proxy, local health endpoint |
-| `infra/nginx/cloudflare.conf` | Trusted Cloudflare ranges and source gate |
-| `infra/refresh-cloudflare-ips.sh` | Updates those ranges from Cloudflare |
-| `infra/deploy.sh` | Validate, back up, migrate, and start a release |
-| `infra/activate-release.sh` | Install uploaded files and deploy under one lock |
-| `infra/check.sh` | CI validation with disposable configuration and certificates |
-| `infra/backup.sh` | Custom-format database dump, read-back check, retention |
-| `infra/maintenance.sh` | Runs maintenance under the release lock; skips failed cutovers |
-| `infra/slidesage-*.service`, `infra/slidesage-*.timer` | Daily backup and maintenance every 15 minutes |
-
-- JSON preserves tab indentation. Scripts and systemd set `COMPOSE_FILE=compose.json`; `.env` also sets it for interactive commands.
-- `.env`, `certs/`, `secrets/`, `backups/`, `.deploy.lock`, `.deploy-incomplete`, and `.deployed-release` are server state ignored by version control.
-
-## Server setup
-
-1. Allow SSH, 80, and 443 in the provider firewall. Restrict HTTP/HTTPS to [Cloudflare edge ranges](https://www.cloudflare.com/ips/) when possible. Docker publishes ports around the host firewall; Nginx also rejects non-Cloudflare sources. Nginx listens on IPv4 and IPv6; preserve the existing Docker public network's IPv6 configuration.
-2. Create the deploy user and stack directory. Docker group membership and the SSH key must work in a fresh login. The included timers use `slidesage`; edit their `User` if choosing another user.
+Keep the existing `/opt/slidesage/.env` and database credentials. Do not overwrite them with the reduced example. Compose publishes PostgreSQL only as `127.0.0.1:15432:5432`. Each Cloudflare application uses a restricted SSH connection to that loopback port. The public firewall needs the existing SSH port; it does not need a PostgreSQL rule or application HTTPS ports after the API cutover.
 
 ```bash
-sudo useradd --create-home --shell /bin/bash slidesage
-sudo usermod --append --groups docker slidesage
-sudo install -d -o slidesage -g slidesage /opt/slidesage
-# Install the deployment public key in the user's .ssh/authorized_keys.
-# From the repository checkout:
-rsync -a infra/ slidesage@<vps>:/opt/slidesage/
-```
-
-3. Log in as `slidesage` for all stack operations. Use the same user for GHCR login, deployment, and timers so file ownership and registry credentials agree.
-
-```bash
-ssh slidesage@<vps>
 cd /opt/slidesage
-cp env.example .env
-chmod 600 .env
-mkdir -p certs secrets backups
-docker login ghcr.io
-```
-
-4. Fill in `.env`. Generate database/cache passwords, `AUTH_SECRET`, and `RATE_LIMIT_HASH_SECRET` with `openssl rand -hex 32`. Generate `BYOK_ENCRYPTION_KEY` with `openssl rand -base64 32`. All three Razorpay values are required. Keep database passwords URL-safe.
-5. When moving an existing deployment, preserve auth secrets, rate-limit secrets, all BYOK key versions, and the `slidesage_objects` volume. See [Environment variables](ENVIRONMENT_VARIABLES.md).
-6. Configure DNS, certificates, and storage below. Build or select a published release SHA, then run:
-
-```bash
 docker compose config --quiet
-./deploy.sh <commit-sha>
-sudo install -m 644 slidesage-*.service slidesage-*.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now slidesage-maintenance.timer slidesage-backup.timer
-```
-
-- Configure [GitHub deployment settings](CI_CD.md#repository-setup) and enable `VPS_DEPLOY_ENABLED` after the first successful deployment.
-- Arrange an off-server copy of `backups/` and the `slidesage_objects` volume with your backup tool. Database dumps do not contain image bytes, and local copies do not survive VPS disk loss.
-
-### DNS and TLS
-
-- Create a Cloudflare Origin CA certificate covering `slidesage.app`, `www.slidesage.app`, and `api.slidesage.app`, or the apex and wildcard. Save the certificate as `certs/origin.pem` and key as `certs/origin.key`; use mode `600` for the key.
-- Set Full (strict) TLS mode and Always Use HTTPS. Origin CA certificates require Cloudflare proxying and are not trusted directly by browsers. See [Cloudflare Origin CA](https://developers.cloudflare.com/ssl/origin-configuration/origin-ca/).
-- Point proxied `A` and, where configured, `AAAA` records for `@`, `www`, and `api` to the VPS. Remove conflicting Pages CNAMEs for the frontend, detach its Pages custom domains, and disable the Pages Git build integration after the VPS frontend is verified. Preserve email and other unrelated DNS records.
-- Match `.env` domains and `WEB_ORIGINS` to these records. Set OAuth callbacks to `https://api.slidesage.app/auth/callback/google` and `/github`.
-- Nginx rejects unknown hosts and TLS names. Its local frontend health endpoint binds only to loopback inside the container and has no host port.
-- To update Cloudflare ranges, run `./refresh-cloudflare-ips.sh`, then `docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload`.
-- Cloudflare's default proxy read timeout is 125 seconds. Long synchronous outline requests can exceed it even though Nginx permits 300 seconds. Generation runs in the worker and sends SSE keepalives every 10 seconds. See [Cloudflare connection limits](https://developers.cloudflare.com/fundamentals/reference/connection-limits/).
-
-### Card image storage
-
-- `PRESENTATION_STORAGE_DIR=/data/objects` selects disk storage. API, worker, and maintenance mount the `objects` Compose volume, whose existing server name is `slidesage_objects`.
-- The runtime image creates `/data/objects` with UID/GID 65532 ownership. Docker preserves the existing volume on image updates; do not run `docker compose down --volumes` during releases.
-- Objects use the existing content-addressed keys. Writes check their size and SHA-256 digest, then link a complete temporary file into place without replacing an existing object. GCS credentials are unnecessary.
-- Back up the volume together with PostgreSQL. For a consistent copy, pause API, worker, and maintenance under the deployment lock before copying image files and taking the database dump.
-
-## Releases and proxy behavior
-
-- Pull requests must pass all application and infrastructure checks before merging into protected `main`. Pushes to `main` build and publish all five release images, then deploy when `VPS_DEPLOY_ENABLED=true`. CI uploads files to an isolated directory, then holds the release lock while copying configuration and deploying. Server secrets, certificates, and backups are excluded from sync. Manual builds are in [CI/CD](CI_CD.md#manual-build).
-- `activate-release.sh` refuses registry or domain values that differ from the build. Keep `WEB_DOMAIN`, `API_DOMAIN`, and `IMAGE_REGISTRY` consistent with [CI/CD settings](CI_CD.md#repository-setup). The VPS still needs a persistent GHCR login if the image packages are private.
-- `./deploy.sh <commit-sha>` takes the shared lock, pulls images, and validates the rendered Nginx configuration before downtime. It starts dependencies, backs up the database, stops API and worker, and runs a fresh migration container to completion.
-- Only after migration succeeds does it recreate Nginx, API, and worker. It waits for frontend health, API health, and worker readiness. A migration failure leaves API and worker stopped. A `.deploy-incomplete` marker keeps maintenance disabled after any failed cutover until a release succeeds or recovery completes.
-- Nginx serves client routes through `index.html` with `Cache-Control: no-cache`. Fingerprinted `/assets/` files cache for a year; missing chunks return `404` rather than HTML. The frontend preload-error handler can then reload after a release.
-- The API proxy accepts 16 MiB requests and disables buffering/cache for streaming responses. It resolves Docker DNS dynamically so container replacement does not leave a stale API address. See [Nginx proxy settings](https://nginx.org/en/docs/http/ngx_http_proxy_module.html).
-- Nginx trusts `CF-Connecting-IP` only from Cloudflare ranges and replaces every client-IP header before forwarding. This supports `TRUST_PROXY_HEADERS=true` without accepting client-supplied forwarding addresses.
-- Rerun `deploy.sh` after changing a mounted template or certificate; it recreates Nginx even when the tag is unchanged. API calls return `502` while API is stopped during cutover.
-- Avoid Cloudflare Cache Everything rules or forced Browser TTL on frontend HTML and API routes.
-
-## Moving the existing database
-
-1. Pause the old API, worker, and maintenance scheduler so nothing writes after the dump. Keep their database and backups until the VPS has served traffic successfully.
-2. Dump through a connection authorized for the old database, then restore into the empty PostgreSQL database on the VPS before the first release:
-
-```bash
-pg_dump --format=custom --no-owner --no-acl -d "$CLOUD_SQL_URL" > cloudsql.dump
-scp cloudsql.dump slidesage@<vps>:/opt/slidesage/
-# As slidesage on the VPS:
-cd /opt/slidesage
 docker compose up --detach --wait postgres
-docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl --exit-on-error' < cloudsql.dump
-./deploy.sh <commit-sha>
+./backup.sh
+sudo install -m 644 slidesage-backup.service slidesage-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now slidesage-backup.timer
 ```
 
-3. Verify frontend routes, auth, generation, image access, and export before changing all DNS records. Existing encryption keys and image files must remain available. A migration from a GCS deployment also requires copying image objects into the local volume using their original keys.
-4. Verify the first `main` release before allowing routine updates. Preserve the previous deployment backups until the migration is verified.
+Preserve the previous Compose file before installing this one. Starting the reduced project leaves old application containers running as orphans; stop them explicitly only at the cutover step. Never use `docker compose down --volumes` or delete the original volumes as part of this migration.
 
-## Operations
+`backup.sh` creates PostgreSQL custom-format dumps, verifies each archive can be listed, and retains `BACKUP_KEEP` dumps, 14 by default. Copy dumps off the VPS separately. Database dumps do not contain image bytes; R2 and the old image volume need their own retention policy.
 
-| Task | Command from `/opt/slidesage` |
-| --- | --- |
-| Status | `docker compose ps --all` |
-| Logs | `docker compose logs --follow api worker nginx` |
-| Backup | `./backup.sh` |
-| Maintenance | `./maintenance.sh` |
-| Database shell | `docker compose exec postgres psql -U slidesage -d slidesage` |
-| Timers | `systemctl list-timers 'slidesage-*'` |
-| Nginx validation | `docker compose exec nginx nginx -t` |
+## Restricted database SSH account
 
-- Logs rotate at 10 MB, five files per service. `backup.sh` retains `BACKUP_KEEP` dumps, 14 by default.
-- Valkey uses password authentication and `allkeys-lru`, with no RDB/AOF persistence. Restarting it causes cache misses; PostgreSQL remains authoritative.
+Create a dedicated `slidesage-db` account with a unique key. It must accept public-key authentication and local forwarding only. It needs no Docker membership or interactive shell. Restrict the key to `permitopen="127.0.0.1:15432"` and use `restrict,port-forwarding` in `authorized_keys`. Add an sshd `Match User slidesage-db` block:
 
-## Recovery
+```text
+Match User slidesage-db
+	AuthenticationMethods publickey
+	PasswordAuthentication no
+	KbdInteractiveAuthentication no
+	AllowTcpForwarding local
+	PermitOpen 127.0.0.1:15432
+	AllowStreamLocalForwarding no
+	AllowAgentForwarding no
+	X11Forwarding no
+	PermitTTY no
+	ForceCommand /bin/false
+```
 
-- Deploy an earlier tag only if all its binaries support the current schema. Otherwise restore a pre-release dump with runtimes and timers paused. Migrations 33 and 35 refuse downgrade.
-- Choose a compatible `IMAGE_TAG` in `.env` before starting restored services. Hold the lock during recovery so jobs cannot mutate the restored database.
+Validate `sshd -t` and the effective `sshd -T -C user=slidesage-db,host=localhost,addr=127.0.0.1` configuration before reloading SSH. Keep the authenticated administrative connection open until a second connection through the new key succeeds. Obtain the server host public key through that existing authenticated session and create a known-hosts entry for `[148.113.1.66]:20135`. An unauthenticated `ssh-keyscan` alone does not verify its identity. Source: [OpenSSH configuration](https://man.openbsd.org/sshd_config).
+
+The Container supervisor pins that host key, disables password prompts, binds its local PostgreSQL listener only to `127.0.0.1:15432`, and supervises the SSH process. If forwarding dies, it drains the application and exits; the edge heartbeat starts a fresh instance. The application verifies database connectivity before serving traffic.
+
+## Migrations and recovery
+
+Compile `dist/migrate` with `just binaries` and transfer that binary and `infra/migrate.sh` to the VPS. The binary must be compatible with the VPS architecture. Pause application writers before incompatible schema migrations, then run:
 
 ```bash
-sudo systemctl stop slidesage-maintenance.timer slidesage-backup.timer
-# Hold this lock in the same shell for the entire restore.
+cd /opt/slidesage
+./migrate.sh /opt/slidesage/releases/<sha>/migrate
+```
+
+The script holds `.deploy.lock`, takes a backup, and passes the database URL through the environment without printing credentials. It assumes the retained production database credentials remain URL-safe, as required by the original deployment.
+
+To restore, pause both Cloudflare application instances and any retained VPS writers, hold `.deploy.lock`, and restore a compatible dump:
+
+```bash
 exec 9>.deploy.lock
 flock 9
-docker compose stop api worker
 docker compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-acl --exit-on-error' < backups/<dump>
-# Set IMAGE_TAG to a release compatible with the restored schema.
-docker compose up --detach --wait postgres valkey converter
-# Restore does not run migrations. Start only the matching runtime images.
-docker compose up --detach --no-deps --force-recreate --wait nginx api worker
-docker compose exec -T nginx wget -q -O /dev/null http://api:8000/health
-docker compose exec -T nginx wget -q -O /dev/null http://worker:8080/ready
-# Clear the failed-cutover guard only after restored services are ready.
-rm -f .deploy-incomplete
 flock --unlock 9
-sudo systemctl start slidesage-maintenance.timer slidesage-backup.timer
 ```
 
-- Restore failures can leave a partly restored database. Keep runtimes stopped and investigate before proceeding.
+Restore failures can leave a partly restored schema. Keep writers stopped until the database and matching application version are verified. An application rollback does not reverse schema migrations or copy new R2 images back into the old local volume.

@@ -49,7 +49,7 @@
 					"uses": "dorny/paths-filter@v4",
 					"with": {
 						"base": "${{ steps.base.outputs.ref }}",
-						"filters": "api:\n  - 'apps/api/**'\n  - 'libs/cards/**'\n  - 'libs/types/**'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\nweb:\n  - 'apps/web/**'\n  - 'libs/**'\n  - 'package.json'\n  - 'bun.lock'\n  - 'tsconfig.json'\n  - 'biome.json'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'docker-bake.hcl'\n"
+						"filters": "api:\n  - 'apps/api/**'\n  - 'libs/cards/**'\n  - 'libs/types/**'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'apps/edge/**'\nweb:\n  - 'apps/web/**'\n  - 'libs/**'\n  - 'package.json'\n  - 'bun.lock'\n  - 'tsconfig.json'\n  - 'biome.json'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'apps/edge/**'\n"
 					}
 				},
 				{
@@ -105,6 +105,10 @@
 				{
 					"if": "steps.scope.outputs.web == 'true'",
 					"run": "bun run test:web\n"
+				},
+				{
+					"name": "Test the edge controller and object gateway",
+					"run": "bun run --cwd apps/edge test"
 				},
 				{
 					"name": "Start API integration dependencies",
@@ -170,6 +174,18 @@
 					}
 				},
 				{
+					"uses": "actions/setup-node@v4",
+					"with": {
+						"node-version": "24"
+					}
+				},
+				{
+					"uses": "oven-sh/setup-bun@v2",
+					"with": {
+						"bun-version": "1.3.13"
+					}
+				},
+				{
 					"uses": "docker/setup-buildx-action@v3"
 				},
 				{
@@ -177,8 +193,17 @@
 					"run": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color .github/workflows/*.yml\n"
 				},
 				{
-					"name": "Validate Compose, Bake, shell scripts, and Nginx",
+					"name": "Validate database Compose and shell scripts",
 					"run": "./infra/check.sh\n"
+				},
+				{
+					"name": "Compile and validate the Cloudflare Container images",
+					"env": {
+						"CGO_ENABLED": "0",
+						"GOOS": "linux",
+						"GOARCH": "amd64"
+					},
+					"run": "set -euo pipefail\nbun install --frozen-lockfile\nmkdir -p dist\nfor component in api worker converter container; do\n\tgo -C apps/api build -mod=readonly -trimpath -buildvcs=false -o \"$GITHUB_WORKSPACE/dist/$component\" \"./cmd/$component\"\ndone\nbun run --cwd apps/edge check\n"
 				}
 			]
 		}

@@ -14,12 +14,13 @@ SlideSage is a presentation builder with AI-assisted research and generation. Th
 
 ```text
 apps/
-    api/        Go API, Goose migrations, repositories, and provider integrations
-    web/        React web application
+	api/        Go API, Goose migrations, repositories, and provider integrations
+	edge/       Cloudflare Container lifecycle and private R2 gateway
+	web/        React web application
 libs/
-    cards/      Card document schema and validation
-    types/      Shared TypeScript contracts
-    ui/         Shared React UI primitives
+	cards/      Card document schema and validation
+	types/      Shared TypeScript contracts
+	ui/         Shared React UI primitives
 docs/           Maintainer documentation
 devenv.nix      Local toolchain and service orchestration
 Justfile        Common development commands
@@ -29,8 +30,9 @@ Justfile        Common development commands
 
 - [Development setup](docs/DEVELOPMENT_SETUP.md)
 - [Environment variables](docs/ENVIRONMENT_VARIABLES.md)
-- [CI/CD: GitHub Actions and VPS releases](docs/CI_CD.md)
+- [CI/CD: Pages and Containers releases](docs/CI_CD.md)
 - [Production infrastructure](docs/PRODUCTION_INFRASTRUCTURE.md)
+- [Cloudflare deployment and cutover](docs/CLOUDFLARE_DEPLOYMENT.md)
 - [Architecture](docs/API_ARCHITECTURE.md)
 - [Card document architecture](docs/CARD_ARCHITECTURE.md)
 - [Card documents](docs/CARD_DOCUMENTS.md)

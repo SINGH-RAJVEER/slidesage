@@ -107,7 +107,8 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Browser and share views load the remote URL; asset routes redirect. PPTX downloads the photo into the file without retaining a copy.
 - Upload limits are 15 MB, 50 megapixels, and 12000px per side; costly formats may be rejected below those limits.
 - Decoding has a 192 MB per-process budget, with at most four uploads read concurrently. Images exceeding the decode budget are rejected.
-- Stored images normalize to at most 2400px width, then JPEG or transparent PNG. Object keys are `presentations/{id}/assets/{sha256}`, stored as files under `PRESENTATION_STORAGE_DIR`; metadata includes MIME, dimensions, size, and source.
+- Stored images normalize to at most 2400px width, then JPEG or transparent PNG. Object keys are `presentations/{id}/assets/{sha256}.jpg` or `.png`, stored in private R2 through `OBJECT_STORAGE_URL`, or under `PRESENTATION_STORAGE_DIR` for local development. Metadata includes MIME, dimensions, size, and source.
+- The remote gateway streams normalized objects up to 96 MiB into R2 with checksum validation. Normalization can expand a source image; source uploads retain their 15 MB limit.
 - Remote downloads allow only approved hosts and redirects. Historical Pexels assets and credits remain readable.
 - `STOCK_LIBRARIES` shares attribution metadata between browser and converter.
 
@@ -119,7 +120,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 | `GET` | `/presentations/{id}/assets/{sha256}` | Serve owned stored image or redirect to hotlink |
 
 - Without `UNSPLASH_ACCESS_KEY`, stock routes return `503` and generation uses text layouts. Uploads remain available.
-- Production stock photos are enabled by setting `UNSPLASH_ACCESS_KEY` in the server `.env`. See [VPS deployment](VPS_DEPLOYMENT.md).
+- Production stock photos are enabled by setting `UNSPLASH_ACCESS_KEY` in the Worker `APP_ENV` secret. See [Cloudflare deployment](CLOUDFLARE_DEPLOYMENT.md).
 - AI image generation remains disabled until priced.
 
 ## Storage

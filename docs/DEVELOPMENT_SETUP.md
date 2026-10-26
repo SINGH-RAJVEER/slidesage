@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Install Nix and [devenv](https://devenv.sh/getting-started/). The shell provides Go, Watchexec, Bun, PostgreSQL, Goose, and `just`.
+- Install Nix and [devenv](https://devenv.sh/getting-started/). The shell provides Go, Watchexec, Bun, Node.js 24 for Wrangler, OpenSSH, the Docker client, ShellCheck, PostgreSQL, Goose, and `just`. Container builds also need a running Docker-compatible engine.
 - `apps/api` targets Go 1.27.1. The pinned shell ships Go 1.26; `GOTOOLCHAIN=auto` downloads and caches the required toolchain on first use. That build needs network access.
 
 ```bash
@@ -27,7 +27,7 @@ just dev
 5. Vite on `5173`, after API and worker readiness.
 
 - Stop with `Ctrl+C`; devenv shuts down managed services.
-- Document bodies live in PostgreSQL JSONB; the emulator stores image bytes.
+- Document bodies live in PostgreSQL JSONB; local development stores image bytes in `.devenv/state/objects`.
 - Vite exposes only `VITE_*` variables. Without `VITE_API_URL`, local requests use port `8000` on the same loopback hostname.
 - `apps/web/styles.css` imports shared styles from `libs/ui/styles/base.css`. The web workspace needs both `tailwindcss` and `@tailwindcss/vite`.
 
@@ -82,7 +82,7 @@ just migrate
 - It does not start services.
 - Migration 35 deletes decks without card documents and refuses downgrade. See [Card storage](CARD_DOCUMENTS.md#storage).
 - Migration 36 invalidates legacy password hashes. See [Password and email changes](AUTH_API.md#password-and-email-changes).
-- Apply migrations before API and worker startup. Production uses the separate `migrate` image target.
+- Apply migrations before API and worker startup. Production uses the compiled `dist/migrate` binary through `infra/migrate.sh`; see [Cloudflare deployment](CLOUDFLARE_DEPLOYMENT.md).
 
 ## Test user
 

@@ -20,7 +20,9 @@ import (
 )
 
 // defaultModel is used when no model is configured and no per-user AI selection exists.
-const defaultModel = "nvidia/nemotron-3-super-120b-a12b:free"
+// OpenRouter routes it to any available free model, so one retired free model
+// does not take generation down.
+const defaultModel = "openrouter/free"
 
 // streamIdleTimeout bounds the gap between two chunks of an accepted stream. A
 // stalled upstream would otherwise cost the whole three-minute request timeout
