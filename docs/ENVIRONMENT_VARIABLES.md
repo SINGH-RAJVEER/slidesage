@@ -78,7 +78,7 @@
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
 | `OPEN_ROUTER_API_KEY` | Yes for default generation | None | Server OpenRouter authentication; BYOK replaces only generation calls |
-| `OPEN_ROUTER_MODEL` | No | `nvidia/nemotron-3-super-120b-a12b:free` | Server-owned OpenRouter generation model |
+| `OPEN_ROUTER_MODEL` | No | `openrouter/free` | Server-owned OpenRouter generation model |
 | `OPEN_ROUTER_API_BASE` | No | OpenRouter chat completions endpoint | Chat endpoint override |
 | `PROVIDER_VALIDATION_TIMEOUT_MS` | No | `15000` | Total timeout for listing models from a user-connected BYOK provider |
 | `EXA_API_KEY` | For web research | None | Exa search authentication |
