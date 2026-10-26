@@ -53,15 +53,15 @@
 - Reservations cover planning, card output bounds, repeated prompt context, and repair headroom.
 - Persist events before delivery. `saved` and `error` terminate streams.
 - Cancellation locks the application job, cancels River work, releases its reservation, and records terminal state in one transaction. Late provider results cannot settle a cancelled job.
-- River uses a six-second soft-stop window; the process shutdown deadline is controlled by `WORKER_DRAIN_TIMEOUT`. The continuous VPS worker stops gracefully before its container exits.
+- River uses a six-second soft-stop window; the process shutdown deadline is controlled by `WORKER_DRAIN_TIMEOUT`. The Container supervisor keeps its database tunnel and converter alive during graceful worker shutdown.
 
 ## Recovery and cleanup
 
-- `slidesage-maintenance` runs `cmd/worker --maintenance` every 15 minutes through Cloud Scheduler.
+- `WORKER_MAINTENANCE_INTERVAL=15m` runs recovery and cleanup inside the continuous generation process. `cmd/worker --maintenance` remains available for explicit one-off operations.
 - It recovers terminated generation jobs and expired reservations, removes expired rate-limit rows and unverified accounts, deletes queued images for removed users/presentations.
-- Image cleanup uses `PRESENTATION_STORAGE_DIR` and the shared objects volume. Each sweep processes up to 100 queued images within two minutes; failures are deferred for 15 minutes so they do not block other queued images. Missing objects count as already removed.
+- Image cleanup uses the selected object store, the private R2 gateway in Containers or local files during development. Each sweep processes up to 100 queued images within two minutes; failures are deferred for 15 minutes so they do not block other queued images. Missing objects count as already removed.
 - Each sweep handles at most 100 terminated jobs and 100 affected users, with two concurrent recovery transactions and bounded cleanup batches.
-- `maintenance_mode` pauses the scheduler during migrations.
+- Pause application writers during incompatible database migrations. Maintenance stops when the generation process drains.
 
 ## Job API
 
@@ -98,11 +98,11 @@ All endpoints require the job owner:
 
 ## Deployment
 
-- API, worker, and converter run as separate Compose services on the VPS private network.
-- Worker uses instance-based billing with `cpu_idle=false`, no minimum instance, and request-owned River clients.
-- Cloud Tasks request count drives scaling; PostgreSQL queue depth does not.
-- Run the migration image before updating runtimes. API and worker startup never applies migrations.
-- Follow [Migration cutover](CI_CD.md#migration-cutover) for verified backups, service pauses, irreversible migrations, and recovery.
+- API and generation run in separate fixed Cloudflare Containers. Each has its own private converter and supervised SSH tunnel to the retained VPS database.
+- A one-minute Cloudflare Cron heartbeat renews a five-minute inactivity timeout. PostgreSQL queue traffic alone does not renew Container activity.
+- Startup probes readiness; deployments drain and replace old images and Worker versions. There is no queue-depth autoscaling in this first migration.
+- Run reviewed schema migrations explicitly before updating runtimes. API and worker startup never applies migrations.
+- Follow [Cloudflare cutover](CLOUDFLARE_DEPLOYMENT.md) for backups, writer pauses, image copying, and runtime verification.
 
 ## Local development
 

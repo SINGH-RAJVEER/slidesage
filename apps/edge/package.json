@@ -1,0 +1,18 @@
+{
+	"name": "@slidesage/edge",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"type-check": "tsc --noEmit",
+		"test": "bun test",
+		"lint": "biome check src test package.json tsconfig.json wrangler.jsonc wrangler.bootstrap.jsonc",
+		"format": "biome format --write src test package.json tsconfig.json wrangler.jsonc wrangler.bootstrap.jsonc",
+		"check": "bun run type-check && wrangler deploy --dry-run",
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "5.20261026.1",
+		"@biomejs/biome": "^2.4.7"
+	}
+}

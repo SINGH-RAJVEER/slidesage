@@ -49,12 +49,12 @@ OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>
 - Filter Datadog on `env:development` for local runs.
 - Local telemetry is billed. Leave the endpoint empty when unused or reduce `OTEL_TRACES_SAMPLING_RATIO`.
 
-## Datadog on the VPS
+## Datadog in Containers
 
-- API and worker export directly to the OTLP endpoint configured in `/opt/slidesage/.env`. Metrics use delta temporality.
-- Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, and `OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>,compute_stats=true` on the server. Keep credentials out of GitHub and the repository.
-- Service names default to `slidesage-api` and `slidesage-worker`. Compose sets `OTEL_SERVICE_VERSION` to the release SHA and the environment to `production`.
-- Recreate API and worker after changing telemetry credentials so they load the new environment. Keep `OTEL_LOGS_EXPORTER=otlp` for direct log intake, or `none` when logs are collected separately.
+- API and worker export directly to the OTLP endpoint configured in the Worker `APP_ENV` secret. Metrics use delta temporality.
+- Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, and `OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>,compute_stats=true` in that secret. Keep credentials out of the repository.
+- Service names default to `slidesage-api` and `slidesage-worker`. The edge controller sets `OTEL_SERVICE_VERSION` to the Worker version ID and `NODE_ENV` to `production`.
+- Upload the updated secret and deploy a new Worker version so the controller drains and restarts the application instances with the new environment. Keep `OTEL_LOGS_EXPORTER=otlp` for direct log intake, or `none` when logs are collected separately.
 - An empty endpoint disables export.
 
 ### Check ingestion

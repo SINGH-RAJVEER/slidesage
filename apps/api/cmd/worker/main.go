@@ -66,12 +66,20 @@ func main() {
 		fatal(logger, err)
 	}
 
-	// A systemd timer runs maintenance separately from the continuous worker.
+	// VPS installs may run maintenance separately. Containers opt into the
+	// in-process schedule so cleanup does not depend on a VPS application timer.
 	if *maintenance {
 		runRecovery(signalContext, database)
 		runCleanup(signalContext, database, authService)
 		slog.Info("maintenance sweep finished")
 		return
+	}
+	var maintenanceInterval time.Duration
+	if value := os.Getenv("WORKER_MAINTENANCE_INTERVAL"); value != "" {
+		maintenanceInterval, err = time.ParseDuration(value)
+		if err != nil || maintenanceInterval < time.Minute {
+			fatal(logger, errors.New("WORKER_MAINTENANCE_INTERVAL must be a duration of at least one minute"))
+		}
 	}
 
 	continuousWorker, err := generation.NewWorkerClient(database, ai.ConnectionService{DB: database}, maxWorkers)
@@ -87,6 +95,26 @@ func main() {
 		fatal(logger, err)
 	}
 	ready.Store(true)
+	maintenanceDone := make(chan struct{})
+	maintenanceContext, cancelMaintenance := context.WithCancel(signalContext)
+	defer cancelMaintenance()
+	go func() {
+		defer close(maintenanceDone)
+		if maintenanceInterval == 0 {
+			return
+		}
+		ticker := time.NewTicker(maintenanceInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-maintenanceContext.Done():
+				return
+			case <-ticker.C:
+				runRecovery(maintenanceContext, database)
+				runCleanup(maintenanceContext, database, authService)
+			}
+		}
+	}()
 	slog.Info("generation worker started", slog.Int("concurrency", maxWorkers))
 	select {
 	case <-signalContext.Done():
@@ -97,6 +125,8 @@ func main() {
 	}
 
 	ready.Store(false)
+	cancelMaintenance()
+	<-maintenanceDone
 	healthDone := make(chan error, 1)
 	go func() {
 		healthContext, cancelHealth := context.WithTimeout(context.Background(), time.Second)

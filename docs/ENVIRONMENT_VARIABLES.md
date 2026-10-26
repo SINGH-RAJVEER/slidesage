@@ -1,7 +1,7 @@
 # Environment variables
 
 - Copy `.env.example` to `.env`; devenv loads it for API, worker, and Bun processes.
-- Keep `.env` out of version control. Store VPS production secrets in `/opt/slidesage/.env`, copied from `infra/env.example`, with mode `600`. Compose supplies the internal database, cache, converter, and public API addresses.
+- Keep `.env` out of version control. Keep database credentials in the retained VPS `.env`. Store application settings in the Cloudflare Worker `APP_ENV` secret. The Container controller supplies its public origins, converter address, object gateway, and SSH configuration. See [Cloudflare deployment](CLOUDFLARE_DEPLOYMENT.md).
 
 ## Core
 
@@ -45,7 +45,7 @@
 | `VITE_ADSENSE_SLOT_MARKETPLACE` | No | Unset | Ad unit ID for `/marketplace` |
 | `VITE_ADSENSE_SLOT_ANCHOR` | No | Unset | Ad unit ID for the mobile anchored banner |
 
-- Production sets these as GitHub repository variables for the VPS frontend build. See [Ads](ADS.md).
+- Production sets these as Cloudflare Pages build environment variables. See [Ads](ADS.md).
 
 ## Database read cache
 
@@ -57,7 +57,7 @@
 | `CACHE_VALKEY_CA_PEM` | With TLS | Empty | Trusted TLS CA certificates |
 | `CACHE_TIMEOUT_MS` | No | `100` | Operation timeout, 1 to 1,000 milliseconds |
 
-- The VPS stack always runs Valkey and sets the address and password auth itself.
+- The first Containers cutover disables the optional Valkey cache; reads go directly to PostgreSQL.
 - See [Database cache](DATABASE_CACHE.md) for read paths, invalidation, fallback, and production setup.
 
 ## Generation worker
@@ -68,6 +68,7 @@
 | `WORKER_DATABASE_POOL_MAX` | No | `WORKER_CONCURRENCY + 3` | Maximum open and idle connections in the worker database pool |
 | `WORKER_DRAIN_TIMEOUT` | No | `8` | Graceful shutdown timeout in seconds after `SIGINT` or `SIGTERM` |
 | `WORKER_HEALTH_PORT` | No | `8080` | Worker `/live`, `/ready`, health server port |
+| `WORKER_MAINTENANCE_INTERVAL` | No | Disabled locally | Duration of at least one minute; Containers sets `15m` for recovery and image/account cleanup |
 
 - Worker needs the same database, provider, and BYOK encryption settings as API.
 - Health probes and shutdown are in [Worker operation](GENERATION_WORKER.md#process-configuration).
@@ -101,7 +102,7 @@
 
 - Development without a Resend key skips delivery and never logs OTPs. Production delivery failures return `503`.
 - OAuth callbacks use `${BASE_URL}/auth/callback/google` and `${BASE_URL}/auth/callback/github`.
-- The VPS sets `BASE_URL=https://${API_DOMAIN}` explicitly.
+- The Container controller sets `BASE_URL=https://api.slidesage.app` explicitly.
 - See [Authentication](AUTH_API.md) for cookie and email behavior.
 
 ## Billing
@@ -136,14 +137,16 @@
 
 | Variable | Required | Secret | Purpose |
 | --- | --- | --- | --- |
-| `PRESENTATION_STORAGE_DIR` | Stored images | No | Directory holding card image files, created on first use; text-only documents need none. Devenv uses `.devenv/state/objects`; compose sets `/data/objects` on the `objects` volume |
+| `PRESENTATION_STORAGE_DIR` | Stored images | No | Local image directory, created on first use. Devenv uses `.devenv/state/objects`; leave empty in Containers. |
+| `OBJECT_STORAGE_URL` | Container images | No | Authenticated edge gateway URL, `https://api.slidesage.app/__storage`; mutually exclusive with `PRESENTATION_STORAGE_DIR` |
+| `OBJECT_STORAGE_TOKEN` | Remote images | Yes | Shared token of at least 32 characters; stored as a Worker secret and passed to Containers |
 | `CARD_CONVERTER_URL` | Card generation | No | Base URL of the card converter the worker calls; devenv sets `http://127.0.0.1:8090`. Without it the API refuses generation |
 | `CARD_CONVERTER_HOST` | No | No | Converter listen address; defaults to `127.0.0.1` so the service stays private |
 | `CARD_CONVERTER_PORT` | No | No | Converter listen port; falls back to `PORT`, then `8090` |
 | `UNSPLASH_ACCESS_KEY` | Stock photos | Yes | Unsplash key; without it stock routes return `503` and generation uses text layouts. Uploads remain available |
 | `UNSPLASH_API_BASE` | No | No | Unsplash API base URL; defaults to `https://api.unsplash.com`. Only for tests and local stubs |
 
-- Production enables photos when `UNSPLASH_ACCESS_KEY` is set in the server `.env`, and disables them when it is empty.
+- Production enables photos when `UNSPLASH_ACCESS_KEY` is set in the Worker `APP_ENV` secret, and disables them when it is empty.
 
 ## Observability
 
