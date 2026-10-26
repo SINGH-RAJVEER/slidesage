@@ -44,7 +44,9 @@ func (store *HTTPBlobStore) PutImmutable(ctx context.Context, key string, body i
 	if err := validateObjectWrite(key, body, size, contentType, digest); err != nil {
 		return err
 	}
-	if size > MaxSourceImageBytes {
+	// PNG normalization can expand a compressed source. Do not apply the
+	// original upload limit again to the resulting immutable object.
+	if size > 96<<20 {
 		return ErrObjectSize
 	}
 	var data bytes.Buffer

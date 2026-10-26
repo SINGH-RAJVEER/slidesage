@@ -108,6 +108,7 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 - Upload limits are 15 MB, 50 megapixels, and 12000px per side; costly formats may be rejected below those limits.
 - Decoding has a 192 MB per-process budget, with at most four uploads read concurrently. Images exceeding the decode budget are rejected.
 - Stored images normalize to at most 2400px width, then JPEG or transparent PNG. Object keys are `presentations/{id}/assets/{sha256}.jpg` or `.png`, stored in private R2 through `OBJECT_STORAGE_URL`, or under `PRESENTATION_STORAGE_DIR` for local development. Metadata includes MIME, dimensions, size, and source.
+- The remote gateway streams normalized objects up to 96 MiB into R2 with checksum validation. Normalization can expand a source image; source uploads retain their 15 MB limit.
 - Remote downloads allow only approved hosts and redirects. Historical Pexels assets and credits remain readable.
 - `STOCK_LIBRARIES` shares attribution metadata between browser and converter.
 

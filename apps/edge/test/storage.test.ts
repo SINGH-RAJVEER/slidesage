@@ -27,9 +27,18 @@ function fixture() {
 		async delete() {
 			object = undefined;
 		},
-		async put(_key: string, body: Uint8Array, options: R2PutOptions) {
+		async put(_key: string, input: Uint8Array | ReadableStream, options: R2PutOptions) {
 			expect(options.onlyIf).toEqual({ etagDoesNotMatch: "*" });
 			if (object) return null;
+			const body =
+				input instanceof Uint8Array
+					? input
+					: new Uint8Array(await new Response(input).arrayBuffer());
+			const actual = Array.from(
+				new Uint8Array(await crypto.subtle.digest("SHA-256", body)),
+				(byte) => byte.toString(16).padStart(2, "0"),
+			).join("");
+			if (options.sha256 && options.sha256 !== actual) throw new Error("R2 checksum mismatch");
 			object = {
 				body,
 				size: body.length,
@@ -49,6 +58,7 @@ function request(method: string, body?: Uint8Array, authorized = true) {
 			Authorization: authorized ? `Bearer ${token}` : "Bearer wrong",
 			"Content-Type": "image/png",
 			"X-Object-SHA256": digest,
+			"Content-Length": String(body?.byteLength ?? 0),
 		},
 		body,
 	});
@@ -70,7 +80,7 @@ describe("private immutable image gateway", () => {
 		expect((await storage(request("PUT", data), bucket, token)).status).toBe(204);
 		expect(
 			(await storage(request("PUT", new TextEncoder().encode("changed")), bucket, token)).status,
-		).toBe(400);
+		).toBe(409);
 		const read = await storage(request("GET"), bucket, token);
 		expect(await read.text()).toBe("original image");
 		expect(read.headers.get("Cache-Control")).toBe("no-store");
@@ -87,12 +97,22 @@ describe("private immutable image gateway", () => {
 	});
 	test("bounds streaming uploads and restricts keys", async () => {
 		const bucket = fixture();
-		expect(
-			(await storage(request("PUT", new Uint8Array((15 << 20) + 1)), bucket, token)).status,
-		).toBe(413);
+		const oversized = request("PUT", data);
+		oversized.headers.set("Content-Length", String((96 << 20) + 1));
+		expect((await storage(oversized, bucket, token)).status).toBe(413);
+		const missingLength = request("PUT", data);
+		missingLength.headers.delete("Content-Length");
+		expect((await storage(missingLength, bucket, token)).status).toBe(411);
 		const unsafe = new Request("https://api.slidesage.app/__storage/other/secret", {
 			headers: { Authorization: `Bearer ${token}` },
 		});
 		expect((await storage(unsafe, bucket, token)).status).toBe(400);
+	});
+	test("asks R2 to verify the streamed checksum before creating an object", async () => {
+		const bucket = fixture();
+		await expect(
+			storage(request("PUT", new TextEncoder().encode("wrong")), bucket, token),
+		).rejects.toThrow("checksum mismatch");
+		expect((await storage(request("GET"), bucket, token)).status).toBe(404);
 	});
 });

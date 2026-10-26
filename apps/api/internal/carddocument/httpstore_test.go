@@ -98,3 +98,25 @@ func TestHTTPBlobStoreDoesNotFollowRedirects(t *testing.T) {
 		t.Fatal("redirect accepted")
 	}
 }
+
+func TestHTTPBlobStoreAcceptsExpandedNormalizedImage(t *testing.T) {
+	data := bytes.Repeat([]byte{42}, 16<<20)
+	sum := sha256.Sum256(data)
+	digest := hex.EncodeToString(sum[:])
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		written, err := io.Copy(io.Discard, request.Body)
+		if err != nil || written != int64(len(data)) {
+			t.Errorf("normalized image upload = %d bytes, %v", written, err)
+		}
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	store, err := NewHTTPBlobStore(server.URL, strings.Repeat("s", 32), server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "presentations/deck/assets/" + digest + ".png"
+	if err := store.PutImmutable(context.Background(), key, bytes.NewReader(data), int64(len(data)), "image/png", digest); err != nil {
+		t.Fatalf("normalized object larger than its source limit was rejected: %v", err)
+	}
+}

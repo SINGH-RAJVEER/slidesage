@@ -1,4 +1,6 @@
-const MAX_BYTES = 15 << 20;
+// Normalized PNGs can exceed the 15 MiB source upload limit. Stream these
+// objects so their bytes do not consume the Worker's 128 MiB memory budget.
+const MAX_BYTES = 96 << 20;
 const KEY = /^presentations\/[A-Za-z0-9_-]+\/assets\/([0-9a-f]{64})\.(jpg|png)$/;
 
 // The gateway is reachable by containers and the one-time migration tool.
@@ -34,21 +36,23 @@ export async function storage(
 	if (expected !== match[1] || request.headers.get("Content-Type") !== contentType) {
 		return new Response(null, { status: 400 });
 	}
-	const data = await boundedBody(request);
-	if (!data?.length) return new Response(null, { status: 413 });
-	const sum = await crypto.subtle.digest("SHA-256", data);
-	const digest = Array.from(new Uint8Array(sum), (byte) => byte.toString(16).padStart(2, "0")).join(
-		"",
-	);
-	if (digest !== expected) return new Response(null, { status: 400 });
-	const result = await bucket.put(key, data, {
+	const length = request.headers.get("Content-Length");
+	if (!length) return new Response(null, { status: 411 });
+	const size = Number(length);
+	if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_BYTES || !request.body) {
+		return new Response(null, { status: 413 });
+	}
+	// R2 validates the supplied SHA-256 while consuming the known-length
+	// request stream. A mismatched digest cannot create an object.
+	const result = await bucket.put(key, request.body, {
 		onlyIf: { etagDoesNotMatch: "*" },
+		sha256: expected,
 		httpMetadata: { contentType },
-		customMetadata: { sha256: digest },
+		customMetadata: { sha256: expected },
 	});
 	if (!result) {
 		const previous = await bucket.head(key);
-		if (previous?.size !== data.byteLength || previous.customMetadata?.["sha256"] !== digest) {
+		if (previous?.size !== size || previous.customMetadata?.["sha256"] !== expected) {
 			return new Response(null, { status: 409 });
 		}
 	}
@@ -67,29 +71,4 @@ async function authorized(request: Request, token: string): Promise<boolean> {
 	let difference = 0;
 	for (let index = 0; index < a.length; index++) difference |= (a[index] ?? 0) ^ (b[index] ?? 0);
 	return difference === 0;
-}
-
-async function boundedBody(request: Request): Promise<Uint8Array<ArrayBuffer> | null> {
-	if (Number(request.headers.get("Content-Length")) > MAX_BYTES) return null;
-	const reader = request.body?.getReader();
-	if (!reader) return null;
-	const chunks: Uint8Array[] = [];
-	let size = 0;
-	for (;;) {
-		const { done, value } = await reader.read();
-		if (done) break;
-		size += value.length;
-		if (size > MAX_BYTES) {
-			await reader.cancel();
-			return null;
-		}
-		chunks.push(value);
-	}
-	const result = new Uint8Array(size);
-	let offset = 0;
-	for (const chunk of chunks) {
-		result.set(chunk, offset);
-		offset += chunk.length;
-	}
-	return result;
 }
