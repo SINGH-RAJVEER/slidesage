@@ -10,10 +10,6 @@
 	"version_metadata": { "binding": "VERSION" },
 	"triggers": { "crons": ["* * * * *"] },
 	"vars": {
-		"DATABASE_SSH_HOST": "148.113.1.66",
-		"DATABASE_SSH_PORT": "20135",
-		"DATABASE_SSH_USER": "slidesage-db",
-		"DATABASE_SSH_TARGET": "127.0.0.1:15432",
 		"OBJECT_STORAGE_URL": "https://api.slidesage.app/__storage"
 	},
 	"containers": [

@@ -10,12 +10,6 @@ interface Env {
 	APP_ENV: string;
 	OBJECT_STORAGE_TOKEN: string;
 	OBJECT_STORAGE_URL: string;
-	DATABASE_SSH_HOST: string;
-	DATABASE_SSH_PORT: string;
-	DATABASE_SSH_USER: string;
-	DATABASE_SSH_TARGET: string;
-	DATABASE_SSH_PRIVATE_KEY: string;
-	DATABASE_SSH_KNOWN_HOSTS: string;
 }
 
 const INACTIVITY_MS = 5 * 60 * 1000;
@@ -100,12 +94,6 @@ class AppContainer extends DurableObject<Env> {
 					OTEL_SERVICE_VERSION: this.env.VERSION.id,
 					OBJECT_STORAGE_URL: this.env.OBJECT_STORAGE_URL,
 					OBJECT_STORAGE_TOKEN: this.env.OBJECT_STORAGE_TOKEN,
-					DATABASE_SSH_HOST: this.env.DATABASE_SSH_HOST,
-					DATABASE_SSH_PORT: this.env.DATABASE_SSH_PORT,
-					DATABASE_SSH_USER: this.env.DATABASE_SSH_USER,
-					DATABASE_SSH_TARGET: this.env.DATABASE_SSH_TARGET,
-					DATABASE_SSH_PRIVATE_KEY: this.env.DATABASE_SSH_PRIVATE_KEY,
-					DATABASE_SSH_KNOWN_HOSTS: this.env.DATABASE_SSH_KNOWN_HOSTS,
 				},
 			});
 			await this.ctx.storage.put("release", this.env.VERSION.id);
@@ -121,7 +109,7 @@ class AppContainer extends DurableObject<Env> {
 				await response.body?.cancel();
 				if (response.ok) return;
 			} catch {
-				/* Startup includes establishing the database tunnel. */
+				/* Startup includes connecting to the database. */
 			}
 			await scheduler.wait(250);
 		}
