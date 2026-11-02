@@ -53,7 +53,7 @@
 - Reservations cover planning, card output bounds, repeated prompt context, and repair headroom.
 - Persist events before delivery. `saved` and `error` terminate streams.
 - Cancellation locks the application job, cancels River work, releases its reservation, and records terminal state in one transaction. Late provider results cannot settle a cancelled job.
-- River uses a six-second soft-stop window; the process shutdown deadline is controlled by `WORKER_DRAIN_TIMEOUT`. The Container supervisor keeps its database tunnel and converter alive during graceful worker shutdown.
+- River uses a six-second soft-stop window; the process shutdown deadline is controlled by `WORKER_DRAIN_TIMEOUT`. The Container supervisor keeps its converter alive during graceful worker shutdown.
 
 ## Recovery and cleanup
 
@@ -98,7 +98,7 @@ All endpoints require the job owner:
 
 ## Deployment
 
-- API and generation run in separate fixed Cloudflare Containers. Each has its own private converter and supervised SSH tunnel to the retained VPS database.
+- API and generation run in separate fixed Cloudflare Containers. Each has its own private converter and connects to Neon PostgreSQL over TLS.
 - A one-minute Cloudflare Cron heartbeat renews a five-minute inactivity timeout. PostgreSQL queue traffic alone does not renew Container activity.
 - Startup probes readiness; deployments drain and replace old images and Worker versions. There is no queue-depth autoscaling in this first migration.
 - Run reviewed schema migrations explicitly before updating runtimes. API and worker startup never applies migrations.

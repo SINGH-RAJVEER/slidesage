@@ -28,6 +28,6 @@ Local manual deployment is `just deploy-backend`, after the same prerequisites. 
 
 ## Schema changes and rollback
 
-Database migrations remain an explicit operation against the retained VPS PostgreSQL. `infra/migrate.sh /absolute/path/to/migrate` takes the database lock, creates a verified backup, and runs the compiled migration binary. Stop application writers before an incompatible migration. Automatic Container startup never races to migrate the schema.
+Database migrations remain an explicit operation against Neon. `infra/migrate.sh /absolute/path/to/migrate /path/to/database-url` reads the direct-host URL from a private file and runs the compiled migration binary; create a Neon restore branch first. Stop application writers before an incompatible migration. Automatic Container startup never races to migrate the schema.
 
 A release is qualified only after public API health, cookie auth from Pages, outline and worker generation, progress streaming, image persistence after container replacement, and PPTX export pass. A green workflow alone does not prove those paths. Container updates drain the old role before starting its replacement; River jobs can resume through PostgreSQL after interruption. A rollback must use code compatible with the database schema and preserve R2 images created since cutover.

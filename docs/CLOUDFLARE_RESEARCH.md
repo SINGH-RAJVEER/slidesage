@@ -14,9 +14,7 @@ The `durable_object` scheduling policy does not automatically roll out a new ima
 
 ## Database connectivity
 
-The user chose to retain PostgreSQL on the VPS for the first cutover. A dedicated restricted SSH local-forward preserves pgx/River's PostgreSQL protocol, does not expose the database publicly, and avoids introducing a new database provider. This is an application design inference. Pin the existing host identity and restrict the account to one loopback target; `ForceCommand` alone does not restrict forwarding. Sources: [OpenSSH forwarding](https://man.openbsd.org/ssh#L), [sshd restrictions](https://man.openbsd.org/sshd_config).
-
-The Container supervisor maintains that connection and leaves it alive during application drain. `ExitOnForwardFailure` checks listener establishment, not database availability, so application database pings remain required. Sources: [SSH configuration](https://man.openbsd.org/ssh_config), [application startup](../apps/api/cmd/api/main.go), [worker readiness](../apps/api/cmd/worker/main.go).
+The first design kept PostgreSQL on the VPS behind a restricted SSH local-forward that each Container supervised. On 2026-11-02 the user chose Neon instead, which removes the SSH account, pinned host key, and tunnel process. Neon speaks the PostgreSQL protocol, so pgx and River need no driver change. The Container refuses database URLs without `sslmode=require` or stricter, and URLs that override their host in the query string. The runtime uses the Neon pooler host; it runs in transaction mode, which keeps the application's transaction-scoped advisory locks working. Migrations set session state, so they use the direct host. Sources: [Neon connection pooling](https://neon.com/docs/connect/connection-pooling), [Neon pgvector](https://neon.com/docs/extensions/pgvector).
 
 Hyperdrive is not a transparent replacement for this migration. Its documented restrictions include PostgreSQL advisory locks and LISTEN/NOTIFY, while current River/migrations use PostgreSQL features beyond simple queries. Source: [Hyperdrive PostgreSQL support](https://developers.cloudflare.com/hyperdrive/reference/postgres-compatibility/).
 
