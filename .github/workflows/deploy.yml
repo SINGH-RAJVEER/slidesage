@@ -4,7 +4,7 @@
 		"workflow_dispatch": {
 			"inputs": {
 				"database_prepared": {
-					"description": "VPS backup, schema migrations, SSH tunnel, secrets and object migration are prepared per the cutover runbook",
+					"description": "VPS backup, Neon restore and migrations, secrets and object migration are prepared per the cutover runbook",
 					"type": "boolean",
 					"required": true,
 					"default": false

@@ -1,11 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const [source, identity, knownHosts, output = "infra/cloudflare/secrets.json"] =
-	process.argv.slice(2);
-if (!source || !identity || !knownHosts) {
+const [source, databaseFile, output = "infra/cloudflare/secrets.json"] = process.argv.slice(2);
+if (!source || !databaseFile) {
 	throw new Error(
-		"Usage: bun infra/cloudflare/prepare-secrets.ts <api-env.json> <ssh-private-key> <known-hosts> [output]",
+		"Usage: bun infra/cloudflare/prepare-secrets.ts <api-env.json> <database-url-file> [output]",
 	);
 }
 const input: unknown = JSON.parse(readFileSync(source, "utf8"));
@@ -35,29 +34,21 @@ for (const key of [
 ]) {
 	if (!config[key]) throw new Error(`Missing required runtime setting ${key}`);
 }
-const databaseURL = config["DATABASE_URL"];
-if (!databaseURL) throw new Error("DATABASE_URL is required");
-const database = new URL(databaseURL);
-database.hostname = "127.0.0.1";
-database.port = "15432";
-for (const override of ["host", "hostaddr", "port", "service", "servicefile"])
-	database.searchParams.delete(override);
-database.searchParams.set("sslmode", "disable");
+// The VPS address is replaced by the managed Neon database. Read it from a
+// file so the credential never appears in shell history or process listings.
+const database = new URL(readFileSync(databaseFile, "utf8").trim());
+if (database.protocol !== "postgresql:" && database.protocol !== "postgres:")
+	throw new Error("Expected a postgres database URL");
+if (!["require", "verify-ca", "verify-full"].includes(database.searchParams.get("sslmode") ?? ""))
+	throw new Error("The database URL must require TLS");
 config["DATABASE_URL"] = database.toString();
 config["OPEN_ROUTER_MODEL"] = "openrouter/free";
-const key = readFileSync(identity, "utf8");
-if (!key.includes("PRIVATE KEY")) throw new Error("Expected an SSH private key");
-const hosts = readFileSync(knownHosts, "utf8");
-if (!hosts.includes("ssh-ed25519") && !hosts.includes("ecdsa-sha2-") && !hosts.includes("ssh-rsa"))
-	throw new Error("Expected a pinned SSH host key");
 writeFileSync(
 	output,
 	JSON.stringify(
 		{
 			APP_ENV: JSON.stringify(config),
 			OBJECT_STORAGE_TOKEN: randomBytes(32).toString("hex"),
-			DATABASE_SSH_PRIVATE_KEY: key,
-			DATABASE_SSH_KNOWN_HOSTS: hosts,
 		},
 		null,
 		"\t",
