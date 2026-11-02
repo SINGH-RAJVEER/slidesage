@@ -1,6 +1,18 @@
 # Cloudflare deployment and first cutover
 
-This migration is prepared for review. Do not treat local tests or a Wrangler dry run as a production migration. The frontend belongs on Pages, API and generation worker on Containers, images in private R2, and PostgreSQL on Neon. The current template was used as the starting reference: [Cloudflare Containers starter](https://github.com/cloudflare/templates/tree/main/containers-template). [Research notes](CLOUDFLARE_RESEARCH.md) record the platform constraints.
+## Fresh production deployment on 2026-11-03
+
+The API custom domain now routes to the `slidesage-backend` Worker and its Cloudflare Containers. A fresh Neon database was migrated through Goose version 41 and the River migrations; no existing database or images were imported. The private R2 bucket is `slidesage-objects` in Asia-Pacific. The API and generation instances were observed running, the one-minute Worker schedule was configured, and `/health` returned HTTP 200. A production R2 gateway test verified authenticated writes, byte-for-byte reads, deletion, and rejection of unauthenticated reads. A fingerprinted Pages asset returned a Cloudflare cache hit. The application database read cache remains disabled in the Containers configuration.
+
+The user verified GitHub OAuth sign-in and generated a basic two-slide presentation. Image upload through the application, export, scheduled restart behavior, and restore remain to be verified. The original application data was not migrated. No VPS access was used for this deployment.
+
+- [ ] Investigate and fix Google OAuth sign-in in production, then verify the complete sign-in flow.
+
+The image was built locally and pushed to the Cloudflare registry using Podman. Podman's locally reported repository digest differed from the digest of the pushed manifest, so Wrangler's initial Dockerfile deployment failed image preparation. The successful deployment used the actual digest written by `podman push --digestfile` as a digest-pinned named image in a temporary Wrangler configuration. Keep the referenced image in the registry; deleting it breaks redeployment of this release. Future deployments must verify the remote manifest digest or use a compatible Docker build and push workflow.
+
+The sections below record the earlier migration plan and preparation, including steps that do not apply to this fresh deployment.
+
+The original migration plan placed the frontend on Pages, API and generation worker on Containers, images in private R2, and PostgreSQL on Neon. It used the [Cloudflare Containers starter](https://github.com/cloudflare/templates/tree/main/containers-template) as a starting reference. [Research notes](CLOUDFLARE_RESEARCH.md) record the platform constraints.
 
 ## Prerequisites
 
@@ -8,7 +20,7 @@ This migration is prepared for review. Do not treat local tests or a Wrangler dr
 - A token that can manage the Worker, Container images, Durable Objects, R2, and the custom API domain. Keep it outside version control as `CLOUDFLARE_API_TOKEN`; set `CLOUDFLARE_ACCOUNT_ID` separately.
 - Docker-compatible local builds, Node.js 24, Bun, and the repository's Go toolchain. Wrangler runs under Node.js; use Bun to install and invoke it.
 - Verified database backup, original auth/rate-limit secrets, every active and retired BYOK encryption key, provider/payment credentials, original DNS records, and the old Compose configuration.
-- A Neon project with an empty `slidesage` database on PostgreSQL 18, matching the VPS major version. Keep its connection URL in a mode `600` file outside the repository, never in Wrangler vars, docs, or command lines. The runtime uses the `-pooler` host; dumps, restores, and migrations use the direct host without `-pooler`.
+- A Neon project with an empty `neondb` database in Singapore on PostgreSQL 18, matching the VPS major version. Keep its connection URL in a mode `600` file outside the repository, never in Wrangler vars, docs, or command lines. The runtime uses the `-pooler` host; dumps, restores, and migrations use the direct host without `-pooler`.
 - PostgreSQL 18 client tools (`pg_restore`, `psql`) on the operator machine.
 
 ## Build and prepare secrets
@@ -105,6 +117,6 @@ Local validation on 2026-10-26 passed the full Go suite against migrated disposa
 
 The object migration command uploaded and read back small and 16 MiB objects through the local R2 emulator, safely replayed an upload, and recovered the original bytes after restarting the local Worker. A mismatched stream checksum failed without creating an object. The secrets helper preserved auth and retired BYOK settings, filtered the Cloudflare deployment token, rewrote the database address, and wrote mode `600` output using fixture credentials.
 
-On 2026-11-02 the target database changed from the SSH-forwarded VPS to Neon. The Go driver connected to the empty Neon database through both the pooler and direct hosts, Neon offers the `vector` extension the migrations create, and the container URL checks, edge tests, type checks, and a Wrangler dry run with a real image build passed without SSH.
+On 2026-11-02 the target database changed from the SSH-forwarded VPS to Neon. Container URL checks, edge tests, type checks, and a Wrangler dry run with a real image build passed without SSH. A later check of the selected Singapore `neondb` confirmed PostgreSQL 18.6, no public tables, and availability of the `vector` extension. The Go driver connected through both the pooler and direct hosts using the supplied URL. It also connected through the pooler with `sslmode=verify-full`.
 
-Production Containers deployment, the Neon restore, image migration, DNS changes, and the public generation/auth/export gates have not run as part of preparation.
+As of 2026-11-02, production Containers deployment, the Neon restore, image migration, DNS changes, and the public generation/auth/export gates had not run as part of preparation. See the fresh production deployment status above for the later cutover.

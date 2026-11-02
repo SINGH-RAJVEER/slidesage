@@ -1,5 +1,7 @@
 # Durable generation worker
 
+- [ ] Fix the generation page so the generation prompt clears when generation has finished.
+
 - PostgreSQL stores generation and AI revision jobs. River schedules work; `cmd/worker` executes it.
 - Submission and event-stream lifetimes do not control job execution.
 
