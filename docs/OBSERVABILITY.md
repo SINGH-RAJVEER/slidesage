@@ -2,6 +2,7 @@
 
 - `apps/api/internal/observability` exports API and worker traces, metrics, and logs through OTLP HTTP/protobuf.
 - Export starts only with `OTEL_EXPORTER_OTLP_ENDPOINT`; otherwise processes write local text logs.
+- As deployed on 2026-11-03, the API and worker have no OTLP endpoint configured, so Datadog export is disabled. Cloudflare Worker observability is enabled separately; this alone does not establish Datadog ingestion.
 
 ## Signals
 

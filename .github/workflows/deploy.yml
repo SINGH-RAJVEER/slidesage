@@ -4,7 +4,7 @@
 		"workflow_dispatch": {
 			"inputs": {
 				"database_prepared": {
-					"description": "VPS backup, schema migrations, SSH tunnel, secrets and object migration are prepared per the cutover runbook",
+					"description": "Neon schema and application secrets are ready for this release",
 					"type": "boolean",
 					"required": true,
 					"default": false
@@ -39,6 +39,10 @@
 				{
 					"name": "Check API health",
 					"run": "curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --max-time 90 https://api.slidesage.app/health"
+				},
+				{
+					"name": "Check frontend CORS",
+					"run": "set -euo pipefail\nheaders=$(mktemp)\ntrap 'rm -f \"$headers\"' EXIT\ncurl --fail --silent --show-error --max-time 30 -D \"$headers\" -o /dev/null -X OPTIONS -H 'Origin: https://slidesage.app' -H 'Access-Control-Request-Method: POST' https://api.slidesage.app/auth/sign-in/email\ngrep -iq '^access-control-allow-origin: https://slidesage.app' \"$headers\"\n"
 				}
 			]
 		}

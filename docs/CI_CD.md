@@ -10,9 +10,9 @@ Public Pages build values are declared in root `wrangler.jsonc`, including the p
 
 ## Backend on Containers
 
-`apps/edge/wrangler.jsonc` deploys the edge Worker, private R2 binding, and two Container-backed Durable Objects. The same Linux amd64 image runs separate API and continuous generation instances. `cmd/container` starts each instance's restricted SSH database connection and local converter before its application. A one-minute Cron Trigger keeps both instances available and restarts failed instances. The worker performs maintenance every 15 minutes.
+`apps/edge/wrangler.jsonc` deploys the edge Worker at `https://api.slidesage.app`, its private R2 binding, and two Container-backed Durable Objects. The same Linux amd64 image runs separate API and continuous generation instances. Each instance connects to Neon over TLS and runs a local converter. A one-minute Cron Trigger keeps both instances available and restarts failed instances. The worker performs maintenance every 15 minutes.
 
-`.github/workflows/deploy.yml` is manual while this migration is being introduced. It runs only for `main` when the operator confirms `database_prepared`. It compiles the runtime, then uses Wrangler to build and publish the image and Worker. It does not migrate the production database, copy images, upload runtime secrets, provision SSH, or change Pages settings. Complete [the cutover runbook](CLOUDFLARE_DEPLOYMENT.md) first. There is no push-to-VPS deployment or frontend container build.
+`.github/workflows/deploy.yml` is a manual production release. It runs only for `main` when the operator confirms `database_prepared`. It compiles the runtime, then uses Wrangler and Docker to build and publish the image and Worker, and checks public health and frontend CORS. It does not migrate the production database, upload runtime secrets, or change Pages settings. Confirm schema compatibility and runtime secrets before deploying. There is no push-to-VPS deployment or frontend container build.
 
 Configure the `cloudflare-production` GitHub environment with secret `CLOUDFLARE_API_TOKEN` and variable `CLOUDFLARE_ACCOUNT_ID`. Restrict it to protected `main`. The account needs Workers Paid, Containers, Durable Objects, and enabled R2. Runtime secrets are uploaded directly with Wrangler; the workflow token is never included in an application image.
 
@@ -20,7 +20,7 @@ Configure the `cloudflare-production` GitHub environment with secret `CLOUDFLARE
 bun install --frozen-lockfile
 just binaries
 bun run --cwd apps/edge check
-# After the reviewed backup, migration, storage copy, and SSH preparation:
+# After checking schema compatibility and runtime secrets:
 gh workflow run deploy.yml --ref main -f database_prepared=true
 ```
 
@@ -28,6 +28,6 @@ Local manual deployment is `just deploy-backend`, after the same prerequisites. 
 
 ## Schema changes and rollback
 
-Database migrations remain an explicit operation against the retained VPS PostgreSQL. `infra/migrate.sh /absolute/path/to/migrate` takes the database lock, creates a verified backup, and runs the compiled migration binary. Stop application writers before an incompatible migration. Automatic Container startup never races to migrate the schema.
+Database migrations remain an explicit operation against Neon. `infra/migrate.sh /absolute/path/to/migrate /path/to/database-url` reads the direct-host URL from a private file and runs the compiled migration binary; create a Neon restore branch first. Stop application writers before an incompatible migration. Automatic Container startup never races to migrate the schema.
 
 A release is qualified only after public API health, cookie auth from Pages, outline and worker generation, progress streaming, image persistence after container replacement, and PPTX export pass. A green workflow alone does not prove those paths. Container updates drain the old role before starting its replacement; River jobs can resume through PostgreSQL after interruption. A rollback must use code compatible with the database schema and preserve R2 images created since cutover.
