@@ -1,6 +1,7 @@
 {
 	"name": "Deploy Cloudflare Containers",
 	"on": {
+		"push": { "branches": ["main"] },
 		"workflow_dispatch": {
 			"inputs": {
 				"database_prepared": {
@@ -16,7 +17,7 @@
 	"concurrency": { "group": "cloudflare-production", "cancel-in-progress": false },
 	"jobs": {
 		"deploy": {
-			"if": "github.ref == 'refs/heads/main' && inputs.database_prepared",
+			"if": "github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.database_prepared)",
 			"runs-on": "ubuntu-latest",
 			"timeout-minutes": 30,
 			"environment": { "name": "cloudflare-production", "url": "https://api.slidesage.app/health" },
