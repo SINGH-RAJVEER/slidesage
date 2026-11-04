@@ -55,7 +55,7 @@ OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>
 - API and worker export directly to the US5 OTLP endpoint configured in the Worker variables. Metrics use delta temporality.
 - Upload `OTEL_EXPORTER_OTLP_HEADERS` as a separate Worker secret containing `dd-api-key=<api-key>,compute_stats=true`. The controller passes the endpoint and secret to both Containers only when both are present, preserving the application settings in `APP_ENV`. Keep credentials out of the repository.
 - Service names default to `slidesage-api` and `slidesage-worker`. The edge controller sets `OTEL_SERVICE_VERSION` to the Worker version ID and `NODE_ENV` to `production`.
-- Secret changes create a new Worker version so the controller drains and restarts the application instances with the new environment. Keep `OTEL_LOGS_EXPORTER=otlp` for direct log intake, or `none` when logs are collected separately.
+- Secret changes create a new Worker version. Verify that both Containers restart with the new configuration before treating the change as active. Keep `OTEL_LOGS_EXPORTER=otlp` for direct log intake, or `none` when logs are collected separately.
 - An empty endpoint disables export.
 
 ### Check ingestion

@@ -76,9 +76,9 @@ function fixture(running = false, telemetry = false) {
 	const env = {
 		APP_ENV: JSON.stringify({ DATABASE_URL: "postgresql://test@127.0.0.1:15432/db" }),
 		VERSION: { id: "new-release" },
+		OTEL_EXPORTER_OTLP_ENDPOINT: "https://otlp.us5.datadoghq.com",
 		...(telemetry
 			? {
-					OTEL_EXPORTER_OTLP_ENDPOINT: "https://otlp.us5.datadoghq.com",
 					OTEL_EXPORTER_OTLP_HEADERS: "dd-api-key=test-key",
 				}
 			: {}),
