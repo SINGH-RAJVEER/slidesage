@@ -2,7 +2,7 @@
 
 - `apps/api/internal/observability` exports API and worker traces, metrics, and logs through OTLP HTTP/protobuf.
 - Export starts only with `OTEL_EXPORTER_OTLP_ENDPOINT`; otherwise processes write local text logs.
-- As deployed on 2026-11-03, the API and worker have no OTLP endpoint configured, so Datadog export is disabled. Cloudflare Worker observability is enabled separately; this alone does not establish Datadog ingestion.
+- Cloudflare Worker observability is separate from Datadog export; enabling one does not establish ingestion by the other.
 
 ## Signals
 
@@ -52,10 +52,10 @@ OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>
 
 ## Datadog in Containers
 
-- API and worker export directly to the OTLP endpoint configured in the Worker `APP_ENV` secret. Metrics use delta temporality.
-- Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`, and `OTEL_EXPORTER_OTLP_HEADERS=dd-api-key=<api-key>,compute_stats=true` in that secret. Keep credentials out of the repository.
+- API and worker export directly to the US5 OTLP endpoint configured in the Worker variables. Metrics use delta temporality.
+- Upload `OTEL_EXPORTER_OTLP_HEADERS` as a separate Worker secret containing `dd-api-key=<api-key>,compute_stats=true`. The controller passes the endpoint and secret to both Containers only when both are present, preserving the application settings in `APP_ENV`. Keep credentials out of the repository.
 - Service names default to `slidesage-api` and `slidesage-worker`. The edge controller sets `OTEL_SERVICE_VERSION` to the Worker version ID and `NODE_ENV` to `production`.
-- Upload the updated secret and deploy a new Worker version so the controller drains and restarts the application instances with the new environment. Keep `OTEL_LOGS_EXPORTER=otlp` for direct log intake, or `none` when logs are collected separately.
+- Secret changes create a new Worker version. Verify that both Containers restart with the new configuration before treating the change as active. Keep `OTEL_LOGS_EXPORTER=otlp` for direct log intake, or `none` when logs are collected separately.
 - An empty endpoint disables export.
 
 ### Check ingestion

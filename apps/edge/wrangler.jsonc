@@ -10,7 +10,8 @@
 	"version_metadata": { "binding": "VERSION" },
 	"triggers": { "crons": ["* * * * *"] },
 	"vars": {
-		"OBJECT_STORAGE_URL": "https://api.slidesage.app/__storage"
+		"OBJECT_STORAGE_URL": "https://api.slidesage.app/__storage",
+		"OTEL_EXPORTER_OTLP_ENDPOINT": "https://otlp.us5.datadoghq.com"
 	},
 	"containers": [
 		{
