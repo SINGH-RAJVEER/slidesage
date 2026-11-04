@@ -12,15 +12,15 @@ Public Pages build values are declared in root `wrangler.jsonc`, including the p
 
 `apps/edge/wrangler.jsonc` deploys the edge Worker at `https://api.slidesage.app`, its private R2 binding, and two Container-backed Durable Objects. The same Linux amd64 image runs separate API and continuous generation instances. Each instance connects to Neon over TLS and runs a local converter. A one-minute Cron Trigger keeps both instances available and restarts failed instances. The worker performs maintenance every 15 minutes.
 
-`.github/workflows/deploy.yml` deploys automatically on pushes to `main`, including merged pull requests. It can also be dispatched manually on `main` after confirming `database_prepared`. It compiles the runtime, then uses Wrangler and Docker to build and publish the image and Worker, and checks public health and frontend CORS. The workflow does not migrate the database, upload runtime secrets, or change Pages settings. Confirm schema compatibility and runtime secrets before merging; production deployment follows the merge automatically. There is no push-to-VPS deployment or frontend container build.
+`.github/workflows/deploy.yml` deploys automatically on pushes to `main`, including merged pull requests. It can also be dispatched manually on `main` after confirming `database_prepared`. After checking out the release, it runs the Goose and River migrations against Neon before installing frontend tooling, building, or deploying. A migration failure stops the job and leaves the existing Worker version in place; earlier migrations may already have committed. After success, the workflow builds and publishes the image and Worker, then checks public health and frontend CORS. It does not upload runtime secrets or change Pages settings. Confirm schema compatibility and runtime secrets before merging; production deployment follows the merge automatically.
 
-Configure the `cloudflare-production` GitHub environment with secret `CLOUDFLARE_API_TOKEN` and variable `CLOUDFLARE_ACCOUNT_ID`. Restrict it to protected `main`. The account needs Workers Paid, Containers, Durable Objects, and enabled R2. Runtime secrets are uploaded directly with Wrangler; the workflow token is never included in an application image.
+Configure the `cloudflare-production` GitHub environment with secrets `CLOUDFLARE_API_TOKEN` and `NEON_DIRECT_DATABASE_URL`, and variable `CLOUDFLARE_ACCOUNT_ID`. The Neon URL must use the direct, non-pooled endpoint and TLS with `sslmode=verify-full`; keep it out of logs and repository files. Restrict the environment to protected `main`. The account needs Workers Paid, Containers, Durable Objects, and enabled R2. Runtime secrets are uploaded directly with Wrangler; neither workflow secret is included in an application image.
 
 ```bash
 bun install --frozen-lockfile
 just binaries
 bun run --cwd apps/edge check
-# After checking schema compatibility and runtime secrets:
+# After checking migration compatibility and runtime secrets:
 gh workflow run deploy.yml --ref main -f database_prepared=true
 ```
 
@@ -28,6 +28,6 @@ Local manual deployment is `just deploy-backend`, after the same prerequisites. 
 
 ## Schema changes and rollback
 
-Database migrations remain an explicit operation against Neon. `infra/migrate.sh /absolute/path/to/migrate /path/to/database-url` reads the direct-host URL from a private file and runs the compiled migration binary; create a Neon restore branch first. Apply backward-compatible schema changes before merging code that requires them. Incompatible changes require a planned maintenance window with application writers stopped before the migration and merge. Automatic Container startup never races to migrate the schema.
+The release workflow applies migrations once before deploying. The existing API and worker continue running while migrations execute, so automatic migrations must remain backward-compatible with them. Stage incompatible changes across releases, or arrange a maintenance window with application writers stopped before migration and deployment. The workflow concurrency group serializes release jobs, but does not prevent manual migrations or other database writers. Individual migrations may commit before a later migration fails; inspect the schema and restore or repair deliberately before retrying. Use Neon point-in-time recovery or a verified backup as appropriate. For a separate manual migration, `infra/migrate.sh /absolute/path/to/migrate /path/to/database-url` reads the direct URL from a private file. Automatic Container startup never races to migrate the schema.
 
 A release is qualified only after public API health, cookie auth from Pages, outline and worker generation, progress streaming, image persistence after container replacement, and PPTX export pass. A green workflow alone does not prove those paths. Container updates drain the old role before starting its replacement; River jobs can resume through PostgreSQL after interruption. A rollback must use code compatible with the database schema and preserve R2 images created since cutover.
