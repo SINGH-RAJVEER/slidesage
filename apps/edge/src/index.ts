@@ -10,6 +10,8 @@ interface Env {
 	APP_ENV: string;
 	OBJECT_STORAGE_TOKEN: string;
 	OBJECT_STORAGE_URL: string;
+	OTEL_EXPORTER_OTLP_ENDPOINT?: string;
+	OTEL_EXPORTER_OTLP_HEADERS?: string;
 }
 
 const INACTIVITY_MS = 5 * 60 * 1000;
@@ -92,6 +94,13 @@ class AppContainer extends DurableObject<Env> {
 					WORKER_MAINTENANCE_INTERVAL: "15m",
 					WORKER_DRAIN_TIMEOUT: "45",
 					OTEL_SERVICE_VERSION: this.env.VERSION.id,
+					...(this.env.OTEL_EXPORTER_OTLP_ENDPOINT && this.env.OTEL_EXPORTER_OTLP_HEADERS
+						? {
+								OTEL_EXPORTER_OTLP_ENDPOINT: this.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+								OTEL_EXPORTER_OTLP_HEADERS: this.env.OTEL_EXPORTER_OTLP_HEADERS,
+								OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+							}
+						: {}),
 					OBJECT_STORAGE_URL: this.env.OBJECT_STORAGE_URL,
 					OBJECT_STORAGE_TOKEN: this.env.OBJECT_STORAGE_TOKEN,
 				},
