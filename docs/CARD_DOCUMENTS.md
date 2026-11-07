@@ -94,7 +94,8 @@ Every widget has size `small`, `medium`, `large`, or `full`:
 
 - `/presentation-outlines` accepts generation fields plus a client `outline_id`, returning `plan`, photo availability, charged points, and remaining points.
 - Planning has its own `outline` reservation/settlement; repeated IDs return `409`.
-- Users can edit, reorder, add, or remove entries and change layouts or photo searches.
+- Users can edit, reorder, add, or remove entries and change layouts or photo searches. The page lists the points beside a wireframe layout picker for the selected card, which opens in a bottom sheet on phones.
+- Going back from a loaded outline carries it along as the plan, so returning with the same prompt and slide count, or the same reviewed sources, reuses it instead of planning and charging again.
 - The browser keeps the latest unfinished outline and its request settings per account. Returning or refreshing restores edits and photo availability without another planning charge. Starting a new outline replaces this draft; an accepted generation clears it.
 - Submit the approved `plan` to `/presentation-jobs` with `slide_count` matching its length. Submission and worker validate it; drafting follows its order.
 - A deck that fails after an approved outline saves it as `failure.retry.plan`. Retrying opens that outline instead of planning, and charging for, a new one while the prompt and slide count are unchanged and, with research, while the reviewed sources are exactly the saved ones, since the plan cites them by position. Changing any of these plans afresh. A restored outline offers photo layouts only if it already used one.
