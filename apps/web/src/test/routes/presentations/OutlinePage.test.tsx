@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, mock } from "bun:test";
 import { StreamingProvider } from "@slidesage/ui";
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { fireEvent, render, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useParams } from "react-router-dom";
 import OutlinePage from "../../../routes/presentations/OutlinePage";
 
@@ -165,6 +165,50 @@ describe("OutlinePage", () => {
 		expect(notice.closest("div")).toHaveClass("fixed");
 		expect(view.getByDisplayValue("Battery storage")).toBeInTheDocument();
 		expect(view.getByRole("button", { name: "Write 3 cards" })).not.toBeDisabled();
+	});
+
+	it("edits the chosen card from the layout picker", async () => {
+		const calls = serve(() => new Promise<Response>(() => {}));
+		const view = renderOutline();
+
+		fireEvent.focus(await view.findByLabelText("Card 3 point"));
+		const picker = view.getByRole("group", { name: "Card 3 layout" });
+		fireEvent.click(within(picker).getByRole("button", { name: "Quote" }));
+		expect(within(picker).getByRole("button", { name: "Quote" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+
+		fireEvent.click(view.getByRole("button", { name: "Write 3 cards" }));
+		await waitFor(() =>
+			expect(calls.some((call) => call.url.includes("/presentation-jobs"))).toBe(true),
+		);
+		const job = calls.find((call) => call.url.includes("/presentation-jobs"));
+		const plan = job?.body["plan"] as { cards: { layout: string }[] } | undefined;
+		expect(plan?.cards[2]?.layout).toBe("quote");
+	});
+
+	it("keeps the chosen card when another is removed", async () => {
+		serve(() => new Promise<Response>(() => {}));
+		const view = renderOutline();
+
+		fireEvent.focus(await view.findByLabelText("Card 3 point"));
+		fireEvent.click(view.getByRole("button", { name: "Remove card 1" }));
+
+		expect(view.getByRole("group", { name: "Card 2 layout" })).toBeInTheDocument();
+		expect(view.getByLabelText("Card 2 point")).toHaveValue("Grids need flexibility");
+	});
+
+	it("takes the edited outline back so returning does not plan again", async () => {
+		serve(() => new Promise<Response>(() => {}));
+		const view = renderOutline();
+
+		fireEvent.click(await view.findByRole("button", { name: "Remove card 3" }));
+		fireEvent.click(view.getByRole("button", { name: "Back to generate" }));
+
+		const probe = await view.findByText(/^\/generate /);
+		expect(probe).toHaveTextContent('"slide_count":2');
+		expect(probe).toHaveTextContent('"plan":{"title":"Battery storage"');
 	});
 
 	it("keeps the reason an outline failed on the page", async () => {
