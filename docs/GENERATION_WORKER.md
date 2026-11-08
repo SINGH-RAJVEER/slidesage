@@ -103,7 +103,7 @@ All endpoints require the job owner:
 - API and generation run in separate fixed Cloudflare Containers. Each has its own private converter and connects to Neon PostgreSQL over TLS.
 - A one-minute Cloudflare Cron heartbeat renews a five-minute inactivity timeout. PostgreSQL queue traffic alone does not renew Container activity.
 - Startup probes readiness; deployments drain and replace old images and Worker versions. There is no queue-depth autoscaling in this first migration.
-- Run reviewed schema migrations explicitly before updating runtimes. API and worker startup never applies migrations.
+- The release workflow applies reviewed, backward-compatible schema migrations before updating runtimes. API and worker startup never applies migrations.
 - Follow [Cloudflare cutover](CLOUDFLARE_DEPLOYMENT.md) for backups, writer pauses, image copying, and runtime verification.
 
 ## Local development

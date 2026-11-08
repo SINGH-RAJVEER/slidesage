@@ -14,7 +14,7 @@ The prepared deployment puts the React frontend on Cloudflare Pages and the Go A
 | Read cache | Disabled for the first cutover; PostgreSQL remains authoritative |
 | Lifecycle | One-minute Cloudflare Cron heartbeat, five-minute inactivity timeout, graceful image replacement |
 | Maintenance | Generation worker runs recovery and cleanup every 15 minutes |
-| Backups and migrations | Neon point-in-time restore and explicit `infra/migrate.sh` through the direct host |
+| Backups and migrations | Neon point-in-time restore; release workflow migrations through the direct host |
 
 The current direct Container API uses `standard-1` instances. Each role also runs its own converter, so old Compose memory limits cannot be carried across without measurement. Containers are billed resources and their disks are ephemeral. See [Cloudflare limits](https://developers.cloudflare.com/containers/platform/limits/) and [lifecycle](https://developers.cloudflare.com/containers/concepts/architecture/).
 
