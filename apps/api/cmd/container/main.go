@@ -57,7 +57,10 @@ func run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 	case <-app.done:
-		failure = fmt.Errorf("%s process exited: %v", role, app.err)
+		// An idle on-demand worker exits cleanly, which stops the Container.
+		if app.err != nil {
+			failure = fmt.Errorf("%s process exited: %v", role, app.err)
+		}
 	case <-converter.done:
 		failure = errors.New("card converter exited")
 	}
