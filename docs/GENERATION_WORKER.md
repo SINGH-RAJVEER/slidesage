@@ -59,7 +59,7 @@
 
 ## Recovery and cleanup
 
-- `WORKER_MAINTENANCE_INTERVAL=15m` runs recovery and cleanup inside the continuous generation process. `cmd/worker --maintenance` remains available for explicit one-off operations.
+- `WORKER_MAINTENANCE_INTERVAL=15m` runs recovery and cleanup when the generation process starts and on that interval. `cmd/worker --maintenance` remains available for explicit one-off operations.
 - It recovers terminated generation jobs and expired reservations, removes expired rate-limit rows and unverified accounts, deletes queued images for removed users/presentations.
 - Image cleanup uses the selected object store, the private R2 gateway in Containers or local files during development. Each sweep processes up to 100 queued images within two minutes; failures are deferred for 15 minutes so they do not block other queued images. Missing objects count as already removed.
 - Each sweep handles at most 100 terminated jobs and 100 affected users, with two concurrent recovery transactions and bounded cleanup batches.
@@ -101,7 +101,7 @@ All endpoints require the job owner:
 ## Deployment
 
 - API and generation run in separate fixed Cloudflare Containers. Each has its own private converter and connects to Neon PostgreSQL over TLS.
-- A one-minute Cloudflare Cron heartbeat renews a five-minute inactivity timeout. PostgreSQL queue traffic alone does not renew Container activity.
+- Both run on demand on `lite` instances. Writes start the worker; it exits after `WORKER_IDLE_EXIT` with no running, available, retryable, or due scheduled River jobs. PostgreSQL queue traffic alone does not renew Container activity, so a five-minute Cron renews a running worker's backstop timeout.
 - Startup probes readiness; deployments drain and replace old images and Worker versions. There is no queue-depth autoscaling in this first migration.
 - Run reviewed schema migrations explicitly before updating runtimes. API and worker startup never applies migrations.
 - Follow [Cloudflare cutover](CLOUDFLARE_DEPLOYMENT.md) for backups, writer pauses, image copying, and runtime verification.

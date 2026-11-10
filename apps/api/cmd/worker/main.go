@@ -81,6 +81,13 @@ func main() {
 			fatal(logger, errors.New("WORKER_MAINTENANCE_INTERVAL must be a duration of at least one minute"))
 		}
 	}
+	var idleExit time.Duration
+	if value := os.Getenv("WORKER_IDLE_EXIT"); value != "" {
+		idleExit, err = time.ParseDuration(value)
+		if err != nil || idleExit < time.Minute {
+			fatal(logger, errors.New("WORKER_IDLE_EXIT must be a duration of at least one minute"))
+		}
+	}
 
 	continuousWorker, err := generation.NewWorkerClient(database, ai.ConnectionService{DB: database}, maxWorkers)
 	if err != nil {
@@ -103,6 +110,9 @@ func main() {
 		if maintenanceInterval == 0 {
 			return
 		}
+		// An on-demand worker may live for only a few minutes, so sweep on start.
+		runRecovery(maintenanceContext, database)
+		runCleanup(maintenanceContext, database, authService)
 		ticker := time.NewTicker(maintenanceInterval)
 		defer ticker.Stop()
 		for {
@@ -115,9 +125,15 @@ func main() {
 			}
 		}
 	}()
+	idle := make(chan struct{})
+	if idleExit > 0 {
+		go watchIdle(maintenanceContext, database, idleExit, idle)
+	}
 	slog.Info("generation worker started", slog.Int("concurrency", maxWorkers))
 	select {
 	case <-signalContext.Done():
+	case <-idle:
+		slog.Info("generation queue idle; worker exiting", slog.Duration("idle", idleExit))
 	case err := <-healthErrors:
 		if err != nil {
 			log.Printf("worker health server failed: %v", err)
@@ -189,6 +205,35 @@ func startHealthServer(database *sql.DB, ready *atomic.Bool) (*http.Server, <-ch
 	}()
 	return server, errorChannel, nil
 }
+
+// watchIdle closes idle once the generation queue has had no active work for
+// the whole window. A failed check counts as activity, so database trouble
+// never stops a worker that may still own a job.
+func watchIdle(ctx context.Context, database *sql.DB, window time.Duration, idle chan<- struct{}) {
+	ticker := time.NewTicker(idleCheckInterval)
+	defer ticker.Stop()
+	lastActive := time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+		checkContext, cancel := context.WithTimeout(ctx, 5*time.Second)
+		active, err := generation.QueueActive(checkContext, database)
+		cancel()
+		if err != nil || active {
+			lastActive = time.Now()
+			continue
+		}
+		if time.Since(lastActive) >= window {
+			close(idle)
+			return
+		}
+	}
+}
+
+const idleCheckInterval = 15 * time.Second
 
 func runRecovery(ctx context.Context, database *sql.DB) {
 	if err := generation.RecoverTerminatedQueueJobs(ctx, database); err != nil && !errors.Is(err, context.Canceled) {

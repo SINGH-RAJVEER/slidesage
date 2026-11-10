@@ -132,6 +132,15 @@ func NewWorkerClient(database *sql.DB, connections ai.ConnectionService, maxWork
 	})
 }
 
+// QueueActive reports whether the generation queue holds work that is running
+// or due within the next minute. Retryable jobs count, so a backoff retry is
+// not stranded by an on-demand worker that exits while idle.
+func QueueActive(ctx context.Context, database *sql.DB) (bool, error) {
+	var active bool
+	err := database.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM river_job WHERE queue = $1 AND (state = 'running' OR (state IN ('available', 'retryable', 'scheduled') AND scheduled_at <= NOW() + INTERVAL '1 minute')))`, generationQueue).Scan(&active)
+	return active, err
+}
+
 // RecoverTerminatedQueueJobs refunds domain jobs that River permanently
 // discarded or cancelled outside the normal processor finalization path.
 func RecoverTerminatedQueueJobs(ctx context.Context, database *sql.DB) error {

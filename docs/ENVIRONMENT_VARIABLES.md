@@ -68,7 +68,8 @@
 | `WORKER_DATABASE_POOL_MAX` | No | `WORKER_CONCURRENCY + 3` | Maximum open and idle connections in the worker database pool |
 | `WORKER_DRAIN_TIMEOUT` | No | `8` | Graceful shutdown timeout in seconds after `SIGINT` or `SIGTERM` |
 | `WORKER_HEALTH_PORT` | No | `8080` | Worker `/live`, `/ready`, health server port |
-| `WORKER_MAINTENANCE_INTERVAL` | No | Disabled locally | Duration of at least one minute; Containers sets `15m` for recovery and image/account cleanup |
+| `WORKER_MAINTENANCE_INTERVAL` | No | Disabled locally | Duration of at least one minute; Containers sets `15m` for recovery and image/account cleanup, which also runs on start |
+| `WORKER_IDLE_EXIT` | No | Disabled | Duration of at least one minute; the worker exits cleanly after the generation queue stays idle this long. Containers sets `5m` |
 
 - Worker needs the same database, provider, and BYOK encryption settings as API.
 - Health probes and shutdown are in [Worker operation](GENERATION_WORKER.md#process-configuration).
