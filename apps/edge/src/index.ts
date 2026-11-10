@@ -75,7 +75,7 @@ class AppContainer extends DurableObject<Env> {
 			}
 			container.start({
 				image,
-				instance: "standard-1",
+				instance: "lite",
 				enableInternet: true,
 				env: {
 					...(config as Record<string, string>),
