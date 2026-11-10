@@ -8,7 +8,7 @@
 	"routes": [{ "pattern": "api.slidesage.app", "custom_domain": true }],
 	"observability": { "enabled": true },
 	"version_metadata": { "binding": "VERSION" },
-	"triggers": { "crons": ["* * * * *"] },
+	"triggers": { "crons": ["*/5 * * * *", "0 */6 * * *"] },
 	"vars": {
 		"OBJECT_STORAGE_URL": "https://api.slidesage.app/__storage",
 		"OTEL_EXPORTER_OTLP_ENDPOINT": "https://otlp.us5.datadoghq.com"

@@ -14,22 +14,50 @@ interface Env {
 	OTEL_EXPORTER_OTLP_HEADERS?: string;
 }
 
-const INACTIVITY_MS = 5 * 60 * 1000;
+// Requests renew the API timeout. The worker stops itself after WORKER_IDLE_EXIT,
+// so its longer timeout is only a backstop that the cron renews while it runs.
+const API_INACTIVITY_MS = 5 * 60 * 1000;
+const WORKER_INACTIVITY_MS = 15 * 60 * 1000;
+// A wake that lands just as the worker exits sees it running and does nothing,
+// so an exit this soon after a wake restarts the Container.
+const REWAKE_MS = 60 * 1000;
+
+const RENEW_CRON = "*/5 * * * *";
+const MAINTENANCE_CRON = "0 */6 * * *";
 
 class AppContainer extends DurableObject<Env> {
-	protected role: "api" | "worker" = "api";
 	private starting: Promise<void> | undefined;
 	private monitoring: Promise<void> | undefined;
+	private wokenAt = 0;
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
 		if (ctx.container?.running) {
-			void ctx.blockConcurrencyWhile(() => ctx.container!.setInactivityTimeout(INACTIVITY_MS));
+			void ctx.blockConcurrencyWhile(() => ctx.container!.setInactivityTimeout(this.inactivityMs));
 			this.observeExit();
 		}
 	}
 
+	protected get role(): "api" | "worker" {
+		return "api";
+	}
+
+	private get inactivityMs(): number {
+		return this.role === "api" ? API_INACTIVITY_MS : WORKER_INACTIVITY_MS;
+	}
+
 	async ensureRunning(): Promise<void> {
+		this.wokenAt = Date.now();
+		return this.run();
+	}
+
+	// Renews a running Container without starting a stopped one.
+	async renew(): Promise<void> {
+		if (this.ctx.container?.running)
+			await this.ctx.container.setInactivityTimeout(this.inactivityMs);
+	}
+
+	private run(): Promise<void> {
 		this.starting ??= this.startAndWait().finally(() => {
 			this.starting = undefined;
 		});
@@ -92,6 +120,7 @@ class AppContainer extends DurableObject<Env> {
 					PRESENTATION_STORAGE_DIR: "",
 					CACHE_VALKEY_ADDR: "",
 					WORKER_MAINTENANCE_INTERVAL: "15m",
+					WORKER_IDLE_EXIT: "5m",
 					WORKER_DRAIN_TIMEOUT: "45",
 					OTEL_SERVICE_VERSION: this.env.VERSION.id,
 					...(this.env.OTEL_EXPORTER_OTLP_ENDPOINT && this.env.OTEL_EXPORTER_OTLP_HEADERS
@@ -108,7 +137,7 @@ class AppContainer extends DurableObject<Env> {
 			await this.ctx.storage.put("release", this.env.VERSION.id);
 		}
 		this.observeExit();
-		await container.setInactivityTimeout(INACTIVITY_MS);
+		await container.setInactivityTimeout(this.inactivityMs);
 		const endpoint = this.role === "api" ? "/health" : "/ready";
 		for (let attempt = 0; attempt < 100; attempt++) {
 			try {
@@ -132,6 +161,10 @@ class AppContainer extends DurableObject<Env> {
 			.catch(() => console.error(`${this.role} container exited with an error`))
 			.finally(() => {
 				this.monitoring = undefined;
+				if (!this.starting && Date.now() - this.wokenAt < REWAKE_MS)
+					this.ctx.waitUntil(
+						this.run().catch(() => console.error(`${this.role} container restart failed`)),
+					);
 			});
 		this.ctx.waitUntil(this.monitoring);
 	}
@@ -139,7 +172,9 @@ class AppContainer extends DurableObject<Env> {
 
 export class ApiContainer extends AppContainer {}
 export class GenerationContainer extends AppContainer {
-	protected override role = "worker" as const;
+	protected override get role(): "worker" {
+		return "worker";
+	}
 }
 
 export default {
@@ -147,7 +182,9 @@ export default {
 		try {
 			if (new URL(request.url).pathname.startsWith("/__storage/"))
 				return await storage(request, env.OBJECTS, env.OBJECT_STORAGE_TOKEN);
-			ctx.waitUntil(env.GENERATION.getByName("generation").ensureRunning());
+			// Writes may enqueue generation, so they start the worker ahead of the job.
+			if (!["GET", "HEAD", "OPTIONS"].includes(request.method))
+				ctx.waitUntil(env.GENERATION.getByName("generation").ensureRunning());
 			// Only the fixed API instance is public. No path can address a worker.
 			return await env.API.getByName("api").fetch(request);
 		} catch {
@@ -158,11 +195,11 @@ export default {
 			);
 		}
 	},
-	async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+	async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+		const worker = env.GENERATION.getByName("generation");
 		// PostgreSQL polling does not renew the Container inactivity timeout.
-		await Promise.all([
-			env.GENERATION.getByName("generation").ensureRunning(),
-			env.API.getByName("api").ensureRunning(),
-		]);
+		if (controller.cron === RENEW_CRON) await worker.renew();
+		// The worker sweeps on start, so this keeps cleanup going without traffic.
+		if (controller.cron === MAINTENANCE_CRON) await worker.ensureRunning();
 	},
 } satisfies ExportedHandler<Env>;

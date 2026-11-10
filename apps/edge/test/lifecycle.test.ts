@@ -46,8 +46,7 @@ function fixture(running = false, telemetry = false) {
 			this.running = false;
 		},
 		async setInactivityTimeout(milliseconds: number) {
-			expect(milliseconds).toBe(300_000);
-			calls.push("heartbeat");
+			calls.push(`heartbeat:${milliseconds / 60_000}m`);
 		},
 		getTcpPort(port: number) {
 			return {
@@ -58,6 +57,7 @@ function fixture(running = false, telemetry = false) {
 			};
 		},
 	};
+	const waits: Promise<unknown>[] = [];
 	const ctx = {
 		container,
 		storage: {
@@ -68,7 +68,9 @@ function fixture(running = false, telemetry = false) {
 				release = value;
 			},
 		},
-		waitUntil() {},
+		waitUntil(promise: Promise<unknown>) {
+			waits.push(promise);
+		},
 		blockConcurrencyWhile(callback: () => Promise<unknown>) {
 			return callback();
 		},
@@ -89,6 +91,15 @@ function fixture(running = false, telemetry = false) {
 		calls,
 		container,
 		environments,
+		exit: () => {
+			container.running = false;
+			finish?.();
+		},
+		// The exit monitor, then the restart it schedules.
+		restarted: async () => {
+			await waits[0];
+			await waits[1];
+		},
 	};
 }
 
@@ -103,14 +114,36 @@ test("passes telemetry configuration to both containers without replacing applic
 	}
 });
 
-test("a worker starts without API traffic and renews its inactivity timeout", async () => {
+test("a worker starts on lite with an idle exit and a longer backstop timeout", async () => {
 	const f = fixture();
 	const worker = new GenerationContainer(f.ctx, f.env);
 	await Promise.all([worker.ensureRunning(), worker.ensureRunning()]);
 	expect(f.environments[0]?.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+	expect(f.environments[0]?.WORKER_IDLE_EXIT).toBe("5m");
 	expect(f.calls.filter((call) => call.startsWith("start:"))).toEqual(["start:worker"]);
-	expect(f.calls).toContain("heartbeat");
+	expect(f.calls).toContain("heartbeat:15m");
 	expect(f.calls).toContain("ready:8080");
+});
+
+test("a worker that exits right after a wake starts again", async () => {
+	const f = fixture();
+	await new GenerationContainer(f.ctx, f.env).ensureRunning();
+	f.exit();
+	await f.restarted();
+	expect(f.calls.filter((call) => call.startsWith("start:"))).toEqual([
+		"start:worker",
+		"start:worker",
+	]);
+});
+
+test("renewal keeps a running Container alive without starting a stopped one", async () => {
+	const stopped = fixture();
+	await new GenerationContainer(stopped.ctx, stopped.env).renew();
+	expect(stopped.calls).toEqual([]);
+	const running = fixture(true);
+	await new ApiContainer(running.ctx, running.env).renew();
+	expect(running.calls).toContain("heartbeat:5m");
+	expect(running.calls.some((call) => call.startsWith("start:"))).toBe(false);
 });
 
 test("an old running image drains before replacement", async () => {
