@@ -51,10 +51,13 @@ class AppContainer extends DurableObject<Env> {
 		return this.run();
 	}
 
-	// Renews a running Container without starting a stopped one.
+	// Renews a running Container without starting a stopped one. A Container
+	// from an earlier release is replaced instead, so renewal never keeps an old
+	// image or instance size alive after a deploy.
 	async renew(): Promise<void> {
-		if (this.ctx.container?.running)
-			await this.ctx.container.setInactivityTimeout(this.inactivityMs);
+		if (!this.ctx.container?.running) return;
+		if ((await this.ctx.storage.get<string>("release")) !== this.env.VERSION.id) return this.run();
+		await this.ctx.container.setInactivityTimeout(this.inactivityMs);
 	}
 
 	private run(): Promise<void> {

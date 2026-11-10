@@ -141,9 +141,16 @@ test("renewal keeps a running Container alive without starting a stopped one", a
 	await new GenerationContainer(stopped.ctx, stopped.env).renew();
 	expect(stopped.calls).toEqual([]);
 	const running = fixture(true);
+	await running.ctx.storage.put("release", "new-release");
 	await new ApiContainer(running.ctx, running.env).renew();
 	expect(running.calls).toContain("heartbeat:5m");
 	expect(running.calls.some((call) => call.startsWith("start:"))).toBe(false);
+});
+
+test("renewal replaces a Container left running by an earlier release", async () => {
+	const f = fixture(true);
+	await new GenerationContainer(f.ctx, f.env).renew();
+	expect(f.calls.indexOf("drain")).toBeLessThan(f.calls.indexOf("start:worker"));
 });
 
 test("an old running image drains before replacement", async () => {
