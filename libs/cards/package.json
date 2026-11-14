@@ -7,13 +7,9 @@
 		".": "./src/index.ts"
 	},
 	"scripts": {
-		"test": "bun test --isolate",
-		"lint": "bunx --bun biome check .",
-		"lint:fix": "bunx --bun biome check --write .",
-		"format": "bunx --bun biome format --write ."
+		"test": "bun test --isolate"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.4.7",
 		"@types/bun": "1.4.4"
 	}
 }

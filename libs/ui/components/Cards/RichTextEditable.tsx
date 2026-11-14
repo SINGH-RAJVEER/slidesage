@@ -114,7 +114,7 @@ export function RichTextEditable({
 	};
 
 	return (
-		// biome-ignore lint/a11y/useSemanticElements: a native input cannot hold bold and italic runs, so a contenteditable span carries the textbox role
+		// A native input cannot hold bold and italic runs, so a contenteditable span carries the textbox role
 		<span
 			ref={ref}
 			role="textbox"

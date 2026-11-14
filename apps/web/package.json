@@ -8,10 +8,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"test": "bun test --isolate",
-		"test:watch": "bun test --watch --isolate",
-		"lint": "bunx biome check .",
-		"lint:fix": "bunx biome check --write .",
-		"format": "bunx biome format --write ."
+		"test:watch": "bun test --watch --isolate"
 	},
 	"dependencies": {
 		"@slidesage/cards": "workspace:*",
@@ -24,7 +21,6 @@
 		"react-router-dom": "^7.6.2"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.4.7",
 		"@happy-dom/global-registrator": "^20.1.0",
 		"tailwindcss": "^4.3.3",
 		"@tailwindcss/vite": "^4.3.3",

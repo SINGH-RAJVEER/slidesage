@@ -6,12 +6,5 @@
 	"exports": {
 		".": "./src/index.ts"
 	},
-	"scripts": {
-		"lint": "bunx --bun biome check .",
-		"lint:fix": "bunx --bun biome check --write .",
-		"format": "bunx --bun biome format --write ."
-	},
-	"devDependencies": {
-		"@biomejs/biome": "^2.4.7"
-	}
+	"scripts": {}
 }

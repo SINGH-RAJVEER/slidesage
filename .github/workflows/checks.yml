@@ -49,7 +49,7 @@
 					"uses": "dorny/paths-filter@v4",
 					"with": {
 						"base": "${{ steps.base.outputs.ref }}",
-						"filters": "api:\n  - 'apps/api/**'\n  - 'libs/cards/**'\n  - 'libs/types/**'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'apps/edge/**'\nweb:\n  - 'apps/web/**'\n  - 'libs/**'\n  - 'package.json'\n  - 'bun.lock'\n  - 'tsconfig.json'\n  - 'biome.json'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'apps/edge/**'\n"
+						"filters": "api:\n  - 'apps/api/**'\n  - 'libs/cards/**'\n  - 'libs/types/**'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'apps/edge/**'\nweb:\n  - 'apps/web/**'\n  - 'libs/**'\n  - 'package.json'\n  - 'bun.lock'\n  - 'tsconfig.json'\n  - 'bunfig.toml'\n  - '.github/workflows/checks.yml'\n  - '.github/workflows/deploy.yml'\n  - 'apps/edge/**'\n"
 					}
 				},
 				{
@@ -93,6 +93,10 @@
 				{
 					"if": "steps.scope.outputs.web == 'true'",
 					"run": "bun run type-check\n"
+				},
+				{
+					"if": "steps.scope.outputs.web == 'true'",
+					"run": "bun run format:check\n"
 				},
 				{
 					"if": "steps.scope.outputs.web == 'true'",

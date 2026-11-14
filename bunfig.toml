@@ -1,0 +1,10 @@
+[fmt]
+useTabs = true
+# Width a tab counts for when wrapping lines; indentation stays tabs.
+tabWidth = 4
+printWidth = 100
+endOfLine = "lf"
+ignorePatterns = ["dist"]
+
+[fmt.sortImports]
+newlinesBetween = false

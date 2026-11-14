@@ -25,14 +25,14 @@
 		"type-check:types": "bun node_modules/typescript/bin/tsc -p libs/types/tsconfig.json --tsBuildInfoFile node_modules/.cache/slidesage-types.tsbuildinfo",
 		"type-check:ui": "bun node_modules/typescript/bin/tsc -p libs/ui/tsconfig.json --tsBuildInfoFile node_modules/.cache/slidesage-ui.tsbuildinfo",
 		"type-check:cards": "bun node_modules/typescript/bin/tsc -p libs/cards/tsconfig.json",
-		"lint": "bun run lint:api && bun --cwd apps/web lint && bun --cwd libs/types lint && bun --cwd libs/ui lint && bun --cwd libs/cards lint && bun run --cwd apps/edge lint",
+		"lint": "bun run lint:api && bun run format:check",
 		"lint:api": "CGO_ENABLED=0 go -C apps/api vet ./...",
-		"lint:web": "bun --cwd apps/web lint",
 		"migrate:api": "CGO_ENABLED=0 go -C apps/api run ./cmd/migrate",
 		"migration:create": "goose -dir apps/api/migrations create",
-		"format": "bun run format:api && bun --cwd apps/web format && bun --cwd libs/types format && bun --cwd libs/ui format && bun run --cwd apps/edge format",
+		"format": "bun run format:api && bun run format:web",
 		"format:api": "go -C apps/api fmt ./...",
-		"format:web": "bun --cwd apps/web format"
+		"format:web": "bun fmt --no-script apps/web apps/edge libs",
+		"format:check": "bun fmt --no-script --check apps/web apps/edge libs"
 	},
 	"devDependencies": {
 		"@types/bun": "1.4.4",

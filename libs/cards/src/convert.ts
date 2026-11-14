@@ -59,7 +59,6 @@ function hash(value: string): string {
 
 // C0/C1 controls, zero-width characters, and bidirectional overrides can hide
 // or reorder text, so none survive conversion.
-// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping them is the point
 const UNSAFE_CHARACTERS = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁠-⁩﻿]/g;
 // Only HTML tags a model might emit are stripped, and only with name="value"
 // attributes, so comparisons such as "a<b and c>d" stay as text. Text is

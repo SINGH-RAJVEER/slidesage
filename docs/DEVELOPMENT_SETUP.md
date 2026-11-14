@@ -59,7 +59,7 @@ Run from the repository root inside `devenv shell`:
 | `just test-api` | Run Go tests |
 | `just test-web` | Run web tests |
 | `just test-ui` | Run shared UI tests |
-| `just lint` | Run Go vet and Biome |
+| `just lint` | Run Go vet and check formatting with `bun fmt` |
 | `just format` | Format repository |
 
 ## Project structure
