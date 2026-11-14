@@ -32,7 +32,10 @@ function claimRecovery(storage: RecoveryStorage | undefined, fingerprint: string
 
 		storage.setItem(
 			RECOVERED_PRELOAD_ERRORS_KEY,
-			JSON.stringify([...recoveredErrors.slice(-(MAX_RECOVERED_PRELOAD_ERRORS - 1)), fingerprint]),
+			JSON.stringify([
+				...recoveredErrors.slice(-(MAX_RECOVERED_PRELOAD_ERRORS - 1)),
+				fingerprint,
+			]),
 		);
 		return true;
 	} catch {

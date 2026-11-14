@@ -173,7 +173,9 @@ function ColumnPlot({ node, width, height, font, measure }: PlotProps) {
 		const dot = Math.max(4, font * 0.3);
 		marks = node.series.map((series, seriesIndex) => {
 			const points = series.values.map((value, index) => [center(index), y(value)] as const);
-			const path = points.map(([px, py], index) => `${index ? "L" : "M"}${px},${py}`).join(" ");
+			const path = points
+				.map(([px, py], index) => `${index ? "L" : "M"}${px},${py}`)
+				.join(" ");
 			const color = seriesColor(seriesIndex);
 			const last = points.at(-1);
 			return (
@@ -249,7 +251,14 @@ function ColumnPlot({ node, width, height, font, measure }: PlotProps) {
 				return (
 					<path
 						key={series.id}
-						d={barPath("vertical", x, thickness, y(base), y(base + value), outermost ? radius : 0)}
+						d={barPath(
+							"vertical",
+							x,
+							thickness,
+							y(base),
+							y(base + value),
+							outermost ? radius : 0,
+						)}
 						fill={seriesColor(seriesIndex)}
 						stroke={stacked ? "var(--card-surface)" : undefined}
 						strokeWidth={stacked ? 2 : undefined}
@@ -329,7 +338,9 @@ function BarPlot({ node, width, height, font, measure }: PlotProps) {
 	const labelled = labelsBars(node);
 	const valueRoom = labelled
 		? Math.max(
-				...(node.series[0]?.values ?? []).map((value) => measure(formatChartValue(value, node))),
+				...(node.series[0]?.values ?? []).map((value) =>
+					measure(formatChartValue(value, node)),
+				),
 			) +
 			font * 0.6
 		: font * 0.6;
@@ -360,7 +371,12 @@ function BarPlot({ node, width, height, font, measure }: PlotProps) {
 							stroke={tick === 0 ? "var(--card-muted)" : "var(--card-rule)"}
 							strokeOpacity={tick === 0 ? 0.6 : 1}
 						/>
-						<text x={x(tick)} y={height - font * 0.5} textAnchor="middle" fill="var(--card-muted)">
+						<text
+							x={x(tick)}
+							y={height - font * 0.5}
+							textAnchor="middle"
+							fill="var(--card-muted)"
+						>
 							{formatChartValue(tick, node)}
 						</text>
 					</g>
@@ -556,7 +572,9 @@ function DataTable({ node }: { node: ChartNode }) {
 					<tr key={category}>
 						<th scope="row">{category}</th>
 						{node.series.map((series) => (
-							<td key={series.id}>{formatChartValue(series.values[index] ?? 0, node)}</td>
+							<td key={series.id}>
+								{formatChartValue(series.values[index] ?? 0, node)}
+							</td>
 						))}
 					</tr>
 				))}
@@ -594,7 +612,10 @@ export function Chart({ node, theme }: { node: ChartNode; theme: CardTheme }) {
 					)}
 				>
 					{node.series.map((series, index) => (
-						<li key={series.id} className="flex items-center gap-[calc(0.6cqw*var(--fit,1))]">
+						<li
+							key={series.id}
+							className="flex items-center gap-[calc(0.6cqw*var(--fit,1))]"
+						>
 							<Swatch index={index} line={line} />
 							{series.name}
 						</li>
@@ -612,15 +633,30 @@ export function Chart({ node, theme }: { node: ChartNode; theme: CardTheme }) {
 					>
 						{node.categories.map((category, index) => {
 							const value = formatChartValue(values[index] ?? 0, node);
-							const share = total > 0 ? `${Math.round(((values[index] ?? 0) / total) * 100)}%` : "";
+							const share =
+								total > 0
+									? `${Math.round(((values[index] ?? 0) / total) * 100)}%`
+									: "";
 							return (
-								<li key={category} className="flex items-center gap-[calc(0.8cqw*var(--fit,1))]">
+								<li
+									key={category}
+									className="flex items-center gap-[calc(0.8cqw*var(--fit,1))]"
+								>
 									<Swatch index={index} />
 									<span className="min-w-0 flex-1 truncate">{category}</span>
-									<span className={cn("tabular-nums font-semibold", theme.heading)}>{value}</span>
+									<span
+										className={cn("tabular-nums font-semibold", theme.heading)}
+									>
+										{value}
+									</span>
 									{/* Values that are already percentages need no second share. */}
 									{share !== value && (
-										<span className={cn("w-[4ch] text-right tabular-nums", theme.muted)}>
+										<span
+											className={cn(
+												"w-[4ch] text-right tabular-nums",
+												theme.muted,
+											)}
+										>
 											{share}
 										</span>
 									)}
@@ -695,7 +731,13 @@ export function Progress({ node, theme }: { node: ProgressNode; theme: CardTheme
 							}
 						/>
 					</div>
-					<meter className="sr-only" aria-label={meter.label} min={0} max={100} value={meter.value}>
+					<meter
+						className="sr-only"
+						aria-label={meter.label}
+						min={0}
+						max={100}
+						value={meter.value}
+					>
 						{meter.value}%
 					</meter>
 					<div
@@ -713,7 +755,9 @@ export function Progress({ node, theme }: { node: ProgressNode; theme: CardTheme
 				label="Add meter"
 				theme={theme}
 				visible={!!editing && node.items.length < LIMITS.meters.max}
-				onAdd={() => editing?.edit((document) => addListItem(document, editing.card.id, node.id))}
+				onAdd={() =>
+					editing?.edit((document) => addListItem(document, editing.card.id, node.id))
+				}
 			/>
 		</div>
 	);
@@ -781,17 +825,32 @@ export function Table({ node, theme }: { node: TableNode; theme: CardTheme }) {
 												value={cell}
 												label="Table cell"
 												update={(document, value, cardId) =>
-													setTableCell(document, cardId, node.id, row.id, column, value)
+													setTableCell(
+														document,
+														cardId,
+														node.id,
+														row.id,
+														column,
+														value,
+													)
 												}
 											/>
 										</span>
 										{column === row.cells.length - 1 && (
 											<RemoveItem
 												label="Remove row"
-												visible={!!editing && node.rows.length > LIMITS.tableRows.min}
+												visible={
+													!!editing &&
+													node.rows.length > LIMITS.tableRows.min
+												}
 												onRemove={() =>
 													editing?.edit((document) =>
-														removeListItem(document, editing.card.id, node.id, row.id),
+														removeListItem(
+															document,
+															editing.card.id,
+															node.id,
+															row.id,
+														),
 													)
 												}
 											/>
@@ -807,7 +866,9 @@ export function Table({ node, theme }: { node: TableNode; theme: CardTheme }) {
 				label="Add row"
 				theme={theme}
 				visible={!!editing && node.rows.length < LIMITS.tableRows.max}
-				onAdd={() => editing?.edit((document) => addListItem(document, editing.card.id, node.id))}
+				onAdd={() =>
+					editing?.edit((document) => addListItem(document, editing.card.id, node.id))
+				}
 			/>
 		</div>
 	);
@@ -843,7 +904,9 @@ export function Callout({ node, theme }: { node: CalloutNode; theme: CardTheme }
 				<RichField
 					value={node.text}
 					label="Callout"
-					update={(document, value, cardId) => setNodeText(document, cardId, node.id, value)}
+					update={(document, value, cardId) =>
+						setNodeText(document, cardId, node.id, value)
+					}
 				/>
 			</p>
 		</aside>

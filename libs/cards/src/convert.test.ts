@@ -18,7 +18,9 @@ describe("curated starter decks", () => {
 		expect(new Set(CARD_TEMPLATES.map((template) => template.id)).size).toBe(6);
 		expect(CURATED_THEMES).toHaveLength(6);
 		for (const template of CARD_TEMPLATES) {
-			expect(TEMPLATE_CATEGORIES.some((category) => category.id === template.category)).toBe(true);
+			expect(TEMPLATE_CATEGORIES.some((category) => category.id === template.category)).toBe(
+				true,
+			);
 			expect(template.document.cardOrder).toHaveLength(5);
 			expect(template.document.cards[template.previewCardId]).toBeDefined();
 			expect(
@@ -33,7 +35,9 @@ describe("curated starter decks", () => {
 			for (const card of cards) {
 				for (const node of card?.nodes ?? []) {
 					if (node.type === "image")
-						expect(template.assets[node.assetId]?.url).toStartWith("https://images.unsplash.com/");
+						expect(template.assets[node.assetId]?.url).toStartWith(
+							"https://images.unsplash.com/",
+						);
 				}
 			}
 		}
@@ -145,7 +149,9 @@ describe("convertCards", () => {
 				{ type: "bullets", items: ["Only one"] },
 			],
 		});
-		expect("issue" in result && result.issue.message).toContain("needs 2-6 bullets items, got 1");
+		expect("issue" in result && result.issue.message).toContain(
+			"needs 2-6 bullets items, got 1",
+		);
 	});
 
 	it("reports text over its limit with the measured length", () => {
@@ -199,7 +205,11 @@ describe("assembleDocument", () => {
 	});
 
 	it("rejects fields the schema does not know", () => {
-		const document = assembleDocument({ title: "T", theme: "paper", cards: [card(bulletsDraft)] });
+		const document = assembleDocument({
+			title: "T",
+			theme: "paper",
+			cards: [card(bulletsDraft)],
+		});
 		const tampered = { ...document, style: "color:red" };
 		const result = validateCardDocument(tampered);
 		expect(result.ok).toBe(false);
@@ -329,7 +339,13 @@ describe("cardToDraft", () => {
 		const withPhoto: Card = {
 			...converted,
 			nodes: [
-				{ id: "n_photo", type: "image", assetId: "a".repeat(64), alt: "Batteries", fit: "cover" },
+				{
+					id: "n_photo",
+					type: "image",
+					assetId: "a".repeat(64),
+					alt: "Batteries",
+					fit: "cover",
+				},
 				...converted.nodes,
 			],
 		};

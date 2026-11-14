@@ -18,12 +18,15 @@ export interface DocumentDraft {
 const strings = (value: unknown): value is string[] =>
 	Array.isArray(value) && value.every((item) => typeof item === "string");
 const numbers = (value: unknown): value is number[] =>
-	Array.isArray(value) && value.every((item) => typeof item === "number" && Number.isFinite(item));
+	Array.isArray(value) &&
+	value.every((item) => typeof item === "number" && Number.isFinite(item));
 const richText = (value: unknown): boolean =>
 	Array.isArray(value) && value.every((run) => isRecord(run) && typeof run["text"] === "string");
 const listItems = (value: unknown): boolean =>
 	Array.isArray(value) &&
-	value.every((item) => isRecord(item) && typeof item["id"] === "string" && richText(item["text"]));
+	value.every(
+		(item) => isRecord(item) && typeof item["id"] === "string" && richText(item["text"]),
+	);
 
 function isNode(value: unknown): boolean {
 	if (!isRecord(value) || typeof value["id"] !== "string") return false;
@@ -94,7 +97,8 @@ function isNode(value: unknown): boolean {
 				strings(value["columns"]) &&
 				Array.isArray(value["rows"]) &&
 				value["rows"].every(
-					(row) => isRecord(row) && typeof row["id"] === "string" && strings(row["cells"]),
+					(row) =>
+						isRecord(row) && typeof row["id"] === "string" && strings(row["cells"]),
 				)
 			);
 		default:
@@ -123,7 +127,9 @@ function isDocument(value: unknown): value is CardDocument {
 				typeof value["cards"][id]["layout"] === "string" &&
 				(LAYOUTS as readonly string[]).includes(value["cards"][id]["layout"] as string) &&
 				typeof value["cards"][id]["role"] === "string" &&
-				(NARRATIVE_ROLES as readonly string[]).includes(value["cards"][id]["role"] as string) &&
+				(NARRATIVE_ROLES as readonly string[]).includes(
+					value["cards"][id]["role"] as string,
+				) &&
 				Array.isArray(value["cards"][id]["nodes"]) &&
 				(value["cards"][id]["nodes"] as unknown[]).every(isNode) &&
 				strings(value["cards"][id]["sourceIds"]),

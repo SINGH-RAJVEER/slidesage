@@ -101,7 +101,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 	useEffect(() => {
 		const handlePointsUpdated = (event: Event) => {
-			const slideTokens = (event as CustomEvent<{ slideTokens?: unknown }>).detail?.slideTokens;
+			const slideTokens = (event as CustomEvent<{ slideTokens?: unknown }>).detail
+				?.slideTokens;
 			if (typeof slideTokens !== "number" || !Number.isFinite(slideTokens)) return;
 
 			setUser((currentUser) =>
@@ -118,7 +119,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 			if (event.key !== POINTS_UPDATED_EVENT) return;
 			const slideTokens = readPointBalanceStorage(event.newValue);
 			if (slideTokens !== null) {
-				handlePointsUpdated(new CustomEvent(POINTS_UPDATED_EVENT, { detail: { slideTokens } }));
+				handlePointsUpdated(
+					new CustomEvent(POINTS_UPDATED_EVENT, { detail: { slideTokens } }),
+				);
 			}
 		};
 		window.addEventListener(POINTS_UPDATED_EVENT, handlePointsUpdated);

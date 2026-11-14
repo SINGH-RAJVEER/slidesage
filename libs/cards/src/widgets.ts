@@ -120,8 +120,9 @@ export function axisTicks(values: number[], count = 4): number[] {
 	const rough = (high - low) / count;
 	const power = 10 ** Math.floor(Math.log10(rough));
 	const step =
-		[1, 2, 2.5, 5, 10].map((factor) => factor * power).find((candidate) => candidate >= rough) ??
-		10 * power;
+		[1, 2, 2.5, 5, 10]
+			.map((factor) => factor * power)
+			.find((candidate) => candidate >= rough) ?? 10 * power;
 	const ticks: number[] = [];
 	const end = Math.ceil(high / step) * step;
 	for (let tick = Math.floor(low / step) * step; tick <= end + step / 2; tick += step) {

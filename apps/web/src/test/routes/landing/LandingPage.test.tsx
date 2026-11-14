@@ -41,7 +41,10 @@ describe("LandingPage", () => {
 		expect(queryByRole("banner")).not.toBeInTheDocument();
 		expect(queryByRole("contentinfo")).not.toBeInTheDocument();
 		/* the sphere is the page's single call to action */
-		expect(getByRole("link", { name: "SlideSage — sign up" })).toHaveAttribute("href", "/sign-up");
+		expect(getByRole("link", { name: "SlideSage — sign up" })).toHaveAttribute(
+			"href",
+			"/sign-up",
+		);
 		/* the plates carry cards, which are pictures here rather than copy */
 		const copy = Array.from(container.querySelectorAll("h1, h2, p")).filter(
 			(element) => !element.closest("[data-plate-index]"),
@@ -184,7 +187,9 @@ describe("Landing plates", () => {
 		});
 		const catalogOrder = randomLandingPool(() => 0);
 
-		expect(pinned.map((plate) => plate.key)).not.toEqual(catalogOrder.map((plate) => plate.key));
+		expect(pinned.map((plate) => plate.key)).not.toEqual(
+			catalogOrder.map((plate) => plate.key),
+		);
 	});
 });
 
@@ -218,7 +223,9 @@ describe("Reduced motion", () => {
 
 			/* the belt is laid out, but nothing is animating it: the old loop
 			   rewrote thirty plates a frame with the values they already held */
-			expect(container.querySelectorAll("[data-plate-index]").length).toBe(LANDING_PLATE_COUNT);
+			expect(container.querySelectorAll("[data-plate-index]").length).toBe(
+				LANDING_PLATE_COUNT,
+			);
 			expect(scheduled).toBe(0);
 		} finally {
 			window.matchMedia = originalMatchMedia;

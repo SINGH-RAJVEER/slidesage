@@ -114,7 +114,10 @@ export default function ResetPasswordPage() {
 
 						<form className="space-y-4" onSubmit={handleSubmit}>
 							<div className="space-y-2">
-								<label htmlFor="email" className="text-sm font-medium text-white/80">
+								<label
+									htmlFor="email"
+									className="text-sm font-medium text-white/80"
+								>
 									Email
 								</label>
 								<input
@@ -148,11 +151,16 @@ export default function ResetPasswordPage() {
 									className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 text-center text-2xl tracking-widest font-mono"
 									required
 								/>
-								<p className="text-xs text-white/50 text-center mt-2">Code expires in 15 minutes</p>
+								<p className="text-xs text-white/50 text-center mt-2">
+									Code expires in 15 minutes
+								</p>
 							</div>
 
 							<div className="space-y-2">
-								<label htmlFor="password" className="text-sm font-medium text-white/80">
+								<label
+									htmlFor="password"
+									className="text-sm font-medium text-white/80"
+								>
 									New password
 								</label>
 								<input
@@ -169,7 +177,10 @@ export default function ResetPasswordPage() {
 							</div>
 
 							<div className="space-y-2">
-								<label htmlFor="confirmPassword" className="text-sm font-medium text-white/80">
+								<label
+									htmlFor="confirmPassword"
+									className="text-sm font-medium text-white/80"
+								>
 									Confirm password
 								</label>
 								<input
@@ -205,7 +216,10 @@ export default function ResetPasswordPage() {
 
 						<p className="mt-6 text-center text-sm text-white/55">
 							Back to{" "}
-							<Link to="/sign-in" className="text-white hover:underline font-semibold">
+							<Link
+								to="/sign-in"
+								className="text-white hover:underline font-semibold"
+							>
 								sign in
 							</Link>
 						</p>

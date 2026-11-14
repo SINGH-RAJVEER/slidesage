@@ -68,7 +68,9 @@ export function centredAlignOffset(measurements: {
  * marketplace template, so nothing here is labelled by where it came from.
  */
 function templateColumns(installedTemplateIds: string[]): TemplateColumn[] {
-	const installed = CARD_TEMPLATES.filter((template) => installedTemplateIds.includes(template.id));
+	const installed = CARD_TEMPLATES.filter((template) =>
+		installedTemplateIds.includes(template.id),
+	);
 	return TEMPLATE_CATEGORIES.map((category) => ({
 		label: category.label,
 		options: installed.filter((template) => template.category === category.id),
@@ -106,7 +108,8 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 				triggerLeft: trigger.getBoundingClientRect().left,
 				viewportWidth: window.innerWidth,
 				rootFontSize:
-					Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16,
+					Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) ||
+					16,
 			}),
 		);
 	}, [columns.length]);
@@ -133,7 +136,10 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 						className="flex h-12 select-none items-center gap-3 rounded-lg px-5 text-base font-light text-white/70 transition-all outline-none hover:bg-white/5 hover:text-white focus-visible:bg-white/5 focus-visible:text-white focus-visible:outline-none focus-visible:ring-0"
 					>
 						<span className="opacity-50">Template</span>
-						<MarqueeText className="max-w-40 text-white" text={currentTemplate?.name || "Select"} />
+						<MarqueeText
+							className="max-w-40 text-white"
+							text={currentTemplate?.name || "Select"}
+						/>
 						<ChevronDown className="h-4 w-4 opacity-50" />
 					</Button>
 				</DropdownMenuTrigger>
@@ -177,7 +183,11 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 														// it is out of the menu's roving focus. Delete on the row
 														// is the keyboard path to the same action.
 														if (!onTemplateRemove) return;
-														if (event.key !== "Delete" && event.key !== "Backspace") return;
+														if (
+															event.key !== "Delete" &&
+															event.key !== "Backspace"
+														)
+															return;
 														event.preventDefault();
 														onTemplateRemove(template.id);
 													}}

@@ -125,7 +125,8 @@ export default function ProfilePage() {
 
 	useEffect(() => {
 		const handlePointsUpdated = (event: Event) => {
-			const slideTokens = (event as CustomEvent<{ slideTokens?: unknown }>).detail?.slideTokens;
+			const slideTokens = (event as CustomEvent<{ slideTokens?: unknown }>).detail
+				?.slideTokens;
 			if (typeof slideTokens !== "number" || !Number.isFinite(slideTokens)) return;
 
 			setProfile((currentProfile) =>
@@ -272,7 +273,8 @@ export default function ProfilePage() {
 	let passwordSubmitLabel = savingProfile ? "Updating..." : "Update Password";
 	if (!hasPassword) {
 		passwordSubmitLabel = passwordCodeSent ? "Set Password" : "Email me a code";
-		if (savingProfile) passwordSubmitLabel = passwordCodeSent ? "Setting..." : "Sending code...";
+		if (savingProfile)
+			passwordSubmitLabel = passwordCodeSent ? "Setting..." : "Sending code...";
 	}
 
 	const resetPasswordForm = () => {
@@ -309,7 +311,11 @@ export default function ProfilePage() {
 				setSuccess(`We sent a 6-digit code to ${profile.email}`);
 				return;
 			}
-			await auth.resetPassword({ email: profile.email, otp: passwordCode, password: newPassword });
+			await auth.resetPassword({
+				email: profile.email,
+				otp: passwordCode,
+				password: newPassword,
+			});
 			setHasPassword(true);
 			resetPasswordForm();
 			setSuccess("Password set. You can now sign in with it.");
@@ -409,7 +415,11 @@ export default function ProfilePage() {
 
 		const formData = new FormData();
 		formData.append("file", file);
-		void applyAvatarUpdate("/profile/avatar/upload", { method: "POST", body: formData }, revision);
+		void applyAvatarUpdate(
+			"/profile/avatar/upload",
+			{ method: "POST", body: formData },
+			revision,
+		);
 	};
 
 	useEffect(() => {
@@ -467,7 +477,10 @@ export default function ProfilePage() {
 						)}
 
 						<div className="space-y-2">
-							<label htmlFor="avatar-url" className="text-sm font-medium text-white/80">
+							<label
+								htmlFor="avatar-url"
+								className="text-sm font-medium text-white/80"
+							>
 								Image URL
 							</label>
 							<div className="flex items-center gap-2">
@@ -596,7 +609,9 @@ export default function ProfilePage() {
 										type="password"
 										autoComplete="current-password"
 										value={emailCurrentPassword}
-										onChange={(event) => setEmailCurrentPassword(event.target.value)}
+										onChange={(event) =>
+											setEmailCurrentPassword(event.target.value)
+										}
 										className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
 										placeholder="Current password"
 										required
@@ -662,7 +677,10 @@ export default function ProfilePage() {
 							>
 								{hasPassword ? (
 									<div className="space-y-2">
-										<label htmlFor="current-password" className="text-sm font-medium text-white/80">
+										<label
+											htmlFor="current-password"
+											className="text-sm font-medium text-white/80"
+										>
 											Current Password
 										</label>
 										<input
@@ -678,7 +696,10 @@ export default function ProfilePage() {
 								) : null}
 
 								<div className="space-y-2">
-									<label htmlFor="new-password" className="text-sm font-medium text-white/80">
+									<label
+										htmlFor="new-password"
+										className="text-sm font-medium text-white/80"
+									>
 										New Password
 									</label>
 									<input
@@ -714,7 +735,10 @@ export default function ProfilePage() {
 
 								{!hasPassword && passwordCodeSent ? (
 									<div className="space-y-2">
-										<label htmlFor="password-code" className="text-sm font-medium text-white/80">
+										<label
+											htmlFor="password-code"
+											className="text-sm font-medium text-white/80"
+										>
 											Verification Code
 										</label>
 										<input
@@ -724,7 +748,9 @@ export default function ProfilePage() {
 											autoComplete="one-time-code"
 											maxLength={6}
 											value={passwordCode}
-											onChange={(e) => setPasswordCode(e.target.value.replace(/\D/g, ""))}
+											onChange={(e) =>
+												setPasswordCode(e.target.value.replace(/\D/g, ""))
+											}
 											className="w-full rounded-lg bg-white/10 border border-white/15 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20"
 											placeholder="6-digit code from your email"
 											minLength={6}
@@ -753,13 +779,17 @@ export default function ProfilePage() {
 						) : hasPassword ? (
 							<p className="text-white/80">••••••••</p>
 						) : (
-							<p className="text-white/60">Not set. You sign in with a code sent to your email.</p>
+							<p className="text-white/60">
+								Not set. You sign in with a code sent to your email.
+							</p>
 						)}
 					</div>
 
 					{/* Account Info */}
 					<div className="border-t border-white/10 py-8">
-						<h2 className="mb-4 text-lg font-semibold text-white">Account Information</h2>
+						<h2 className="mb-4 text-lg font-semibold text-white">
+							Account Information
+						</h2>
 
 						<div className="space-y-3">
 							<div className="flex justify-between items-center">

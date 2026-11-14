@@ -285,7 +285,10 @@ describe("DeckWorkspace", () => {
 		globalThis.fetch = mock(async () =>
 			Response.json(
 				{
-					error: { message: "This presentation was changed elsewhere. Reload it before editing." },
+					error: {
+						message:
+							"This presentation was changed elsewhere. Reload it before editing.",
+					},
 					currentRevision: 5,
 				},
 				{ status: 409 },
@@ -298,7 +301,11 @@ describe("DeckWorkspace", () => {
 		typeHeading(view, "Conflicting edit");
 
 		fireEvent.click(
-			await view.findByRole("button", { name: "Reload the latest version" }, { timeout: 8000 }),
+			await view.findByRole(
+				"button",
+				{ name: "Reload the latest version" },
+				{ timeout: 8000 },
+			),
 		);
 		expect(onReload).toHaveBeenCalled();
 		expect(view.queryByRole("textbox", { name: "Card heading" })).not.toBeInTheDocument();
@@ -307,7 +314,8 @@ describe("DeckWorkspace", () => {
 	it("adds an Unsplash photo to a card and saves it", async () => {
 		const assetId = "e".repeat(64);
 		const hotlink = "https://images.unsplash.com/photo-1?ixid=x&w=2400";
-		const photographerUrl = "https://unsplash.com/@ada?utm_source=slidesage&utm_medium=referral";
+		const photographerUrl =
+			"https://unsplash.com/@ada?utm_source=slidesage&utm_medium=referral";
 		const requests: Array<{ url: string; body?: string }> = [];
 		globalThis.fetch = mock(async (input: string | URL | Request, init?: RequestInit) => {
 			const url = String(input);
@@ -341,7 +349,12 @@ describe("DeckWorkspace", () => {
 							mimeType: "image/jpeg",
 							width: 1600,
 							height: 900,
-							source: { type: "stock", provider: "unsplash", photographer: "Ada", photographerUrl },
+							source: {
+								type: "stock",
+								provider: "unsplash",
+								photographer: "Ada",
+								photographerUrl,
+							},
 						},
 					},
 					{ status: 201 },
@@ -353,7 +366,9 @@ describe("DeckWorkspace", () => {
 		const view = open();
 		fireEvent.click(view.getByRole("button", { name: "Edit" }));
 		fireEvent.click(view.getByRole("button", { name: "Add photo" }));
-		expect(await view.findByRole("textbox", { name: "Search photos" })).toHaveValue("Grid storage");
+		expect(await view.findByRole("textbox", { name: "Search photos" })).toHaveValue(
+			"Grid storage",
+		);
 		fireEvent.click(view.getByRole("button", { name: "Search" }));
 		expect(await view.findByRole("img", { name: "Solar farm" })).toBeInTheDocument();
 		expect(view.getByRole("link", { name: "Photos provided by Unsplash" })).toHaveAttribute(
@@ -375,7 +390,9 @@ describe("DeckWorkspace", () => {
 		expect(photo).toHaveAttribute("src", hotlink);
 		expect(article).toHaveAttribute("data-layout", "cover");
 		expect(
-			JSON.parse(requests.find((request) => request.url.endsWith("/assets/stock"))?.body ?? "{}"),
+			JSON.parse(
+				requests.find((request) => request.url.endsWith("/assets/stock"))?.body ?? "{}",
+			),
 		).toEqual({
 			provider: "unsplash",
 			photoId: "Ab_1",
@@ -383,9 +400,9 @@ describe("DeckWorkspace", () => {
 		});
 		await waitFor(
 			() =>
-				expect(requests.some((request) => request.body?.includes(`"assetId":"${assetId}"`))).toBe(
-					true,
-				),
+				expect(
+					requests.some((request) => request.body?.includes(`"assetId":"${assetId}"`)),
+				).toBe(true),
 			{ timeout: 8000 },
 		);
 	}, 15000);
@@ -395,7 +412,11 @@ describe("DeckWorkspace", () => {
 		globalThis.fetch = mock(async (input: string | URL | Request, init?: RequestInit) => {
 			const url = String(input);
 			const method = init?.method ?? "GET";
-			requests.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+			requests.push({
+				url,
+				method,
+				body: init?.body ? JSON.parse(String(init.body)) : undefined,
+			});
 			if (url.endsWith("/document")) return Response.json({ revision: { revision: 4 } });
 			if (url.endsWith("/presentation-jobs")) {
 				return Response.json(
@@ -410,12 +431,16 @@ describe("DeckWorkspace", () => {
 		const view = open();
 		fireEvent.click(view.getByRole("button", { name: "Edit" }));
 		typeHeading(view, "Grid batteries");
-		fireEvent.click(view.getByRole("button", { name: "Revise this card with AI", hidden: true }));
+		fireEvent.click(
+			view.getByRole("button", { name: "Revise this card with AI", hidden: true }),
+		);
 		fireEvent.click(await view.findByRole("button", { name: "Make it more concise" }));
 
 		await waitFor(
 			() =>
-				expect(requests.some((request) => request.url.endsWith("/presentation-jobs"))).toBe(true),
+				expect(requests.some((request) => request.url.endsWith("/presentation-jobs"))).toBe(
+					true,
+				),
 			{
 				timeout: 8000,
 			},
@@ -423,7 +448,9 @@ describe("DeckWorkspace", () => {
 		const methods = requests.map(
 			(request) => `${request.method} ${request.url.split("/").slice(-1)[0]}`,
 		);
-		expect(methods.indexOf("PUT document")).toBeLessThan(methods.indexOf("POST presentation-jobs"));
+		expect(methods.indexOf("PUT document")).toBeLessThan(
+			methods.indexOf("POST presentation-jobs"),
+		);
 		const job = requests.find((request) => request.url.endsWith("/presentation-jobs"));
 		expect(job?.body).toMatchObject({
 			topic: "Make it more concise",
@@ -539,8 +566,12 @@ describe("workspace templates", () => {
 		expect(calls[0]).toContain("/templates/ocean-proposal");
 		await waitFor(() => expect(saves).toHaveLength(1), { timeout: 5000 });
 		expect(JSON.stringify(saves[0])).toContain("A better place to work");
-		expect(JSON.stringify(saves[0])).toContain(Object.keys(starter.assets)[0] ?? "missing asset");
+		expect(JSON.stringify(saves[0])).toContain(
+			Object.keys(starter.assets)[0] ?? "missing asset",
+		);
 		fireEvent.click(view.getByRole("button", { name: "Undo" }));
-		expect(view.getByRole("textbox", { name: "Card heading" }).textContent).toBe("Grid storage");
+		expect(view.getByRole("textbox", { name: "Card heading" }).textContent).toBe(
+			"Grid storage",
+		);
 	}, 15000);
 });

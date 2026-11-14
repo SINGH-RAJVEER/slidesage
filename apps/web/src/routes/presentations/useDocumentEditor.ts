@@ -70,7 +70,10 @@ export function useDocumentEditor(options: {
 		if (!draft) return null;
 		// A lost response may have reached the server. Reconcile that save first
 		// instead of replaying it against a revision it already produced.
-		if (draft.pendingOperation && sameDocument(draft.pendingOperation.document, options.initial)) {
+		if (
+			draft.pendingOperation &&
+			sameDocument(draft.pendingOperation.document, options.initial)
+		) {
 			return {
 				...draft,
 				savedDocument: options.initial,
@@ -124,7 +127,9 @@ export function useDocumentEditor(options: {
 	const persist = useCallback(() => {
 		if (discarded.current) return;
 		// An older editor's in-flight save must not erase a newer editor's draft.
-		if (readPageDraft(ownerKey, (value): value is string => typeof value === "string") !== owner)
+		if (
+			readPageDraft(ownerKey, (value): value is string => typeof value === "string") !== owner
+		)
 			return;
 		writePageDraft(
 			draftKey,
@@ -156,7 +161,9 @@ export function useDocumentEditor(options: {
 			const coalesce = now - lastEdit.current < COALESCE_MS && current.past.length > 0;
 			lastEdit.current = now;
 			return {
-				past: coalesce ? current.past : [...current.past, current.present].slice(-HISTORY_LIMIT),
+				past: coalesce
+					? current.past
+					: [...current.past, current.present].slice(-HISTORY_LIMIT),
 				present: next,
 				future: [],
 			};
@@ -222,7 +229,10 @@ export function useDocumentEditor(options: {
 					// come after the revision was, so that save stays pending.
 					if (response.status < 500) pendingOperation.current = null;
 					persist();
-					setStatus({ state: "error", message: body?.error?.message ?? "Unable to save changes." });
+					setStatus({
+						state: "error",
+						message: body?.error?.message ?? "Unable to save changes.",
+					});
 					return false;
 				}
 				base.current = body.revision.revision;
@@ -232,7 +242,10 @@ export function useDocumentEditor(options: {
 				onSaved?.(operation.document, body.revision.revision);
 				return true;
 			} catch {
-				setStatus({ state: "error", message: "Unable to save changes. Check your connection." });
+				setStatus({
+					state: "error",
+					message: "Unable to save changes. Check your connection.",
+				});
 				return false;
 			}
 		},
@@ -262,7 +275,11 @@ export function useDocumentEditor(options: {
 		// A retry of the same document reuses its operation ID, so a save whose
 		// response was lost is not applied twice.
 		if (pendingOperation.current?.document !== document) {
-			pendingOperation.current = { document, validated: checked.value, id: crypto.randomUUID() };
+			pendingOperation.current = {
+				document,
+				validated: checked.value,
+				id: crypto.randomUUID(),
+			};
 		}
 		persist();
 		if (!(await send(pendingOperation.current))) return;

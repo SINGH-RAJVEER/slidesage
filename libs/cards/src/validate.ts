@@ -1,8 +1,8 @@
 import { layoutMismatch } from "./layouts";
 import {
 	CALLOUT_TONES,
-	CARD_SCHEMA_VERSION,
 	type Card,
+	CARD_SCHEMA_VERSION,
 	type CardDocument,
 	CHART_KINDS,
 	type ChartNode,
@@ -160,17 +160,26 @@ function chart(value: unknown, path: string, seen: Set<string>): ChartNode {
 		text(category, `${path}.categories[${index}]`, LIMITS.categoryLabel),
 	);
 	count(categories.length, `${path}.categories`, LIMITS.chartCategories, "categories");
-	if (new Set(categories).size !== categories.length) fail(`${path}.categories`, "must not repeat");
+	if (new Set(categories).size !== categories.length)
+		fail(`${path}.categories`, "must not repeat");
 	const seriesList = array(raw["series"], `${path}.series`);
 	count(seriesList.length, `${path}.series`, LIMITS.chartSeries, "series");
 	const series = seriesList.map((rawSeries, index) => {
 		const seriesPath = `${path}.series[${index}]`;
 		const entry = record(rawSeries, seriesPath, ["id", "name", "values"]);
 		const values = array(entry["values"], `${seriesPath}.values`).map((number, valueIndex) =>
-			finite(number, `${seriesPath}.values[${valueIndex}]`, -LIMITS.chartValue, LIMITS.chartValue),
+			finite(
+				number,
+				`${seriesPath}.values[${valueIndex}]`,
+				-LIMITS.chartValue,
+				LIMITS.chartValue,
+			),
 		);
 		if (values.length !== categories.length) {
-			fail(`${seriesPath}.values`, `must hold one value per category, ${categories.length} in all`);
+			fail(
+				`${seriesPath}.values`,
+				`must hold one value per category, ${categories.length} in all`,
+			);
 		}
 		return {
 			id: id(entry["id"], `${seriesPath}.id`, seen),
@@ -232,7 +241,11 @@ function node(
 				text: richText(raw["text"], `${path}.text`, LIMITS.quote),
 			};
 			if (raw["attribution"] !== undefined) {
-				result.attribution = text(raw["attribution"], `${path}.attribution`, LIMITS.attribution);
+				result.attribution = text(
+					raw["attribution"],
+					`${path}.attribution`,
+					LIMITS.attribution,
+				);
 			}
 			return result;
 		}
@@ -256,7 +269,11 @@ function node(
 					title: text(step["title"], `${stepPath}.title`, LIMITS.stepTitle),
 				};
 				if (step["detail"] !== undefined) {
-					result.detail = richText(step["detail"], `${stepPath}.detail`, LIMITS.stepDetail);
+					result.detail = richText(
+						step["detail"],
+						`${stepPath}.detail`,
+						LIMITS.stepDetail,
+					);
 				}
 				return result;
 			});
@@ -265,15 +282,21 @@ function node(
 		case "columns": {
 			const raw = record(value, path, ["id", "type", "columns"]);
 			const nodeID = id(raw["id"], `${path}.id`, seen);
-			const columns: Column[] = array(raw["columns"], `${path}.columns`).map((rawColumn, index) => {
-				const columnPath = `${path}.columns[${index}]`;
-				const column = record(rawColumn, columnPath, ["id", "heading", "items"]);
-				return {
-					id: id(column["id"], `${columnPath}.id`, seen),
-					heading: text(column["heading"], `${columnPath}.heading`, LIMITS.columnHeading),
-					items: listItems(column["items"], `${columnPath}.items`, seen),
-				};
-			});
+			const columns: Column[] = array(raw["columns"], `${path}.columns`).map(
+				(rawColumn, index) => {
+					const columnPath = `${path}.columns[${index}]`;
+					const column = record(rawColumn, columnPath, ["id", "heading", "items"]);
+					return {
+						id: id(column["id"], `${columnPath}.id`, seen),
+						heading: text(
+							column["heading"],
+							`${columnPath}.heading`,
+							LIMITS.columnHeading,
+						),
+						items: listItems(column["items"], `${columnPath}.items`, seen),
+					};
+				},
+			);
 			return { id: nodeID, type, columns };
 		}
 		case "image": {
@@ -316,7 +339,12 @@ function node(
 				};
 			});
 			count(items.length, `${path}.items`, LIMITS.meters, "meters");
-			return { id: nodeID, type, size: oneOf(raw["size"], `${path}.size`, WIDGET_SIZES), items };
+			return {
+				id: nodeID,
+				type,
+				size: oneOf(raw["size"], `${path}.size`, WIDGET_SIZES),
+				items,
+			};
 		}
 		case "table": {
 			const raw = record(value, path, ["id", "type", "size", "columns", "rows"]);
@@ -334,7 +362,10 @@ function node(
 					return text(cell, `${rowPath}.cells[${cellIndex}]`, LIMITS.tableCell);
 				});
 				if (cells.length !== columns.length) {
-					fail(`${rowPath}.cells`, `must hold one cell per column, ${columns.length} in all`);
+					fail(
+						`${rowPath}.cells`,
+						`must hold one cell per column, ${columns.length} in all`,
+					);
 				}
 				return { id: id(row["id"], `${rowPath}.id`, seen), cells };
 			});
@@ -430,7 +461,13 @@ export interface DocumentOptions {
  * Stored bytes are never rewritten; the next save writes the current version.
  */
 export function parseCardDocument(value: unknown, options: DocumentOptions = {}): CardDocument {
-	const raw = record(value, "document", ["schemaVersion", "title", "theme", "cardOrder", "cards"]);
+	const raw = record(value, "document", [
+		"schemaVersion",
+		"title",
+		"theme",
+		"cardOrder",
+		"cards",
+	]);
 	const version = raw["schemaVersion"];
 	if (!READABLE_SCHEMA_VERSIONS.includes(version as (typeof READABLE_SCHEMA_VERSIONS)[number])) {
 		fail("document.schemaVersion", `must be one of ${READABLE_SCHEMA_VERSIONS.join(", ")}`);

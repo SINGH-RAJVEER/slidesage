@@ -31,7 +31,13 @@ describe("presentation retry destination", () => {
 		const plan = {
 			title: "Quantum computing",
 			cards: [
-				{ position: 1, takeaway: "Qubits", role: "opening", layout: "title", sourceIds: ["s1"] },
+				{
+					position: 1,
+					takeaway: "Qubits",
+					role: "opening",
+					layout: "title",
+					sourceIds: ["s1"],
+				},
 			],
 		};
 		const destination = getPresentationRetryDestination(failed({ plan }), "abc");

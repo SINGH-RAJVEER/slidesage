@@ -101,6 +101,8 @@ export async function getJson<T>(path: string): Promise<ApiResult<T>> {
 		return { ok: true, data: body as T };
 	}
 	const message =
-		body !== null && typeof body === "object" && "error" in body ? body.error?.message : undefined;
+		body !== null && typeof body === "object" && "error" in body
+			? body.error?.message
+			: undefined;
 	return { ok: false, status: response.status, message };
 }

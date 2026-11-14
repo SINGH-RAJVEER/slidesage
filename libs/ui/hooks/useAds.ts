@@ -1,5 +1,5 @@
 import { useAuth } from "../context/AuthContext";
-import { ADS_CONFIG, type AdPlacement, type AdsConfig, isAdEligible } from "../lib/ads";
+import { type AdPlacement, ADS_CONFIG, type AdsConfig, isAdEligible } from "../lib/ads";
 
 /** Whether the signed-in reader sees ads. False until the session has loaded. */
 export function useAdsEligible(): boolean {

@@ -64,9 +64,13 @@ const LAYOUT_MARKS: Record<string, readonly Mark[]> = {
 	],
 	chart: [
 		heading,
-		...[0, 1, 2, 3, 4, 5].map(
-			(at): Mark => [18 + at * 22, 74 - (at + 1) * 7, 14, (at + 1) * 7, 0.2 + at * 0.13],
-		),
+		...[0, 1, 2, 3, 4, 5].map((at): Mark => [
+			18 + at * 22,
+			74 - (at + 1) * 7,
+			14,
+			(at + 1) * 7,
+			0.2 + at * 0.13,
+		]),
 	],
 	table: [
 		heading,

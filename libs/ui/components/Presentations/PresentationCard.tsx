@@ -40,11 +40,17 @@ export const PresentationCard: React.FC<PresentationCardProps> = ({
 					<span className="min-w-0 flex-1">
 						{presentation.status === "failed" && (
 							<span className="mb-2 flex items-center gap-1.5 text-xs font-medium text-red-300">
-								{isOpening ? <ThinkingOrb size={20} /> : <RotateCcw className="h-3.5 w-3.5" />}
+								{isOpening ? (
+									<ThinkingOrb size={20} />
+								) : (
+									<RotateCcw className="h-3.5 w-3.5" />
+								)}
 								Ready to retry
 							</span>
 						)}
-						<span className="line-clamp-2 block font-light opacity-90">{presentation.title}</span>
+						<span className="line-clamp-2 block font-light opacity-90">
+							{presentation.title}
+						</span>
 					</span>
 					<Button
 						variant="ghost"

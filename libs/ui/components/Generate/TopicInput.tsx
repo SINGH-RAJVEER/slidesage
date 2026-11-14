@@ -110,7 +110,9 @@ export const TopicInput: React.FC<TopicInputProps> = ({
 		if (nextExpanded === expanded || morphing) return;
 
 		const composer = composerRef.current;
-		const nextCompactHeight = nextExpanded ? composer?.getBoundingClientRect().height : undefined;
+		const nextCompactHeight = nextExpanded
+			? composer?.getBoundingClientRect().height
+			: undefined;
 		const nextBounds = nextExpanded ? getExpandedEditorBounds() : expandedBounds;
 
 		const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -186,7 +188,9 @@ export const TopicInput: React.FC<TopicInputProps> = ({
 						: undefined
 				}
 			>
-				<legend className="sr-only">{expanded ? "Expanded prompt" : "Prompt composer"}</legend>
+				<legend className="sr-only">
+					{expanded ? "Expanded prompt" : "Prompt composer"}
+				</legend>
 				<div
 					className={
 						expanded
@@ -223,7 +227,11 @@ export const TopicInput: React.FC<TopicInputProps> = ({
 							aria-label={expanded ? "Shrink prompt editor" : "Expand prompt editor"}
 							className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-md text-white/45 transition-[color,background-color,transform] duration-200 hover:bg-white/10 hover:text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:pointer-events-none desktop:size-9"
 						>
-							{expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+							{expanded ? (
+								<Minimize2 className="size-4" />
+							) : (
+								<Maximize2 className="size-4" />
+							)}
 						</button>
 					)}
 				</div>

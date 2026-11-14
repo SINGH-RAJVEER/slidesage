@@ -46,7 +46,9 @@ it("restores unfinished profile fields without storing passwords", async () => {
 		);
 		await first.findByText("old@example.com");
 		fireEvent.click(first.getAllByRole("button", { name: "Edit" })[0] as HTMLElement);
-		fireEvent.change(first.getByPlaceholderText("Your name"), { target: { value: "Draft name" } });
+		fireEvent.change(first.getByPlaceholderText("Your name"), {
+			target: { value: "Draft name" },
+		});
 		fireEvent.click(first.getAllByRole("button", { name: "Edit" })[0] as HTMLElement);
 		fireEvent.change(first.getByDisplayValue("old@example.com"), {
 			target: { value: "draft@example.com" },
@@ -165,7 +167,9 @@ it("sets a first password with an emailed code when the account has none", async
 		await view.findByText("Not set. You sign in with a code sent to your email.");
 		fireEvent.click(view.getByRole("button", { name: "Set password" }));
 		expect(view.queryByPlaceholderText("Enter current password")).toBeNull();
-		fireEvent.change(view.getByLabelText("New Password"), { target: { value: "new-password" } });
+		fireEvent.change(view.getByLabelText("New Password"), {
+			target: { value: "new-password" },
+		});
 		fireEvent.change(view.getByLabelText("Confirm Password"), {
 			target: { value: "new-password" },
 		});
@@ -242,7 +246,8 @@ it("updates the profile picture automatically after entering an image URL", asyn
 			{ timeout: 3000 },
 		);
 		const avatarCall = calls.find(
-			({ input, init }) => String(input).endsWith("/profile/avatar") && init?.method === "POST",
+			({ input, init }) =>
+				String(input).endsWith("/profile/avatar") && init?.method === "POST",
 		);
 		expect(JSON.parse(String(avatarCall?.init?.body))).toEqual({
 			imageUrl: "https://example.com/avatar.png",
@@ -272,7 +277,10 @@ it("uploads a local profile picture from the folder button", async () => {
 		calls.push({ input, init });
 		if (String(input).endsWith("/profile/avatar/upload") && init?.method === "POST") {
 			return Response.json({
-				user: { id: user.id, image: "https://api.example.com/profile/avatar/image/avatar_1" },
+				user: {
+					id: user.id,
+					image: "https://api.example.com/profile/avatar/image/avatar_1",
+				},
 			});
 		}
 		return Response.json({ user });
@@ -289,7 +297,9 @@ it("uploads a local profile picture from the folder button", async () => {
 		);
 
 		await view.findByText("old@example.com");
-		fireEvent.click(view.getByRole("button", { name: "Upload profile picture from your device" }));
+		fireEvent.click(
+			view.getByRole("button", { name: "Upload profile picture from your device" }),
+		);
 		const input = view.container.querySelector<HTMLInputElement>("#avatar-file");
 		if (!input) throw new Error("file input was not rendered");
 		const file = new File(
@@ -304,7 +314,8 @@ it("uploads a local profile picture from the folder button", async () => {
 			expect(
 				calls.some(
 					({ input: requestInput, init }) =>
-						String(requestInput).endsWith("/profile/avatar/upload") && init?.method === "POST",
+						String(requestInput).endsWith("/profile/avatar/upload") &&
+						init?.method === "POST",
 				),
 			).toBe(true);
 		});

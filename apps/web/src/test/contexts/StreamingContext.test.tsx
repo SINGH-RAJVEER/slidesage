@@ -24,7 +24,8 @@ function GenerateStarter({ onNavigateAway }: { onNavigateAway?: () => void }) {
 		<div>
 			<span>{streamingState.isStreaming ? "streaming" : "idle"}</span>
 			<output data-testid="generation-state">
-				{streamingState.isComplete ? "complete" : "pending"}:{streamingState.error ?? "no-error"}
+				{streamingState.isComplete ? "complete" : "pending"}:
+				{streamingState.error ?? "no-error"}
 			</output>
 			<button
 				type="button"
@@ -58,7 +59,8 @@ function IterateStarter() {
 			<output data-testid="iteration-result">{String(result)}</output>
 			<output data-testid="iteration-state">
 				{streamingState.isStreaming ? "streaming" : "idle"}:
-				{streamingState.isComplete ? "complete" : "pending"}:{streamingState.error ?? "no-error"}
+				{streamingState.isComplete ? "complete" : "pending"}:
+				{streamingState.error ?? "no-error"}
 			</output>
 			<button
 				type="button"
@@ -84,7 +86,8 @@ function CancelStarter() {
 	return (
 		<div>
 			<output data-testid="cancel-state">
-				{streamingState.isStreaming ? "streaming" : "idle"}:{streamingState.error ?? "no-error"}
+				{streamingState.isStreaming ? "streaming" : "idle"}:
+				{streamingState.error ?? "no-error"}
 			</output>
 			<button
 				type="button"
@@ -194,7 +197,8 @@ it("submits a job and continues processing after the initiating page unmounts", 
 		});
 		expect(eventsRequested).toBe(true);
 		expect(presentationUpdated).toHaveBeenCalledTimes(1);
-		const event = presentationUpdated.mock.calls[0]?.[0] as CustomEvent<PresentationUpdatedDetail>;
+		const event = presentationUpdated.mock
+			.calls[0]?.[0] as CustomEvent<PresentationUpdatedDetail>;
 		expect(event.detail.presentationId).toBe("presentation_1");
 	} finally {
 		window.removeEventListener(PRESENTATIONS_UPDATED_EVENT, presentationUpdated);
@@ -228,14 +232,18 @@ it("cancels an active generation and clears its resumable state", async () => {
 		);
 
 		fireEvent.click(view.getByRole("button", { name: "Start" }));
-		await waitFor(() => expect(view.getByTestId("cancel-state")).toHaveTextContent("streaming"));
+		await waitFor(() =>
+			expect(view.getByTestId("cancel-state")).toHaveTextContent("streaming"),
+		);
 		fireEvent.click(view.getByRole("button", { name: "Cancel generation" }));
 
 		await waitFor(() =>
 			expect(view.getByTestId("cancel-state")).toHaveTextContent("idle:no-error"),
 		);
 		expect(
-			requests.some((request) => request.url.endsWith("/cancel") && request.method === "POST"),
+			requests.some(
+				(request) => request.url.endsWith("/cancel") && request.method === "POST",
+			),
 		).toBe(true);
 		expect(localStorage.getItem("slidesage-active-generation")).toBeNull();
 	} finally {
@@ -299,7 +307,10 @@ it("treats saved as terminal", async () => {
 		const url = String(input);
 		if (url.endsWith("/presentation-jobs")) {
 			requestBody = JSON.parse(String(init?.body));
-			return Response.json({ job_id: "job_2", presentation_id: "presentation_1" }, { status: 202 });
+			return Response.json(
+				{ job_id: "job_2", presentation_id: "presentation_1" },
+				{ status: 202 },
+			);
 		}
 		return sse(
 			'id: 1\nevent: complete\ndata: {"title":"Updated deck","slides":[],"totalSlides":0}\n\n' +
@@ -473,7 +484,9 @@ it("starts a second generation after the first completes", async () => {
 			const [runs, setRuns] = useState(0);
 			return (
 				<div>
-					<span data-testid="done">{streamingState.isComplete ? "complete" : "pending"}</span>
+					<span data-testid="done">
+						{streamingState.isComplete ? "complete" : "pending"}
+					</span>
 					<button
 						type="button"
 						onClick={() => {
@@ -527,7 +540,9 @@ it("returns failure to the iteration form when the worker emits an error", async
 			</StreamingProvider>,
 		);
 		fireEvent.click(view.getByRole("button", { name: "Iterate" }));
-		await waitFor(() => expect(view.getByTestId("iteration-result")).toHaveTextContent("false"));
+		await waitFor(() =>
+			expect(view.getByTestId("iteration-result")).toHaveTextContent("false"),
+		);
 		expect(view.getByTestId("iteration-state")).toHaveTextContent(
 			"idle:pending:Could not revise the deck",
 		);

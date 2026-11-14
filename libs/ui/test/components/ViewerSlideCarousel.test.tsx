@@ -49,7 +49,11 @@ const carouselProps = {
 
 describe("ViewerSlideCarousel", () => {
 	it("shows every card as a slide, in order, with its citations", () => {
-		const document = assembleDocument({ title: "Grid storage", theme: "paper", cards: cards() });
+		const document = assembleDocument({
+			title: "Grid storage",
+			theme: "paper",
+			cards: cards(),
+		});
 		const view = render(
 			<ViewerSlideCarousel
 				{...carouselProps}
@@ -71,7 +75,11 @@ describe("ViewerSlideCarousel", () => {
 	});
 
 	it("lets only the slide being edited take edits", () => {
-		const document = assembleDocument({ title: "Grid storage", theme: "slate", cards: cards() });
+		const document = assembleDocument({
+			title: "Grid storage",
+			theme: "slate",
+			cards: cards(),
+		});
 		const view = render(
 			<ViewerSlideCarousel
 				{...carouselProps}
@@ -88,7 +96,11 @@ describe("ViewerSlideCarousel", () => {
 
 	it("selects a slide when it is clicked", () => {
 		const onSelectSlide = mock();
-		const document = assembleDocument({ title: "Grid storage", theme: "slate", cards: cards() });
+		const document = assembleDocument({
+			title: "Grid storage",
+			theme: "slate",
+			cards: cards(),
+		});
 		const view = render(
 			<ViewerSlideCarousel
 				{...carouselProps}

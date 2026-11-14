@@ -352,7 +352,8 @@ export function SlideRingHero() {
 		};
 
 		const render = (dt = 0) => {
-			proximity += (proximityTarget - proximity) * (reducedMotion ? 1 : 1 - Math.exp(-dt * 3.2));
+			proximity +=
+				(proximityTarget - proximity) * (reducedMotion ? 1 : 1 - Math.exp(-dt * 3.2));
 			// Latch on first contact, including when the growing surface reaches
 			// a stationary cursor. Completion is not required to retain capture.
 			const visibleRadius =
@@ -365,10 +366,12 @@ export function SlideRingHero() {
 			const deformation = expanded && proximity > 0.985 && !reducedMotion ? 1 : 0;
 			const response = 1 - Math.exp(-dt * 18);
 			deformX +=
-				(Math.max(-1, Math.min(1, cursorX / Math.max(1, horizonRadius))) * deformation - deformX) *
+				(Math.max(-1, Math.min(1, cursorX / Math.max(1, horizonRadius))) * deformation -
+					deformX) *
 				response;
 			deformY +=
-				(Math.max(-1, Math.min(1, cursorY / Math.max(1, horizonRadius))) * deformation - deformY) *
+				(Math.max(-1, Math.min(1, cursorY / Math.max(1, horizonRadius))) * deformation -
+					deformY) *
 				response;
 			root.style.setProperty("--horizon-deform-x", `${deformX * 3}px`);
 			root.style.setProperty("--horizon-deform-y", `${deformY * 3}px`);
@@ -376,7 +379,10 @@ export function SlideRingHero() {
 			root.style.setProperty("--horizon-stretch", String(1 + Math.abs(deformY) * 0.008));
 			root.style.setProperty("--horizon-scale", String(1 / 3 + proximity * (1.22 - 1 / 3)));
 			const reveal = Math.max(0, Math.min(1, (proximity - 0.88) / 0.12));
-			root.style.setProperty("--horizon-wordmark", String(reveal * reveal * (3 - 2 * reveal)));
+			root.style.setProperty(
+				"--horizon-wordmark",
+				String(reveal * reveal * (3 - 2 * reveal)),
+			);
 			const cx = width / 2;
 			const cy = height / 2;
 			const radiusX = Math.min(width * 0.4, 540);
@@ -566,7 +572,10 @@ export function SlideRingHero() {
 				const inner = Math.min(width, height) * 0.08;
 				proximityTarget = expanded
 					? 1
-					: Math.max(0, Math.min(1, (breakoff - distance) / Math.max(1, breakoff - inner)));
+					: Math.max(
+							0,
+							Math.min(1, (breakoff - distance) / Math.max(1, breakoff - inner)),
+						);
 			}
 			if (!dragging) return;
 			const dx = event.clientX - lastX;

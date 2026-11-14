@@ -57,9 +57,15 @@ export const GenerateOptionsBar: React.FC<GenerateOptionsBarProps> = ({
 					onTemplateRemove={onTemplateRemove}
 					installedTemplateIds={installedTemplateIds}
 				/>
-				<DetailLevelSelector detailLevel={detailLevel} onDetailLevelChange={onDetailLevelChange} />
+				<DetailLevelSelector
+					detailLevel={detailLevel}
+					onDetailLevelChange={onDetailLevelChange}
+				/>
 				<TonalitySelector tonality={tonality} onTonalityChange={onTonalityChange} />
-				<SlideCountSelector slideCount={slideCount} onSlideCountChange={onSlideCountChange} />
+				<SlideCountSelector
+					slideCount={slideCount}
+					onSlideCountChange={onSlideCountChange}
+				/>
 			</div>
 		</div>
 	);

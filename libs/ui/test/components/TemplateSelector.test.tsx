@@ -74,7 +74,9 @@ it("removes a template with Delete on its row", () => {
 it("says so when the reader has removed every template", () => {
 	const { view } = openSelector([]);
 
-	expect(view.getByText("No themes installed. Add one from the marketplace.")).toBeInTheDocument();
+	expect(
+		view.getByText("No themes installed. Add one from the marketplace."),
+	).toBeInTheDocument();
 	expect(view.queryAllByRole("menuitem")).toHaveLength(0);
 });
 
@@ -84,16 +86,31 @@ it("says so when the reader has removed every template", () => {
 it("offsets a trigger-aligned panel onto the centre of the page", () => {
 	// A 60rem panel on a 1440px page starts at (1440 - 960) / 2 = 240.
 	expect(
-		centredAlignOffset({ columnCount: 4, triggerLeft: 400, viewportWidth: 1440, rootFontSize: 16 }),
+		centredAlignOffset({
+			columnCount: 4,
+			triggerLeft: 400,
+			viewportWidth: 1440,
+			rootFontSize: 16,
+		}),
 	).toBe(-160);
 
 	// A trigger already at the centred position needs no shift.
 	expect(
-		centredAlignOffset({ columnCount: 4, triggerLeft: 240, viewportWidth: 1440, rootFontSize: 16 }),
+		centredAlignOffset({
+			columnCount: 4,
+			triggerLeft: 240,
+			viewportWidth: 1440,
+			rootFontSize: 16,
+		}),
 	).toBe(0);
 
 	// A panel wider than the page is capped at 92vw and centred on what is left.
 	expect(
-		centredAlignOffset({ columnCount: 6, triggerLeft: 0, viewportWidth: 1000, rootFontSize: 16 }),
+		centredAlignOffset({
+			columnCount: 6,
+			triggerLeft: 0,
+			viewportWidth: 1000,
+			rootFontSize: 16,
+		}),
 	).toBe(40);
 });

@@ -33,7 +33,9 @@ class AppContainer extends DurableObject<Env> {
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
 		if (ctx.container?.running) {
-			void ctx.blockConcurrencyWhile(() => ctx.container!.setInactivityTimeout(this.inactivityMs));
+			void ctx.blockConcurrencyWhile(() =>
+				ctx.container!.setInactivityTimeout(this.inactivityMs),
+			);
 			this.observeExit();
 		}
 	}
@@ -56,7 +58,8 @@ class AppContainer extends DurableObject<Env> {
 	// image or instance size alive after a deploy.
 	async renew(): Promise<void> {
 		if (!this.ctx.container?.running) return;
-		if ((await this.ctx.storage.get<string>("release")) !== this.env.VERSION.id) return this.run();
+		if ((await this.ctx.storage.get<string>("release")) !== this.env.VERSION.id)
+			return this.run();
 		await this.ctx.container.setInactivityTimeout(this.inactivityMs);
 	}
 
@@ -166,7 +169,9 @@ class AppContainer extends DurableObject<Env> {
 				this.monitoring = undefined;
 				if (!this.starting && Date.now() - this.wokenAt < REWAKE_MS)
 					this.ctx.waitUntil(
-						this.run().catch(() => console.error(`${this.role} container restart failed`)),
+						this.run().catch(() =>
+							console.error(`${this.role} container restart failed`),
+						),
 					);
 			});
 		this.ctx.waitUntil(this.monitoring);

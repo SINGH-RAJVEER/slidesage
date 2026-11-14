@@ -225,7 +225,8 @@ export function DeckViewer({
 			return undefined;
 		}
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key.toLowerCase() !== "n" || event.metaKey || event.ctrlKey || event.altKey) return;
+			if (event.key.toLowerCase() !== "n" || event.metaKey || event.ctrlKey || event.altKey)
+				return;
 			setNotesOpen((open) => !open);
 		};
 		window.addEventListener("keydown", onKey);
@@ -314,7 +315,9 @@ export function DeckViewer({
 						onCancelGeneration={onCancelGeneration}
 						cancelDisabled={cancelDisabled}
 						onDeleteSlide={
-							onDeleteSlide && hasCards ? () => onDeleteSlide(navigation.currentSlide) : undefined
+							onDeleteSlide && hasCards
+								? () => onDeleteSlide(navigation.currentSlide)
+								: undefined
 						}
 						deleteDisabled={deleteDisabled}
 						onExport={onExport}

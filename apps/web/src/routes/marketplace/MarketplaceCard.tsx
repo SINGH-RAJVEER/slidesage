@@ -47,7 +47,9 @@ export default function MarketplaceCard({
 					className="min-w-0 flex-1 text-left focus:outline-none"
 				>
 					<h2 className="truncate text-base font-semibold text-white">{template.name}</h2>
-					<p className="mt-0.5 line-clamp-2 text-sm text-white/45">{template.description}</p>
+					<p className="mt-0.5 line-clamp-2 text-sm text-white/45">
+						{template.description}
+					</p>
 				</button>
 				<button
 					type="button"
@@ -55,7 +57,11 @@ export default function MarketplaceCard({
 					onClick={() => (installed ? onRemove(template.id) : onInstall(template.id))}
 					className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
 				>
-					{installed ? <Trash2 className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+					{installed ? (
+						<Trash2 className="h-3.5 w-3.5" />
+					) : (
+						<Plus className="h-3.5 w-3.5" />
+					)}
 					{installed ? "Remove" : "Install"}
 				</button>
 			</div>

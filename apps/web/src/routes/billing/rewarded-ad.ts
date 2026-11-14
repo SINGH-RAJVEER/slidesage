@@ -93,7 +93,10 @@ export async function showRewardedAd(
 	}
 	return new Promise<RewardedAdOutcome>((resolve, reject) => {
 		// GPT returns null where the rewarded format is unsupported.
-		const slot = googletag.defineOutOfPageSlot(adUnit, googletag.enums.OutOfPageFormat.REWARDED);
+		const slot = googletag.defineOutOfPageSlot(
+			adUnit,
+			googletag.enums.OutOfPageFormat.REWARDED,
+		);
 		if (!slot) {
 			resolve("unavailable");
 			return;
@@ -117,7 +120,8 @@ export async function showRewardedAd(
 			window.clearTimeout(timer);
 			beforeShow().then(
 				() => event.makeRewardedVisible(),
-				(error: unknown) => finish(error instanceof Error ? error : new Error(String(error))),
+				(error: unknown) =>
+					finish(error instanceof Error ? error : new Error(String(error))),
 			);
 		};
 		const onGranted = (event: RewardedSlotEvent) => {

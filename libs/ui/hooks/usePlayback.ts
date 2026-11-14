@@ -46,9 +46,12 @@ export function usePlayback({
 		if (slideIntervalSeconds <= 0) return;
 		if (currentSlide >= slideCount - 1) return;
 
-		const id = setInterval(() => {
-			onAdvance(currentSlide + 1);
-		}, Math.max(slideIntervalSeconds, 0) * 1000);
+		const id = setInterval(
+			() => {
+				onAdvance(currentSlide + 1);
+			},
+			Math.max(slideIntervalSeconds, 0) * 1000,
+		);
 
 		return () => clearInterval(id);
 	}, [currentSlide, isPlaying, onAdvance, slideCount, slideIntervalSeconds]);

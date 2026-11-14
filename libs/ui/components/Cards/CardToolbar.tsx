@@ -1,9 +1,9 @@
 import {
 	addCard,
 	addWidget,
-	type CardDocument,
 	canAddImage,
 	canAddWidget,
+	type CardDocument,
 	compatibleLayouts,
 	duplicateCard,
 	type LayoutId,
@@ -111,7 +111,9 @@ function InsertMenu({
 				{WIDGET_CARDS.map(({ layout, label }) => (
 					<DropdownMenuItem
 						key={layout}
-						onSelect={() => edit((current) => addCard(current, cardId, newWidgetCard(layout)))}
+						onSelect={() =>
+							edit((current) => addCard(current, cardId, newWidgetCard(layout)))
+						}
 					>
 						{label}
 					</DropdownMenuItem>
@@ -250,7 +252,10 @@ export function CardToolbar({ document, cardId, edit, onPhoto, onRevise }: CardT
 				>
 					<Copy className="size-4" />
 				</Action>
-				<Action label="Add card after" onClick={() => edit((current) => addCard(current, cardId))}>
+				<Action
+					label="Add card after"
+					onClick={() => edit((current) => addCard(current, cardId))}
+				>
 					<Plus className="size-4" />
 				</Action>
 			</div>

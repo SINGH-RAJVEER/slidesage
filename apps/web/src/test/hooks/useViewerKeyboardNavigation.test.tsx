@@ -62,7 +62,9 @@ describe("useViewerKeyboardNavigation", () => {
 
 	it("navigates on plain J and L keydowns", () => {
 		const onNavigate = mock(() => {});
-		render(<Harness currentSlide={1} onNavigate={onNavigate} onStopPlayback={mock(() => {})} />);
+		render(
+			<Harness currentSlide={1} onNavigate={onNavigate} onStopPlayback={mock(() => {})} />,
+		);
 
 		act(() => {
 			window.dispatchEvent(new KeyboardEvent("keydown", { key: "l" }));
@@ -91,7 +93,9 @@ describe("useViewerKeyboardNavigation", () => {
 	it("uses controlled repeat navigation while a key is held", () => {
 		jest.useFakeTimers();
 		const onNavigate = mock(() => {});
-		render(<Harness currentSlide={0} onNavigate={onNavigate} onStopPlayback={mock(() => {})} />);
+		render(
+			<Harness currentSlide={0} onNavigate={onNavigate} onStopPlayback={mock(() => {})} />,
+		);
 
 		act(() => {
 			window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));

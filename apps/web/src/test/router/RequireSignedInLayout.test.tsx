@@ -17,7 +17,9 @@ const { default: RequireSignedInLayout } = await import("../../app/router/Requir
 
 function CurrentLocation() {
 	const location = useLocation();
-	return <output aria-label="Current location">{`${location.pathname}${location.search}`}</output>;
+	return (
+		<output aria-label="Current location">{`${location.pathname}${location.search}`}</output>
+	);
 }
 
 function renderGuard(initialEntry = "/private") {

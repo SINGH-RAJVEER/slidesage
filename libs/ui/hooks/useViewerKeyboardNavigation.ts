@@ -45,7 +45,11 @@ export function useViewerKeyboardNavigation({
 			activeKeyRef.current = null;
 		};
 		const navigateForKey = (key: string) => {
-			const nextIndex = getViewerKeyboardDestination(key, keyboardSlideRef.current, slideCount);
+			const nextIndex = getViewerKeyboardDestination(
+				key,
+				keyboardSlideRef.current,
+				slideCount,
+			);
 			if (nextIndex === undefined || nextIndex === keyboardSlideRef.current) return;
 			keyboardSlideRef.current = nextIndex;
 			navigate(nextIndex);
@@ -76,7 +80,9 @@ export function useViewerKeyboardNavigation({
 			navigate(nextIndex);
 			if (["arrowleft", "arrowright", "j", "l"].includes(event.key.toLowerCase())) {
 				activeKeyRef.current = event.key.toLowerCase();
-				stopRepeatRef.current = startKeyboardNavigationRepeat(() => navigateForKey(event.key));
+				stopRepeatRef.current = startKeyboardNavigationRepeat(() =>
+					navigateForKey(event.key),
+				);
 			}
 		};
 

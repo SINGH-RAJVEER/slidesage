@@ -127,12 +127,13 @@ export default function CreatePasswordPage() {
 					<p className="mb-6 text-white/65">
 						{step === "password" ? (
 							<>
-								<span className="font-semibold text-white">{email}</span> has no password yet.
-								Choose one, then confirm it with a code we email you.
+								<span className="font-semibold text-white">{email}</span> has no
+								password yet. Choose one, then confirm it with a code we email you.
 							</>
 						) : (
 							<>
-								We sent a 6-digit code to <span className="font-semibold text-white">{email}</span>.
+								We sent a 6-digit code to{" "}
+								<span className="font-semibold text-white">{email}</span>.
 							</>
 						)}
 					</p>
@@ -140,7 +141,10 @@ export default function CreatePasswordPage() {
 					{step === "password" ? (
 						<form className="space-y-4" onSubmit={handlePasswordSubmit}>
 							<div className="space-y-2">
-								<label htmlFor="new-password" className="text-sm font-medium text-white/80">
+								<label
+									htmlFor="new-password"
+									className="text-sm font-medium text-white/80"
+								>
 									Password
 								</label>
 								<input
@@ -157,7 +161,10 @@ export default function CreatePasswordPage() {
 							</div>
 
 							<div className="space-y-2">
-								<label htmlFor="confirm-password" className="text-sm font-medium text-white/80">
+								<label
+									htmlFor="confirm-password"
+									className="text-sm font-medium text-white/80"
+								>
 									Confirm password
 								</label>
 								<input
@@ -173,7 +180,11 @@ export default function CreatePasswordPage() {
 								/>
 							</div>
 
-							<Button type="submit" className={primaryButtonClassName} disabled={submitting}>
+							<Button
+								type="submit"
+								className={primaryButtonClassName}
+								disabled={submitting}
+							>
 								{submitting ? "Sending code..." : "Continue"}
 							</Button>
 						</form>
@@ -190,12 +201,16 @@ export default function CreatePasswordPage() {
 									autoComplete="one-time-code"
 									maxLength={6}
 									value={code}
-									onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
+									onChange={(event) =>
+										setCode(event.target.value.replace(/\D/g, ""))
+									}
 									placeholder="000000"
 									className={`${inputClassName} text-center text-2xl tracking-widest font-mono`}
 									required
 								/>
-								<p className="mt-2 text-center text-xs text-white/50">Code expires in 15 minutes</p>
+								<p className="mt-2 text-center text-xs text-white/50">
+									Code expires in 15 minutes
+								</p>
 							</div>
 
 							<Button

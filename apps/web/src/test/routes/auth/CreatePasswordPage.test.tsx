@@ -43,7 +43,9 @@ it("saves the new password with the emailed code and signs in", async () => {
 	);
 
 	fireEvent.change(view.getByLabelText("Password"), { target: { value: "new-password" } });
-	fireEvent.change(view.getByLabelText("Confirm password"), { target: { value: "new-password" } });
+	fireEvent.change(view.getByLabelText("Confirm password"), {
+		target: { value: "new-password" },
+	});
 	fireEvent.click(view.getByRole("button", { name: "Continue" }));
 
 	await waitFor(() => {

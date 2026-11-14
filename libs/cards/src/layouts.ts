@@ -53,7 +53,8 @@ export const LAYOUT_RULES: Record<LayoutId, LayoutRule> = {
 	process: {
 		nodes: { heading: { min: 1, max: 1 }, steps: { min: 1, max: 1 } },
 		items: { min: 3, max: 6 },
-		description: "Heading and three to six ordered steps, each with a title and optional detail.",
+		description:
+			"Heading and three to six ordered steps, each with a title and optional detail.",
 	},
 	quote: {
 		nodes: { heading: { min: 0, max: 1 }, quote: { min: 1, max: 1 } },
@@ -65,7 +66,8 @@ export const LAYOUT_RULES: Record<LayoutId, LayoutRule> = {
 			stat: { min: 2, max: 4 },
 			paragraph: { min: 0, max: 1 },
 		},
-		description: "Heading, two to four headline figures with labels, and an optional paragraph.",
+		description:
+			"Heading, two to four headline figures with labels, and an optional paragraph.",
 	},
 	"image-left": {
 		nodes: {
@@ -159,7 +161,11 @@ export function layoutMismatch(layout: LayoutId, nodes: ContentNode[]): string |
 		if (!rule.nodes[node.type]) return `layout "${layout}" does not accept ${node.type} nodes`;
 		counts.set(node.type, (counts.get(node.type) ?? 0) + 1);
 		const items = itemCount(node);
-		if (items !== undefined && rule.items && (items < rule.items.min || items > rule.items.max)) {
+		if (
+			items !== undefined &&
+			rule.items &&
+			(items < rule.items.min || items > rule.items.max)
+		) {
 			return `layout "${layout}" needs ${rule.items.min}-${rule.items.max} ${node.type} items, got ${items}`;
 		}
 		if (node.type === "columns") {
@@ -191,7 +197,8 @@ export function layoutMismatch(layout: LayoutId, nodes: ContentNode[]): string |
 	for (const [type, bounds] of Object.entries(rule.nodes) as [ContentNodeType, Bounds][]) {
 		const count = counts.get(type) ?? 0;
 		if (count < bounds.min || count > bounds.max) {
-			const expected = bounds.min === bounds.max ? `${bounds.min}` : `${bounds.min}-${bounds.max}`;
+			const expected =
+				bounds.min === bounds.max ? `${bounds.min}` : `${bounds.min}-${bounds.max}`;
 			return `layout "${layout}" needs ${expected} ${type} node(s), got ${count}`;
 		}
 	}

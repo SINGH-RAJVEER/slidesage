@@ -45,7 +45,8 @@ export function usePageDraft<T>(
 	const load = () => {
 		const stored = readPageDraft(
 			key,
-			(value): value is { value: T; seedKey?: string } => isRecord(value) && valid(value["value"]),
+			(value): value is { value: T; seedKey?: string } =>
+				isRecord(value) && valid(value["value"]),
 		);
 		const owner = crypto.randomUUID();
 		return stored && (!seedKey || stored.seedKey === seedKey)
@@ -76,7 +77,11 @@ export function usePageDraft<T>(
 		const value =
 			typeof action === "function" ? (action as (value: T) => T)(previous.value) : action;
 		const next = { ...previous, value };
-		writePageDraft(previous.key, { value, seedKey: previous.storageSeed, owner: previous.owner });
+		writePageDraft(previous.key, {
+			value,
+			seedKey: previous.storageSeed,
+			owner: previous.owner,
+		});
 		current.current = next;
 		if (mounted.current) setState(next);
 	}, []);

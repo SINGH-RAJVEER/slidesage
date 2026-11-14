@@ -11,7 +11,8 @@ export default function FeedbackPage() {
 	const [message, setMessage] = usePageDraft(
 		"feedback",
 		"",
-		(value): value is string => typeof value === "string" && value.length <= FEEDBACK_MAX_LENGTH,
+		(value): value is string =>
+			typeof value === "string" && value.length <= FEEDBACK_MAX_LENGTH,
 	);
 	const [sending, setSending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -56,7 +57,9 @@ export default function FeedbackPage() {
 			<main className="flex-1 px-4 py-8 desktop:px-8 desktop:py-12">
 				<form className="mx-auto w-full max-w-2xl" onSubmit={handleSubmit}>
 					<div className="text-center">
-						<h1 className="text-3xl font-semibold text-white desktop:text-4xl">Feedback</h1>
+						<h1 className="text-3xl font-semibold text-white desktop:text-4xl">
+							Feedback
+						</h1>
 					</div>
 					<label htmlFor="feedback-message" className="sr-only">
 						Your feedback

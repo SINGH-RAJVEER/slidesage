@@ -19,7 +19,8 @@ async function loadFailedPresentation(presentationId: string): Promise<LoadResul
 		});
 		const result = await readJsonResponse<PresentationResponse | ApiErrorResponse>(response);
 
-		if (response.status === 401) return { error: "Your session expired. Please sign in again." };
+		if (response.status === 401)
+			return { error: "Your session expired. Please sign in again." };
 		if (!result) {
 			return { error: "The presentation service returned an invalid response. Try again." };
 		}
@@ -30,7 +31,8 @@ async function loadFailedPresentation(presentationId: string): Promise<LoadResul
 		return { presentation: result.presentation };
 	} catch (requestError) {
 		return {
-			error: requestError instanceof Error ? requestError.message : "Unable to open this retry.",
+			error:
+				requestError instanceof Error ? requestError.message : "Unable to open this retry.",
 		};
 	}
 }
@@ -76,7 +78,9 @@ export default function PresentationErrorPage({
 				return;
 			}
 			const slidesData = result.presentation.slides_data;
-			setFailureMessage(slidesData.status === "failed" ? (slidesData.failure?.message ?? "") : "");
+			setFailureMessage(
+				slidesData.status === "failed" ? (slidesData.failure?.message ?? "") : "",
+			);
 		});
 		return () => {
 			active = false;
@@ -135,7 +139,10 @@ export default function PresentationErrorPage({
 			<Header />
 			<FloatingNotice error={retryError} onDismiss={() => setRetryError("")} />
 			<main className="flex flex-1 items-center px-6 py-12 desktop:px-10 desktop:py-16">
-				<section aria-labelledby="presentation-error-title" className="mx-auto w-full max-w-3xl">
+				<section
+					aria-labelledby="presentation-error-title"
+					className="mx-auto w-full max-w-3xl"
+				>
 					<div className="max-w-2xl">
 						<h1
 							id="presentation-error-title"
@@ -150,8 +157,8 @@ export default function PresentationErrorPage({
 						)}
 						{presentationId && (
 							<p className="mt-3 text-sm leading-6 text-white/45">
-								Your prompt, generation settings, and available research sources are saved with this
-								presentation.
+								Your prompt, generation settings, and available research sources are
+								saved with this presentation.
 							</p>
 						)}
 					</div>
@@ -165,7 +172,8 @@ export default function PresentationErrorPage({
 							</li>
 							<li className="flex gap-3">
 								<span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/30" />
-								Check your connection if generation stopped before any slides appeared.
+								Check your connection if generation stopped before any slides
+								appeared.
 							</li>
 							<li className="flex gap-3">
 								<span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-white/30" />
@@ -185,7 +193,11 @@ export default function PresentationErrorPage({
 								disabled={isRetrying}
 								className="h-11 bg-white px-5 text-[#151c2a] hover:bg-white/90"
 							>
-								{isRetrying ? <ThinkingOrb size={20} /> : <RotateCcw className="h-4 w-4" />}
+								{isRetrying ? (
+									<ThinkingOrb size={20} />
+								) : (
+									<RotateCcw className="h-4 w-4" />
+								)}
 								{isRetrying ? "Opening retry..." : "Retry presentation"}
 							</Button>
 						)}

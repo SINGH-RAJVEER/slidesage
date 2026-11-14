@@ -11,33 +11,39 @@
 	"triggers": { "crons": ["*/5 * * * *", "0 */6 * * *"] },
 	"vars": {
 		"OBJECT_STORAGE_URL": "https://api.slidesage.app/__storage",
-		"OTEL_EXPORTER_OTLP_ENDPOINT": "https://otlp.us5.datadoghq.com"
+		"OTEL_EXPORTER_OTLP_ENDPOINT": "https://otlp.us5.datadoghq.com",
 	},
 	"containers": [
 		{
 			"class_name": "ApiContainer",
 			"scheduling_policy": "durable_object",
 			"images": {
-				"base": { "dockerfile": "../../infra/cloudflare/Dockerfile", "build_context": "../.." }
-			}
+				"base": {
+					"dockerfile": "../../infra/cloudflare/Dockerfile",
+					"build_context": "../..",
+				},
+			},
 		},
 		{
 			"class_name": "GenerationContainer",
 			"scheduling_policy": "durable_object",
 			"images": {
-				"base": { "dockerfile": "../../infra/cloudflare/Dockerfile", "build_context": "../.." }
-			}
-		}
+				"base": {
+					"dockerfile": "../../infra/cloudflare/Dockerfile",
+					"build_context": "../..",
+				},
+			},
+		},
 	],
 	"durable_objects": {
 		"bindings": [
 			{ "name": "API", "class_name": "ApiContainer" },
-			{ "name": "GENERATION", "class_name": "GenerationContainer" }
-		]
+			{ "name": "GENERATION", "class_name": "GenerationContainer" },
+		],
 	},
 	"exports": {
 		"ApiContainer": { "type": "durable-object", "storage": "sqlite" },
-		"GenerationContainer": { "type": "durable-object", "storage": "sqlite" }
+		"GenerationContainer": { "type": "durable-object", "storage": "sqlite" },
 	},
-	"r2_buckets": [{ "binding": "OBJECTS", "bucket_name": "slidesage-objects" }]
+	"r2_buckets": [{ "binding": "OBJECTS", "bucket_name": "slidesage-objects" }],
 }

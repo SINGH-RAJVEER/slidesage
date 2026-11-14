@@ -115,7 +115,10 @@ export const ViewerSlideCarousel: React.FC<ViewerSlideCarouselProps> = ({
 										edit={index === editableSlide ? edit : undefined}
 									/>
 								) : (
-									<PendingSlide takeaway={slide.takeaway} generation={generation} />
+									<PendingSlide
+										takeaway={slide.takeaway}
+										generation={generation}
+									/>
 								)}
 							</div>
 						);

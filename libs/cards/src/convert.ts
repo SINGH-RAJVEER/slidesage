@@ -1,6 +1,6 @@
 import {
-	CARD_SCHEMA_VERSION,
 	type Card,
+	CARD_SCHEMA_VERSION,
 	type CardDocument,
 	type ContentNodeType,
 	type NarrativeRole,
@@ -34,8 +34,7 @@ export interface ConvertCardsRequest {
 }
 
 export type CardResult =
-	| { position: number; card: Card }
-	| { position: number; issue: SchemaIssue };
+	{ position: number; card: Card } | { position: number; issue: SchemaIssue };
 
 /**
  * cyrb53: a small, fast, well-distributed 53-bit string hash. IDs derived from
@@ -51,9 +50,11 @@ function hash(value: string): string {
 		second = Math.imul(second ^ code, 1597334677);
 	}
 	first =
-		Math.imul(first ^ (first >>> 16), 2246822507) ^ Math.imul(second ^ (second >>> 13), 3266489909);
+		Math.imul(first ^ (first >>> 16), 2246822507) ^
+		Math.imul(second ^ (second >>> 13), 3266489909);
 	second =
-		Math.imul(second ^ (second >>> 16), 2246822507) ^ Math.imul(first ^ (first >>> 13), 3266489909);
+		Math.imul(second ^ (second >>> 16), 2246822507) ^
+		Math.imul(first ^ (first >>> 13), 3266489909);
 	return (4294967296 * (2097151 & second) + (first >>> 0)).toString(36).padStart(8, "0");
 }
 
@@ -175,14 +176,21 @@ class DraftReader {
 			case "paragraph":
 				return { id: this.nextID("n"), type, text: this.rich(raw["text"], `${path}.text`) };
 			case "bullets":
-				return { id: this.nextID("n"), type, items: this.items(raw["items"], `${path}.items`) };
+				return {
+					id: this.nextID("n"),
+					type,
+					items: this.items(raw["items"], `${path}.items`),
+				};
 			case "quote": {
 				const node: Record<string, unknown> = {
 					id: this.nextID("n"),
 					type,
 					text: this.rich(raw["text"], `${path}.text`),
 				};
-				if (typeof raw["attribution"] === "string" && cleanText(raw["attribution"]) !== "") {
+				if (
+					typeof raw["attribution"] === "string" &&
+					cleanText(raw["attribution"]) !== ""
+				) {
 					node["attribution"] = cleanText(raw["attribution"]);
 				}
 				return node;
@@ -212,15 +220,17 @@ class DraftReader {
 			}
 			case "columns": {
 				const id = this.nextID("n");
-				const columns = this.list(raw["columns"], `${path}.columns`).map((rawColumn, index) => {
-					const columnPath = `${path}.columns[${index}]`;
-					const column = this.object(rawColumn, columnPath);
-					return {
-						id: this.nextID("i"),
-						heading: this.string(column["heading"], `${columnPath}.heading`),
-						items: this.items(column["items"], `${columnPath}.items`),
-					};
-				});
+				const columns = this.list(raw["columns"], `${path}.columns`).map(
+					(rawColumn, index) => {
+						const columnPath = `${path}.columns[${index}]`;
+						const column = this.object(rawColumn, columnPath);
+						return {
+							id: this.nextID("i"),
+							heading: this.string(column["heading"], `${columnPath}.heading`),
+							items: this.items(column["items"], `${columnPath}.items`),
+						};
+					},
+				);
 				return { id, type, columns };
 			}
 			case "image": {
@@ -242,10 +252,11 @@ class DraftReader {
 					type,
 					kind: raw["kind"],
 					size: raw["size"],
-					categories: this.list(raw["categories"], `${path}.categories`).map((category, index) =>
-						typeof category === "number"
-							? String(category)
-							: this.string(category, `${path}.categories[${index}]`),
+					categories: this.list(raw["categories"], `${path}.categories`).map(
+						(category, index) =>
+							typeof category === "number"
+								? String(category)
+								: this.string(category, `${path}.categories[${index}]`),
 					),
 					series: this.list(raw["series"], `${path}.series`).map((rawSeries, index) => {
 						const seriesPath = `${path}.series[${index}]`;
@@ -254,7 +265,8 @@ class DraftReader {
 							id: this.nextID("i"),
 							name: this.string(series["name"], `${seriesPath}.name`),
 							values: this.list(series["values"], `${seriesPath}.values`).map(
-								(number, valueIndex) => this.number(number, `${seriesPath}.values[${valueIndex}]`),
+								(number, valueIndex) =>
+									this.number(number, `${seriesPath}.values[${valueIndex}]`),
 							),
 						};
 					}),
@@ -372,7 +384,8 @@ export function convertCards(request: ConvertCardsRequest): CardResult[] {
 				card: convertOne(input, request.operationId, knownSources, knownAssets),
 			};
 		} catch (error) {
-			if (error instanceof SchemaError) return { position: input.position, issue: error.issue };
+			if (error instanceof SchemaError)
+				return { position: input.position, issue: error.issue };
 			throw error;
 		}
 	});

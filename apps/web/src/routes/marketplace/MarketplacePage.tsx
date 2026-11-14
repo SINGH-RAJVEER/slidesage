@@ -33,9 +33,9 @@ export default function MarketplacePage() {
 	const firstRowLength = useMediaQuery("(min-width: 1024px)") ? 3 : 2;
 	/* Always by name. A catalog the reader cannot reorder is one they can learn
 	   the shape of, and alphabetical is the order a name is looked up in. */
-	const visibleTemplates = CARD_TEMPLATES.filter((template) => matchesSearch(template, query)).sort(
-		(a, b) => a.name.localeCompare(b.name),
-	);
+	const visibleTemplates = CARD_TEMPLATES.filter((template) =>
+		matchesSearch(template, query),
+	).sort((a, b) => a.name.localeCompare(b.name));
 
 	const setInstalled = (templateId: string, installed: boolean) => {
 		try {
@@ -68,7 +68,11 @@ export default function MarketplacePage() {
 								{visibleTemplates.map((template, index) => (
 									<Fragment key={template.id}>
 										{index === firstRowLength ? (
-											<InlineAd placement="marketplace" maxWidth={970} className="col-span-full" />
+											<InlineAd
+												placement="marketplace"
+												maxWidth={970}
+												className="col-span-full"
+											/>
 										) : null}
 										<MarketplaceCard
 											template={template}

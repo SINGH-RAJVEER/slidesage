@@ -66,7 +66,10 @@ export default function ForgotPasswordPage() {
 
 						<form className="space-y-4" onSubmit={handleSubmit}>
 							<div className="space-y-2">
-								<label htmlFor="email" className="text-sm font-medium text-white/80">
+								<label
+									htmlFor="email"
+									className="text-sm font-medium text-white/80"
+								>
 									Email
 								</label>
 								<input
@@ -96,7 +99,10 @@ export default function ForgotPasswordPage() {
 						{missingAccount ? (
 							<p className="mt-4 text-sm text-white/75">
 								No account exists for that email address.{" "}
-								<Link to="/sign-up" className="text-white hover:underline font-semibold">
+								<Link
+									to="/sign-up"
+									className="text-white hover:underline font-semibold"
+								>
 									Create an account
 								</Link>{" "}
 								to get started.
@@ -105,7 +111,10 @@ export default function ForgotPasswordPage() {
 
 						<p className="mt-6 text-center text-sm text-white/55">
 							Remember your password?{" "}
-							<Link to="/sign-in" className="text-white hover:underline font-semibold">
+							<Link
+								to="/sign-in"
+								className="text-white hover:underline font-semibold"
+							>
 								Sign in
 							</Link>
 						</p>

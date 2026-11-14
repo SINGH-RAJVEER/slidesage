@@ -80,7 +80,9 @@ describe("inserting widgets", () => {
 					}}
 				/>,
 			);
-			fireEvent.pointerDown(view.getByRole("button", { name: "Insert a widget" }), { button: 0 });
+			fireEvent.pointerDown(view.getByRole("button", { name: "Insert a widget" }), {
+				button: 0,
+			});
 			return view;
 		};
 		let view = open(crowded);
@@ -113,7 +115,9 @@ describe("widget controls", () => {
 		expect(within(chartControls).queryByRole("button", { name: "Widget size" })).toBeNull();
 		// A dashboard needs two widgets, and has exactly two.
 		expect(within(dashboardCard).queryByRole("button", { name: "Remove chart" })).toBeNull();
-		expect(within(dashboardCard).getAllByRole("button", { name: "Widget size" })).toHaveLength(2);
+		expect(within(dashboardCard).getAllByRole("button", { name: "Widget size" })).toHaveLength(
+			2,
+		);
 	});
 
 	it("edits chart data in a grid and refuses values that are not numbers", () => {

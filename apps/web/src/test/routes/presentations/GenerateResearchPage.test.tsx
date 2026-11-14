@@ -84,7 +84,9 @@ describe("GenerateResearchPage", () => {
 
 			// The sources the outline cites are unchanged, so it goes along.
 			fireEvent.click(view.getByText("Proceed to Generate"));
-			const state = JSON.parse((await view.findByTestId("outline-state")).textContent ?? "{}");
+			const state = JSON.parse(
+				(await view.findByTestId("outline-state")).textContent ?? "{}",
+			);
 			expect(state.plan).toEqual(plan);
 		} finally {
 			globalThis.fetch = originalFetch;
@@ -124,7 +126,10 @@ describe("GenerateResearchPage", () => {
 
 			await waitFor(() => expect(view.getByText(/No sources found/)).toBeInTheDocument());
 			const init = fetchMock.mock.calls[0]?.[1];
-			expect(JSON.parse(String(init?.body)).research).toEqual({ enabled: true, maxResults: 3 });
+			expect(JSON.parse(String(init?.body)).research).toEqual({
+				enabled: true,
+				maxResults: 3,
+			});
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
@@ -238,7 +243,9 @@ describe("GenerateResearchPage", () => {
 			expect(view.getByText("Searching the web for sources...")).toBeInTheDocument();
 			expect(view.queryByText("Proceed to Generate")).not.toBeInTheDocument();
 			expect(view.queryByText("Sources")).not.toBeInTheDocument();
-			expect(view.queryByRole("columnheader", { name: "Research note" })).not.toBeInTheDocument();
+			expect(
+				view.queryByRole("columnheader", { name: "Research note" }),
+			).not.toBeInTheDocument();
 
 			resolveResearch?.(
 				new Response(
@@ -277,7 +284,9 @@ describe("GenerateResearchPage", () => {
 
 			fireEvent.keyDown(window, { key: "Enter" });
 
-			const state = JSON.parse((await view.findByTestId("outline-state")).textContent ?? "{}");
+			const state = JSON.parse(
+				(await view.findByTestId("outline-state")).textContent ?? "{}",
+			);
 			expect(requestCount).toBe(1);
 			expect(state.ai).toEqual({ provider: "google", model: "gemini-2.5-pro" });
 			expect(state.researchPayload).toEqual({
@@ -394,7 +403,9 @@ describe("GenerateResearchPage", () => {
 			resolveResearch?.(
 				new Response(
 					JSON.stringify({
-						sources: [{ url: "https://example.com/tidal", title: "Tidal power outlook" }],
+						sources: [
+							{ url: "https://example.com/tidal", title: "Tidal power outlook" },
+						],
 						estimated_tokens: 3.1,
 					}),
 					{ status: 200, headers: { "Content-Type": "application/json" } },
@@ -483,9 +494,9 @@ describe("GenerateResearchPage", () => {
 			await waitFor(() => {
 				expect(view.getByText("Storage policy update")).toBeInTheDocument();
 			});
-			expect(view.getAllByText("The request completed while the page was away.")).not.toHaveLength(
-				0,
-			);
+			expect(
+				view.getAllByText("The request completed while the page was away."),
+			).not.toHaveLength(0);
 			expect(fetchMock).toHaveBeenCalledTimes(1);
 		} finally {
 			globalThis.fetch = originalFetch;

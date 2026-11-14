@@ -38,7 +38,8 @@ function fixture() {
 				new Uint8Array(await crypto.subtle.digest("SHA-256", body)),
 				(byte) => byte.toString(16).padStart(2, "0"),
 			).join("");
-			if (options.sha256 && options.sha256 !== actual) throw new Error("R2 checksum mismatch");
+			if (options.sha256 && options.sha256 !== actual)
+				throw new Error("R2 checksum mismatch");
 			object = {
 				body,
 				size: body.length,
@@ -69,8 +70,13 @@ describe("private immutable image gateway", () => {
 		const bucket = fixture();
 		for (const method of ["GET", "PUT", "DELETE"]) {
 			expect(
-				(await storage(request(method, method === "PUT" ? data : undefined, false), bucket, token))
-					.status,
+				(
+					await storage(
+						request(method, method === "PUT" ? data : undefined, false),
+						bucket,
+						token,
+					)
+				).status,
 			).toBe(404);
 		}
 	});
@@ -79,7 +85,8 @@ describe("private immutable image gateway", () => {
 		expect((await storage(request("PUT", data), bucket, token)).status).toBe(204);
 		expect((await storage(request("PUT", data), bucket, token)).status).toBe(204);
 		expect(
-			(await storage(request("PUT", new TextEncoder().encode("changed")), bucket, token)).status,
+			(await storage(request("PUT", new TextEncoder().encode("changed")), bucket, token))
+				.status,
 		).toBe(409);
 		const read = await storage(request("GET"), bucket, token);
 		expect(await read.text()).toBe("original image");

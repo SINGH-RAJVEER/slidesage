@@ -114,7 +114,10 @@ describe("AuthProvider", () => {
 			);
 		});
 		globalThis.fetch = fetchMock as unknown as typeof fetch;
-		window.localStorage.setItem("slidesage:points-updated", JSON.stringify({ slideTokens: 50 }));
+		window.localStorage.setItem(
+			"slidesage:points-updated",
+			JSON.stringify({ slideTokens: 50 }),
+		);
 
 		let signOut: () => Promise<void> = async () => {};
 		function SessionState() {
@@ -147,7 +150,9 @@ describe("AuthProvider", () => {
 				await waitFor(
 					() => {
 						expect(
-							fetchMock.mock.calls.some(([input]) => String(input).includes("/auth/sign-out")),
+							fetchMock.mock.calls.some(([input]) =>
+								String(input).includes("/auth/sign-out"),
+							),
 						).toBe(true);
 						expect(replace).toHaveBeenCalledWith("/sign-in");
 					},

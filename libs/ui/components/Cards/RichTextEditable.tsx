@@ -51,7 +51,10 @@ export function htmlToRuns(root: Node): RichText {
 			weight === "bold" ||
 			Number(weight) >= 600;
 		const nextItalic =
-			italic || node.tagName === "EM" || node.tagName === "I" || style?.fontStyle === "italic";
+			italic ||
+			node.tagName === "EM" ||
+			node.tagName === "I" ||
+			style?.fontStyle === "italic";
 		for (const child of Array.from(node.childNodes)) walk(child, nextBold, nextItalic);
 	};
 	for (const child of Array.from(root.childNodes)) walk(child, false, false);

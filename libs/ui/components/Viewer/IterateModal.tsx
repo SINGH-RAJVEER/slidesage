@@ -11,7 +11,10 @@ export type IterateScope = "deck" | "slide";
 interface IterateModalProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	onIterate: (instruction: string, scope: IterateScope) => boolean | void | Promise<boolean | void>;
+	onIterate: (
+		instruction: string,
+		scope: IterateScope,
+	) => boolean | void | Promise<boolean | void>;
 	/** The scope chosen when the panel opens. */
 	initialScope?: IterateScope;
 	/** One-based number of the slide on screen. */
@@ -88,7 +91,9 @@ export default function IterateModal({
 				>
 					<X className="size-4" />
 				</button>
-				<h2 className="text-xl font-medium tracking-tight text-white">Iterate on presentation</h2>
+				<h2 className="text-xl font-medium tracking-tight text-white">
+					Iterate on presentation
+				</h2>
 			</DialogHeader>
 			<div className="min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6">
 				<div className="space-y-3">
@@ -157,8 +162,8 @@ export default function IterateModal({
 							</div>
 						</div>
 						<p className="text-sm text-white/50">
-							A revision keeps the number and order of slides. Everything outside the chosen slides
-							stays as it is, and the result is saved as a new version.
+							A revision keeps the number and order of slides. Everything outside the
+							chosen slides stays as it is, and the result is saved as a new version.
 						</p>
 					</div>
 				</div>

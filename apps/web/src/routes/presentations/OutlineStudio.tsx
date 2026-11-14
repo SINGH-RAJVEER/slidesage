@@ -50,7 +50,10 @@ function CardDetail({ editor, index }: { editor: OutlineEditor; index: number })
 								selected ? "bg-white/10 text-white" : "text-white/45",
 							)}
 						>
-							<LayoutGlyph layout={layout} className="aspect-[16/9] size-auto w-full" />
+							<LayoutGlyph
+								layout={layout}
+								className="aspect-[16/9] size-auto w-full"
+							/>
 							{LAYOUT_NAMES[layout as LayoutId]}
 						</Button>
 					);
@@ -64,7 +67,9 @@ function CardDetail({ editor, index }: { editor: OutlineEditor; index: number })
 						value={entry.imageQuery ?? ""}
 						maxLength={100}
 						placeholder="Add a photo search"
-						onChange={(event) => editor.update(index, { imageQuery: event.target.value })}
+						onChange={(event) =>
+							editor.update(index, { imageQuery: event.target.value })
+						}
 						className={`h-8 min-w-0 flex-1 px-2 font-light desktop:text-sm ${QUIET_FIELD} ${entry.imageQuery?.trim() ? "" : "placeholder:text-amber-200/70"}`}
 					/>
 				</div>
@@ -106,7 +111,9 @@ export function OutlineStudio({ editor }: { editor: OutlineEditor }) {
 						aria-label="Presentation title"
 						value={outline.title}
 						maxLength={120}
-						onChange={(event) => editor.setOutline({ ...outline, title: event.target.value })}
+						onChange={(event) =>
+							editor.setOutline({ ...outline, title: event.target.value })
+						}
 						className={`-mx-3 h-auto w-[calc(100%+1.5rem)] py-1.5 text-2xl font-light desktop:text-2xl ${QUIET_FIELD}`}
 					/>
 					<p className="truncate text-sm font-light text-white/40">{request?.prompt}</p>
@@ -135,7 +142,9 @@ export function OutlineStudio({ editor }: { editor: OutlineEditor }) {
 										onKeyDown={keepOnOneLine}
 										placeholder="The one point this card makes"
 										onChange={(event) =>
-											editor.update(index, { takeaway: event.target.value.replace(/\n/g, " ") })
+											editor.update(index, {
+												takeaway: event.target.value.replace(/\n/g, " "),
+											})
 										}
 										className="min-h-0 flex-1 resize-none border-transparent bg-transparent px-1.5 py-1 font-light text-white shadow-none placeholder:text-white/30 focus-visible:border-transparent focus-visible:ring-0"
 									/>
@@ -152,12 +161,16 @@ export function OutlineStudio({ editor }: { editor: OutlineEditor }) {
 										className="ml-8 h-8 max-w-[calc(100%-2rem)] justify-start gap-2 px-2 text-sm font-light hover:bg-white/5"
 									>
 										<span className="text-white/40">Layout</span>
-										<span className="text-white">{LAYOUT_NAMES[entry.layout as LayoutId]}</span>
+										<span className="text-white">
+											{LAYOUT_NAMES[entry.layout as LayoutId]}
+										</span>
 										{isImageLayout(entry.layout) && (
 											<span
 												className={cn(
 													"min-w-0 truncate",
-													entry.imageQuery?.trim() ? "text-white/50" : "text-amber-200/70",
+													entry.imageQuery?.trim()
+														? "text-white/50"
+														: "text-amber-200/70",
 												)}
 											>
 												{entry.imageQuery?.trim() || "Add a photo search"}

@@ -15,9 +15,8 @@ function RouteStateProbe() {
 
 describe("PresentationErrorPage", () => {
 	it("shows the routed error without a presentations shortcut", async () => {
-		const { default: PresentationErrorPage } = await import(
-			"../../../routes/presentations/PresentationErrorPage"
-		);
+		const { default: PresentationErrorPage } =
+			await import("../../../routes/presentations/PresentationErrorPage");
 		const view = render(
 			<MemoryRouter
 				initialEntries={[
@@ -44,9 +43,8 @@ describe("PresentationErrorPage", () => {
 	});
 
 	it("reopens a saved failure for retry from the error page", async () => {
-		const { default: PresentationErrorPage } = await import(
-			"../../../routes/presentations/PresentationErrorPage"
-		);
+		const { default: PresentationErrorPage } =
+			await import("../../../routes/presentations/PresentationErrorPage");
 		const originalFetch = globalThis.fetch;
 		const retryRequest = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
 			expect(String(input)).toContain("/presentations/presentation_42");
@@ -107,9 +105,8 @@ describe("PresentationErrorPage", () => {
 	});
 
 	it("retries from the id in the URL after a reload drops history state", async () => {
-		const { default: PresentationErrorPage } = await import(
-			"../../../routes/presentations/PresentationErrorPage"
-		);
+		const { default: PresentationErrorPage } =
+			await import("../../../routes/presentations/PresentationErrorPage");
 		const originalFetch = globalThis.fetch;
 		const retryRequest = mock(async (input: RequestInfo | URL) => {
 			expect(String(input)).toContain("/presentations/presentation_42");
@@ -164,9 +161,8 @@ describe("PresentationErrorPage", () => {
 	});
 
 	it("shows why the saved presentation failed", async () => {
-		const { default: PresentationErrorPage } = await import(
-			"../../../routes/presentations/PresentationErrorPage"
-		);
+		const { default: PresentationErrorPage } =
+			await import("../../../routes/presentations/PresentationErrorPage");
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = mock(async () =>
 			Response.json({
@@ -211,9 +207,8 @@ describe("PresentationErrorPage", () => {
 	});
 
 	it("handles an HTML deployment error without exposing a JSON parser failure", async () => {
-		const { default: PresentationErrorPage } = await import(
-			"../../../routes/presentations/PresentationErrorPage"
-		);
+		const { default: PresentationErrorPage } =
+			await import("../../../routes/presentations/PresentationErrorPage");
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = mock(() =>
 			Promise.resolve(
@@ -234,7 +229,9 @@ describe("PresentationErrorPage", () => {
 			fireEvent.click(view.getByRole("button", { name: "Retry presentation" }));
 
 			expect(
-				await view.findByText("The presentation service returned an invalid response. Try again."),
+				await view.findByText(
+					"The presentation service returned an invalid response. Try again.",
+				),
 			).toBeInTheDocument();
 			expect(view.queryByText(/Unexpected token/)).toBeNull();
 		} finally {
@@ -243,9 +240,8 @@ describe("PresentationErrorPage", () => {
 	});
 
 	it("uses the provided delete action for an unfinished presentation", async () => {
-		const { default: PresentationErrorPage } = await import(
-			"../../../routes/presentations/PresentationErrorPage"
-		);
+		const { default: PresentationErrorPage } =
+			await import("../../../routes/presentations/PresentationErrorPage");
 		const onDelete = mock(() => {});
 		const view = render(
 			<MemoryRouter initialEntries={["/presentation-error"]}>
@@ -261,9 +257,8 @@ describe("PresentationErrorPage", () => {
 	});
 
 	it("deletes a saved unfinished presentation with the current session", async () => {
-		const { default: PresentationErrorPage } = await import(
-			"../../../routes/presentations/PresentationErrorPage"
-		);
+		const { default: PresentationErrorPage } =
+			await import("../../../routes/presentations/PresentationErrorPage");
 		const originalFetch = globalThis.fetch;
 		const deleteRequest = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
 			expect(init).toMatchObject({
@@ -274,7 +269,9 @@ describe("PresentationErrorPage", () => {
 		});
 		// Opening the page loads the saved failure; only the delete is under test.
 		globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) =>
-			init?.method === "DELETE" ? deleteRequest(input, init) : new Promise<Response>(() => {}),
+			init?.method === "DELETE"
+				? deleteRequest(input, init)
+				: new Promise<Response>(() => {}),
 		) as unknown as typeof fetch;
 
 		try {

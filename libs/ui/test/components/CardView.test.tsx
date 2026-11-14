@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
 	assembleDocument,
+	type Card,
 	CARD_TEMPLATES,
 	CARD_THEME_DEFINITIONS,
-	type Card,
 	convertCards,
 } from "@slidesage/cards";
 import { render, within } from "@testing-library/react";
@@ -47,7 +47,10 @@ function cards(): Card[] {
 							type: "columns",
 							columns: [
 								{ heading: "Lithium", items: ["Fast response", "Short duration"] },
-								{ heading: "Pumped hydro", items: ["Long duration", "Site limited"] },
+								{
+									heading: "Pumped hydro",
+									items: ["Long duration", "Site limited"],
+								},
 							],
 						},
 					],
@@ -69,20 +72,28 @@ describe("CardView", () => {
 			const definition = CARD_THEME_DEFINITIONS[template.theme];
 			expect(articles).toHaveLength(5);
 			for (const article of articles) {
-				expect(article.style.getPropertyValue("--card-surface")).toBe(definition.palette.surface);
+				expect(article.style.getPropertyValue("--card-surface")).toBe(
+					definition.palette.surface,
+				);
 				expect(article.style.getPropertyValue("--card-heading-font")).toBe(
 					definition.fonts.heading.cssFamily,
 				);
 			}
 			for (const img of view.getAllByRole("img")) {
-				expect(img.getAttribute("src")).toBe(Object.values(template.assets)[0]?.url ?? null);
+				expect(img.getAttribute("src")).toBe(
+					Object.values(template.assets)[0]?.url ?? null,
+				);
 			}
 			expect(view.getAllByText(/Photo by/).length).toBeGreaterThan(0);
 			view.unmount();
 		}
 	});
 	it("renders every card in order with its layout content", () => {
-		const document = assembleDocument({ title: "Grid storage", theme: "paper", cards: cards() });
+		const document = assembleDocument({
+			title: "Grid storage",
+			theme: "paper",
+			cards: cards(),
+		});
 		const view = render(
 			<CardList
 				document={document}
@@ -99,7 +110,11 @@ describe("CardView", () => {
 	});
 
 	it("links a card's citations to the research sources", () => {
-		const document = assembleDocument({ title: "Grid storage", theme: "slate", cards: cards() });
+		const document = assembleDocument({
+			title: "Grid storage",
+			theme: "slate",
+			cards: cards(),
+		});
 		const view = render(
 			<CardList
 				document={document}
@@ -216,7 +231,8 @@ describe("image cards", () => {
 							type: "stock",
 							provider: "unsplash",
 							photographer: "Ada",
-							photographerUrl: "https://unsplash.com/@ada?utm_source=slidesage&utm_medium=referral",
+							photographerUrl:
+								"https://unsplash.com/@ada?utm_source=slidesage&utm_medium=referral",
 						},
 					},
 				}}

@@ -10,8 +10,8 @@ import {
 import { useState } from "react";
 import { PrefetchLink } from "../../app/PrefetchLink";
 import { ROUTES } from "../../app/router/paths";
-import { TemplatePreview } from "./TemplatePreview";
 import { useTemplateLibrary } from "./template-library";
+import { TemplatePreview } from "./TemplatePreview";
 
 // The picker sits on the dark marketplace surface, so its controls use the
 // white-on-navy styling the rest of the app draws by hand.
@@ -54,8 +54,9 @@ export function TemplatePicker({
 				<DialogHeader>
 					<DialogTitle>Choose a template</DialogTitle>
 					<DialogDescription className="text-white/60">
-						Apply colors and fonts to keep your content, or replace all {slideCount} slides with an
-						editable starter deck and its photos. You can undo either change.
+						Apply colors and fonts to keep your content, or replace all {slideCount}{" "}
+						slides with an editable starter deck and its photos. You can undo either
+						change.
 					</DialogDescription>
 				</DialogHeader>
 				<div className="flex flex-wrap gap-2">
@@ -88,8 +89,8 @@ export function TemplatePicker({
 							<TemplatePreview template={template} />
 							<h3 className="font-medium">{template.name}</h3>
 							<p className="text-sm text-white/60">
-								{CARD_THEME_DEFINITIONS[template.theme].name} / {template.document.cardOrder.length}{" "}
-								slides
+								{CARD_THEME_DEFINITIONS[template.theme].name} /{" "}
+								{template.document.cardOrder.length} slides
 							</p>
 							<div className="flex flex-wrap gap-2">
 								<Button

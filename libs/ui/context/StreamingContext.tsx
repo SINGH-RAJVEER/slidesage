@@ -269,7 +269,9 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 	const researchPreviewStateRef = useRef<ResearchPreviewState>(initialResearchPreviewState);
 
 	const updateResearchPreviewState = useCallback(
-		(next: ResearchPreviewState | ((previous: ResearchPreviewState) => ResearchPreviewState)) => {
+		(
+			next: ResearchPreviewState | ((previous: ResearchPreviewState) => ResearchPreviewState),
+		) => {
 			setResearchPreviewState((previous) => {
 				const resolved = typeof next === "function" ? next(previous) : next;
 				researchPreviewStateRef.current = resolved;
@@ -376,7 +378,10 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 					...prev,
 					generationStage: payload.stage,
 					generationMessage: payload.message,
-					generationProgress: { completed: payload.completed ?? 0, total: payload.total ?? 0 },
+					generationProgress: {
+						completed: payload.completed ?? 0,
+						total: payload.total ?? 0,
+					},
 				}));
 				break;
 			}
@@ -452,7 +457,12 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 	// any interruption retries with exponential backoff until a terminal
 	// saved/error event arrives or the caller aborts.
 	const consumeJobEvents = useCallback(
-		async (jobId: string, presentationId: string, controller: AbortController, startCursor = 0) => {
+		async (
+			jobId: string,
+			presentationId: string,
+			controller: AbortController,
+			startCursor = 0,
+		) => {
 			let cursor = startCursor;
 			let retryDelay = 1000;
 			let receivedComplete = false;
@@ -503,11 +513,15 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 
 							switch (event) {
 								case "created": {
-									const payload = data as { job_id?: string; presentation_id?: string };
+									const payload = data as {
+										job_id?: string;
+										presentation_id?: string;
+									};
 									setStreamingState((prev) => ({
 										...prev,
 										jobId: payload.job_id || prev.jobId,
-										presentationId: payload.presentation_id || prev.presentationId,
+										presentationId:
+											payload.presentation_id || prev.presentationId,
 									}));
 									break;
 								}
@@ -521,7 +535,10 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 												payload.presentation_id || presentationId,
 												controller.signal,
 											).catch(() => null);
-									if (controller.signal.aborted || abortControllerRef.current !== controller) {
+									if (
+										controller.signal.aborted ||
+										abortControllerRef.current !== controller
+									) {
 										return false;
 									}
 									if (!receivedComplete && !persisted) {
@@ -541,7 +558,8 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 										completedDocument: persisted || prev.completedDocument,
 										slideCount: persisted?.totalSlides ?? prev.slideCount,
 										totalSlides: persisted?.totalSlides ?? prev.totalSlides,
-										presentationId: payload.presentation_id || prev.presentationId,
+										presentationId:
+											payload.presentation_id || prev.presentationId,
 									}));
 									publishPresentationUpdated(payload.presentation_id);
 									publishPointsBalance(payload.slide_tokens_remaining);
@@ -561,7 +579,11 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 							}
 						});
 					}
-					if (terminal || controller.signal.aborted || abortControllerRef.current !== controller) {
+					if (
+						terminal ||
+						controller.signal.aborted ||
+						abortControllerRef.current !== controller
+					) {
 						return outcome.succeeded;
 					}
 				} catch (error) {
@@ -592,7 +614,8 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				prompt: options.prompt,
 				presentationId: targetPresentationId || undefined,
 				theme: options.theme,
-				researchStatus: options.researchEnabled && !options.researchPayload ? "searching" : "idle",
+				researchStatus:
+					options.researchEnabled && !options.researchPayload ? "searching" : "idle",
 			});
 			const stored: StoredGeneration = {
 				jobId,
@@ -689,7 +712,8 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 					response,
 				);
 				if (!response.ok || !data?.job_id) {
-					const message = (data as { error?: { message?: string } } | null)?.error?.message ?? "";
+					const message =
+						(data as { error?: { message?: string } } | null)?.error?.message ?? "";
 					clearStoredGeneration(jobId);
 					releaseActiveStream(controller);
 					setStreamingState((prev) => ({
@@ -703,7 +727,8 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 				return await attachAndConsume(data.presentation_id);
 			} catch (error) {
 				const isAbort =
-					(error instanceof Error && error.name === "AbortError") || controller.signal.aborted;
+					(error instanceof Error && error.name === "AbortError") ||
+					controller.signal.aborted;
 				if (isAbort) {
 					releaseActiveStream(controller);
 					return false;
@@ -821,7 +846,9 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 					const errorMessage =
 						typeof errorData?.error === "string"
 							? errorData.error
-							: errorData?.error?.message || errorData?.message || "Failed to fetch research";
+							: errorData?.error?.message ||
+								errorData?.message ||
+								"Failed to fetch research";
 					updateResearchPreviewState((previous) => ({
 						...previous,
 						status: "error",
@@ -878,7 +905,9 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
 
 	const restoreResearchSources = useCallback(() => {
 		updateResearchPreviewState((previous) =>
-			previous.removedSourceUrls.length === 0 ? previous : { ...previous, removedSourceUrls: [] },
+			previous.removedSourceUrls.length === 0
+				? previous
+				: { ...previous, removedSourceUrls: [] },
 		);
 	}, [updateResearchPreviewState]);
 
