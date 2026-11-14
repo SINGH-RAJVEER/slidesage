@@ -1,9 +1,27 @@
 { pkgs, lib, config, ... }:
+let
+	# Pin Bun to the release CI uses until nixpkgs catches up.
+	bunVersion = "1.4.4";
+	bunReleases = {
+		x86_64-linux = { asset = "linux-x64"; sha256 = "bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c"; };
+		aarch64-linux = { asset = "linux-aarch64"; sha256 = "baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e"; };
+		x86_64-darwin = { asset = "darwin-x64"; sha256 = "50a3491f73abc2fe81673171a85762d3bc2cc1680ccecadd983de99adf77977e"; };
+		aarch64-darwin = { asset = "darwin-aarch64"; sha256 = "c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510"; };
+	};
+	bunRelease = bunReleases.${pkgs.stdenv.hostPlatform.system};
+	bun = pkgs.bun.overrideAttrs (_: {
+		version = bunVersion;
+		src = pkgs.fetchurl {
+			url = "https://github.com/oven-sh/bun/releases/download/bun-v${bunVersion}/bun-${bunRelease.asset}.zip";
+			inherit (bunRelease) sha256;
+		};
+	});
+in
 {
 	dotenv.enable = true;
 
 	packages = [
-		pkgs.bun
+		bun
 		pkgs.nodejs_24
 		pkgs.openssh
 		pkgs.docker-client

@@ -35,10 +35,10 @@
 		"format:web": "bun --cwd apps/web format"
 	},
 	"devDependencies": {
-		"@types/bun": "1.3.14",
+		"@types/bun": "1.4.4",
 		"typescript": "^7.0.2",
 		"wrangler": "4.153.0"
 	},
 	"trustedDependencies": [],
-	"packageManager": "bun@1.3.13"
+	"packageManager": "bun@1.4.4"
 }
