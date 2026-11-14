@@ -152,7 +152,11 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 							backgroundColor: "hsl(222 27% 12%)",
 						},
 					],
-			{ duration: reduced ? 180 : 1000, easing: "cubic-bezier(.55,0,.18,1)", fill: "forwards" },
+			{
+				duration: reduced ? 180 : 1000,
+				easing: "cubic-bezier(.55,0,.18,1)",
+				fill: "forwards",
+			},
 		);
 		animations.current.push(animation);
 		void animation.finished
@@ -179,14 +183,18 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 		void (async () => {
 			await document.fonts?.ready;
 			await nextPaint();
-			if (cancelled || run !== runId.current || !contentRef.current || !coverRef.current) return;
+			if (cancelled || run !== runId.current || !contentRef.current || !coverRef.current)
+				return;
 			const content = contentRef.current;
 			content.style.visibility = "visible";
 			const candidates = [
-				...content.querySelectorAll<HTMLElement>("header, h1, form > *, [data-horizon-reveal]"),
+				...content.querySelectorAll<HTMLElement>(
+					"header, h1, form > *, [data-horizon-reveal]",
+				),
 			];
 			const elements = candidates.filter(
-				(element) => !candidates.some((other) => other !== element && other.contains(element)),
+				(element) =>
+					!candidates.some((other) => other !== element && other.contains(element)),
 			);
 			for (const [index, element] of elements.entries()) {
 				const animation = element.animate(
@@ -254,7 +262,9 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 				ref={contentRef}
 				inert={transition !== null}
 				className="horizon-route-content"
-				style={{ visibility: transition && transition.phase !== "cover" ? "hidden" : "visible" }}
+				style={{
+					visibility: transition && transition.phase !== "cover" ? "hidden" : "visible",
+				}}
 			>
 				{children}
 			</div>
@@ -288,7 +298,10 @@ export function HorizonTransitionProvider({ children }: { children: ReactNode })
 					{slow && (
 						<div className="horizon-route-wait" role="status">
 							<p>Your page is taking a little longer to arrive.</p>
-							<button type="button" onClick={() => window.location.assign(transition.href)}>
+							<button
+								type="button"
+								onClick={() => window.location.assign(transition.href)}
+							>
 								Open page directly
 							</button>
 						</div>

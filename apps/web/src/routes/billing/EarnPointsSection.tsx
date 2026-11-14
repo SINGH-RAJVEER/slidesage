@@ -45,7 +45,9 @@ class AdRewardError extends Error {
 
 async function postJson<T>(path: string): Promise<T> {
 	const response = await fetch(`${API_URL}${path}`, { method: "POST", credentials: "include" });
-	const body = await readJsonResponse<T | (ApiErrorResponse & { retry_after?: number })>(response);
+	const body = await readJsonResponse<T | (ApiErrorResponse & { retry_after?: number })>(
+		response,
+	);
 	if (!response.ok || body === null || (typeof body === "object" && "error" in body)) {
 		const failure = body && typeof body === "object" && "error" in body ? body : null;
 		throw new AdRewardError(
@@ -119,7 +121,9 @@ export default function EarnPointsSection({
 				setPhase("claiming");
 				// The server refuses claims before the minimum watch time. Timing it
 				// from local receipt, not the server timestamp, ignores clock skew.
-				await sleep((issued.receivedAt ?? 0) + status.min_watch_seconds * 1000 - Date.now());
+				await sleep(
+					(issued.receivedAt ?? 0) + status.min_watch_seconds * 1000 - Date.now(),
+				);
 				const claim = await claimSession(issued.session.session_id);
 				onBalance(claim.new_balance);
 				publishPointsBalance(claim.new_balance);

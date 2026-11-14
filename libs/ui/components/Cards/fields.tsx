@@ -65,7 +65,8 @@ export function RichField({
 			label={label}
 			onChange={(next) => {
 				// Leaving a field re-reads it; unchanged text is not an edit.
-				if (JSON.stringify(normalizeRuns(next)) === JSON.stringify(normalizeRuns(value))) return;
+				if (JSON.stringify(normalizeRuns(next)) === JSON.stringify(normalizeRuns(value)))
+					return;
 				edit((document) => update(document, next, card.id));
 			}}
 		/>

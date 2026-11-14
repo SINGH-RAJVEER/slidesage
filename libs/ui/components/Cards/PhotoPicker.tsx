@@ -67,7 +67,12 @@ function PhotoCredit({ photo }: { photo: StockPhoto }) {
 				<>
 					{" "}
 					on{" "}
-					<a href={library.url} target="_blank" rel="noreferrer noopener" className={creditLink}>
+					<a
+						href={library.url}
+						target="_blank"
+						rel="noreferrer noopener"
+						className={creditLink}
+					>
 						{library.name}
 					</a>
 				</>
@@ -159,7 +164,11 @@ export function PhotoPicker({
 						onChange={(event) => setQuery(event.target.value)}
 						className="border-white/10 bg-transparent text-white"
 					/>
-					<Button type="submit" disabled={busy !== null || !query.trim()} className="gap-2">
+					<Button
+						type="submit"
+						disabled={busy !== null || !query.trim()}
+						className="gap-2"
+					>
 						<Search className="size-4" />
 						Search
 					</Button>
@@ -194,7 +203,9 @@ export function PhotoPicker({
 				{busy === "search" && <p className="text-sm text-white/50">Searching</p>}
 				{busy === "add" && <p className="text-sm text-white/50">Adding photo</p>}
 				{photos && photos.length === 0 && busy === null && (
-					<p className="text-sm text-white/50">No photos matched. Try a broader search.</p>
+					<p className="text-sm text-white/50">
+						No photos matched. Try a broader search.
+					</p>
 				)}
 				{photos && photos.length > 0 && (
 					<ul
@@ -206,8 +217,13 @@ export function PhotoPicker({
 								<button
 									type="button"
 									disabled={busy !== null}
-									onClick={() => void run("add", () => choose(photo, query.trim()))}
-									className={cn("group block w-full outline-none", busy !== null && "opacity-50")}
+									onClick={() =>
+										void run("add", () => choose(photo, query.trim()))
+									}
+									className={cn(
+										"group block w-full outline-none",
+										busy !== null && "opacity-50",
+									)}
 								>
 									<img
 										src={photo.thumbnail}

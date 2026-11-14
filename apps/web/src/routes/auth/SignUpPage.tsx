@@ -45,7 +45,10 @@ export default function SignUpPage() {
 
 	const handleGoogleSignUp = async () => {
 		try {
-			const result = await auth.startSocialSignIn("google", window.location.origin + redirectTo);
+			const result = await auth.startSocialSignIn(
+				"google",
+				window.location.origin + redirectTo,
+			);
 			window.location.href = result.url;
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Google sign-up failed.");
@@ -54,7 +57,10 @@ export default function SignUpPage() {
 
 	const handleGithubSignUp = async () => {
 		try {
-			const result = await auth.startSocialSignIn("github", window.location.origin + redirectTo);
+			const result = await auth.startSocialSignIn(
+				"github",
+				window.location.origin + redirectTo,
+			);
 			window.location.href = result.url;
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "GitHub sign-up failed.");
@@ -94,7 +100,9 @@ export default function SignUpPage() {
 				});
 			} catch (deliveryErr) {
 				deliveryError =
-					deliveryErr instanceof Error ? deliveryErr.message : "Failed to send verification code";
+					deliveryErr instanceof Error
+						? deliveryErr.message
+						: "Failed to send verification code";
 			}
 
 			navigate(
@@ -168,13 +176,17 @@ export default function SignUpPage() {
 								minLength={8}
 							/>
 							<p className="text-xs text-white/50">
-								Optional. Without a password, you sign in with a code sent to your email.
+								Optional. Without a password, you sign in with a code sent to your
+								email.
 							</p>
 						</div>
 
 						{password ? (
 							<div className="space-y-2">
-								<label htmlFor="confirmPassword" className="text-sm font-medium text-white/80">
+								<label
+									htmlFor="confirmPassword"
+									className="text-sm font-medium text-white/80"
+								>
 									Confirm password
 								</label>
 								<input

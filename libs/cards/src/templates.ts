@@ -107,8 +107,7 @@ function slide(
 		draft: {
 			layout,
 			nodes,
-			notes:
-				"Starter content is illustrative. Replace claims and figures with your own evidence before presenting.",
+			notes: "Starter content is illustrative. Replace claims and figures with your own evidence before presenting.",
 		},
 	};
 }
@@ -268,19 +267,30 @@ export const CARD_TEMPLATES: CardTemplate[] = [
 				),
 				image(TEAM, "Collaborators reviewing work at a shared table"),
 			]),
-			slide("comparison", "comparison", "Replace disconnected choices with a repeatable system", [
-				heading("Before and after"),
-				columns(
-					[
-						"Before",
-						["Different type choices on each channel", "Layouts rebuilt for every launch"],
-					],
-					[
-						"After",
-						["A shared type scale and image treatment", "Reusable layouts with clear rules"],
-					],
-				),
-			]),
+			slide(
+				"comparison",
+				"comparison",
+				"Replace disconnected choices with a repeatable system",
+				[
+					heading("Before and after"),
+					columns(
+						[
+							"Before",
+							[
+								"Different type choices on each channel",
+								"Layouts rebuilt for every launch",
+							],
+						],
+						[
+							"After",
+							[
+								"A shared type scale and image treatment",
+								"Reusable layouts with clear rules",
+							],
+						],
+					),
+				],
+			),
 			slide("process", "process", "Move from research to a usable toolkit", [
 				heading("How we got there"),
 				steps(
@@ -404,7 +414,9 @@ export const CARD_TEMPLATES: CardTemplate[] = [
 		[
 			slide("title", "opening", "Make reliability a property of the system", [
 				heading("A system we can trust"),
-				paragraph("A technical briefing on making background jobs observable and safe to retry."),
+				paragraph(
+					"A technical briefing on making background jobs observable and safe to retry.",
+				),
 			]),
 			slide("image-right", "context", "A retry must not repeat a completed side effect", [
 				heading("The failure we need to handle"),
@@ -418,11 +430,17 @@ export const CARD_TEMPLATES: CardTemplate[] = [
 				columns(
 					[
 						"Best effort",
-						["Simple workers and low coordination", "Duplicate effects require cleanup"],
+						[
+							"Simple workers and low coordination",
+							"Duplicate effects require cleanup",
+						],
 					],
 					[
 						"Idempotent jobs",
-						["Stable keys identify completed work", "State transitions need explicit rules"],
+						[
+							"Stable keys identify completed work",
+							"State transitions need explicit rules",
+						],
 					],
 				),
 			]),

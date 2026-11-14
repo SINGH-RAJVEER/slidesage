@@ -73,14 +73,17 @@ function OutlineVisit() {
 							id="outline-error-title"
 							className="text-3xl font-semibold text-white desktop:text-4xl"
 						>
-							{needsPoints(loadError) ? "You need more points" : "We couldn't plan this outline"}
+							{needsPoints(loadError)
+								? "You need more points"
+								: "We couldn't plan this outline"}
 						</h1>
 						<p role="alert" className="mt-3 max-w-xl text-sm leading-6 text-red-200">
 							{loadError}
 						</p>
 						{needsPoints(loadError) ? (
 							<p className="mt-3 max-w-xl text-sm leading-6 text-white/45">
-								Planning an outline uses points. Add more from the purchase page, then try again.
+								Planning an outline uses points. Add more from the purchase page,
+								then try again.
 							</p>
 						) : null}
 						<div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">

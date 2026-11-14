@@ -7,8 +7,8 @@ import {
 	type ChartKind,
 	type ChartNode,
 	type ContentNode,
-	LAYOUTS,
 	type LayoutId,
+	LAYOUTS,
 	LIMITS,
 	type ListItem,
 	type RichText,
@@ -125,7 +125,9 @@ export function setNodeField(
 }
 
 function editItems(items: ListItem[], itemId: string, text: RichText): ListItem[] {
-	return items.map((item) => (item.id === itemId ? { ...item, text: normalizeRuns(text) } : item));
+	return items.map((item) =>
+		item.id === itemId ? { ...item, text: normalizeRuns(text) } : item,
+	);
 }
 
 /** Replaces the text of a bullet or a column item. */
@@ -167,7 +169,8 @@ export function setPartField(
 				items: node.items.map((step) => {
 					if (step.id !== partId) return step;
 					if (field === "title") return { ...step, title: String(value) };
-					const detail = typeof value === "string" ? plainRuns(value) : normalizeRuns(value);
+					const detail =
+						typeof value === "string" ? plainRuns(value) : normalizeRuns(value);
 					if (detail.length === 0) {
 						const { detail: _removed, ...rest } = step;
 						return rest;
@@ -233,7 +236,10 @@ export function addListItem(
 					column.id === options.columnId
 						? {
 								...column,
-								items: insert(column.items, { id: newId("i"), text: plainRuns("New point") }),
+								items: insert(column.items, {
+									id: newId("i"),
+									text: plainRuns("New point"),
+								}),
 							}
 						: column,
 				),
@@ -249,7 +255,8 @@ export function removeListItem(
 	nodeId: string,
 	itemId: string,
 ): CardDocument {
-	const drop = <T extends { id: string }>(items: T[]) => items.filter((item) => item.id !== itemId);
+	const drop = <T extends { id: string }>(items: T[]) =>
+		items.filter((item) => item.id !== itemId);
 	return withNode(document, cardId, nodeId, (node) => {
 		if (node.type === "bullets") return { ...node, items: drop(node.items) };
 		if (node.type === "steps") return { ...node, items: drop(node.items) };
@@ -303,11 +310,23 @@ function reissueIds(card: Card): Card {
 		const id = newId("n");
 		switch (node.type) {
 			case "bullets":
-				return { ...node, id, items: node.items.map((item) => ({ ...item, id: newId("i") })) };
+				return {
+					...node,
+					id,
+					items: node.items.map((item) => ({ ...item, id: newId("i") })),
+				};
 			case "steps":
-				return { ...node, id, items: node.items.map((step) => ({ ...step, id: newId("i") })) };
+				return {
+					...node,
+					id,
+					items: node.items.map((step) => ({ ...step, id: newId("i") })),
+				};
 			case "progress":
-				return { ...node, id, items: node.items.map((meter) => ({ ...meter, id: newId("i") })) };
+				return {
+					...node,
+					id,
+					items: node.items.map((meter) => ({ ...meter, id: newId("i") })),
+				};
 			case "chart":
 				return {
 					...node,
@@ -598,7 +617,12 @@ export function setTableCell(
 			...node,
 			rows: node.rows.map((row) =>
 				row.id === rowId
-					? { ...row, cells: row.cells.map((cell, index) => (index === column ? value : cell)) }
+					? {
+							...row,
+							cells: row.cells.map((cell, index) =>
+								index === column ? value : cell,
+							),
+						}
 					: row,
 			),
 		};

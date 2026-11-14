@@ -3,9 +3,8 @@ import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 GlobalRegistrator.register();
 
-const { default: _defaultMatchers, ...matchers } = await import(
-	"@testing-library/jest-dom/matchers"
-);
+const { default: _defaultMatchers, ...matchers } =
+	await import("@testing-library/jest-dom/matchers");
 expect.extend(matchers);
 const { cleanup } = await import("@testing-library/react");
 

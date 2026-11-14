@@ -25,9 +25,8 @@ afterAll(() => {
 	}
 });
 
-const { default: _defaultMatchers, ...matchers } = await import(
-	"@testing-library/jest-dom/matchers"
-);
+const { default: _defaultMatchers, ...matchers } =
+	await import("@testing-library/jest-dom/matchers");
 expect.extend(matchers);
 const { cleanup } = await import("@testing-library/react");
 const { clearPrefetched } = await import("@slidesage/ui/lib/prefetch");

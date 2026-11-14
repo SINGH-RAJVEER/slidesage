@@ -223,7 +223,9 @@ it("allows selecting a Gemini model after enabling its connected provider", asyn
 	fireEvent.click(toggle);
 
 	await waitFor(() => expect(toggle).toBeChecked());
-	await waitFor(() => expect(selection).toEqual({ provider: "google", model: "gemini-2.5-flash" }));
+	await waitFor(() =>
+		expect(selection).toEqual({ provider: "google", model: "gemini-2.5-flash" }),
+	);
 	expect(view.getByRole("combobox", { name: "Google Gemini model" })).toBeEnabled();
 });
 

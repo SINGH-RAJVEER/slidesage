@@ -76,7 +76,9 @@ export const ADS_CONFIG = readAdsConfig();
 /** Ads follow the current balance, so spending below the threshold brings them back. */
 export function isAdEligible(slideTokens: number | null | undefined): boolean {
 	return (
-		typeof slideTokens === "number" && Number.isFinite(slideTokens) && slideTokens < AD_FREE_POINTS
+		typeof slideTokens === "number" &&
+		Number.isFinite(slideTokens) &&
+		slideTokens < AD_FREE_POINTS
 	);
 }
 

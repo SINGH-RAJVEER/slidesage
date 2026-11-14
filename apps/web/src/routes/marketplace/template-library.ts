@@ -31,7 +31,9 @@ export function readTemplateLibrary(raw: string | null): string[] {
 		return Array.isArray(value)
 			? [
 					...new Set(
-						value.filter((id): id is string => typeof id === "string" && !!getCardTemplate(id)),
+						value.filter(
+							(id): id is string => typeof id === "string" && !!getCardTemplate(id),
+						),
 					),
 				]
 			: [];

@@ -36,7 +36,10 @@ describe("Header", () => {
 			</MemoryRouter>,
 		);
 
-		expect(getByRole("link", { name: "SlideSage — landing" })).toHaveAttribute("href", "/landing");
+		expect(getByRole("link", { name: "SlideSage — landing" })).toHaveAttribute(
+			"href",
+			"/landing",
+		);
 	});
 
 	it("renders header component", async () => {
@@ -175,7 +178,10 @@ describe("Header", () => {
 		const signOut = await view.findByRole("menuitem", { name: "Sign Out" });
 		expect(settings).toHaveAttribute("href", "/settings");
 		expect(feedback).toHaveAttribute("href", "/feedback");
-		expect(reportBug).toHaveAttribute("href", "https://github.com/SINGH-RAJVEER/slidesage/issues");
+		expect(reportBug).toHaveAttribute(
+			"href",
+			"https://github.com/SINGH-RAJVEER/slidesage/issues",
+		);
 		expect(reportBug).toHaveAttribute("target", "_blank");
 		expect(view.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
 			"Profile",
@@ -228,7 +234,10 @@ describe("Header", () => {
 
 			const sheet = await view.findByRole("dialog");
 			expect(sheet).toHaveTextContent("rajveer@example.com");
-			expect(view.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+			expect(view.getByRole("link", { name: "Settings" })).toHaveAttribute(
+				"href",
+				"/settings",
+			);
 			expect(view.getByRole("button", { name: "Sign Out" })).toBeInTheDocument();
 		} finally {
 			window.matchMedia = desktopMatchMedia;
@@ -264,7 +273,9 @@ describe("Header", () => {
 			fireEvent.focus(getByRole("link", { name: "Generate" }));
 
 			expect(fetchMock).toHaveBeenCalledTimes(1);
-			expect(String(fetchMock.mock.calls[0]?.[0])).toEndWith("/presentations?limit=20&offset=0");
+			expect(String(fetchMock.mock.calls[0]?.[0])).toEndWith(
+				"/presentations?limit=20&offset=0",
+			);
 		} finally {
 			globalThis.fetch = originalFetch;
 		}

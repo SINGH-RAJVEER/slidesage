@@ -20,8 +20,8 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "./dropdown-menu";
-import { SlideSageLogo } from "./SlideSageLogo";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./sheet";
+import { SlideSageLogo } from "./SlideSageLogo";
 
 export interface HeaderUser {
 	name?: string | null;
@@ -128,7 +128,9 @@ export function Header({
 	};
 
 	const points = `${user?.slideTokens?.toFixed(1) ?? "0.0"} points`;
-	const avatar = user && <Avatar user={user} initials={getUserInitials()} className="text-base" />;
+	const avatar = user && (
+		<Avatar user={user} initials={getUserInitials()} className="text-base" />
+	);
 
 	if (isMobile) {
 		return (
@@ -285,7 +287,9 @@ function Avatar({
 					className="size-full object-cover"
 				/>
 			) : (
-				<span className="flex-shrink-0 font-semibold uppercase text-white/90">{initials}</span>
+				<span className="flex-shrink-0 font-semibold uppercase text-white/90">
+					{initials}
+				</span>
 			)}
 		</div>
 	);
@@ -388,9 +392,15 @@ function MobileHeader({
 									key={path}
 									to={path}
 									aria-current={active ? "page" : undefined}
-									className={cn(tabClassName, active ? "text-white" : "text-white/50")}
+									className={cn(
+										tabClassName,
+										active ? "text-white" : "text-white/50",
+									)}
 								>
-									<Icon aria-hidden="true" className={cn("size-5", active && "text-sky-300")} />
+									<Icon
+										aria-hidden="true"
+										className={cn("size-5", active && "text-sky-300")}
+									/>
 									<span className="max-w-full truncate">{label}</span>
 								</LinkComponent>
 							);
@@ -401,7 +411,10 @@ function MobileHeader({
 								onClick={() => setAccountOpen(true)}
 								aria-label="Open account menu"
 								aria-haspopup="dialog"
-								className={cn(tabClassName, accountOpen ? "text-white" : "text-white/50")}
+								className={cn(
+									tabClassName,
+									accountOpen ? "text-white" : "text-white/50",
+								)}
 							>
 								<Avatar
 									user={user}
@@ -419,10 +432,18 @@ function MobileHeader({
 				<Sheet open={accountOpen} onOpenChange={setAccountOpen}>
 					<SheetContent side="bottom" className="gap-5">
 						<SheetHeader className="flex-row items-center gap-3">
-							<Avatar user={user} initials={initials} className="size-12 shrink-0 text-lg" />
+							<Avatar
+								user={user}
+								initials={initials}
+								className="size-12 shrink-0 text-lg"
+							/>
 							<div className="min-w-0">
-								<SheetTitle className="truncate">{user.name?.trim() || "Account"}</SheetTitle>
-								<SheetDescription className="truncate">{user.email}</SheetDescription>
+								<SheetTitle className="truncate">
+									{user.name?.trim() || "Account"}
+								</SheetTitle>
+								<SheetDescription className="truncate">
+									{user.email}
+								</SheetDescription>
 							</div>
 						</SheetHeader>
 
@@ -452,7 +473,10 @@ function MobileHeader({
 								>
 									<Icon aria-hidden="true" className="size-5 text-white/60" />
 									<span className="flex-1">{label}</span>
-									<ChevronRight aria-hidden="true" className="size-4 text-white/30" />
+									<ChevronRight
+										aria-hidden="true"
+										className="size-4 text-white/30"
+									/>
 								</LinkComponent>
 							))}
 							<a
@@ -468,7 +492,10 @@ function MobileHeader({
 								type="button"
 								disabled={signingOut}
 								onClick={() => void onSignOut()}
-								className={cn(accountRowClassName, "text-red-400 disabled:opacity-60")}
+								className={cn(
+									accountRowClassName,
+									"text-red-400 disabled:opacity-60",
+								)}
 							>
 								<LogOut aria-hidden="true" className="size-5" />
 								<span className="flex-1 text-left">

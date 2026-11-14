@@ -78,7 +78,9 @@ describe("PresentationPage", () => {
 		serve("ready", savedDocument());
 		const view = open();
 
-		expect(await view.findByRole("article")).toHaveAccessibleName("Card 1: Storage is now cheap");
+		expect(await view.findByRole("article")).toHaveAccessibleName(
+			"Card 1: Storage is now cheap",
+		);
 		expect(view.getByRole("button", { name: "Go to slide 1" })).toBeInTheDocument();
 	});
 
@@ -106,14 +108,24 @@ describe("PresentationPage", () => {
 			const id = /presentations\/(pres_\d)/.exec(url)?.[1] ?? "";
 			const heading = id === "pres_1" ? "Deck one" : "Deck two";
 			if (init?.method === "PUT") {
-				saves.push({ url, document: JSON.stringify(JSON.parse(String(init.body)).document) });
+				saves.push({
+					url,
+					document: JSON.stringify(JSON.parse(String(init.body)).document),
+				});
 				return Response.json({ revision: { revision: 2 } });
 			}
 			if (url.endsWith("/document")) {
-				return Response.json({ revision: { revision: 1 }, document: savedDocument(heading) });
+				return Response.json({
+					revision: { revision: 1 },
+					document: savedDocument(heading),
+				});
 			}
 			return Response.json({
-				presentation: { id, title: heading, slides_data: { title: heading, status: "ready" } },
+				presentation: {
+					id,
+					title: heading,
+					slides_data: { title: heading, status: "ready" },
+				},
 			});
 		}) as unknown as typeof fetch;
 		const view = open();
@@ -195,7 +207,9 @@ describe("PresentationPage", () => {
 		await waitFor(() => expect(requests).toContain("/presentations/pres_1/document"));
 		fireEvent.click(card);
 
-		expect(await view.findByRole("article")).toHaveAccessibleName("Card 1: Storage is now cheap");
+		expect(await view.findByRole("article")).toHaveAccessibleName(
+			"Card 1: Storage is now cheap",
+		);
 		expect(requests.filter((url) => url === "/presentations/pres_1")).toHaveLength(1);
 		expect(requests.filter((url) => url === "/presentations/pres_1/document")).toHaveLength(1);
 

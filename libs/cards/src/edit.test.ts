@@ -92,7 +92,9 @@ describe("edit operations", () => {
 		const card = document.cards[document.cardOrder[1] ?? ""];
 		const bullets = card?.nodes[1];
 		if (!card || bullets?.type !== "bullets") throw new Error("fixture");
-		let edited = addListItem(document, card.id, bullets.id, { afterItemId: bullets.items[0]?.id });
+		let edited = addListItem(document, card.id, bullets.id, {
+			afterItemId: bullets.items[0]?.id,
+		});
 		const added = edited.cards[card.id]?.nodes[1];
 		if (added?.type !== "bullets") throw new Error("bullets");
 		expect(added.items).toHaveLength(3);
@@ -146,7 +148,12 @@ describe("edit operations", () => {
 
 	it("merges runs with identical marks", () => {
 		expect(
-			normalizeRuns([{ text: "a" }, { text: "" }, { text: "b" }, { text: "c", italic: true }]),
+			normalizeRuns([
+				{ text: "a" },
+				{ text: "" },
+				{ text: "b" },
+				{ text: "c", italic: true },
+			]),
 		).toEqual([{ text: "ab" }, { text: "c", italic: true }]);
 	});
 });

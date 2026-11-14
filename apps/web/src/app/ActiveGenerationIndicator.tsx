@@ -17,12 +17,16 @@ export default function ActiveGenerationIndicator() {
 		<IndicatorView
 			hidden={onPresentationPage}
 			onOpen={(presentationId) =>
-				navigate(presentationId ? ROUTES.presentationById(presentationId) : ROUTES.presentations)
+				navigate(
+					presentationId ? ROUTES.presentationById(presentationId) : ROUTES.presentations,
+				)
 			}
 			// A generating deck streams its own progress, so only the page's code
 			// is worth loading early.
 			onPrefetch={(presentationId) =>
-				prefetchModule(presentationId ? routeModules.presentation : routeModules.presentations)
+				prefetchModule(
+					presentationId ? routeModules.presentation : routeModules.presentations,
+				)
 			}
 		/>
 	);

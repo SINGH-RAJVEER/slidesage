@@ -48,9 +48,6 @@ test-ui:
 lint:
 	bun run lint
 
-lint-fix:
-	bunx biome check --write .
-
 format:
 	bun run format
 

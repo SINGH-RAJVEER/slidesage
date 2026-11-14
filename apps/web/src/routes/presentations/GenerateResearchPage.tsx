@@ -206,7 +206,8 @@ export default function GenerateResearchPage() {
 			const target = event.target;
 			if (
 				target instanceof HTMLElement &&
-				(target.isContentEditable || target.closest("a, button, input, textarea, select") !== null)
+				(target.isContentEditable ||
+					target.closest("a, button, input, textarea, select") !== null)
 			) {
 				return;
 			}
@@ -267,7 +268,8 @@ export default function GenerateResearchPage() {
 										)}
 										{hasSources && (
 											<span className="text-sm text-white/45">
-												{sources.length} {sources.length === 1 ? "source" : "sources"}
+												{sources.length}{" "}
+												{sources.length === 1 ? "source" : "sources"}
 											</span>
 										)}
 									</div>
@@ -315,7 +317,8 @@ export default function GenerateResearchPage() {
 										<tbody className="divide-y divide-white/[0.07]">
 											{hasSources &&
 												sources.map((source) => {
-													const sourceTitle = source.title || getSourceLabel(source.url);
+													const sourceTitle =
+														source.title || getSourceLabel(source.url);
 
 													return (
 														<tr
@@ -343,15 +346,26 @@ export default function GenerateResearchPage() {
 																</p>
 															</td>
 															<td className="hidden px-5 py-5 align-top text-xs leading-5 text-white/45 desktop:table-cell">
-																{source.author || source.published_date ? (
+																{source.author ||
+																source.published_date ? (
 																	<div className="space-y-0.5">
 																		{source.author && (
-																			<p className="truncate text-white/60">{source.author}</p>
+																			<p className="truncate text-white/60">
+																				{source.author}
+																			</p>
 																		)}
-																		{source.published_date && <p>{source.published_date}</p>}
+																		{source.published_date && (
+																			<p>
+																				{
+																					source.published_date
+																				}
+																			</p>
+																		)}
 																	</div>
 																) : (
-																	<span className="text-white/30">Not listed</span>
+																	<span className="text-white/30">
+																		Not listed
+																	</span>
 																)}
 															</td>
 															<td className="sticky right-0 bg-[hsl(222,27%,12%)] px-3 py-5 text-center align-top transition-colors group-hover/row:bg-[hsl(222,27%,14%)] lg:bg-transparent lg:group-hover/row:bg-transparent">
@@ -369,15 +383,24 @@ export default function GenerateResearchPage() {
 																	<Button
 																		ref={(button) => {
 																			if (button) {
-																				removeButtonsRef.current.set(source.url, button);
+																				removeButtonsRef.current.set(
+																					source.url,
+																					button,
+																				);
 																			} else {
-																				removeButtonsRef.current.delete(source.url);
+																				removeButtonsRef.current.delete(
+																					source.url,
+																				);
 																			}
 																		}}
 																		type="button"
 																		variant="ghost"
 																		size="icon"
-																		onClick={() => handleRemoveSource(source.url)}
+																		onClick={() =>
+																			handleRemoveSource(
+																				source.url,
+																			)
+																		}
 																		aria-label={`Remove source: ${sourceTitle}`}
 																		title="Remove source"
 																		className="size-8 border border-white/10 text-white/45 hover:border-red-300/30 hover:bg-red-400/10 hover:text-red-200"
@@ -392,7 +415,10 @@ export default function GenerateResearchPage() {
 
 											{!hasSources && (
 												<tr>
-													<td colSpan={4} className="px-6 py-10 text-center text-sm text-white/45">
+													<td
+														colSpan={4}
+														className="px-6 py-10 text-center text-sm text-white/45"
+													>
 														{removedCount > 0
 															? "All sources removed. Restore them, or proceed without research sources."
 															: "No sources found. Try a different phrasing or a broader topic."}

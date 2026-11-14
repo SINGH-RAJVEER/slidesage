@@ -25,7 +25,9 @@ it("renders the page shell while presentations are loading", () => {
 		);
 
 		expect(view.queryByText("Generated Presentations")).not.toBeInTheDocument();
-		expect(view.getByPlaceholderText("Search by title, prompt, or date...")).toBeInTheDocument();
+		expect(
+			view.getByPlaceholderText("Search by title, prompt, or date..."),
+		).toBeInTheDocument();
 		expect(view.getByLabelText("Loading presentations")).toBeInTheDocument();
 		expect(view.queryByText("No Presentations Generated Yet")).not.toBeInTheDocument();
 	} finally {
@@ -377,7 +379,10 @@ it("shows why a presentation could not be opened", async () => {
 		const view = render(
 			<MemoryRouter
 				initialEntries={[
-					{ pathname: "/presentations", state: { notice: "This deck can no longer be opened." } },
+					{
+						pathname: "/presentations",
+						state: { notice: "This deck can no longer be opened." },
+					},
 				]}
 			>
 				<Routes>
@@ -386,7 +391,9 @@ it("shows why a presentation could not be opened", async () => {
 			</MemoryRouter>,
 		);
 
-		expect(await view.findByRole("alert")).toHaveTextContent("This deck can no longer be opened.");
+		expect(await view.findByRole("alert")).toHaveTextContent(
+			"This deck can no longer be opened.",
+		);
 	} finally {
 		globalThis.fetch = originalFetch;
 	}

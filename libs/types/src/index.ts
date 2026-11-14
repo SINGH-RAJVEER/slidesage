@@ -225,11 +225,7 @@ export interface BillingVerifyResponse {
 
 /** Why a signed-in user cannot earn points from an ad right now. */
 export type AdRewardReason =
-	| "email_unverified"
-	| "account_too_new"
-	| "daily_cap"
-	| "monthly_cap"
-	| "cooldown";
+	"email_unverified" | "account_too_new" | "daily_cap" | "monthly_cap" | "cooldown";
 
 export type AdRewardStatusResponse =
 	| { enabled: false }

@@ -153,8 +153,7 @@ export function useOutlineEditor() {
 					}),
 				});
 				const body = (await response.json().catch(() => null)) as
-					| (Partial<OutlineResponse> & Partial<ApiErrorResponse>)
-					| null;
+					(Partial<OutlineResponse> & Partial<ApiErrorResponse>) | null;
 				if (!response.ok || !body?.plan) {
 					setLoadError(body?.error?.message ?? "The outline could not be prepared.");
 					return;

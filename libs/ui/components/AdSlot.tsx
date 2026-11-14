@@ -1,6 +1,6 @@
 import { type ComponentType, type ReactNode, useEffect, useRef, useState } from "react";
 import { useAdUnit } from "../hooks/useAds";
-import { ADS_CONFIG, type AdPlacement, type AdsConfig, loadAdScript, requestAd } from "../lib/ads";
+import { type AdPlacement, ADS_CONFIG, type AdsConfig, loadAdScript, requestAd } from "../lib/ads";
 import { cn } from "../lib/utils";
 
 export interface AdLinkProps {

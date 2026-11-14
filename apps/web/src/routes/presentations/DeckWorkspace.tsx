@@ -1,7 +1,7 @@
 import {
 	addCard,
-	CARD_THEME_DEFINITIONS,
 	type Card,
+	CARD_THEME_DEFINITIONS,
 	type CardDocument,
 	type CardTemplate,
 	deleteCard,
@@ -9,8 +9,8 @@ import {
 	setImage,
 	setTheme,
 	setTitle,
-	THEMES,
 	type ThemeId,
+	THEMES,
 } from "@slidesage/cards";
 import type { Source } from "@slidesage/types";
 import { useStreaming } from "@slidesage/ui";
@@ -94,7 +94,9 @@ function downloadName(response: Response, fallback: string): string {
 }
 
 async function readError(response: Response, fallback: string): Promise<string> {
-	const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+	const body = (await response.json().catch(() => null)) as {
+		error?: { message?: string };
+	} | null;
 	return body?.error?.message ?? fallback;
 }
 
@@ -229,12 +231,15 @@ export function DeckWorkspace({
 	}, [editing, editor.redo, editor.undo]);
 
 	const placePhoto = async (response: Response, fallbackAlt: string) => {
-		if (!response.ok) throw new Error(await readError(response, "The photo could not be added."));
+		if (!response.ok)
+			throw new Error(await readError(response, "The photo could not be added."));
 		const body = (await response.json()) as { assetId: string; asset: CardAsset; alt: string };
 		const cardId = photoCard;
 		setAssets((current) => ({ ...current, [body.assetId]: body.asset }));
 		if (cardId) {
-			editor.edit((current) => setImage(current, cardId, body.assetId, body.alt || fallbackAlt));
+			editor.edit((current) =>
+				setImage(current, cardId, body.assetId, body.alt || fallbackAlt),
+			);
 		}
 		setPhotoCard(null);
 	};
@@ -245,7 +250,9 @@ export function DeckWorkspace({
 	): Promise<PhotoSearch> => {
 		const params = new URLSearchParams({ q: query });
 		params.set("provider", provider);
-		const response = await fetch(`${API_URL}/images/search?${params}`, { credentials: "include" });
+		const response = await fetch(`${API_URL}/images/search?${params}`, {
+			credentials: "include",
+		});
 		if (!response.ok) throw new Error(await readError(response, "Photo search failed."));
 		return (await response.json()) as PhotoSearch;
 	};
@@ -297,7 +304,9 @@ export function DeckWorkspace({
 			editor.edit(() => body.document);
 			setTemplatesOpen(false);
 		} catch (error) {
-			setNotice(error instanceof Error ? error.message : "The template could not be applied.");
+			setNotice(
+				error instanceof Error ? error.message : "The template could not be applied.",
+			);
 		} finally {
 			setApplyingTemplate(false);
 		}
@@ -410,7 +419,9 @@ export function DeckWorkspace({
 						aria-label="Presentation title"
 						value={editor.document.title}
 						maxLength={120}
-						onChange={(event) => editor.edit((current) => setTitle(current, event.target.value))}
+						onChange={(event) =>
+							editor.edit((current) => setTitle(current, event.target.value))
+						}
 						className="h-10 min-w-0 flex-1 border-white/10 bg-transparent text-lg font-light text-white"
 					/>
 				) : undefined
@@ -418,7 +429,11 @@ export function DeckWorkspace({
 			headerTools={
 				editing ? (
 					<>
-						<Button variant="outline" disabled={!canEdit} onClick={() => setTemplatesOpen(true)}>
+						<Button
+							variant="outline"
+							disabled={!canEdit}
+							onClick={() => setTemplatesOpen(true)}
+						>
 							Templates
 						</Button>
 						<Select
@@ -483,7 +498,11 @@ export function DeckWorkspace({
 						disabled={!canEdit}
 						className={headerButtonClassName}
 					>
-						{editing ? <Check className="mr-2 size-4" /> : <Pencil className="mr-2 size-4" />}
+						{editing ? (
+							<Check className="mr-2 size-4" />
+						) : (
+							<Pencil className="mr-2 size-4" />
+						)}
 						{/* Done keeps its word on a phone, where Edit and Share are icons. */}
 						<span className={editing ? undefined : "viewer-header__label"}>
 							{editing ? "Done" : "Edit"}
@@ -495,14 +514,20 @@ export function DeckWorkspace({
 				const cardId = editor.document.cardOrder[currentSlide];
 				if (revising) {
 					return (
-						<div role="status" aria-live="polite" className="flex flex-col gap-2 px-4 pt-3">
+						<div
+							role="status"
+							aria-live="polite"
+							className="flex flex-col gap-2 px-4 pt-3"
+						>
 							<p className="text-sm text-white/60">
-								{streamingState.generationMessage ?? "Revising cards"}. The deck is read-only until
-								the revision is saved.
+								{streamingState.generationMessage ?? "Revising cards"}. The deck is
+								read-only until the revision is saved.
 							</p>
 							<Progress
 								value={
-									progress?.total ? Math.round((progress.completed / progress.total) * 100) : 0
+									progress?.total
+										? Math.round((progress.completed / progress.total) * 100)
+										: 0
 								}
 								aria-label="Revision progress"
 							/>
@@ -519,7 +544,9 @@ export function DeckWorkspace({
 						>
 							<span
 								className={
-									status.state === "invalid" || status.state === "error" || blocked
+									status.state === "invalid" ||
+									status.state === "error" ||
+									blocked
 										? "text-amber-200"
 										: undefined
 								}
@@ -609,7 +636,8 @@ export function DeckWorkspace({
 						<DialogTitle>Leave without saving?</DialogTitle>
 						<DialogDescription>
 							Your latest changes are not saved: {statusText(status)}
-							{editor.hasLocalDraft() && " A draft is kept in this browser for your return."}
+							{editor.hasLocalDraft() &&
+								" A draft is kept in this browser for your return."}
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>

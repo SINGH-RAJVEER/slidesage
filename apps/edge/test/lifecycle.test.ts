@@ -108,7 +108,9 @@ test("passes telemetry configuration to both containers without replacing applic
 		const f = fixture(false, true);
 		await new Container(f.ctx, f.env).ensureRunning();
 		expect(f.environments[0]?.DATABASE_URL).toBe("postgresql://test@127.0.0.1:15432/db");
-		expect(f.environments[0]?.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("https://otlp.us5.datadoghq.com");
+		expect(f.environments[0]?.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
+			"https://otlp.us5.datadoghq.com",
+		);
 		expect(f.environments[0]?.OTEL_EXPORTER_OTLP_HEADERS).toBe("dd-api-key=test-key");
 		expect(f.environments[0]?.OTEL_EXPORTER_OTLP_PROTOCOL).toBe("http/protobuf");
 	}

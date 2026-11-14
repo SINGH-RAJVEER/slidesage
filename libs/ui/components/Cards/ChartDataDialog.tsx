@@ -1,6 +1,6 @@
 import {
-	CARD_SCHEMA_VERSION,
 	type Card,
+	CARD_SCHEMA_VERSION,
 	type CardDocument,
 	type ChartData,
 	type ChartNode,
@@ -59,7 +59,8 @@ function readDraft(draft: Draft): ChartData | string {
 	}
 	const names = draft.categories.map((category) => category.trim());
 	if (new Set(names).size !== names.length) return "Category names must not repeat.";
-	if (draft.series.some((series) => series.name.trim() === "")) return "Every series needs a name.";
+	if (draft.series.some((series) => series.name.trim() === ""))
+		return "Every series needs a name.";
 	const series: ChartData["series"] = [];
 	for (const entry of draft.series) {
 		const values: number[] = [];
@@ -149,17 +150,22 @@ export function ChartDataDialog({ open, onOpenChange, card, node, edit }: ChartD
 				<DialogHeader>
 					<DialogTitle>Chart data</DialogTitle>
 					<DialogDescription>
-						Categories run down the side and each series is a column. Values are plain numbers; put
-						units in the prefix or suffix.
+						Categories run down the side and each series is a column. Values are plain
+						numbers; put units in the prefix or suffix.
 					</DialogDescription>
 				</DialogHeader>
 				<div className="max-h-[50vh] overflow-auto">
 					<table className="w-full border-separate border-spacing-1 text-sm">
 						<thead>
 							<tr>
-								<th className="w-40 text-left font-medium text-muted-foreground">Category</th>
+								<th className="w-40 text-left font-medium text-muted-foreground">
+									Category
+								</th>
 								{draft.series.map((series, seriesIndex) => (
-									<th key={series.id ?? `new-${seriesIndex}`} className="min-w-28">
+									<th
+										key={series.id ?? `new-${seriesIndex}`}
+										className="min-w-28"
+									>
 										<div className="flex items-center gap-1">
 											<Input
 												aria-label={`Series ${seriesIndex + 1} name`}
@@ -168,10 +174,15 @@ export function ChartDataDialog({ open, onOpenChange, card, node, edit }: ChartD
 												onChange={(event) =>
 													update((current) => ({
 														...current,
-														series: current.series.map((entry, index) =>
-															index === seriesIndex
-																? { ...entry, name: event.target.value }
-																: entry,
+														series: current.series.map(
+															(entry, index) =>
+																index === seriesIndex
+																	? {
+																			...entry,
+																			name: event.target
+																				.value,
+																		}
+																	: entry,
 														),
 													}))
 												}
@@ -186,7 +197,9 @@ export function ChartDataDialog({ open, onOpenChange, card, node, edit }: ChartD
 													onClick={() =>
 														update((current) => ({
 															...current,
-															series: current.series.filter((_, index) => index !== seriesIndex),
+															series: current.series.filter(
+																(_, index) => index !== seriesIndex,
+															),
 														}))
 													}
 												>
@@ -211,7 +224,9 @@ export function ChartDataDialog({ open, onOpenChange, card, node, edit }: ChartD
 														...current.series,
 														{
 															name: `Series ${current.series.length + 1}`,
-															values: current.categories.map(() => "0"),
+															values: current.categories.map(
+																() => "0",
+															),
 														},
 													],
 												}))
@@ -235,8 +250,11 @@ export function ChartDataDialog({ open, onOpenChange, card, node, edit }: ChartD
 												onChange={(event) =>
 													update((current) => ({
 														...current,
-														categories: current.categories.map((entry, index) =>
-															index === categoryIndex ? event.target.value : entry,
+														categories: current.categories.map(
+															(entry, index) =>
+																index === categoryIndex
+																	? event.target.value
+																	: entry,
 														),
 													}))
 												}
@@ -252,11 +270,15 @@ export function ChartDataDialog({ open, onOpenChange, card, node, edit }: ChartD
 														update((current) => ({
 															...current,
 															categories: current.categories.filter(
-																(_, index) => index !== categoryIndex,
+																(_, index) =>
+																	index !== categoryIndex,
 															),
 															series: current.series.map((entry) => ({
 																...entry,
-																values: entry.values.filter((_, index) => index !== categoryIndex),
+																values: entry.values.filter(
+																	(_, index) =>
+																		index !== categoryIndex,
+																),
 															})),
 														}))
 													}
@@ -276,15 +298,25 @@ export function ChartDataDialog({ open, onOpenChange, card, node, edit }: ChartD
 												onChange={(event) =>
 													update((current) => ({
 														...current,
-														series: current.series.map((entry, index) =>
-															index === seriesIndex
-																? {
-																		...entry,
-																		values: entry.values.map((value, position) =>
-																			position === categoryIndex ? event.target.value : value,
-																		),
-																	}
-																: entry,
+														series: current.series.map(
+															(entry, index) =>
+																index === seriesIndex
+																	? {
+																			...entry,
+																			values: entry.values.map(
+																				(
+																					value,
+																					position,
+																				) =>
+																					position ===
+																					categoryIndex
+																						? event
+																								.target
+																								.value
+																						: value,
+																			),
+																		}
+																	: entry,
 														),
 													}))
 												}
@@ -304,7 +336,10 @@ export function ChartDataDialog({ open, onOpenChange, card, node, edit }: ChartD
 							onClick={() =>
 								update((current) => ({
 									...current,
-									categories: [...current.categories, `Category ${current.categories.length + 1}`],
+									categories: [
+										...current.categories,
+										`Category ${current.categories.length + 1}`,
+									],
 									series: current.series.map((entry) => ({
 										...entry,
 										values: [...entry.values, "0"],

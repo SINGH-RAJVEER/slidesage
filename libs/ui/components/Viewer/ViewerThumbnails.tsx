@@ -68,15 +68,19 @@ export const ViewerThumbnails: React.FC<{
 								}}
 								className={`w-32 h-[4.5rem] border-2 rounded-lg flex-shrink-0 transition-all duration-300 overflow-hidden
                 ${
-									currentSlide === index
-										? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/50"
-										: "border-white/20 bg-white/10 hover:border-white/40 hover:bg-white/20"
-								}
+					currentSlide === index
+						? "border-blue-500 bg-blue-500/20 shadow-lg shadow-blue-500/50"
+						: "border-white/20 bg-white/10 hover:border-white/40 hover:bg-white/20"
+				}
                 backdrop-blur-sm relative`}
 							>
 								{"card" in slide ? (
 									// The button names the slide; its miniature card is only a picture.
-									<div aria-hidden inert className="relative h-full w-full overflow-hidden">
+									<div
+										aria-hidden
+										inert
+										className="relative h-full w-full overflow-hidden"
+									>
 										<CardView
 											card={slide.card}
 											theme={theme}

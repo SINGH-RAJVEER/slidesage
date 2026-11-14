@@ -171,7 +171,10 @@ export function AISettings({
 
 	if (!config) {
 		return (
-			<div role="alert" className="flex min-h-64 items-center justify-center text-sm text-red-200">
+			<div
+				role="alert"
+				className="flex min-h-64 items-center justify-center text-sm text-red-200"
+			>
 				{loadError || "AI settings could not be loaded."}
 			</div>
 		);
@@ -202,16 +205,20 @@ export function AISettings({
 							<Info className="size-4" />
 						</TooltipTrigger>
 						<TooltipContent>
-							Keys are validated server-side and encrypted at rest. Plaintext values are never
-							returned to this page. Web research is billed by SlideSage and still costs points even
-							when generating with your own provider key.
+							Keys are validated server-side and encrypted at rest. Plaintext values
+							are never returned to this page. Web research is billed by SlideSage and
+							still costs points even when generating with your own provider key.
 						</TooltipContent>
 					</Tooltip>
 				</div>
 				<div className="mt-5">
 					{PROVIDERS.map((provider) => {
-						const connection = config.connections.find((item) => item.provider === provider.id);
-						const providerModels = config.models.filter((model) => model.provider === provider.id);
+						const connection = config.connections.find(
+							(item) => item.provider === provider.id,
+						);
+						const providerModels = config.models.filter(
+							(model) => model.provider === provider.id,
+						);
 						return (
 							<div key={provider.id} className="py-5 first:pt-4 last:pb-4">
 								<div className="flex items-start justify-between gap-4">
@@ -243,7 +250,9 @@ export function AISettings({
 												Create API key
 											</a>
 											{connection ? (
-												<span className="text-white/45">Connected {connection.keyHint}</span>
+												<span className="text-white/45">
+													Connected {connection.keyHint}
+												</span>
 											) : null}
 										</div>
 										{config.modelCatalogErrors?.[provider.id] ? (
@@ -257,15 +266,23 @@ export function AISettings({
 											aria-label={`Use ${PROVIDER_LABELS[provider.id]} for generation`}
 											checked={connection.enabled}
 											disabled={busy === provider.id}
-											onCheckedChange={(next) => void toggleProvider(provider.id, next)}
+											onCheckedChange={(next) =>
+												void toggleProvider(provider.id, next)
+											}
 										/>
 									) : null}
 								</div>
 								{connection && providerModels.length > 0 ? (
 									<Select
-										value={config.selection?.provider === provider.id ? config.selection.model : ""}
+										value={
+											config.selection?.provider === provider.id
+												? config.selection.model
+												: ""
+										}
 										disabled={!connection.enabled || busy === "selection"}
-										onValueChange={(model) => void selectModel({ provider: provider.id, model })}
+										onValueChange={(model) =>
+											void selectModel({ provider: provider.id, model })
+										}
 									>
 										<SelectTrigger
 											aria-label={`${provider.label} model`}
@@ -301,7 +318,9 @@ export function AISettings({
 										/>
 										<Button
 											type="button"
-											disabled={busy === provider.id || !keys[provider.id]?.trim()}
+											disabled={
+												busy === provider.id || !keys[provider.id]?.trim()
+											}
 											onClick={() => void connect(provider.id)}
 											className="h-10 w-full bg-white text-black hover:bg-white/90 sm:w-auto"
 										>

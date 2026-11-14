@@ -58,7 +58,10 @@ export default function SignInPage() {
 
 	const handleGoogleSignIn = async () => {
 		try {
-			const result = await auth.startSocialSignIn("google", window.location.origin + redirectTo);
+			const result = await auth.startSocialSignIn(
+				"google",
+				window.location.origin + redirectTo,
+			);
 			window.location.href = result.url;
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Google sign-in failed.");
@@ -67,7 +70,10 @@ export default function SignInPage() {
 
 	const handleGithubSignIn = async () => {
 		try {
-			const result = await auth.startSocialSignIn("github", window.location.origin + redirectTo);
+			const result = await auth.startSocialSignIn(
+				"github",
+				window.location.origin + redirectTo,
+			);
 			window.location.href = result.url;
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "GitHub sign-in failed.");
@@ -148,7 +154,9 @@ export default function SignInPage() {
 					});
 				} catch (deliveryErr) {
 					deliveryError =
-						deliveryErr instanceof Error ? deliveryErr.message : "Failed to send verification code";
+						deliveryErr instanceof Error
+							? deliveryErr.message
+							: "Failed to send verification code";
 				}
 				navigate(`/sign-up/verify-email?${emailQuery}`, {
 					replace: true,
@@ -192,7 +200,10 @@ export default function SignInPage() {
 					{step === "email" ? (
 						<form className="space-y-4" onSubmit={handleContinue}>
 							<div className="space-y-2">
-								<label htmlFor="email" className="text-sm font-medium text-white/80">
+								<label
+									htmlFor="email"
+									className="text-sm font-medium text-white/80"
+								>
 									Email
 								</label>
 								<input
@@ -221,7 +232,11 @@ export default function SignInPage() {
 								Remember me
 							</label>
 
-							<Button type="submit" className={primaryButtonClassName} disabled={submitting}>
+							<Button
+								type="submit"
+								className={primaryButtonClassName}
+								disabled={submitting}
+							>
 								{submitting ? "Checking..." : "Continue"}
 							</Button>
 						</form>
@@ -254,7 +269,10 @@ export default function SignInPage() {
 							{signedInAs}
 							<div className="space-y-2">
 								<div className="flex items-center justify-between gap-3">
-									<label htmlFor="password" className="text-sm font-medium text-white/80">
+									<label
+										htmlFor="password"
+										className="text-sm font-medium text-white/80"
+									>
 										Password
 									</label>
 									<a
@@ -277,7 +295,11 @@ export default function SignInPage() {
 								/>
 							</div>
 
-							<Button type="submit" className={primaryButtonClassName} disabled={submitting}>
+							<Button
+								type="submit"
+								className={primaryButtonClassName}
+								disabled={submitting}
+							>
 								{submitting ? "Signing in..." : "Sign In"}
 							</Button>
 							<Button

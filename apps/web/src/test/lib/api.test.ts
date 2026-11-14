@@ -51,9 +51,9 @@ describe("resolveApiUrl", () => {
 	});
 
 	it("honors the configured API origin on the production custom domain", () => {
-		expect(resolveApiUrl("https://api.slidesage.app", true, "https://slidesage.app/profile")).toBe(
-			"https://api.slidesage.app",
-		);
+		expect(
+			resolveApiUrl("https://api.slidesage.app", true, "https://slidesage.app/profile"),
+		).toBe("https://api.slidesage.app");
 		expect(
 			resolveApiUrl("https://api.slidesage.app", true, "https://www.slidesage.app/profile"),
 		).toBe("https://api.slidesage.app");
@@ -63,10 +63,10 @@ describe("resolveApiUrl", () => {
 		expect(resolveApiUrl("http://localhost:8000", false, "https://slidesage.app/sign-in")).toBe(
 			"http://localhost:8000",
 		);
-		expect(resolveApiUrl("http://localhost:8000", true, "https://slidesage.app/sign-in")).toBe("");
+		expect(resolveApiUrl("http://localhost:8000", true, "https://slidesage.app/sign-in")).toBe(
+			"",
+		);
 	});
-
-
 });
 
 describe("readJsonResponse", () => {

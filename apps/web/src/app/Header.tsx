@@ -1,5 +1,5 @@
 import { useAuth } from "@slidesage/ui";
-import { type HeaderRoutes, Header as HeaderView } from "@slidesage/ui/components/Header";
+import { Header as HeaderView, type HeaderRoutes } from "@slidesage/ui/components/Header";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PrefetchLink } from "./PrefetchLink";
 import { ROUTES } from "./router/paths";

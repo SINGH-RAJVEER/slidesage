@@ -5,9 +5,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 mock.module("@slidesage/ui", () => ({
 	useAuth: () => ({ isSignedIn: false, loading: false, user: null }),
 }));
-const { HorizonTransitionProvider, useHorizonPageReady, useHorizonTransition } = await import(
-	"../../app/transitions/HorizonTransition"
-);
+const { HorizonTransitionProvider, useHorizonPageReady, useHorizonTransition } =
+	await import("../../app/transitions/HorizonTransition");
 const originalAnimate = HTMLElement.prototype.animate;
 const originalFrame = window.requestAnimationFrame;
 afterEach(() => {
@@ -29,7 +28,10 @@ describe("horizon route handoff", () => {
 		function Trigger() {
 			const transition = useHorizonTransition();
 			return (
-				<button type="button" onClick={() => transition?.begin({ x: 100, y: 100, radius: 30 })}>
+				<button
+					type="button"
+					onClick={() => transition?.begin({ x: 100, y: 100, radius: 30 })}
+				>
 					Enter
 				</button>
 			);
@@ -52,9 +54,9 @@ describe("horizon route handoff", () => {
 		}
 		const view = render(<App ready={false} />);
 		fireEvent.click(view.getByText("Enter"));
-		expect(view.container.querySelector(".horizon-route-cover")?.getAttribute("data-phase")).toBe(
-			"cover",
-		);
+		expect(
+			view.container.querySelector(".horizon-route-cover")?.getAttribute("data-phase"),
+		).toBe("cover");
 		// Repeated activation must not start a second navigation/cover animation.
 		fireEvent.click(view.getByText("Enter"));
 		expect(finishes).toHaveLength(1);
@@ -62,11 +64,12 @@ describe("horizon route handoff", () => {
 			finishes[0]?.();
 		});
 		await waitFor(() => expect(view.getByText("Loading form")).toBeInTheDocument());
-		expect(view.container.querySelector(".horizon-route-cover")?.getAttribute("data-phase")).toBe(
-			"waiting",
-		);
 		expect(
-			(view.container.querySelector(".horizon-route-content") as HTMLElement).style.visibility,
+			view.container.querySelector(".horizon-route-cover")?.getAttribute("data-phase"),
+		).toBe("waiting");
+		expect(
+			(view.container.querySelector(".horizon-route-content") as HTMLElement).style
+				.visibility,
 		).toBe("hidden");
 		view.rerender(<App ready={true} />);
 		await waitFor(() => expect(finishes.length).toBeGreaterThan(1));
@@ -101,7 +104,10 @@ describe("horizon route handoff", () => {
 		function Trigger() {
 			const transition = useHorizonTransition();
 			return (
-				<button type="button" onClick={() => transition?.begin({ x: 100, y: 100, radius: 30 })}>
+				<button
+					type="button"
+					onClick={() => transition?.begin({ x: 100, y: 100, radius: 30 })}
+				>
 					Enter
 				</button>
 			);

@@ -1,8 +1,8 @@
 import { LAYOUT_RULES } from "./layouts";
 import {
 	CALLOUT_TONES,
-	CARD_SCHEMA_VERSION,
 	type Card,
+	CARD_SCHEMA_VERSION,
 	CHART_KINDS,
 	type ContentNode,
 	LAYOUTS,
@@ -70,8 +70,7 @@ export const DRAFT_WIDGET_GUIDE = {
 		pie: "parts of one whole, two to six slices; one series only",
 		donut: "parts of one whole with the total as the point; one series only",
 	},
-	sizes:
-		"small is a third of a row, medium a half, large two thirds, full the whole row. In a chart or table card the size is the widget's share of the width beside the text, and a full widget sits above it.",
+	sizes: "small is a third of a row, medium a half, large two thirds, full the whole row. In a chart or table card the size is the widget's share of the width beside the text, and a full widget sits above it.",
 	tones: "note for context, positive for a gain or success, caution for a risk or limit",
 } as const;
 
@@ -165,7 +164,12 @@ function nodeToDraft(node: ContentNode): Record<string, unknown> | null {
 				rows: node.rows.map((row) => row.cells),
 			};
 		case "callout":
-			return { type: "callout", size: node.size, tone: node.tone, text: runsToMarkup(node.text) };
+			return {
+				type: "callout",
+				size: node.size,
+				tone: node.tone,
+				text: runsToMarkup(node.text),
+			};
 	}
 }
 

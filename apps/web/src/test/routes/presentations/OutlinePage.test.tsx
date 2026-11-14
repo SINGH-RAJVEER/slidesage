@@ -18,7 +18,12 @@ const outline = {
 		cards: [
 			{ position: 1, takeaway: "Storage is scaling fast", role: "opening", layout: "title" },
 			{ position: 2, takeaway: "Costs fell by half", role: "evidence", layout: "stats" },
-			{ position: 3, takeaway: "Grids need flexibility", role: "insight", layout: "statement" },
+			{
+				position: 3,
+				takeaway: "Grids need flexibility",
+				role: "insight",
+				layout: "statement",
+			},
 		],
 	},
 	photos: false,
@@ -134,8 +139,18 @@ describe("OutlinePage", () => {
 		expect(job?.body["plan"]).toEqual({
 			title: "Battery storage",
 			cards: [
-				{ position: 1, takeaway: "Storage is scaling fast", role: "opening", layout: "title" },
-				{ position: 2, takeaway: "Costs fell by sixty percent", role: "evidence", layout: "stats" },
+				{
+					position: 1,
+					takeaway: "Storage is scaling fast",
+					role: "opening",
+					layout: "title",
+				},
+				{
+					position: 2,
+					takeaway: "Costs fell by sixty percent",
+					role: "evidence",
+					layout: "stats",
+				},
 			],
 		});
 	});
@@ -213,7 +228,10 @@ describe("OutlinePage", () => {
 
 	it("keeps the reason an outline failed on the page", async () => {
 		globalThis.fetch = mock(async () =>
-			Response.json({ error: { message: "Insufficient points for an outline" } }, { status: 402 }),
+			Response.json(
+				{ error: { message: "Insufficient points for an outline" } },
+				{ status: 402 },
+			),
 		) as unknown as typeof fetch;
 		const view = renderOutline({ theme: "aurora" });
 
@@ -233,7 +251,10 @@ describe("OutlinePage", () => {
 
 	it("returns a failed outline with reviewed sources to the research page", async () => {
 		globalThis.fetch = mock(async () =>
-			Response.json({ error: { message: "The outline could not be prepared." } }, { status: 503 }),
+			Response.json(
+				{ error: { message: "The outline could not be prepared." } },
+				{ status: 503 },
+			),
 		) as unknown as typeof fetch;
 		const researchPayload = {
 			sources: [{ url: "https://example.com/storage", title: "Storage outlook" }],

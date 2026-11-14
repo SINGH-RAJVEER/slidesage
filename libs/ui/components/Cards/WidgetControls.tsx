@@ -2,9 +2,9 @@ import {
 	addTableColumn,
 	CALLOUT_TONES,
 	type CalloutTone,
+	canRemoveWidget,
 	CHART_KINDS,
 	type ChartKind,
-	canRemoveWidget,
 	compatibleChartKinds,
 	compatibleSizes,
 	FEATURE_TEXT,
@@ -108,7 +108,8 @@ export function WidgetControls({ node }: { node: WidgetNode }) {
 	const [dataOpen, setDataOpen] = useState(false);
 	if (!editing) return null;
 	const { edit, card } = editing;
-	const feature = (card.layout === "chart" || card.layout === "table") && node.type === card.layout;
+	const feature =
+		(card.layout === "chart" || card.layout === "table") && node.type === card.layout;
 	const hasText = card.nodes.some((entry) => entry !== node && FEATURE_TEXT.includes(entry.type));
 	// Size sets a dashboard widget's share of its row, or a chart or table's share beside text.
 	const sizes =
@@ -127,7 +128,9 @@ export function WidgetControls({ node }: { node: WidgetNode }) {
 						<DropdownMenuRadioGroup
 							value={node.kind}
 							onValueChange={(kind) =>
-								edit((document) => setChartKind(document, card.id, node.id, kind as ChartKind))
+								edit((document) =>
+									setChartKind(document, card.id, node.id, kind as ChartKind),
+								)
 							}
 						>
 							{CHART_KINDS.map((kind) => (
@@ -165,7 +168,9 @@ export function WidgetControls({ node }: { node: WidgetNode }) {
 					<DropdownMenuRadioGroup
 						value={node.tone}
 						onValueChange={(tone) =>
-							edit((document) => setCalloutTone(document, card.id, node.id, tone as CalloutTone))
+							edit((document) =>
+								setCalloutTone(document, card.id, node.id, tone as CalloutTone),
+							)
 						}
 					>
 						{CALLOUT_TONES.map((tone) => (
@@ -180,7 +185,9 @@ export function WidgetControls({ node }: { node: WidgetNode }) {
 				<Menu label="Table columns" icon={Columns3}>
 					<DropdownMenuItem
 						disabled={node.columns.length >= LIMITS.tableColumns.max}
-						onSelect={() => edit((document) => addTableColumn(document, card.id, node.id))}
+						onSelect={() =>
+							edit((document) => addTableColumn(document, card.id, node.id))
+						}
 					>
 						Add column
 					</DropdownMenuItem>
@@ -190,7 +197,9 @@ export function WidgetControls({ node }: { node: WidgetNode }) {
 							key={column}
 							disabled={node.columns.length <= LIMITS.tableColumns.min}
 							onSelect={() =>
-								edit((document) => removeTableColumn(document, card.id, node.id, column))
+								edit((document) =>
+									removeTableColumn(document, card.id, node.id, column),
+								)
 							}
 						>
 							Remove “{heading}”
@@ -203,11 +212,17 @@ export function WidgetControls({ node }: { node: WidgetNode }) {
 					<DropdownMenuRadioGroup
 						value={node.size}
 						onValueChange={(size) =>
-							edit((document) => setWidgetSize(document, card.id, node.id, size as WidgetSize))
+							edit((document) =>
+								setWidgetSize(document, card.id, node.id, size as WidgetSize),
+							)
 						}
 					>
 						{WIDGET_SIZES.map((size) => (
-							<DropdownMenuRadioItem key={size} value={size} disabled={!sizes.includes(size)}>
+							<DropdownMenuRadioItem
+								key={size}
+								value={size}
+								disabled={!sizes.includes(size)}
+							>
 								{SIZE_NAMES[size]}
 							</DropdownMenuRadioItem>
 						))}

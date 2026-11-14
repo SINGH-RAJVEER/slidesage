@@ -42,7 +42,8 @@ describe("VerifyEmailPage", () => {
 		verifyEmail.mockClear();
 
 		try {
-			const { default: VerifyEmailPage } = await import("../../../routes/auth/VerifyEmailPage");
+			const { default: VerifyEmailPage } =
+				await import("../../../routes/auth/VerifyEmailPage");
 			const view = render(
 				<MemoryRouter
 					initialEntries={[
@@ -124,10 +125,13 @@ describe("VerifyEmailPage", () => {
 		globalThis.alert = alertMock as typeof alert;
 
 		try {
-			const { default: VerifyEmailPage } = await import("../../../routes/auth/VerifyEmailPage");
+			const { default: VerifyEmailPage } =
+				await import("../../../routes/auth/VerifyEmailPage");
 
 			const view = render(
-				<MemoryRouter initialEntries={["/sign-up/verify-email?email=rajveer%40example.com"]}>
+				<MemoryRouter
+					initialEntries={["/sign-up/verify-email?email=rajveer%40example.com"]}
+				>
 					<VerifyEmailPage />
 				</MemoryRouter>,
 			);

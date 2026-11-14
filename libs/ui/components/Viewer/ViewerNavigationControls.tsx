@@ -102,7 +102,8 @@ export const ViewerNavigationControls: React.FC<ViewerNavigationControlsProps> =
 						>
 							<X className="w-4 h-4 mr-2" />
 							<span>
-								Cancel<span className="viewer-navigation__wide-only"> generation</span>
+								Cancel
+								<span className="viewer-navigation__wide-only"> generation</span>
 							</span>
 						</Button>
 					) : (

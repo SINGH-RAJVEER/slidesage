@@ -92,7 +92,9 @@ describe("drafted widgets", () => {
 				},
 			],
 		});
-		expect("issue" in twoSeriesPie && twoSeriesPie.issue.message).toContain("exactly one series");
+		expect("issue" in twoSeriesPie && twoSeriesPie.issue.message).toContain(
+			"exactly one series",
+		);
 		const short = convert({
 			layout: "chart",
 			nodes: [
@@ -188,8 +190,18 @@ describe("drafted widgets", () => {
 
 describe("widget edits", () => {
 	it("offers only the chart kinds the data suits", () => {
-		const single = { categories: ["A", "B"], series: [{ id: "i_a", name: "x", values: [1, 2] }] };
-		expect(compatibleChartKinds(single)).toEqual(["column", "bar", "line", "area", "pie", "donut"]);
+		const single = {
+			categories: ["A", "B"],
+			series: [{ id: "i_a", name: "x", values: [1, 2] }],
+		};
+		expect(compatibleChartKinds(single)).toEqual([
+			"column",
+			"bar",
+			"line",
+			"area",
+			"pie",
+			"donut",
+		]);
 		const double = {
 			...single,
 			series: [...single.series, { id: "i_b", name: "y", values: [3, -1] }],
@@ -266,7 +278,9 @@ describe("widget edits", () => {
 		const current = document.cards[cardId] as Card;
 		expect(compatibleSizes(current, chart.id)).not.toContain("full");
 		expect(setWidgetSize(document, cardId, chart.id, "full")).toBe(document);
-		document = setMeter(document, cardId, progress.id, progress.items[0]?.id ?? "", { value: 140 });
+		document = setMeter(document, cardId, progress.id, progress.items[0]?.id ?? "", {
+			value: 140,
+		});
 		document = addListItem(document, cardId, progress.id);
 		const meters = document.cards[cardId]?.nodes.find((node) => node.id === progress.id);
 		expect(meters?.type === "progress" && meters.items.map((meter) => meter.value)).toEqual([
@@ -285,7 +299,9 @@ describe("widget edits", () => {
 		document = removeWidget(document, cardId, progress.id);
 		document = removeWidget(document, cardId, table.id);
 		// Two widgets is the minimum, so the last removal is refused.
-		expect(document.cards[cardId]?.nodes.filter((node) => node.type !== "heading")).toHaveLength(2);
+		expect(
+			document.cards[cardId]?.nodes.filter((node) => node.type !== "heading"),
+		).toHaveLength(2);
 		expect(validateCardDocument(document).ok).toBe(true);
 	});
 

@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, mock, setSystemTime } from "bun:test";
 import {
 	clearPrefetched,
 	evictPrefetched,
-	PREFETCH_TTL_MS,
 	prefetch,
+	PREFETCH_TTL_MS,
 	takePrefetched,
 } from "../../lib/prefetch";
 

@@ -27,6 +27,9 @@ describe("WordmarkOrb", () => {
 		/* happy-dom has no WebGL context, so the effect takes the fallback path. */
 		const { container, getByRole } = renderOrb();
 		expect(container.querySelector("[data-black-hole-fallback]")).not.toBeNull();
-		expect(getByRole("link", { name: "SlideSage — sign up" })).toHaveAttribute("href", "/sign-up");
+		expect(getByRole("link", { name: "SlideSage — sign up" })).toHaveAttribute(
+			"href",
+			"/sign-up",
+		);
 	});
 });

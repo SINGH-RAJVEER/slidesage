@@ -105,7 +105,9 @@ function fract(value: number) {
 }
 
 function has2dContext(ctx: CanvasRenderingContext2D | null): ctx is CanvasRenderingContext2D {
-	return ctx !== null && typeof ctx.clearRect === "function" && typeof ctx.fillRect === "function";
+	return (
+		ctx !== null && typeof ctx.clearRect === "function" && typeof ctx.fillRect === "function"
+	);
 }
 
 function BlackHoleFallback() {
@@ -155,7 +157,11 @@ export function WordmarkOrb() {
 
 		const starContext = starCanvas.getContext("2d", { alpha: true });
 		const gl =
-			glCanvas.getContext("webgl", { alpha: true, premultipliedAlpha: false, antialias: false }) ??
+			glCanvas.getContext("webgl", {
+				alpha: true,
+				premultipliedAlpha: false,
+				antialias: false,
+			}) ??
 			glCanvas.getContext("experimental-webgl", {
 				alpha: true,
 				premultipliedAlpha: false,
@@ -246,7 +252,12 @@ export function WordmarkOrb() {
 
 			const drawStars = (elapsed: number, horizonScale: number) => {
 				starContext.setTransform(starDpr, 0, 0, starDpr, 0, 0);
-				starContext.clearRect(0, 0, starCanvas.width / starDpr, starCanvas.height / starDpr);
+				starContext.clearRect(
+					0,
+					0,
+					starCanvas.width / starDpr,
+					starCanvas.height / starDpr,
+				);
 				const count = Math.min(stars.length, Math.round((width * height) / 4200));
 				for (let index = 0; index < count; index += 1) {
 					const star = stars[index];
@@ -260,7 +271,10 @@ export function WordmarkOrb() {
 					const radius = Math.max(0.35, star.size * star.depth);
 					const sprite =
 						starSprites[
-							Math.min(STAR_SPRITE_BUCKETS - 1, Math.floor(star.depth * STAR_SPRITE_BUCKETS))
+							Math.min(
+								STAR_SPRITE_BUCKETS - 1,
+								Math.floor(star.depth * STAR_SPRITE_BUCKETS),
+							)
 						];
 					if (!sprite) continue;
 					starContext.globalAlpha = alpha;
@@ -279,8 +293,15 @@ export function WordmarkOrb() {
 					starContext.beginPath();
 					for (let segment = 0; segment <= 4; segment++) {
 						const sample = Math.max(0, progress - flight.length * (1 - segment / 4));
-						const point = flightPoint(flight.angle, flight.offset, sample, extent, horizonScale);
-						if (segment === 0) starContext.moveTo(width / 2 + point.x, height / 2 + point.y);
+						const point = flightPoint(
+							flight.angle,
+							flight.offset,
+							sample,
+							extent,
+							horizonScale,
+						);
+						if (segment === 0)
+							starContext.moveTo(width / 2 + point.x, height / 2 + point.y);
 						else starContext.lineTo(width / 2 + point.x, height / 2 + point.y);
 					}
 					starContext.stroke();
@@ -304,7 +325,8 @@ export function WordmarkOrb() {
 				);
 				webgl.clear(webgl.COLOR_BUFFER_BIT);
 				webgl.drawArrays(webgl.TRIANGLES, 0, 3);
-				if (!reducedMotion && visible && !document.hidden) frame = requestAnimationFrame(render);
+				if (!reducedMotion && visible && !document.hidden)
+					frame = requestAnimationFrame(render);
 			};
 
 			const start = () => {
@@ -374,7 +396,8 @@ export function WordmarkOrb() {
 		const bounds = event.currentTarget.getBoundingClientRect();
 
 		const scale =
-			Number(hostRef.current?.parentElement?.style.getPropertyValue("--horizon-scale")) || 1 / 3;
+			Number(hostRef.current?.parentElement?.style.getPropertyValue("--horizon-scale")) ||
+			1 / 3;
 		// Pointer activation follows the visible silhouette, not the square canvas.
 		if (
 			event.detail !== 0 &&
@@ -390,7 +413,9 @@ export function WordmarkOrb() {
 			y: bounds.top + bounds.height / 2,
 			radius: bounds.height * 0.3 * scale,
 			wordmark:
-				Number(hostRef.current?.parentElement?.style.getPropertyValue("--horizon-wordmark")) || 0,
+				Number(
+					hostRef.current?.parentElement?.style.getPropertyValue("--horizon-wordmark"),
+				) || 0,
 		});
 	};
 

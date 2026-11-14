@@ -48,7 +48,9 @@ export const WebResearchToggle: React.FC<WebResearchToggleProps> = ({
 	// The count the fill would snap to if released now, which is the committed
 	// count once released, so the number fades out on the value it settled on.
 	const draggedCount =
-		dragFraction === null ? resultCount : clampCount(Math.round(dragFraction * MAX_RESEARCH_RESULTS));
+		dragFraction === null
+			? resultCount
+			: clampCount(Math.round(dragFraction * MAX_RESEARCH_RESULTS));
 
 	const changeCount = (count: number) => {
 		const next = clampCount(count);
@@ -93,7 +95,8 @@ export const WebResearchToggle: React.FC<WebResearchToggleProps> = ({
 
 	const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (pressRef.current?.pointerId !== event.pointerId) return;
-		if (dragRef.current !== null) changeCount(Math.round(dragRef.current * MAX_RESEARCH_RESULTS));
+		if (dragRef.current !== null)
+			changeCount(Math.round(dragRef.current * MAX_RESEARCH_RESULTS));
 		endPress();
 	};
 

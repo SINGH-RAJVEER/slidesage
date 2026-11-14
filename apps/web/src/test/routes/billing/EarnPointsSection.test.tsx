@@ -50,7 +50,10 @@ function serve(status: object, early = 0) {
 		}
 		if (url.endsWith("/claim") && tooEarly-- > 0) {
 			return Response.json(
-				{ error: { message: "Finish watching", code: "AD_REWARD_TOO_EARLY" }, retry_after: 0 },
+				{
+					error: { message: "Finish watching", code: "AD_REWARD_TOO_EARLY" },
+					retry_after: 0,
+				},
 				{ status: 409 },
 			);
 		}

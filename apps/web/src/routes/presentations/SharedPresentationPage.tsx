@@ -51,7 +51,12 @@ export default function SharedPresentationPage() {
 				if (!active) return;
 				setState(
 					validated.ok
-						? { status: "ready", document: validated.value, sources: body.sources ?? [], assets }
+						? {
+								status: "ready",
+								document: validated.value,
+								sources: body.sources ?? [],
+								assets,
+							}
 						: { status: "error", message: "This presentation could not be read." },
 				);
 			} catch {
@@ -99,7 +104,10 @@ export default function SharedPresentationPage() {
 					<SlideSageLogo className="h-8 w-auto" />
 				</Link>
 			</header>
-			<section className="flex flex-1 flex-col items-center justify-center gap-2 px-4" role="alert">
+			<section
+				className="flex flex-1 flex-col items-center justify-center gap-2 px-4"
+				role="alert"
+			>
 				<p className="text-sm text-white/70">
 					{state.status === "missing"
 						? "This link is not valid. It may have been turned off by its owner."

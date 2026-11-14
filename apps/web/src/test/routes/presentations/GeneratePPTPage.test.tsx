@@ -35,7 +35,10 @@ it("restores the generate setup after leaving for another section", async () => 
 				<Link to="/elsewhere">Leave setup</Link>
 				<Routes>
 					<Route path="/generate" element={<GeneratePPTPage />} />
-					<Route path="/elsewhere" element={<Link to="/generate">Return to setup</Link>} />
+					<Route
+						path="/elsewhere"
+						element={<Link to="/generate">Return to setup</Link>}
+					/>
 					<Route path="/generate/research" element={<RouteStateProbe />} />
 				</Routes>
 			</StreamingProvider>
@@ -45,12 +48,17 @@ it("restores the generate setup after leaving for another section", async () => 
 		target: { value: "My edited prompt" },
 	});
 	fireEvent.keyDown(view.getByRole("slider", { name: "Slide count" }), { key: "ArrowRight" });
-	fireEvent.keyDown(view.getByRole("slider", { name: "Research results" }), { key: "ArrowRight" });
+	fireEvent.keyDown(view.getByRole("slider", { name: "Research results" }), {
+		key: "ArrowRight",
+	});
 	fireEvent.click(view.getByText("Leave setup"));
 	fireEvent.click(view.getByText("Return to setup"));
 	expect(view.getByRole("textbox", { name: "Prompt" })).toHaveValue("My edited prompt");
 	expect(view.getByRole("slider", { name: "Slide count" })).toHaveTextContent("13");
-	expect(view.getByRole("slider", { name: "Research results" })).toHaveAttribute("aria-valuenow", "6");
+	expect(view.getByRole("slider", { name: "Research results" })).toHaveAttribute(
+		"aria-valuenow",
+		"6",
+	);
 	expect(view.getByText("Comprehensive")).toBeInTheDocument();
 	expect(view.getByText("Casual")).toBeInTheDocument();
 	fireEvent.click(view.getByRole("button", { name: "Generate" }));

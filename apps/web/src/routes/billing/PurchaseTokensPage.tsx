@@ -119,8 +119,7 @@ export default function PurchaseTokensPage() {
 			});
 
 			const data = (await res.json().catch(() => ({}))) as
-				| BillingCheckoutResponse
-				| ApiErrorResponse;
+				BillingCheckoutResponse | ApiErrorResponse;
 			if (!res.ok) {
 				throw new Error("error" in data ? data.error.message : "Failed to start checkout");
 			}
@@ -160,7 +159,9 @@ export default function PurchaseTokensPage() {
 								slide_tokens: verifyData.new_balance,
 							});
 							publishPointsBalance(verifyData.new_balance);
-							setSuccessMessage(`${verifyData.tokens_awarded} points added to your account!`);
+							setSuccessMessage(
+								`${verifyData.tokens_awarded} points added to your account!`,
+							);
 							resolve();
 						} catch (err) {
 							reject(err);
@@ -260,7 +261,9 @@ export default function PurchaseTokensPage() {
 						<Card className="flex flex-col border border-white/10 bg-black/20 transition-colors hover:bg-white/5">
 							<CardHeader>
 								<CardTitle className="text-white text-2xl">Starter Pack</CardTitle>
-								<CardDescription className="text-white/60">Perfect for trying out</CardDescription>
+								<CardDescription className="text-white/60">
+									Perfect for trying out
+								</CardDescription>
 							</CardHeader>
 							<CardContent className="flex-1 flex flex-col">
 								<div className="flex-1 space-y-4">
@@ -274,10 +277,14 @@ export default function PurchaseTokensPage() {
 									</div>
 									<div className="pt-4 space-y-3 border-t border-white/10 mt-6">
 										<div className="text-sm text-white/70">
-											<span className="text-white/50">• Standard generation speed</span>
+											<span className="text-white/50">
+												• Standard generation speed
+											</span>
 										</div>
 										<div className="text-sm text-white/70">
-											<span className="text-white/50">• Standard support</span>
+											<span className="text-white/50">
+												• Standard support
+											</span>
 										</div>
 									</div>
 								</div>
@@ -302,12 +309,16 @@ export default function PurchaseTokensPage() {
 						<Card className="relative flex flex-col border border-white/10 bg-black/20 transition-colors hover:bg-white/5">
 							<CardHeader>
 								<CardTitle className="text-white text-2xl">Pro Pack</CardTitle>
-								<CardDescription className="text-white/60">Most popular choice</CardDescription>
+								<CardDescription className="text-white/60">
+									Most popular choice
+								</CardDescription>
 							</CardHeader>
 							<CardContent className="flex-1 flex flex-col">
 								<div className="flex-1 space-y-4">
 									<div className="pb-7 pt-4 text-center">
-										<div className="text-5xl font-bold text-white mb-2">250</div>
+										<div className="text-5xl font-bold text-white mb-2">
+											250
+										</div>
 										<div className="text-white/60">points</div>
 									</div>
 									<div className="text-center">
@@ -318,12 +329,16 @@ export default function PurchaseTokensPage() {
 										<div className="text-sm text-white/80 flex items-start gap-2">
 											<span className="text-green-400 mt-0.5">✓</span>
 											<span>
-												<span className="font-semibold">Ad-Free Experience</span> ({AD_FREE_POINTS}+
-												points)
+												<span className="font-semibold">
+													Ad-Free Experience
+												</span>{" "}
+												({AD_FREE_POINTS}+ points)
 											</span>
 										</div>
 										<div className="text-sm text-white/70">
-											<span className="text-white/50">• Standard generation speed</span>
+											<span className="text-white/50">
+												• Standard generation speed
+											</span>
 										</div>
 									</div>
 								</div>
@@ -351,35 +366,52 @@ export default function PurchaseTokensPage() {
 							</div>
 							<Card className="flex flex-col border border-blue-400/30 bg-black/20 transition-colors hover:bg-white/5">
 								<CardHeader>
-									<CardTitle className="text-white text-2xl">Premium Pack</CardTitle>
-									<CardDescription className="text-white/60">Maximum savings</CardDescription>
+									<CardTitle className="text-white text-2xl">
+										Premium Pack
+									</CardTitle>
+									<CardDescription className="text-white/60">
+										Maximum savings
+									</CardDescription>
 								</CardHeader>
 								<CardContent className="flex-1 flex flex-col">
 									<div className="flex-1 space-y-4">
 										<div className="pb-7 pt-4 text-center">
-											<div className="text-5xl font-bold text-white mb-2">625</div>
+											<div className="text-5xl font-bold text-white mb-2">
+												625
+											</div>
 											<div className="text-white/60">points</div>
 										</div>
 										<div className="text-center">
-											<div className="text-3xl font-bold text-blue-400">₹1000</div>
-											<div className="text-sm text-green-400 mt-1">Save 20%</div>
+											<div className="text-3xl font-bold text-blue-400">
+												₹1000
+											</div>
+											<div className="text-sm text-green-400 mt-1">
+												Save 20%
+											</div>
 										</div>
 										<div className="pt-4 space-y-3 border-t border-white/10 mt-6">
 											<div className="text-sm text-white/80 flex items-start gap-2">
 												<span className="text-green-400 mt-0.5">✓</span>
 												<span>
-													<span className="font-semibold">Ad-Free Experience</span> (
-													{AD_FREE_POINTS}+ points)
+													<span className="font-semibold">
+														Ad-Free Experience
+													</span>{" "}
+													({AD_FREE_POINTS}+ points)
 												</span>
 											</div>
 											<div className="text-sm text-white/80 flex items-start gap-2">
 												<span className="text-green-400 mt-0.5">✓</span>
 												<span>
-													<span className="font-semibold">Priority Throughput</span> (100+ points)
+													<span className="font-semibold">
+														Priority Throughput
+													</span>{" "}
+													(100+ points)
 												</span>
 											</div>
 											<div className="text-sm text-white/70">
-												<span className="text-white/50">• Maximum savings per token</span>
+												<span className="text-white/50">
+													• Maximum savings per token
+												</span>
 											</div>
 										</div>
 									</div>
@@ -436,7 +468,9 @@ export default function PurchaseTokensPage() {
 												className="hide-number-spin h-[5.75rem] appearance-none border-0 bg-transparent px-0 py-0 text-center text-5xl font-bold text-white placeholder:text-white/25 shadow-none focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0 desktop:text-5xl"
 											/>
 											{customAmount && !isCustomAmountValid() && (
-												<p className="text-red-400 text-sm">Must be 25-10000</p>
+												<p className="text-red-400 text-sm">
+													Must be 25-10000
+												</p>
 											)}
 										</div>
 									</div>
@@ -447,35 +481,50 @@ export default function PurchaseTokensPage() {
 													₹{calculateCustomPrice(customAmount).toFixed(0)}
 												</div>
 												{parseInt(customAmount, 10) >= 625 && (
-													<div className="text-sm text-green-400 mt-1">20% Discount Applied</div>
+													<div className="text-sm text-green-400 mt-1">
+														20% Discount Applied
+													</div>
 												)}
-												{parseInt(customAmount, 10) >= 250 && parseInt(customAmount, 10) < 625 && (
-													<div className="text-sm text-green-400 mt-1">10% Discount Applied</div>
-												)}
+												{parseInt(customAmount, 10) >= 250 &&
+													parseInt(customAmount, 10) < 625 && (
+														<div className="text-sm text-green-400 mt-1">
+															10% Discount Applied
+														</div>
+													)}
 											</>
 										)}
 									</div>
 									<div className="mt-6 space-y-3 border-t border-white/10 pt-4">
-										{customAmount && isCustomAmountValid() && parseInt(customAmount, 10) >= 30 && (
-											<>
-												{parseInt(customAmount, 10) >= 30 && (
-													<div className="text-sm text-white/80 flex items-start gap-2">
-														<span className="text-green-400 mt-0.5">✓</span>
-														<span>
-															<span className="font-semibold">Ad-Free Experience</span>
-														</span>
-													</div>
-												)}
-												{parseInt(customAmount, 10) >= 100 && (
-													<div className="text-sm text-white/80 flex items-start gap-2">
-														<span className="text-green-400 mt-0.5">✓</span>
-														<span>
-															<span className="font-semibold">Priority Throughput</span>
-														</span>
-													</div>
-												)}
-											</>
-										)}
+										{customAmount &&
+											isCustomAmountValid() &&
+											parseInt(customAmount, 10) >= 30 && (
+												<>
+													{parseInt(customAmount, 10) >= 30 && (
+														<div className="text-sm text-white/80 flex items-start gap-2">
+															<span className="text-green-400 mt-0.5">
+																✓
+															</span>
+															<span>
+																<span className="font-semibold">
+																	Ad-Free Experience
+																</span>
+															</span>
+														</div>
+													)}
+													{parseInt(customAmount, 10) >= 100 && (
+														<div className="text-sm text-white/80 flex items-start gap-2">
+															<span className="text-green-400 mt-0.5">
+																✓
+															</span>
+															<span>
+																<span className="font-semibold">
+																	Priority Throughput
+																</span>
+															</span>
+														</div>
+													)}
+												</>
+											)}
 									</div>
 								</div>
 								<Button

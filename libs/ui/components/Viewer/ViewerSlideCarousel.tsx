@@ -95,8 +95,6 @@ export const ViewerSlideCarousel: React.FC<ViewerSlideCarouselProps> = ({
 						const isActive = visibleSlide === index;
 
 						return (
-							// biome-ignore lint/a11y/useKeyWithClickEvents: click only
-							// biome-ignore lint/a11y/useFocusableInteractive: mouse-based carousel
 							<div
 								key={slide.key}
 								id={`slide-${index}`}
@@ -117,7 +115,10 @@ export const ViewerSlideCarousel: React.FC<ViewerSlideCarouselProps> = ({
 										edit={index === editableSlide ? edit : undefined}
 									/>
 								) : (
-									<PendingSlide takeaway={slide.takeaway} generation={generation} />
+									<PendingSlide
+										takeaway={slide.takeaway}
+										generation={generation}
+									/>
 								)}
 							</div>
 						);

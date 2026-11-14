@@ -16,15 +16,15 @@ import { AnchoredAd, InlineAd } from "../../app/Ads";
 import Header from "../../app/Header";
 import { ROUTES } from "../../app/router/paths";
 import { useHorizonPageReady } from "../../app/transitions/HorizonTransition";
-import type { LibraryNotice } from "./PresentationPage";
 import {
 	evictPresentation,
 	fetchPresentationsPage,
-	PRESENTATIONS_PAGE_SIZE,
 	prefetchPresentation,
 	prefetchPresentationDetail,
+	PRESENTATIONS_PAGE_SIZE,
 	takeLibrary,
 } from "./presentation-data";
+import type { LibraryNotice } from "./PresentationPage";
 
 interface PaginationState {
 	total: number;
@@ -147,7 +147,11 @@ export default function PresentationsGridPage() {
 	}, [presentations, searchQuery]);
 
 	const fetchPresentations = useCallback(
-		async ({ background = false, append = false, offset = 0 }: FetchPresentationsOptions = {}) => {
+		async ({
+			background = false,
+			append = false,
+			offset = 0,
+		}: FetchPresentationsOptions = {}) => {
 			try {
 				if (append) setLoadingMore(true);
 				else if (!background) setLoading(true);
@@ -155,7 +159,9 @@ export default function PresentationsGridPage() {
 				// Opening the library may use the first page that hovering its link
 				// prefetched; refreshes and further pages always ask the server.
 				const page =
-					background || append ? await fetchPresentationsPage(offset) : await takeLibrary();
+					background || append
+						? await fetchPresentationsPage(offset)
+						: await takeLibrary();
 
 				if (!page.ok && page.status === 401) {
 					setError("Authentication failed. Please log in again.");
@@ -177,7 +183,9 @@ export default function PresentationsGridPage() {
 					const existingIds = new Set(current.map((presentation) => presentation.id));
 					return [
 						...current,
-						...presentationsList.filter((presentation) => !existingIds.has(presentation.id)),
+						...presentationsList.filter(
+							(presentation) => !existingIds.has(presentation.id),
+						),
 					];
 				});
 				setPagination({
@@ -286,11 +294,16 @@ export default function PresentationsGridPage() {
 				}
 
 				const result =
-					response.status === 204 ? null : await readJsonResponse<ApiErrorResponse>(response);
+					response.status === 204
+						? null
+						: await readJsonResponse<ApiErrorResponse>(response);
 
 				if (!response.ok) {
 					restorePresentation(entry);
-					setError(result?.error.message || `Failed to delete presentation (${response.status}).`);
+					setError(
+						result?.error.message ||
+							`Failed to delete presentation (${response.status}).`,
+					);
 				}
 			} catch (err) {
 				restorePresentation(entry);
@@ -374,7 +387,11 @@ export default function PresentationsGridPage() {
 				key={pendingDelete?.presentation.id}
 				error={error || notice}
 				success={pendingDelete ? "Presentation deleted" : null}
-				action={!error && !notice && pendingDelete ? { label: "Undo", onClick: undoDelete } : null}
+				action={
+					!error && !notice && pendingDelete
+						? { label: "Undo", onClick: undoDelete }
+						: null
+				}
 				onDismiss={() => {
 					setError("");
 					setNotice(null);

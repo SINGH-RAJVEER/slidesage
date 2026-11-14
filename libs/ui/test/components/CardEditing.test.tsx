@@ -50,7 +50,9 @@ export function everyNodeDeck(): CardDocument {
 		},
 		{
 			layout: "quote",
-			nodes: [{ type: "quote", text: "Storage is **the** piece", attribution: "An operator" }],
+			nodes: [
+				{ type: "quote", text: "Storage is **the** piece", attribution: "An operator" },
+			],
 		},
 		{
 			layout: "stats",
@@ -124,7 +126,10 @@ describe("editing cards", () => {
 			JSON.stringify({
 				...document,
 				cards: Object.fromEntries(
-					Object.entries(document.cards).map(([id, card]) => [id, { ...card, takeaway: "" }]),
+					Object.entries(document.cards).map(([id, card]) => [
+						id,
+						{ ...card, takeaway: "" },
+					]),
 				),
 			});
 		expect(withoutTakeaways(current)).toBe(withoutTakeaways(original));

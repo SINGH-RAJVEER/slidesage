@@ -64,7 +64,8 @@ export default function GeneratePPTPage() {
 	const change = <K extends keyof GenerateDraft>(key: K, value: GenerateDraft[K]) =>
 		setDraft((current) => ({ ...current, [key]: value }));
 	const setPrompt = (value: string) => change("prompt", value);
-	const setSelectedTemplateId = (value: string | undefined) => change("selectedTemplateId", value);
+	const setSelectedTemplateId = (value: string | undefined) =>
+		change("selectedTemplateId", value);
 	const [loading, setLoading] = useState(false);
 	// Raised by pressing Generate with nothing selected. Nothing is preselected
 	// and nothing stands in for a choice, so the reader is told at the moment
@@ -145,7 +146,9 @@ export default function GeneratePPTPage() {
 		// A failed deck's approved outline still fits while the topic and length
 		// are unchanged, so it is offered again instead of a new, paid one.
 		const plan =
-			retry?.plan && normalizedPrompt === retry.prompt.trim() && count === retrySlideCount(retry)
+			retry?.plan &&
+			normalizedPrompt === retry.prompt.trim() &&
+			count === retrySlideCount(retry)
 				? retry.plan
 				: undefined;
 
@@ -196,7 +199,9 @@ export default function GeneratePPTPage() {
 			const target = event.target;
 			if (
 				target instanceof Element &&
-				target.closest('[role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]')
+				target.closest(
+					'[role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]',
+				)
 			) {
 				return;
 			}

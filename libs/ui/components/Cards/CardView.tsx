@@ -2,22 +2,22 @@ import {
 	addListItem,
 	type BulletsNode,
 	type Card,
-	COVER_PALETTE,
 	type ColumnsNode,
 	type ContentNode,
+	COVER_PALETTE,
 	FEATURE_TEXT,
 	featureSplit,
 	type ImageNode,
 	isWidget,
 	type QuoteNode,
 	removeListItem,
-	STOCK_LIBRARIES,
-	type StatNode,
-	type StepsNode,
 	setItemText,
 	setNodeField,
 	setNodeText,
 	setPartField,
+	type StatNode,
+	type StepsNode,
+	STOCK_LIBRARIES,
 	syncTakeaway,
 	type WidgetNode,
 	widgetRows,
@@ -41,7 +41,9 @@ import { Widget } from "./Widgets";
 export { CardEditScope, type DocumentEdit, RichTextView } from "./fields";
 
 function nodesOf<T extends ContentNode["type"]>(card: Card, type: T) {
-	return card.nodes.filter((node): node is Extract<ContentNode, { type: T }> => node.type === type);
+	return card.nodes.filter(
+		(node): node is Extract<ContentNode, { type: T }> => node.type === type,
+	);
 }
 
 function Heading({ card, theme, large }: { card: Card; theme: CardTheme; large?: boolean }) {
@@ -87,7 +89,9 @@ function Paragraphs({ card, theme, large }: { card: Card; theme: CardTheme; larg
 					<RichField
 						value={paragraph.text}
 						label="Paragraph"
-						update={(document, value, cardId) => setNodeText(document, cardId, paragraph.id, value)}
+						update={(document, value, cardId) =>
+							setNodeText(document, cardId, paragraph.id, value)
+						}
 					/>
 				</p>
 			))}
@@ -142,7 +146,9 @@ function Bullets({ node, theme }: { node: BulletsNode; theme: CardTheme }) {
 				label="Add bullet"
 				theme={theme}
 				visible={!!editing && !!bounds && node.items.length < bounds.max}
-				onAdd={() => editing?.edit((document) => addListItem(document, editing.card.id, node.id))}
+				onAdd={() =>
+					editing?.edit((document) => addListItem(document, editing.card.id, node.id))
+				}
 			/>
 		</div>
 	);
@@ -202,10 +208,17 @@ function Columns({ node, theme }: { node: ColumnsNode; theme: CardTheme }) {
 								</span>
 								<RemoveItem
 									label="Remove item"
-									visible={!!editing && !!bounds && column.items.length > bounds.min}
+									visible={
+										!!editing && !!bounds && column.items.length > bounds.min
+									}
 									onRemove={() =>
 										editing?.edit((document) =>
-											removeListItem(document, editing.card.id, node.id, item.id),
+											removeListItem(
+												document,
+												editing.card.id,
+												node.id,
+												item.id,
+											),
 										)
 									}
 								/>
@@ -218,7 +231,9 @@ function Columns({ node, theme }: { node: ColumnsNode; theme: CardTheme }) {
 						visible={!!editing && !!bounds && column.items.length < bounds.max}
 						onAdd={() =>
 							editing?.edit((document) =>
-								addListItem(document, editing.card.id, node.id, { columnId: column.id }),
+								addListItem(document, editing.card.id, node.id, {
+									columnId: column.id,
+								}),
 							)
 						}
 					/>
@@ -280,13 +295,23 @@ function Steps({ node, theme }: { node: StepsNode; theme: CardTheme }) {
 						</span>
 						{(step.detail || editing) && (
 							<span
-								className={cn("text-[length:calc(1.5cqw*var(--fit,1))] leading-snug", theme.body)}
+								className={cn(
+									"text-[length:calc(1.5cqw*var(--fit,1))] leading-snug",
+									theme.body,
+								)}
 							>
 								<RichField
 									value={step.detail ?? []}
 									label="Step detail"
 									update={(document, value, cardId) =>
-										setPartField(document, cardId, node.id, step.id, "detail", value)
+										setPartField(
+											document,
+											cardId,
+											node.id,
+											step.id,
+											"detail",
+											value,
+										)
 									}
 								/>
 							</span>
@@ -298,7 +323,9 @@ function Steps({ node, theme }: { node: StepsNode; theme: CardTheme }) {
 				label="Add step"
 				theme={theme}
 				visible={!!editing && !!bounds && node.items.length < bounds.max}
-				onAdd={() => editing?.edit((document) => addListItem(document, editing.card.id, node.id))}
+				onAdd={() =>
+					editing?.edit((document) => addListItem(document, editing.card.id, node.id))
+				}
 			/>
 		</div>
 	);
@@ -326,16 +353,33 @@ function Stats({ nodes, theme }: { nodes: StatNode[]; theme: CardTheme }) {
 							value={stat.value}
 							label="Figure"
 							update={(document, value, cardId) =>
-								setNodeField(document, cardId, stat.id, { type: "stat", field: "value" }, value)
+								setNodeField(
+									document,
+									cardId,
+									stat.id,
+									{ type: "stat", field: "value" },
+									value,
+								)
 							}
 						/>
 					</span>
-					<span className={cn("text-[length:calc(1.6cqw*var(--fit,1))] leading-snug", theme.body)}>
+					<span
+						className={cn(
+							"text-[length:calc(1.6cqw*var(--fit,1))] leading-snug",
+							theme.body,
+						)}
+					>
 						<PlainField
 							value={stat.label}
 							label="Figure label"
 							update={(document, value, cardId) =>
-								setNodeField(document, cardId, stat.id, { type: "stat", field: "label" }, value)
+								setNodeField(
+									document,
+									cardId,
+									stat.id,
+									{ type: "stat", field: "label" },
+									value,
+								)
 							}
 						/>
 					</span>
@@ -359,7 +403,9 @@ function Quote({ node, theme }: { node: QuoteNode; theme: CardTheme }) {
 				<RichField
 					value={node.text}
 					label="Quotation"
-					update={(document, value, cardId) => setNodeText(document, cardId, node.id, value)}
+					update={(document, value, cardId) =>
+						setNodeText(document, cardId, node.id, value)
+					}
 				/>
 				<span className={theme.accent}>”</span>
 			</blockquote>
@@ -399,7 +445,9 @@ function FeatureText({ node, theme }: { node: ContentNode; theme: CardTheme }) {
 					<RichField
 						value={node.text}
 						label="Paragraph"
-						update={(document, value, cardId) => setNodeText(document, cardId, node.id, value)}
+						update={(document, value, cardId) =>
+							setNodeText(document, cardId, node.id, value)
+						}
 					/>
 				</p>
 			);
@@ -435,7 +483,11 @@ function Feature({ card, theme }: { card: Card; theme: CardTheme }) {
 				<div
 					className="flex min-h-0 min-w-0 flex-col"
 					style={{
-						flex: row ? `${split.share} 1 0` : widget.type === "chart" ? "1 1 0" : "none",
+						flex: row
+							? `${split.share} 1 0`
+							: widget.type === "chart"
+								? "1 1 0"
+								: "none",
 					}}
 				>
 					<Widget node={widget} theme={theme} />
@@ -749,7 +801,8 @@ export function CardView({
 			if (active) fit();
 		});
 		document.fonts?.addEventListener("loadingdone", fit);
-		const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(fit);
+		const observer =
+			typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(fit);
 		observer?.observe(article);
 		if (content.firstElementChild) observer?.observe(content.firstElementChild);
 		return () => {
@@ -761,7 +814,10 @@ export function CardView({
 
 	const footer = (
 		<footer
-			className={cn("flex items-end justify-between gap-[2cqw] text-[1.1cqw]", textTheme.muted)}
+			className={cn(
+				"flex items-end justify-between gap-[2cqw] text-[1.1cqw]",
+				textTheme.muted,
+			)}
 		>
 			<span className="flex flex-wrap gap-[0.8cqw]">
 				{cited.map((source) => (
@@ -799,7 +855,11 @@ export function CardView({
 				aria-label={`Card ${position}: ${card.takeaway}`}
 				className={cn(
 					"relative flex h-[56.25cqw] w-full overflow-hidden rounded-[1.2cqw]",
-					split ? (card.layout === "image-right" ? "flex-row-reverse" : "flex-row") : "flex-col",
+					split
+						? card.layout === "image-right"
+							? "flex-row-reverse"
+							: "flex-row"
+						: "flex-col",
 					!split && "px-[6cqw] pt-[5cqw] pb-[2.2cqw]",
 					theme.surface,
 				)}

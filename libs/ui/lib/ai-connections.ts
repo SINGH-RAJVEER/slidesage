@@ -47,5 +47,8 @@ export function selectAIModel(selection: AIModelSelection): Promise<void> {
 
 export function setAIConnectionEnabled(provider: AIProvider, enabled: boolean): Promise<void> {
 	const body: UpdateAIConnectionEnabledRequest = { enabled };
-	return request(`/connections/${provider}/enabled`, { method: "PUT", body: JSON.stringify(body) });
+	return request(`/connections/${provider}/enabled`, {
+		method: "PUT",
+		body: JSON.stringify(body),
+	});
 }

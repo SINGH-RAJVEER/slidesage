@@ -46,7 +46,9 @@ export async function fetchSessionWithRetry(
 
 			if (response.ok) {
 				const contentType = response.headers.get("content-type") || "";
-				const data = contentType.includes("application/json") ? await response.json() : null;
+				const data = contentType.includes("application/json")
+					? await response.json()
+					: null;
 				return data?.user || null;
 			}
 

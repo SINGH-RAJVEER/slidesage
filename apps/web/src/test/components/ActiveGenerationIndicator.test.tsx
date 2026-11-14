@@ -29,7 +29,9 @@ function Starter() {
 
 it("is hidden while no generation runs", () => {
 	const originalFetch = globalThis.fetch;
-	globalThis.fetch = mock(async () => new Response("", { status: 200 })) as unknown as typeof fetch;
+	globalThis.fetch = mock(
+		async () => new Response("", { status: 200 }),
+	) as unknown as typeof fetch;
 	try {
 		const onOpen = mock(() => {});
 		const view = render(

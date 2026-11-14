@@ -1,4 +1,4 @@
-import { CARD_TEMPLATES, type Card, type SampleAsset, type ThemeId } from "@slidesage/cards";
+import { type Card, CARD_TEMPLATES, type SampleAsset, type ThemeId } from "@slidesage/cards";
 
 /** Real template slides, rendered by the same component as saved presentations. */
 export interface LandingPlate {
