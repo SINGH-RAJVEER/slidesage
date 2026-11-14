@@ -3,7 +3,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"type-check": "tsc --noEmit",
+		"type-check": "bun check --no-script",
 		"test": "bun test",
 		"check": "bun run type-check && wrangler deploy --dry-run",
 		"deploy": "wrangler deploy",
